@@ -303,7 +303,8 @@ async function scanLabels() {
 
         const result = await response.json();
         populateFormFromScan(result);
-        showToast('Label scanned successfully', 'success');
+        const methodName = result.method === 'claude_vision' ? 'Claude Vision' : 'Tesseract OCR';
+        showToast(`Label scanned with ${methodName}`, 'success');
     } catch (error) {
         showToast(`Scan failed: ${error.message}`, 'error');
     } finally {
@@ -339,14 +340,19 @@ function populateFormFromScan(result) {
     }
 
     // Populate raw label text section
-    populateRawLabelText(result.ocr);
+    populateRawLabelText(result.ocr, result.method);
 }
 
-function populateRawLabelText(ocr) {
+function populateRawLabelText(ocr, method) {
     const section = document.getElementById('label-text-section');
     const frontText = document.getElementById('raw-front-label-text');
     const backSection = document.getElementById('raw-back-label-section');
     const backText = document.getElementById('raw-back-label-text');
+    const header = section.querySelector('h3');
+
+    // Update header to show scan method
+    const methodName = method === 'claude_vision' ? 'Claude Vision' : 'Tesseract OCR';
+    header.innerHTML = `Raw Label Text <span class="scan-method-badge">${methodName}</span>`;
 
     if (ocr.front_label_text) {
         frontText.textContent = ocr.front_label_text;
