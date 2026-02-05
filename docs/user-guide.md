@@ -41,6 +41,11 @@ The check-in process adds bottles to your cellar inventory.
 6. **Add notes** (optional):
    - Where you purchased it, price, occasion, etc.
 7. Click **Check In Wine**
+8. **Review in confirmation dialog**:
+   - A confirmation dialog appears with all editable fields
+   - Make any final adjustments to wine details
+   - View raw label text by expanding the "Raw Label Text" section
+   - Click **Confirm** to save or **Cancel** to return to the form
 
 ### Using the API
 
@@ -178,3 +183,56 @@ Your data is stored in:
 - **Images**: `data/images/`
 
 Back up these files regularly to preserve your cellar records.
+
+## Development
+
+### Running Tests
+
+WineBox has both unit tests and end-to-end (E2E) browser tests.
+
+```bash
+# Run all tests (unit + E2E)
+invoke test
+
+# Run only unit tests (fast, no server required)
+invoke test-unit
+
+# Run only E2E tests (requires running server)
+invoke test-e2e
+
+# Run E2E tests with more workers for faster execution
+invoke test-e2e --workers 8
+```
+
+**Note**: E2E tests use Playwright for browser automation and create unique test users for parallel execution. The server must be running (`invoke start-background`) before running E2E tests.
+
+### Invoke Tasks
+
+Common development tasks:
+
+```bash
+# Server management
+invoke start              # Start server in foreground
+invoke start-background   # Start server in background
+invoke stop               # Stop the server
+invoke restart            # Restart the server
+invoke status             # Check server status
+invoke logs               # View server logs
+
+# Database management
+invoke init-db            # Initialize database
+invoke purge --force      # Delete database and images
+invoke purge-wines --force # Delete wines but keep users
+
+# User management
+invoke add-user <username> --password <pass>
+invoke remove-user <username> --force
+invoke list-users
+invoke disable-user <username>
+invoke enable-user <username>
+invoke passwd <username> --password <newpass>
+
+# Documentation
+invoke docs-build         # Build Sphinx documentation
+invoke docs-serve         # Build and serve docs locally
+```

@@ -37,30 +37,47 @@ class ClaudeVisionService:
 
     def __init__(self) -> None:
         """Initialize the Claude Vision service."""
-        self._client = None
+        self._default_client = None
+
+    def _get_system_api_key(self) -> str | None:
+        """Get the system-wide API key from settings or environment."""
+        return settings.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+
+    def _get_client(self, user_api_key: str | None = None):
+        """Get an Anthropic client, using user key if provided, else system key."""
+        try:
+            import anthropic
+
+            # Use user's API key if provided, otherwise use system key
+            api_key = user_api_key or self._get_system_api_key()
+            if not api_key:
+                raise ValueError("No Anthropic API key configured")
+
+            # If using system key, cache the client
+            if not user_api_key:
+                if self._default_client is None:
+                    self._default_client = anthropic.Anthropic(api_key=api_key)
+                return self._default_client
+
+            # Create a new client for user-specific key
+            return anthropic.Anthropic(api_key=api_key)
+        except ImportError:
+            logger.error("anthropic package is not installed")
+            raise
 
     @property
     def client(self):
-        """Lazy-load the Anthropic client."""
-        if self._client is None:
-            try:
-                import anthropic
+        """Lazy-load the default Anthropic client (for backward compatibility)."""
+        return self._get_client()
 
-                # Check for API key in settings or environment
-                api_key = settings.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
-                if not api_key:
-                    raise ValueError("No Anthropic API key configured")
+    def is_available(self, user_api_key: str | None = None) -> bool:
+        """Check if Claude Vision is available.
 
-                self._client = anthropic.Anthropic(api_key=api_key)
-            except ImportError:
-                logger.error("anthropic package is not installed")
-                raise
-        return self._client
-
-    def is_available(self) -> bool:
-        """Check if Claude Vision is available."""
+        Args:
+            user_api_key: Optional user-specific API key to check.
+        """
         try:
-            api_key = settings.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+            api_key = user_api_key or self._get_system_api_key()
             return bool(api_key) and settings.use_claude_vision
         except Exception:
             return False
@@ -68,13 +85,15 @@ class ClaudeVisionService:
     async def analyze_label(
         self,
         image_data: bytes,
-        media_type: str = "image/jpeg"
+        media_type: str = "image/jpeg",
+        user_api_key: str | None = None,
     ) -> dict[str, Any]:
         """Analyze a wine label image using Claude Vision.
 
         Args:
             image_data: Raw image data as bytes.
             media_type: MIME type of the image (image/jpeg, image/png, etc.)
+            user_api_key: Optional user-specific API key.
 
         Returns:
             Dictionary with parsed wine information.
@@ -83,8 +102,11 @@ class ClaudeVisionService:
             # Encode image to base64
             image_base64 = base64.standard_b64encode(image_data).decode("utf-8")
 
+            # Get client (uses user key if provided, else system key)
+            client = self._get_client(user_api_key)
+
             # Call Claude API with vision
-            message = self.client.messages.create(
+            message = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=1024,
                 messages=[
@@ -146,6 +168,7 @@ class ClaudeVisionService:
         back_image_data: bytes | None = None,
         front_media_type: str = "image/jpeg",
         back_media_type: str = "image/jpeg",
+        user_api_key: str | None = None,
     ) -> dict[str, Any]:
         """Analyze front and back wine label images.
 
@@ -154,11 +177,15 @@ class ClaudeVisionService:
             back_image_data: Optional back label image data.
             front_media_type: MIME type of front image.
             back_media_type: MIME type of back image.
+            user_api_key: Optional user-specific API key.
 
         Returns:
             Combined analysis results.
         """
         try:
+            # Get client (uses user key if provided, else system key)
+            client = self._get_client(user_api_key)
+
             # Build message content with images
             content = [
                 {
@@ -199,7 +226,7 @@ class ClaudeVisionService:
                 ])
 
             # Call Claude API
-            message = self.client.messages.create(
+            message = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=1024,
                 messages=[{"role": "user", "content": content}],

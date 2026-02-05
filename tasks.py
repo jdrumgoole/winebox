@@ -88,20 +88,73 @@ def logs(ctx: Context, follow: bool = False, lines: int = 50) -> None:
 
 
 @task
-def test(ctx: Context, verbose: bool = False, coverage: bool = False) -> None:
-    """Run the test suite.
+def test(ctx: Context, verbose: bool = False, coverage: bool = False, no_purge: bool = False) -> None:
+    """Run the full test suite (unit tests + E2E tests).
+
+    Args:
+        ctx: Invoke context
+        verbose: Enable verbose output
+        coverage: Run with coverage report
+        no_purge: Skip purging test data after E2E tests (default: False)
+    """
+    # Run unit tests first (no parallel due to async issues)
+    print("Running unit tests...")
+    cmd = "uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py"
+    if verbose:
+        cmd += " -v"
+    if coverage:
+        cmd += " --cov=winebox --cov-report=term-missing"
+    ctx.run(cmd, pty=True)
+
+    # Run E2E tests with parallel execution
+    print("\nRunning E2E tests...")
+    e2e_cmd = "uv run python -m pytest tests/test_checkin_e2e.py -n 4"
+    if verbose:
+        e2e_cmd += " -v"
+    ctx.run(e2e_cmd, pty=True)
+
+    # Purge test data after E2E tests
+    if not no_purge:
+        print("\nPurging test data...")
+        purge_wines(ctx, include_images=True, force=True)
+
+
+@task(name="test-unit")
+def test_unit(ctx: Context, verbose: bool = False, coverage: bool = False) -> None:
+    """Run unit tests only (faster, no server required).
 
     Args:
         ctx: Invoke context
         verbose: Enable verbose output
         coverage: Run with coverage report
     """
-    cmd = "uv run pytest"
+    cmd = "uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py"
     if verbose:
         cmd += " -v"
     if coverage:
         cmd += " --cov=winebox --cov-report=term-missing"
     ctx.run(cmd, pty=True)
+
+
+@task(name="test-e2e")
+def test_e2e(ctx: Context, verbose: bool = False, workers: int = 4, no_purge: bool = False) -> None:
+    """Run E2E tests only (requires running server).
+
+    Args:
+        ctx: Invoke context
+        verbose: Enable verbose output
+        workers: Number of parallel workers (default: 4)
+        no_purge: Skip purging test data after tests (default: False)
+    """
+    cmd = f"uv run python -m pytest tests/test_checkin_e2e.py -n {workers}"
+    if verbose:
+        cmd += " -v"
+    ctx.run(cmd, pty=True)
+
+    # Purge test data after E2E tests
+    if not no_purge:
+        print("\nPurging test data...")
+        purge_wines(ctx, include_images=True, force=True)
 
 
 @task(name="init-db")

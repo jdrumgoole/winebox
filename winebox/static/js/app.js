@@ -43,11 +43,21 @@ function initAuth() {
     // Logout button
     document.getElementById('logout-btn').addEventListener('click', handleLogout);
 
-    // Password toggle
-    const passwordToggle = document.querySelector('.password-toggle');
-    if (passwordToggle) {
-        passwordToggle.addEventListener('click', function() {
-            const passwordInput = document.getElementById('login-password');
+    // Username link to settings
+    document.getElementById('username-display').addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateTo('settings');
+    });
+
+    // Password toggle for all password fields
+    initPasswordToggles();
+}
+
+function initPasswordToggles() {
+    document.querySelectorAll('.password-toggle').forEach(toggle => {
+        toggle.addEventListener('click', function() {
+            const wrapper = this.closest('.password-input-wrapper');
+            const passwordInput = wrapper.querySelector('input[type="password"], input[type="text"]');
             const eyeIcon = this.querySelector('.eye-icon');
             const eyeOffIcon = this.querySelector('.eye-off-icon');
 
@@ -63,7 +73,7 @@ function initAuth() {
                 this.setAttribute('aria-label', 'Show password');
             }
         });
-    }
+    });
 }
 
 async function checkAuth() {
@@ -96,7 +106,9 @@ function showMainApp() {
     document.body.classList.remove('logged-out');
     document.getElementById('page-login').classList.remove('active');
     document.getElementById('user-info').style.display = 'flex';
-    document.getElementById('username-display').textContent = currentUser.username;
+    // Display full name if available, otherwise username
+    const displayName = currentUser.full_name || currentUser.username;
+    document.getElementById('username-display').textContent = displayName;
     loadDashboard();
 }
 
@@ -204,6 +216,9 @@ function navigateTo(page) {
         case 'search':
             // Search results loaded on form submit
             break;
+        case 'settings':
+            loadSettings();
+            break;
     }
 }
 
@@ -273,6 +288,12 @@ function initForms() {
 
     // History filter
     document.getElementById('history-filter').addEventListener('change', loadHistory);
+
+    // Settings forms
+    document.getElementById('profile-form').addEventListener('submit', handleProfileUpdate);
+    document.getElementById('password-form').addEventListener('submit', handlePasswordChange);
+    document.getElementById('api-key-form').addEventListener('submit', handleApiKeyUpdate);
+    document.getElementById('delete-api-key-btn').addEventListener('click', handleApiKeyDelete);
 }
 
 function previewImage(input, previewId) {
@@ -1086,4 +1107,172 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
+}
+
+// Settings
+function loadSettings() {
+    // Populate profile form with current user data
+    document.getElementById('settings-username').value = currentUser.username;
+    document.getElementById('settings-fullname').value = currentUser.full_name || '';
+
+    // Update API key status
+    updateApiKeyStatus(currentUser.has_api_key);
+
+    // Clear password form
+    document.getElementById('password-form').reset();
+
+    // Clear API key form
+    document.getElementById('api-key').value = '';
+}
+
+function updateApiKeyStatus(hasApiKey) {
+    const statusDiv = document.getElementById('api-key-status');
+    const statusText = statusDiv.querySelector('.status-text');
+    const deleteBtn = document.getElementById('delete-api-key-btn');
+
+    statusDiv.classList.remove('configured', 'not-configured');
+
+    if (hasApiKey) {
+        statusDiv.classList.add('configured');
+        statusText.textContent = 'API key is configured';
+        deleteBtn.style.display = 'inline-block';
+    } else {
+        statusDiv.classList.add('not-configured');
+        statusText.textContent = 'No API key configured';
+        deleteBtn.style.display = 'none';
+    }
+}
+
+async function handleProfileUpdate(e) {
+    e.preventDefault();
+
+    const fullName = document.getElementById('settings-fullname').value.trim();
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/auth/profile`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ full_name: fullName || null })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to update profile');
+        }
+
+        const updatedUser = await response.json();
+        currentUser = updatedUser;
+
+        // Update display name in header
+        const displayName = currentUser.full_name || currentUser.username;
+        document.getElementById('username-display').textContent = displayName;
+
+        showToast('Profile updated successfully', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function handlePasswordChange(e) {
+    e.preventDefault();
+
+    const currentPassword = document.getElementById('current-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+
+    if (newPassword !== confirmPassword) {
+        showToast('New passwords do not match', 'error');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/auth/password`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                current_password: currentPassword,
+                new_password: newPassword
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to change password');
+        }
+
+        document.getElementById('password-form').reset();
+        showToast('Password changed successfully', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function handleApiKeyUpdate(e) {
+    e.preventDefault();
+
+    const apiKey = document.getElementById('api-key').value.trim();
+
+    if (!apiKey) {
+        showToast('Please enter an API key', 'error');
+        return;
+    }
+
+    if (!apiKey.startsWith('sk-ant-')) {
+        showToast('Invalid API key format. Anthropic API keys start with sk-ant-', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/auth/api-key`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ api_key: apiKey })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to update API key');
+        }
+
+        currentUser.has_api_key = true;
+        updateApiKeyStatus(true);
+        document.getElementById('api-key').value = '';
+        showToast('API key saved successfully', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function handleApiKeyDelete() {
+    if (!confirm('Are you sure you want to delete your API key? Wine label scanning will use the default system key if available.')) {
+        return;
+    }
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/auth/api-key`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete API key');
+        }
+
+        currentUser.has_api_key = false;
+        updateApiKeyStatus(false);
+        showToast('API key deleted successfully', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
 }

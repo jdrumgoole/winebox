@@ -5,10 +5,14 @@ These tests require a running WineBox server. Start the server with:
 
 Note: These tests use real wine label images and will call the configured
 OCR/Vision API if WINEBOX_ANTHROPIC_API_KEY is set.
+
+For parallel execution, run with: pytest -n auto tests/test_checkin_e2e.py
+Each worker gets its own test user to avoid conflicts.
 """
 
 import os
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -20,28 +24,83 @@ TEST_DATA_DIR = Path(__file__).parent / "data" / "wine_labels"
 # Server URL - can be overridden with WINEBOX_TEST_URL env var
 BASE_URL = os.environ.get("WINEBOX_TEST_URL", "http://localhost:8000")
 
-# Test credentials
-TEST_USERNAME = os.environ.get("WINEBOX_TEST_USERNAME", "brian")
-TEST_PASSWORD = os.environ.get("WINEBOX_TEST_PASSWORD", "brian")
+
+def get_worker_id(request: pytest.FixtureRequest) -> str:
+    """Get the pytest-xdist worker ID, or 'main' if not running in parallel."""
+    if hasattr(request.config, "workerinput"):
+        return request.config.workerinput["workerid"]
+    return "main"
+
+
+@pytest.fixture(scope="session")
+def base_url() -> str:
+    """Return the base URL for the test server."""
+    return BASE_URL
 
 
 @pytest.fixture(scope="function")
-def authenticated_page(page: Page) -> Page:
-    """Log in and return an authenticated page."""
+def test_user(request: pytest.FixtureRequest) -> tuple[str, str]:
+    """Create a unique test user for this test function.
+
+    Returns (username, password) tuple.
+    Uses worker ID + test name to create unique users for parallel execution.
+    """
+    import time
+
+    worker_id = get_worker_id(request)
+    # Create a unique username based on worker and test name
+    test_name = request.node.name.replace("[", "_").replace("]", "_").replace("-", "_")
+    # Keep it short but unique
+    username = f"e2e_{worker_id}_{hash(test_name) % 10000:04d}"
+    password = "testpass123"
+
+    # Create the user via CLI (ignore errors if user exists)
+    project_dir = Path(__file__).parent.parent
+    try:
+        result = subprocess.run(
+            ["uv", "run", "winebox-admin", "add", username, "--password", password],
+            cwd=project_dir,
+            capture_output=True,
+            timeout=30,
+        )
+        # Small delay to ensure database commits the user
+        time.sleep(0.5)
+    except subprocess.TimeoutExpired:
+        pass
+
+    yield username, password
+
+    # Cleanup: remove the test user after the test
+    try:
+        subprocess.run(
+            ["uv", "run", "winebox-admin", "remove", username, "--force"],
+            cwd=project_dir,
+            capture_output=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        pass
+
+
+@pytest.fixture(scope="function")
+def authenticated_page(page: Page, test_user: tuple[str, str]) -> Page:
+    """Log in and return an authenticated page with a unique test user."""
+    username, password = test_user
+
     page.goto(BASE_URL)
 
     # Wait for login form
     page.wait_for_selector("#login-form", state="visible")
 
-    # Fill in credentials
-    page.fill("#username", TEST_USERNAME)
-    page.fill("#password", TEST_PASSWORD)
+    # Fill in credentials (correct IDs from index.html)
+    page.fill("#login-username", username)
+    page.fill("#login-password", password)
 
     # Click login
     page.click("#login-form button[type='submit']")
 
-    # Wait for navigation to cellar view (login successful)
-    page.wait_for_selector("#cellar-view", state="visible", timeout=10000)
+    # Wait for main content to become visible (login successful)
+    page.wait_for_selector("#main-content", state="visible", timeout=10000)
 
     return page
 
@@ -64,30 +123,32 @@ def wine_images() -> list[Path]:
 class TestCheckinFlow:
     """Test the complete wine checkin flow."""
 
-    def test_login(self, page: Page) -> None:
+    def test_login(self, page: Page, test_user: tuple[str, str]) -> None:
         """Test that login works correctly."""
+        username, password = test_user
+
         page.goto(BASE_URL)
 
         # Should see login form
         expect(page.locator("#login-form")).to_be_visible()
 
         # Fill credentials
-        page.fill("#username", TEST_USERNAME)
-        page.fill("#password", TEST_PASSWORD)
+        page.fill("#login-username", username)
+        page.fill("#login-password", password)
         page.click("#login-form button[type='submit']")
 
-        # Should navigate to cellar view
-        expect(page.locator("#cellar-view")).to_be_visible(timeout=10000)
+        # Should show main content after login
+        expect(page.locator("#main-content")).to_be_visible(timeout=10000)
 
     def test_navigate_to_checkin(self, authenticated_page: Page) -> None:
         """Test navigating to the checkin page."""
         page = authenticated_page
 
-        # Click Check In nav link
-        page.click("nav a[href='#checkin']")
+        # Click Check In nav link (uses data-page attribute)
+        page.click("a[data-page='checkin']")
 
-        # Should show checkin view
-        expect(page.locator("#checkin-view")).to_be_visible()
+        # Should show checkin page
+        expect(page.locator("#page-checkin")).to_be_visible()
         expect(page.locator("#front-label")).to_be_visible()
 
     def test_upload_image_triggers_scan(self, authenticated_page: Page, wine_images: list[Path]) -> None:
@@ -95,8 +156,8 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin
-        page.click("nav a[href='#checkin']")
-        page.wait_for_selector("#checkin-view", state="visible")
+        page.click("a[data-page='checkin']")
+        page.wait_for_selector("#page-checkin", state="visible")
 
         # Upload first wine image
         image_path = wine_images[0]
@@ -114,8 +175,8 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin
-        page.click("nav a[href='#checkin']")
-        page.wait_for_selector("#checkin-view", state="visible")
+        page.click("a[data-page='checkin']")
+        page.wait_for_selector("#page-checkin", state="visible")
 
         # Upload image
         image_path = wine_images[0]
@@ -144,8 +205,8 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin
-        page.click("nav a[href='#checkin']")
-        page.wait_for_selector("#checkin-view", state="visible")
+        page.click("a[data-page='checkin']")
+        page.wait_for_selector("#page-checkin", state="visible")
 
         # Upload image
         image_path = wine_images[0]
@@ -165,8 +226,8 @@ class TestCheckinFlow:
         # Dialog should close
         expect(page.locator("#checkin-confirm-modal")).not_to_have_class(re.compile(r"active"))
 
-        # Should still be on checkin view
-        expect(page.locator("#checkin-view")).to_be_visible()
+        # Should still be on checkin page
+        expect(page.locator("#page-checkin")).to_be_visible()
 
     def test_confirm_saves_wine_to_database(
         self, authenticated_page: Page, wine_images: list[Path]
@@ -175,8 +236,8 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin
-        page.click("nav a[href='#checkin']")
-        page.wait_for_selector("#checkin-view", state="visible")
+        page.click("a[data-page='checkin']")
+        page.wait_for_selector("#page-checkin", state="visible")
 
         # Upload image
         image_path = wine_images[0]
@@ -196,12 +257,12 @@ class TestCheckinFlow:
         # Click Confirm
         page.click("#checkin-confirm-btn")
 
-        # Should show success message and navigate to cellar
-        page.wait_for_selector("#cellar-view", state="visible", timeout=10000)
+        # Should show cellar page after successful checkin
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
 
         # The wine should now appear in the cellar
-        # Look for the wine we just added
-        expect(page.locator(".wine-card")).to_be_visible(timeout=5000)
+        # Look for at least one wine card (use .first to avoid strict mode error)
+        expect(page.locator(".wine-card").first).to_be_visible(timeout=5000)
 
     def test_confirmation_dialog_has_editable_fields(
         self, authenticated_page: Page, wine_images: list[Path]
@@ -210,8 +271,8 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin
-        page.click("nav a[href='#checkin']")
-        page.wait_for_selector("#checkin-view", state="visible")
+        page.click("a[data-page='checkin']")
+        page.wait_for_selector("#page-checkin", state="visible")
 
         # Upload image
         image_path = wine_images[0]
@@ -237,7 +298,7 @@ class TestCheckinFlow:
         page.click("#checkin-confirm-btn")
 
         # Wait for save and navigation
-        page.wait_for_selector("#cellar-view", state="visible", timeout=10000)
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
 
 
 class TestWineImageUploads:
@@ -258,8 +319,8 @@ class TestWineImageUploads:
         page = authenticated_page
 
         # Navigate to checkin
-        page.click("nav a[href='#checkin']")
-        page.wait_for_selector("#checkin-view", state="visible")
+        page.click("a[data-page='checkin']")
+        page.wait_for_selector("#page-checkin", state="visible")
 
         # Upload the image
         page.set_input_files("#front-label", str(image_path))
