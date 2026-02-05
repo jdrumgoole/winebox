@@ -19,9 +19,15 @@ A wine cellar management application with OCR label scanning.
 
 ### Installation
 
+**From PyPI:**
+```bash
+pip install winebox
+```
+
+**From source:**
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/jdrumgoole/winebox.git
 cd winebox
 
 # Install dependencies
