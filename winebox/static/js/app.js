@@ -424,19 +424,142 @@ function showScanningIndicator(show) {
     }
 }
 
-async function handleCheckin(e) {
+// Store pending checkin data for confirmation
+let pendingCheckinData = null;
+
+function handleCheckin(e) {
     e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
+
+    const frontLabel = document.getElementById('front-label');
+    if (!frontLabel.files || !frontLabel.files[0]) {
+        showToast('Please select a front label image', 'error');
+        return;
+    }
+
+    // Store the form data for later submission
+    pendingCheckinData = {
+        frontLabel: frontLabel.files[0],
+        backLabel: document.getElementById('back-label').files?.[0] || null,
+        name: document.getElementById('wine-name').value,
+        winery: document.getElementById('winery').value,
+        vintage: document.getElementById('vintage').value,
+        grapeVariety: document.getElementById('grape-variety').value,
+        region: document.getElementById('region').value,
+        country: document.getElementById('country').value,
+        alcohol: document.getElementById('alcohol').value,
+        quantity: document.getElementById('quantity').value || '1',
+        notes: document.getElementById('notes').value,
+        frontLabelText: lastScanResult?.ocr?.front_label_text || '',
+        backLabelText: lastScanResult?.ocr?.back_label_text || ''
+    };
+
+    // Show the confirmation modal with editable fields
+    showCheckinConfirmation();
+}
+
+function showCheckinConfirmation() {
+    const modal = document.getElementById('checkin-confirm-modal');
+    const data = pendingCheckinData;
+
+    // Set image preview
+    const imageContainer = document.getElementById('checkin-confirm-image');
+    if (data.frontLabel) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            imageContainer.innerHTML = `<img src="${e.target.result}" alt="Wine label">`;
+        };
+        reader.readAsDataURL(data.frontLabel);
+    } else {
+        imageContainer.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">No image</div>';
+    }
+
+    // Populate editable fields
+    document.getElementById('confirm-wine-name').value = data.name || '';
+    document.getElementById('confirm-winery').value = data.winery || '';
+    document.getElementById('confirm-vintage').value = data.vintage || '';
+    document.getElementById('confirm-grape-variety').value = data.grapeVariety || '';
+    document.getElementById('confirm-region').value = data.region || '';
+    document.getElementById('confirm-country').value = data.country || '';
+    document.getElementById('confirm-alcohol').value = data.alcohol || '';
+    document.getElementById('confirm-quantity').value = data.quantity || '1';
+    document.getElementById('confirm-notes').value = data.notes || '';
+
+    // Set OCR text (hidden by default)
+    const ocrSection = document.getElementById('confirm-ocr-section');
+    const ocrContent = document.getElementById('confirm-ocr-content');
+    const ocrToggle = document.getElementById('confirm-ocr-toggle');
+
+    if (data.frontLabelText) {
+        document.getElementById('checkin-confirm-front-ocr').textContent = data.frontLabelText;
+        ocrSection.style.display = 'block';
+        ocrContent.style.display = 'none';  // Hidden by default
+        ocrSection.classList.remove('open');
+        ocrToggle.querySelector('.collapse-icon').textContent = '+';
+        ocrToggle.querySelector('.label').textContent = 'Show Raw Label Text';
+    } else {
+        ocrSection.style.display = 'none';
+    }
+
+    const backOcrSection = document.getElementById('checkin-confirm-back-ocr-section');
+    if (data.backLabelText) {
+        backOcrSection.style.display = 'block';
+        document.getElementById('checkin-confirm-back-ocr').textContent = data.backLabelText;
+    } else {
+        backOcrSection.style.display = 'none';
+    }
+
+    // Show modal
+    modal.classList.add('active');
+
+    // Set up OCR toggle
+    ocrToggle.onclick = () => {
+        ocrSection.classList.toggle('open');
+        if (ocrSection.classList.contains('open')) {
+            ocrContent.style.display = 'block';
+            ocrToggle.querySelector('.collapse-icon').textContent = '-';
+            ocrToggle.querySelector('.label').textContent = 'Hide Raw Label Text';
+        } else {
+            ocrContent.style.display = 'none';
+            ocrToggle.querySelector('.collapse-icon').textContent = '+';
+            ocrToggle.querySelector('.label').textContent = 'Show Raw Label Text';
+        }
+    };
+
+    // Set up button handlers
+    document.getElementById('checkin-confirm-btn').onclick = submitCheckin;
+    document.getElementById('checkin-cancel-btn').onclick = cancelCheckin;
+}
+
+async function submitCheckin() {
+    const modal = document.getElementById('checkin-confirm-modal');
+    const data = pendingCheckinData;
+
+    // Build form data from confirmation modal fields
+    const formData = new FormData();
+    formData.append('front_label', data.frontLabel);
+    if (data.backLabel) {
+        formData.append('back_label', data.backLabel);
+    }
+
+    // Get values from confirmation modal (may have been edited)
+    formData.append('name', document.getElementById('confirm-wine-name').value);
+    formData.append('winery', document.getElementById('confirm-winery').value);
+    const vintage = document.getElementById('confirm-vintage').value;
+    if (vintage) formData.append('vintage', vintage);
+    formData.append('grape_variety', document.getElementById('confirm-grape-variety').value);
+    formData.append('region', document.getElementById('confirm-region').value);
+    formData.append('country', document.getElementById('confirm-country').value);
+    const alcohol = document.getElementById('confirm-alcohol').value;
+    if (alcohol) formData.append('alcohol_percentage', alcohol);
+    formData.append('quantity', document.getElementById('confirm-quantity').value || '1');
+    formData.append('notes', document.getElementById('confirm-notes').value);
 
     // Include pre-scanned OCR text to avoid rescanning (saves API costs)
-    if (lastScanResult && lastScanResult.ocr) {
-        if (lastScanResult.ocr.front_label_text) {
-            formData.append('front_label_text', lastScanResult.ocr.front_label_text);
-        }
-        if (lastScanResult.ocr.back_label_text) {
-            formData.append('back_label_text', lastScanResult.ocr.back_label_text);
-        }
+    if (data.frontLabelText) {
+        formData.append('front_label_text', data.frontLabelText);
+    }
+    if (data.backLabelText) {
+        formData.append('back_label_text', data.backLabelText);
     }
 
     try {
@@ -451,73 +574,28 @@ async function handleCheckin(e) {
         }
 
         const wine = await response.json();
-        showCheckinConfirmation(wine);
-        form.reset();
-        lastScanResult = null;  // Clear stored scan result
+        showToast(`Successfully checked in: ${wine.name}`, 'success');
+
+        // Close modal and reset form
+        modal.classList.remove('active');
+        document.getElementById('checkin-form').reset();
+        document.getElementById('front-preview').innerHTML = 'Tap to take photo or select image';
+        document.getElementById('back-preview').innerHTML = 'Tap to take photo or select image';
+        clearRawLabelText();
+        lastScanResult = null;
+        pendingCheckinData = null;
+
+        // Navigate to cellar
+        navigateTo('cellar');
     } catch (error) {
         showToast(error.message, 'error');
     }
 }
 
-function showCheckinConfirmation(wine) {
+function cancelCheckin() {
     const modal = document.getElementById('checkin-confirm-modal');
-
-    // Set wine name
-    document.getElementById('checkin-confirm-name').textContent = wine.name;
-
-    // Set image
-    const imageContainer = document.getElementById('checkin-confirm-image');
-    if (wine.front_label_image_path) {
-        imageContainer.innerHTML = `<img src="${API_BASE}/images/${wine.front_label_image_path}" alt="Wine label">`;
-    } else {
-        imageContainer.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">No image</div>';
-    }
-
-    // Set parsed fields
-    const fieldsContainer = document.getElementById('checkin-confirm-fields');
-    const fields = [
-        { label: 'Winery', value: wine.winery },
-        { label: 'Vintage', value: wine.vintage },
-        { label: 'Grape Variety', value: wine.grape_variety },
-        { label: 'Region', value: wine.region },
-        { label: 'Country', value: wine.country },
-        { label: 'Alcohol %', value: wine.alcohol_percentage ? `${wine.alcohol_percentage}%` : null },
-        { label: 'Quantity', value: wine.inventory?.quantity || 1 }
-    ];
-
-    fieldsContainer.innerHTML = fields.map(field => `
-        <div class="checkin-confirm-field">
-            <div class="label">${field.label}</div>
-            <div class="value ${field.value ? '' : 'empty'}">${field.value || 'Not detected'}</div>
-        </div>
-    `).join('');
-
-    // Set OCR text
-    document.getElementById('checkin-confirm-front-ocr').textContent = wine.front_label_text || 'No text extracted';
-
-    const backOcrSection = document.getElementById('checkin-confirm-back-ocr-section');
-    if (wine.back_label_text) {
-        backOcrSection.style.display = 'block';
-        document.getElementById('checkin-confirm-back-ocr').textContent = wine.back_label_text;
-    } else {
-        backOcrSection.style.display = 'none';
-    }
-
-    // Show modal
-    modal.classList.add('active');
-
-    // Set up button handlers
-    document.getElementById('checkin-confirm-done').onclick = () => {
-        modal.classList.remove('active');
-        navigateTo('cellar');
-    };
-
-    document.getElementById('checkin-confirm-another').onclick = () => {
-        modal.classList.remove('active');
-        // Reset form previews
-        document.getElementById('front-preview').innerHTML = 'Tap to take photo or select image';
-        document.getElementById('back-preview').innerHTML = 'Tap to take photo or select image';
-    };
+    modal.classList.remove('active');
+    // Keep the form data so user can make changes and try again
 }
 
 async function handleSearch(e) {

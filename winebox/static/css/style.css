@@ -555,6 +555,140 @@ h3 {
     max-width: 400px;
 }
 
+.modal-content.modal-large {
+    max-width: 900px;
+}
+
+/* Checkin Confirmation Modal */
+.checkin-confirm-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.checkin-confirm-header h3 {
+    color: var(--primary-color);
+    margin-bottom: 0.25rem;
+}
+
+.checkin-confirm-subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.checkin-confirm-content {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.checkin-confirm-image {
+    width: 200px;
+    height: 250px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    background: var(--background-color);
+}
+
+.checkin-confirm-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.checkin-confirm-form .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.checkin-confirm-form .form-group {
+    margin-bottom: 0;
+}
+
+.checkin-confirm-form .form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.checkin-confirm-form label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.checkin-confirm-form input,
+.checkin-confirm-form textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+}
+
+.checkin-confirm-form textarea {
+    resize: vertical;
+}
+
+.checkin-confirm-ocr {
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+}
+
+.checkin-confirm-ocr .collapsible-header {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--background-color);
+    border-radius: var(--radius);
+}
+
+.checkin-confirm-ocr .collapsible-header:hover {
+    background: #f0ede8;
+}
+
+.checkin-confirm-ocr .collapsible-content {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.checkin-confirm-ocr .ocr-text-container {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.checkin-confirm-ocr pre {
+    white-space: pre-wrap;
+    font-size: 0.85rem;
+    background: var(--background-color);
+    padding: 0.75rem;
+    border-radius: var(--radius);
+    margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .checkin-confirm-content {
+        grid-template-columns: 1fr;
+    }
+
+    .checkin-confirm-image {
+        width: 100%;
+        height: 200px;
+    }
+
+    .checkin-confirm-form .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-content.modal-large {
+        max-width: 100%;
+    }
+}
+
 .modal-close {
     position: absolute;
     top: 1rem;

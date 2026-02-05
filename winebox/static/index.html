@@ -297,36 +297,77 @@
 
     <!-- Checkin Confirmation Modal -->
     <div id="checkin-confirm-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content modal-large">
             <span class="modal-close">&times;</span>
             <div class="checkin-confirm">
                 <div class="checkin-confirm-header">
-                    <div class="checkin-confirm-icon">&#10003;</div>
-                    <h3>Wine Checked In Successfully</h3>
+                    <h3>Confirm Wine Details</h3>
+                    <p class="checkin-confirm-subtitle">Review and edit the details before saving</p>
                 </div>
                 <div class="checkin-confirm-content">
                     <div class="checkin-confirm-image" id="checkin-confirm-image"></div>
-                    <div class="checkin-confirm-details">
-                        <h4 id="checkin-confirm-name"></h4>
-                        <div class="checkin-confirm-fields" id="checkin-confirm-fields"></div>
+                    <div class="checkin-confirm-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="confirm-wine-name">Wine Name</label>
+                                <input type="text" id="confirm-wine-name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-winery">Winery</label>
+                                <input type="text" id="confirm-winery">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-vintage">Vintage</label>
+                                <input type="number" id="confirm-vintage" min="1900" max="2100">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-grape-variety">Grape Variety</label>
+                                <input type="text" id="confirm-grape-variety">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-region">Region</label>
+                                <input type="text" id="confirm-region">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-country">Country</label>
+                                <input type="text" id="confirm-country">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-alcohol">Alcohol %</label>
+                                <input type="number" id="confirm-alcohol" min="0" max="100" step="0.1">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-quantity">Quantity</label>
+                                <input type="number" id="confirm-quantity" min="1" value="1" required>
+                            </div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="confirm-notes">Notes</label>
+                            <textarea id="confirm-notes" rows="2"></textarea>
+                        </div>
                     </div>
                 </div>
-                <div class="checkin-confirm-ocr">
-                    <h5>Extracted Label Text</h5>
-                    <div class="ocr-text-container">
-                        <div class="ocr-section">
-                            <strong>Front Label:</strong>
-                            <pre id="checkin-confirm-front-ocr"></pre>
-                        </div>
-                        <div class="ocr-section" id="checkin-confirm-back-ocr-section" style="display: none;">
-                            <strong>Back Label:</strong>
-                            <pre id="checkin-confirm-back-ocr"></pre>
+                <div class="checkin-confirm-ocr collapsible" id="confirm-ocr-section" style="display: none;">
+                    <div class="collapsible-header" id="confirm-ocr-toggle">
+                        <span class="label">Show Raw Label Text</span>
+                        <span class="collapse-icon">+</span>
+                    </div>
+                    <div class="collapsible-content" id="confirm-ocr-content" style="display: none;">
+                        <div class="ocr-text-container">
+                            <div class="ocr-section">
+                                <strong>Front Label:</strong>
+                                <pre id="checkin-confirm-front-ocr"></pre>
+                            </div>
+                            <div class="ocr-section" id="checkin-confirm-back-ocr-section" style="display: none;">
+                                <strong>Back Label:</strong>
+                                <pre id="checkin-confirm-back-ocr"></pre>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-primary" id="checkin-confirm-done">Done</button>
-                    <button type="button" class="btn btn-secondary" id="checkin-confirm-another">Check In Another</button>
+                    <button type="button" class="btn btn-primary" id="checkin-confirm-btn">Confirm</button>
+                    <button type="button" class="btn btn-secondary" id="checkin-cancel-btn">Cancel</button>
                 </div>
             </div>
         </div>
