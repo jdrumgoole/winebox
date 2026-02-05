@@ -266,12 +266,72 @@ async function handleCheckin(e) {
         }
 
         const wine = await response.json();
-        showToast(`Successfully checked in: ${wine.name}`, 'success');
+        showCheckinConfirmation(wine);
         form.reset();
-        navigateTo('cellar');
     } catch (error) {
         showToast(error.message, 'error');
     }
+}
+
+function showCheckinConfirmation(wine) {
+    const modal = document.getElementById('checkin-confirm-modal');
+
+    // Set wine name
+    document.getElementById('checkin-confirm-name').textContent = wine.name;
+
+    // Set image
+    const imageContainer = document.getElementById('checkin-confirm-image');
+    if (wine.front_label_image_path) {
+        imageContainer.innerHTML = `<img src="${API_BASE}/images/${wine.front_label_image_path}" alt="Wine label">`;
+    } else {
+        imageContainer.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">No image</div>';
+    }
+
+    // Set parsed fields
+    const fieldsContainer = document.getElementById('checkin-confirm-fields');
+    const fields = [
+        { label: 'Winery', value: wine.winery },
+        { label: 'Vintage', value: wine.vintage },
+        { label: 'Grape Variety', value: wine.grape_variety },
+        { label: 'Region', value: wine.region },
+        { label: 'Country', value: wine.country },
+        { label: 'Alcohol %', value: wine.alcohol_percentage ? `${wine.alcohol_percentage}%` : null },
+        { label: 'Quantity', value: wine.inventory?.quantity || 1 }
+    ];
+
+    fieldsContainer.innerHTML = fields.map(field => `
+        <div class="checkin-confirm-field">
+            <div class="label">${field.label}</div>
+            <div class="value ${field.value ? '' : 'empty'}">${field.value || 'Not detected'}</div>
+        </div>
+    `).join('');
+
+    // Set OCR text
+    document.getElementById('checkin-confirm-front-ocr').textContent = wine.front_label_text || 'No text extracted';
+
+    const backOcrSection = document.getElementById('checkin-confirm-back-ocr-section');
+    if (wine.back_label_text) {
+        backOcrSection.style.display = 'block';
+        document.getElementById('checkin-confirm-back-ocr').textContent = wine.back_label_text;
+    } else {
+        backOcrSection.style.display = 'none';
+    }
+
+    // Show modal
+    modal.classList.add('active');
+
+    // Set up button handlers
+    document.getElementById('checkin-confirm-done').onclick = () => {
+        modal.classList.remove('active');
+        navigateTo('cellar');
+    };
+
+    document.getElementById('checkin-confirm-another').onclick = () => {
+        modal.classList.remove('active');
+        // Reset form previews
+        document.getElementById('front-preview').innerHTML = 'Tap to take photo or select image';
+        document.getElementById('back-preview').innerHTML = 'Tap to take photo or select image';
+    };
 }
 
 async function handleSearch(e) {

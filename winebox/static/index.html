@@ -276,6 +276,43 @@
         </div>
     </div>
 
+    <!-- Checkin Confirmation Modal -->
+    <div id="checkin-confirm-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div class="checkin-confirm">
+                <div class="checkin-confirm-header">
+                    <div class="checkin-confirm-icon">&#10003;</div>
+                    <h3>Wine Checked In Successfully</h3>
+                </div>
+                <div class="checkin-confirm-content">
+                    <div class="checkin-confirm-image" id="checkin-confirm-image"></div>
+                    <div class="checkin-confirm-details">
+                        <h4 id="checkin-confirm-name"></h4>
+                        <div class="checkin-confirm-fields" id="checkin-confirm-fields"></div>
+                    </div>
+                </div>
+                <div class="checkin-confirm-ocr">
+                    <h5>Extracted Label Text</h5>
+                    <div class="ocr-text-container">
+                        <div class="ocr-section">
+                            <strong>Front Label:</strong>
+                            <pre id="checkin-confirm-front-ocr"></pre>
+                        </div>
+                        <div class="ocr-section" id="checkin-confirm-back-ocr-section" style="display: none;">
+                            <strong>Back Label:</strong>
+                            <pre id="checkin-confirm-back-ocr"></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" id="checkin-confirm-done">Done</button>
+                    <button type="button" class="btn btn-secondary" id="checkin-confirm-another">Check In Another</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 

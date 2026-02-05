@@ -1119,3 +1119,151 @@ body.logged-out #user-info {
         content: '...';
     }
 }
+
+/* Checkin Confirmation Modal */
+.checkin-confirm {
+    text-align: center;
+}
+
+.checkin-confirm-header {
+    margin-bottom: 1.5rem;
+}
+
+.checkin-confirm-icon {
+    width: 60px;
+    height: 60px;
+    background: var(--success-color);
+    color: white;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.checkin-confirm-header h3 {
+    color: var(--success-color);
+    margin: 0;
+}
+
+.checkin-confirm-content {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.5rem;
+    text-align: left;
+    margin-bottom: 1.5rem;
+}
+
+.checkin-confirm-image {
+    width: 150px;
+    height: 200px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+}
+
+.checkin-confirm-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.checkin-confirm-details h4 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+}
+
+.checkin-confirm-fields {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.checkin-confirm-field {
+    background: var(--background-color);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+}
+
+.checkin-confirm-field .label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.checkin-confirm-field .value {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.checkin-confirm-field .value.empty {
+    color: var(--text-muted);
+    font-style: italic;
+    font-weight: normal;
+}
+
+.checkin-confirm-ocr {
+    text-align: left;
+    margin-bottom: 1.5rem;
+}
+
+.checkin-confirm-ocr h5 {
+    color: var(--text-color);
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.ocr-text-container {
+    background: var(--background-color);
+    border-radius: var(--radius);
+    padding: 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.ocr-section {
+    margin-bottom: 1rem;
+}
+
+.ocr-section:last-child {
+    margin-bottom: 0;
+}
+
+.ocr-section strong {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.ocr-section pre {
+    font-family: inherit;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    color: var(--text-color);
+}
+
+.checkin-confirm .form-actions {
+    justify-content: center;
+}
+
+@media (max-width: 600px) {
+    .checkin-confirm-content {
+        grid-template-columns: 1fr;
+    }
+
+    .checkin-confirm-image {
+        width: 100%;
+        height: 150px;
+    }
+
+    .checkin-confirm-fields {
+        grid-template-columns: 1fr;
+    }
+}
