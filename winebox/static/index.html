@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#722f37">
+    <title>WineBox - Wine Cellar Management</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>WineBox</h1>
+            <nav id="main-nav">
+                <a href="#" data-page="dashboard" class="nav-link active">Dashboard</a>
+                <a href="#" data-page="checkin" class="nav-link">Check In</a>
+                <a href="#" data-page="cellar" class="nav-link">Cellar</a>
+                <a href="#" data-page="history" class="nav-link">History</a>
+                <a href="#" data-page="search" class="nav-link">Search</a>
+            </nav>
+            <div id="user-info" class="user-info" style="display: none;">
+                <span id="username-display"></span>
+                <button id="logout-btn" class="btn btn-small btn-secondary">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Login Page -->
+    <section id="page-login" class="login-page">
+        <div class="login-container">
+            <div class="login-card">
+                <h2>Welcome to WineBox</h2>
+                <p class="login-subtitle">Sign in to manage your wine cellar</p>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-username">Username</label>
+                        <input type="text" id="login-username" name="username" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" name="password" required autocomplete="current-password">
+                    </div>
+                    <div id="login-error" class="login-error" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <main id="main-content">
+        <!-- Dashboard Page -->
+        <section id="page-dashboard" class="page active">
+            <h2>Dashboard</h2>
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-total-bottles">-</div>
+                    <div class="stat-label">Total Bottles</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-unique-wines">-</div>
+                    <div class="stat-label">Unique Wines</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-total-tracked">-</div>
+                    <div class="stat-label">Wines Tracked</div>
+                </div>
+            </div>
+
+            <div class="dashboard-sections">
+                <div class="dashboard-section">
+                    <h3>By Country</h3>
+                    <div id="by-country" class="chart-list"></div>
+                </div>
+                <div class="dashboard-section">
+                    <h3>By Grape Variety</h3>
+                    <div id="by-grape" class="chart-list"></div>
+                </div>
+                <div class="dashboard-section">
+                    <h3>By Vintage</h3>
+                    <div id="by-vintage" class="chart-list"></div>
+                </div>
+            </div>
+
+            <h3>Recent Activity</h3>
+            <div id="recent-activity" class="activity-list"></div>
+        </section>
+
+        <!-- Check In Page -->
+        <section id="page-checkin" class="page">
+            <h2>Check In Wine</h2>
+            <form id="checkin-form" enctype="multipart/form-data">
+                <div class="form-section">
+                    <h3>Label Images</h3>
+                    <div class="image-upload-grid">
+                        <div class="image-upload">
+                            <label for="front-label">Front Label (Required)</label>
+                            <input type="file" id="front-label" name="front_label" accept="image/*" capture="environment" required>
+                            <div id="front-preview" class="image-preview">Tap to take photo or select image</div>
+                        </div>
+                        <div class="image-upload">
+                            <label for="back-label">Back Label (Optional)</label>
+                            <input type="file" id="back-label" name="back_label" accept="image/*" capture="environment">
+                            <div id="back-preview" class="image-preview">Tap to take photo or select image</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Wine Details</h3>
+                    <p class="form-note">Leave fields blank to use OCR-detected values</p>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="wine-name">Wine Name</label>
+                            <input type="text" id="wine-name" name="name" placeholder="Auto-detected from label">
+                        </div>
+                        <div class="form-group">
+                            <label for="winery">Winery</label>
+                            <input type="text" id="winery" name="winery" placeholder="Auto-detected from label">
+                        </div>
+                        <div class="form-group">
+                            <label for="vintage">Vintage</label>
+                            <input type="number" id="vintage" name="vintage" min="1900" max="2100" placeholder="Auto-detected">
+                        </div>
+                        <div class="form-group">
+                            <label for="grape-variety">Grape Variety</label>
+                            <input type="text" id="grape-variety" name="grape_variety" placeholder="Auto-detected">
+                        </div>
+                        <div class="form-group">
+                            <label for="region">Region</label>
+                            <input type="text" id="region" name="region" placeholder="Auto-detected">
+                        </div>
+                        <div class="form-group">
+                            <label for="country">Country</label>
+                            <input type="text" id="country" name="country" placeholder="Auto-detected">
+                        </div>
+                        <div class="form-group">
+                            <label for="alcohol">Alcohol %</label>
+                            <input type="number" id="alcohol" name="alcohol_percentage" min="0" max="100" step="0.1" placeholder="Auto-detected">
+                        </div>
+                        <div class="form-group">
+                            <label for="quantity">Quantity (Bottles)</label>
+                            <input type="number" id="quantity" name="quantity" min="1" value="1" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" name="notes" rows="3" placeholder="Purchase notes, occasion, etc."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Check In Wine</button>
+                    <button type="reset" class="btn btn-secondary">Clear Form</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Cellar Page -->
+        <section id="page-cellar" class="page">
+            <h2>My Cellar</h2>
+            <div class="filter-bar">
+                <select id="cellar-filter">
+                    <option value="all">All Wines</option>
+                    <option value="in-stock">In Stock Only</option>
+                    <option value="out-of-stock">Out of Stock</option>
+                </select>
+                <input type="text" id="cellar-search" placeholder="Quick search...">
+            </div>
+            <div id="cellar-list" class="wine-grid"></div>
+        </section>
+
+        <!-- Wine Detail Modal -->
+        <div id="wine-modal" class="modal">
+            <div class="modal-content">
+                <span class="modal-close">&times;</span>
+                <div id="wine-detail"></div>
+            </div>
+        </div>
+
+        <!-- History Page -->
+        <section id="page-history" class="page">
+            <h2>Transaction History</h2>
+            <div class="filter-bar">
+                <select id="history-filter">
+                    <option value="all">All Transactions</option>
+                    <option value="CHECK_IN">Check Ins Only</option>
+                    <option value="CHECK_OUT">Check Outs Only</option>
+                </select>
+            </div>
+            <div id="history-list" class="transaction-list"></div>
+        </section>
+
+        <!-- Search Page -->
+        <section id="page-search" class="page">
+            <h2>Search Wines</h2>
+            <form id="search-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="search-q">Text Search</label>
+                        <input type="text" id="search-q" name="q" placeholder="Search name, winery, region...">
+                    </div>
+                    <div class="form-group">
+                        <label for="search-vintage">Vintage</label>
+                        <input type="number" id="search-vintage" name="vintage" min="1900" max="2100">
+                    </div>
+                    <div class="form-group">
+                        <label for="search-grape">Grape Variety</label>
+                        <input type="text" id="search-grape" name="grape">
+                    </div>
+                    <div class="form-group">
+                        <label for="search-winery">Winery</label>
+                        <input type="text" id="search-winery" name="winery">
+                    </div>
+                    <div class="form-group">
+                        <label for="search-region">Region</label>
+                        <input type="text" id="search-region" name="region">
+                    </div>
+                    <div class="form-group">
+                        <label for="search-country">Country</label>
+                        <input type="text" id="search-country" name="country">
+                    </div>
+                    <div class="form-group">
+                        <label for="search-in-stock">
+                            <input type="checkbox" id="search-in-stock" name="in_stock">
+                            In Stock Only
+                        </label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                    <button type="reset" class="btn btn-secondary">Clear</button>
+                </div>
+            </form>
+            <div id="search-results" class="wine-grid"></div>
+        </section>
+    </main>
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="modal-close">&times;</span>
+            <h3>Check Out Wine</h3>
+            <form id="checkout-form">
+                <input type="hidden" id="checkout-wine-id">
+                <div class="form-group">
+                    <label for="checkout-quantity">Quantity</label>
+                    <input type="number" id="checkout-quantity" name="quantity" min="1" value="1" required>
+                    <span id="checkout-available"></span>
+                </div>
+                <div class="form-group">
+                    <label for="checkout-notes">Notes</label>
+                    <textarea id="checkout-notes" name="notes" rows="3" placeholder="Occasion, tasting notes..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Check Out</button>
+                    <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

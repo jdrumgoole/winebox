@@ -1,0 +1,153 @@
+# WineBox
+
+A wine cellar management application with OCR label scanning.
+
+## Features
+
+- **Label Scanning**: Upload wine label images for automatic text extraction via OCR
+- **Inventory Tracking**: Check-in and check-out bottles with full history
+- **Smart Parsing**: Automatically identifies vintage, grape variety, region, and more
+- **Search**: Find wines by any criteria
+- **Web Interface**: Simple, mobile-friendly interface
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd winebox
+
+# Install dependencies
+uv sync --all-extras
+
+# Install Tesseract OCR
+# macOS:
+brew install tesseract
+
+# Ubuntu/Debian:
+sudo apt-get install tesseract-ocr
+```
+
+### Running the Server
+
+```bash
+# Development mode with auto-reload
+invoke start --reload
+
+# Background mode
+invoke start-background
+
+# Check status
+invoke status
+
+# Stop server
+invoke stop
+```
+
+### Access the Application
+
+- **Web Interface**: http://localhost:8000/static/index.html
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+
+## Usage
+
+### Check In Wine
+
+1. Navigate to the Check In page
+2. Upload front label image (required)
+3. Optionally upload back label image
+4. Review/edit auto-detected wine details
+5. Set quantity and add notes
+6. Click "Check In Wine"
+
+### Check Out Wine
+
+1. Go to the Cellar view
+2. Click "Check Out" on a wine card
+3. Enter quantity to remove
+4. Add optional notes (tasting notes, occasion)
+5. Confirm checkout
+
+### Search
+
+Use the Search page to find wines by:
+- Text search (name, winery, region)
+- Vintage year
+- Grape variety
+- Region or country
+- Stock status
+
+## API
+
+Full REST API available at `/api`:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/wines/checkin` | POST | Add wine to cellar |
+| `/api/wines/{id}/checkout` | POST | Remove wine from cellar |
+| `/api/wines` | GET | List all wines |
+| `/api/wines/{id}` | GET | Get wine details |
+| `/api/cellar` | GET | Current inventory |
+| `/api/cellar/summary` | GET | Cellar statistics |
+| `/api/transactions` | GET | Transaction history |
+| `/api/search` | GET | Search wines |
+
+See `/docs` for interactive API documentation.
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+invoke test
+
+# With verbose output
+invoke test --verbose
+
+# With coverage
+invoke test --coverage
+```
+
+### Project Structure
+
+```
+winebox/
+├── winebox/          # Application package
+│   ├── main.py       # FastAPI app
+│   ├── models/       # Database models
+│   ├── schemas/      # API schemas
+│   ├── routers/      # API endpoints
+│   ├── services/     # Business logic
+│   └── static/       # Web interface
+├── tests/            # Test suite
+├── docs/             # Documentation
+└── tasks.py          # Build tasks
+```
+
+### Building Documentation
+
+```bash
+invoke docs-build
+invoke docs-serve
+```
+
+## Tech Stack
+
+- **FastAPI**: Web framework
+- **SQLAlchemy**: ORM
+- **SQLite**: Database
+- **Tesseract**: OCR engine
+- **Vanilla JS**: Frontend (no frameworks)
+
+## License
+
+MIT License
