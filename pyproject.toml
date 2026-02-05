@@ -21,11 +21,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Home Automation",
 ]
-
-[project.urls]
-Homepage = "https://github.com/jdrumgoole/winebox"
-Repository = "https://github.com/jdrumgoole/winebox"
-Issues = "https://github.com/jdrumgoole/winebox/issues"
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
@@ -42,6 +37,11 @@ dependencies = [
     "bcrypt>=4.0.0,<4.1.0",
     "python-jose[cryptography]>=3.3.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/jdrumgoole/winebox"
+Repository = "https://github.com/jdrumgoole/winebox"
+Issues = "https://github.com/jdrumgoole/winebox/issues"
 
 [project.optional-dependencies]
 dev = [
