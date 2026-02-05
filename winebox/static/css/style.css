@@ -982,6 +982,41 @@ h3 {
     text-align: left;
 }
 
+/* Password Toggle */
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-wrapper input {
+    flex: 1;
+    padding-right: 3rem;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    color: var(--text-muted);
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.password-toggle:hover {
+    color: var(--primary-color);
+}
+
+.password-toggle svg {
+    width: 20px;
+    height: 20px;
+}
+
 .login-error {
     background: rgba(166, 61, 64, 0.1);
     color: var(--error-color);

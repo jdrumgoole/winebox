@@ -26,6 +26,28 @@ function initAuth() {
 
     // Logout button
     document.getElementById('logout-btn').addEventListener('click', handleLogout);
+
+    // Password toggle
+    const passwordToggle = document.querySelector('.password-toggle');
+    if (passwordToggle) {
+        passwordToggle.addEventListener('click', function() {
+            const passwordInput = document.getElementById('login-password');
+            const eyeIcon = this.querySelector('.eye-icon');
+            const eyeOffIcon = this.querySelector('.eye-off-icon');
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.style.display = 'none';
+                eyeOffIcon.style.display = 'block';
+                this.setAttribute('aria-label', 'Hide password');
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.style.display = 'block';
+                eyeOffIcon.style.display = 'none';
+                this.setAttribute('aria-label', 'Show password');
+            }
+        });
+    }
 }
 
 async function checkAuth() {
