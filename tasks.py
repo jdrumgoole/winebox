@@ -228,10 +228,10 @@ def purge_wines(ctx: Context, include_images: bool = True, force: bool = False) 
     count_script = """
 import asyncio
 from sqlalchemy import text
-from winebox.database import async_session
+from winebox.database import async_session_maker
 
 async def count_records():
-    async with async_session() as session:
+    async with async_session_maker() as session:
         wines = (await session.execute(text('SELECT COUNT(*) FROM wines'))).scalar()
         transactions = (await session.execute(text('SELECT COUNT(*) FROM transactions'))).scalar()
         inventory = (await session.execute(text('SELECT COUNT(*) FROM cellar_inventory'))).scalar()
@@ -277,10 +277,10 @@ print(f'{wines},{transactions},{inventory}')
     delete_script = """
 import asyncio
 from sqlalchemy import text
-from winebox.database import async_session
+from winebox.database import async_session_maker
 
 async def delete_wine_data():
-    async with async_session() as session:
+    async with async_session_maker() as session:
         await session.execute(text('DELETE FROM transactions'))
         await session.execute(text('DELETE FROM cellar_inventory'))
         await session.execute(text('DELETE FROM wines'))
