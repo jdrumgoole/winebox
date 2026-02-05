@@ -210,3 +210,110 @@ async def test_delete_wine(client: AsyncClient, sample_image_bytes: bytes) -> No
     # Verify deletion
     response = await client.get(f"/api/wines/{wine_id}")
     assert response.status_code == 404
+
+
+# Security tests
+
+
+@pytest.mark.asyncio
+async def test_checkin_rejects_oversized_file(client: AsyncClient) -> None:
+    """Test that oversized file uploads are rejected."""
+    from winebox.config import settings
+
+    # Create a file that exceeds the max upload size
+    oversized_data = b"x" * (settings.max_upload_size_bytes + 1)
+
+    files = {
+        "front_label": ("test.png", io.BytesIO(oversized_data), "image/png"),
+    }
+    data = {"name": "Test Wine", "quantity": "1"}
+
+    response = await client.post("/api/wines/checkin", files=files, data=data)
+    assert response.status_code == 413
+    assert "exceeds maximum allowed size" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_checkin_rejects_invalid_file_type(client: AsyncClient) -> None:
+    """Test that invalid file types are rejected."""
+    # Create a fake executable file
+    fake_exe = b"MZ" + b"\x00" * 100  # DOS header signature
+
+    files = {
+        "front_label": ("malware.exe", io.BytesIO(fake_exe), "application/x-msdownload"),
+    }
+    data = {"name": "Test Wine", "quantity": "1"}
+
+    response = await client.post("/api/wines/checkin", files=files, data=data)
+    assert response.status_code == 400
+    assert "Invalid file type" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_scan_rejects_oversized_file(client: AsyncClient) -> None:
+    """Test that scan endpoint rejects oversized files."""
+    from winebox.config import settings
+
+    # Create a file that exceeds the max upload size
+    oversized_data = b"x" * (settings.max_upload_size_bytes + 1)
+
+    files = {
+        "front_label": ("test.png", io.BytesIO(oversized_data), "image/png"),
+    }
+
+    response = await client.post("/api/wines/scan", files=files)
+    assert response.status_code == 413
+    assert "exceeds maximum allowed size" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_checkin_with_prescanned_text(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Test checking in wine with pre-scanned label text (skips rescanning).
+
+    This tests the optimization where the frontend scans labels once on upload
+    and passes the extracted text to checkin to avoid duplicate API calls.
+    """
+    files = {
+        "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+    }
+    data = {
+        "name": "Pre-scanned Wine",
+        "winery": "Test Winery",
+        "vintage": "2021",
+        "quantity": "1",
+        "front_label_text": "This is the pre-scanned front label text",
+        "back_label_text": "This is the pre-scanned back label text",
+    }
+
+    response = await client.post("/api/wines/checkin", files=files, data=data)
+    assert response.status_code == 201
+
+    wine = response.json()
+    assert wine["name"] == "Pre-scanned Wine"
+    assert wine["front_label_text"] == "This is the pre-scanned front label text"
+    assert wine["back_label_text"] == "This is the pre-scanned back label text"
+
+
+@pytest.mark.asyncio
+async def test_scan_endpoint_returns_parsed_data(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Test the scan endpoint returns parsed wine data and OCR text.
+
+    This endpoint is used by the frontend to scan labels on upload
+    before the user clicks 'Check In Wine'.
+    """
+    files = {
+        "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+    }
+
+    response = await client.post("/api/wines/scan", files=files)
+    assert response.status_code == 200
+
+    data = response.json()
+    # Should have parsed, ocr, and method fields
+    assert "parsed" in data
+    assert "ocr" in data
+    assert "method" in data
+    # Method should be either claude_vision or tesseract
+    assert data["method"] in ["claude_vision", "tesseract"]
+    # OCR should have front_label_text
+    assert "front_label_text" in data["ocr"]
