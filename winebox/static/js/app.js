@@ -330,7 +330,7 @@ async function scanLabels() {
 function populateFormFromScan(result) {
     const parsed = result.parsed;
 
-    // Only fill in fields that are currently empty
+    // Update fields with scanned values (overwrites previous scan results)
     const fields = {
         'wine-name': parsed.name,
         'winery': parsed.winery,
@@ -344,13 +344,10 @@ function populateFormFromScan(result) {
     for (const [fieldId, value] of Object.entries(fields)) {
         const input = document.getElementById(fieldId);
         if (input && value !== null && value !== undefined) {
-            // Only update if the field is empty
-            if (!input.value) {
-                input.value = value;
-                // Add visual indicator that field was auto-filled
-                input.classList.add('auto-filled');
-                setTimeout(() => input.classList.remove('auto-filled'), 2000);
-            }
+            input.value = value;
+            // Add visual indicator that field was auto-filled
+            input.classList.add('auto-filled');
+            setTimeout(() => input.classList.remove('auto-filled'), 2000);
         }
     }
 
@@ -409,7 +406,7 @@ function showScanningIndicator(show) {
         }
         if (formNote) {
             formNote.dataset.originalText = formNote.textContent;
-            formNote.textContent = 'Scanning label with OCR...';
+            formNote.textContent = 'Analyzing label with Claude Vision...';
             formNote.classList.add('scanning');
         }
     } else {

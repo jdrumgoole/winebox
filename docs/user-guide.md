@@ -27,11 +27,15 @@ The check-in process adds bottles to your cellar inventory.
 2. **Upload the front label image** (required):
    - Click the file input or drag and drop an image
    - Supported formats: JPG, PNG, GIF, WebP
+   - Form fields are automatically populated as soon as the image is uploaded
 3. **Upload the back label image** (optional):
    - Back labels often contain additional details
+   - Scanning updates with information from both labels
 4. **Review auto-detected values**:
-   - The OCR system will attempt to extract wine details
-   - Edit any incorrect values
+   - Claude Vision AI (or Tesseract OCR fallback) extracts wine details
+   - A toast notification shows which scanning engine was used
+   - Edit any incorrect values as needed
+   - View raw label text in the collapsible "Raw Label Text" section
 5. **Set the quantity**:
    - Enter the number of bottles you're adding
 6. **Add notes** (optional):
@@ -150,13 +154,15 @@ Shows the last 10 transactions with quick details.
 
 ### Taking Good Label Photos
 
-For best OCR results:
+For best scanning results with Claude Vision:
 
 1. **Good lighting**: Natural light or well-lit room
 2. **Flat surface**: Lay the bottle on its side or hold label flat
 3. **Focus**: Ensure text is sharp and readable
 4. **Full label**: Capture the entire label in frame
-5. **High resolution**: Higher resolution improves OCR accuracy
+5. **High resolution**: Higher resolution improves accuracy
+
+Claude Vision provides intelligent label analysis that understands wine label context. If the Anthropic API key is not configured, the app falls back to Tesseract OCR.
 
 ### Organizing Your Cellar
 

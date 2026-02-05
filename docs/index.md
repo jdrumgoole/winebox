@@ -6,7 +6,7 @@ Welcome to WineBox, a wine cellar management application with OCR label scanning
 
 WineBox helps you manage your wine collection by:
 
-- **Scanning wine labels** using OCR to automatically extract wine details
+- **Scanning wine labels** using Claude Vision AI (with Tesseract OCR fallback) to automatically extract wine details
 - **Tracking inventory** with check-in and check-out functionality
 - **Searching your cellar** by vintage, grape variety, region, and more
 - **Maintaining history** of all bottle movements
@@ -23,10 +23,14 @@ cd winebox
 # Install dependencies
 uv sync --all-extras
 
-# Install Tesseract OCR (macOS)
+# Set up Claude Vision (recommended for better label scanning)
+# Add your Anthropic API key to .env file:
+echo "WINEBOX_ANTHROPIC_API_KEY=your-api-key-here" > .env
+
+# Install Tesseract OCR as fallback (macOS)
 brew install tesseract
 
-# Install Tesseract OCR (Ubuntu/Debian)
+# Install Tesseract OCR as fallback (Ubuntu/Debian)
 sudo apt-get install tesseract-ocr
 ```
 
@@ -70,8 +74,8 @@ api-reference
 ### Check-In Process
 
 1. Upload front label image (required) and back label (optional)
-2. OCR automatically extracts text from the labels
-3. Wine parser identifies: vintage, winery, grape variety, region, country
+2. Claude Vision AI (or Tesseract OCR fallback) automatically analyzes the labels
+3. Form fields are instantly populated with: wine name, vintage, winery, grape variety, region, country, alcohol %
 4. Review and edit auto-detected values
 5. Specify quantity of bottles
 6. Wine is added to your cellar with a CHECK_IN transaction
