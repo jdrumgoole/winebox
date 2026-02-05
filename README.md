@@ -127,27 +127,48 @@ WineBox requires authentication for all API endpoints (except `/health`).
 
 ### Creating Users
 
-Use the `user_admin.py` script to manage users:
+Use the `winebox-admin` command to manage users:
 
 ```bash
 # Create an admin user
-uv run python user_admin.py add admin --email admin@example.com --admin --password yourpassword
+uv run winebox-admin add admin --email admin@example.com --admin --password yourpassword
 
 # Create a regular user
-uv run python user_admin.py add username --email user@example.com --password yourpassword
+uv run winebox-admin add username --email user@example.com --password yourpassword
 
 # List all users
-uv run python user_admin.py list
+uv run winebox-admin list
 
 # Disable/enable a user
-uv run python user_admin.py disable username
-uv run python user_admin.py enable username
+uv run winebox-admin disable username
+uv run winebox-admin enable username
 
 # Change password
-uv run python user_admin.py passwd username --password newpassword
+uv run winebox-admin passwd username --password newpassword
 
 # Remove a user
-uv run python user_admin.py remove username
+uv run winebox-admin remove username
+```
+
+### Server Management
+
+Use the `winebox-server` command to manage the server:
+
+```bash
+# Start server (foreground)
+uv run winebox-server start --foreground
+
+# Start server (background)
+uv run winebox-server start
+
+# Stop server
+uv run winebox-server stop
+
+# Restart server
+uv run winebox-server restart
+
+# Check status
+uv run winebox-server status
 ```
 
 ### API Authentication

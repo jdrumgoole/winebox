@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
 """WineBox server control script.
 
 Usage:
-    python winebox_ctl.py start [--port PORT] [--reload]
-    python winebox_ctl.py stop
-    python winebox_ctl.py restart [--port PORT]
-    python winebox_ctl.py status
+    winebox-server start [--port PORT] [--reload]
+    winebox-server stop
+    winebox-server restart [--port PORT]
+    winebox-server status
 """
 
 import argparse

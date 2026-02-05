@@ -20,7 +20,7 @@ def start(ctx: Context, host: str = "0.0.0.0", port: int = 8000, reload: bool = 
         port: Port to bind to (default: 8000)
         reload: Enable auto-reload for development
     """
-    cmd = f"uv run python winebox_ctl.py start --host {host} --port {port} --foreground"
+    cmd = f"uv run winebox-server start --host {host} --port {port} --foreground"
     if reload:
         cmd += " --reload"
 
@@ -40,13 +40,13 @@ def start_background(ctx: Context, host: str = "0.0.0.0", port: int = 8000) -> N
         host: Host to bind to (default: 0.0.0.0)
         port: Port to bind to (default: 8000)
     """
-    ctx.run(f"uv run python winebox_ctl.py start --host {host} --port {port}")
+    ctx.run(f"uv run winebox-server start --host {host} --port {port}")
 
 
 @task
 def stop(ctx: Context) -> None:
     """Stop the WineBox FastAPI server."""
-    ctx.run("uv run python winebox_ctl.py stop")
+    ctx.run("uv run winebox-server stop")
 
 
 @task
@@ -58,13 +58,13 @@ def restart(ctx: Context, host: str = "0.0.0.0", port: int = 8000) -> None:
         host: Host to bind to (default: 0.0.0.0)
         port: Port to bind to (default: 8000)
     """
-    ctx.run(f"uv run python winebox_ctl.py restart --host {host} --port {port}")
+    ctx.run(f"uv run winebox-server restart --host {host} --port {port}")
 
 
 @task
 def status(ctx: Context) -> None:
     """Check the status of the WineBox server."""
-    ctx.run("uv run python winebox_ctl.py status")
+    ctx.run("uv run winebox-server status")
 
 
 @task
@@ -181,7 +181,7 @@ def purge(ctx: Context, include_images: bool = False, force: bool = False) -> No
 
     # Stop the server if running (SQLite requires exclusive access)
     print("Stopping server if running...")
-    ctx.run("uv run python winebox_ctl.py stop", warn=True)
+    ctx.run("uv run winebox-server stop", warn=True)
     time.sleep(1)
 
     # Delete database

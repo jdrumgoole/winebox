@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """User administration script for WineBox.
 
 Commands:
@@ -184,7 +183,7 @@ def get_password_interactive(confirm: bool = True) -> str:
     return password
 
 
-def main() -> None:
+def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="User administration for WineBox",
@@ -225,7 +224,7 @@ def main() -> None:
 
     if not args.command:
         parser.print_help()
-        sys.exit(1)
+        return 1
 
     try:
         if args.command == "add":
@@ -250,8 +249,10 @@ def main() -> None:
 
     except KeyboardInterrupt:
         print("\nAborted.")
-        sys.exit(1)
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
