@@ -17,7 +17,22 @@ document.addEventListener('DOMContentLoaded', () => {
     initModals();
     initAuth();
     checkAuth();
+    loadAppInfo();
 });
+
+// Load app info for footer
+async function loadAppInfo() {
+    try {
+        const response = await fetch('/health');
+        const data = await response.json();
+        const appInfo = document.getElementById('app-info');
+        if (appInfo && data.app_name && data.version) {
+            appInfo.innerHTML = `${data.app_name} <span class="version">v${data.version}</span>`;
+        }
+    } catch (error) {
+        console.log('Could not load app info');
+    }
+}
 
 // Authentication
 function initAuth() {

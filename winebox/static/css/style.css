@@ -1404,3 +1404,27 @@ body.logged-out #user-info {
     content: '';
     animation: dots 1.5s steps(4, end) infinite;
 }
+
+/* Footer */
+#app-footer {
+    background: var(--primary-dark);
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    padding: 1rem 2rem;
+    font-size: 0.85rem;
+    margin-top: 2rem;
+}
+
+#app-footer #app-info {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#app-footer .version {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
