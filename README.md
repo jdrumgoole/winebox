@@ -127,6 +127,38 @@ Images are served via the API at `/api/images/{filename}`.
 
 **Note:** The `data/` directory is excluded from git (see `.gitignore`). Make sure to back up this directory to preserve your wine collection data.
 
+## Label Scanning
+
+WineBox uses AI-powered label scanning to extract wine information from photos.
+
+### Claude Vision (Recommended)
+
+For best results, configure Claude Vision by setting your Anthropic API key:
+
+```bash
+export ANTHROPIC_API_KEY=your-api-key
+# or
+export WINEBOX_ANTHROPIC_API_KEY=your-api-key
+```
+
+Claude Vision provides intelligent label analysis that:
+- Handles decorative and artistic fonts
+- Understands wine-specific terminology
+- Extracts structured data (winery, vintage, grape variety, region, etc.)
+- Works with curved or angled text
+
+### Tesseract OCR (Fallback)
+
+If no Anthropic API key is configured, WineBox falls back to Tesseract OCR. This requires Tesseract to be installed on your system:
+
+```bash
+# macOS
+brew install tesseract
+
+# Ubuntu/Debian
+sudo apt-get install tesseract-ocr
+```
+
 ## Authentication
 
 WineBox requires authentication for all API endpoints (except `/health`).
