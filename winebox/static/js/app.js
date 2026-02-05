@@ -9,6 +9,7 @@ const API_BASE = '/api';
 let currentPage = 'dashboard';
 let authToken = localStorage.getItem('winebox_token');
 let currentUser = null;
+let lastScanResult = null;  // Store last scan result to avoid rescanning on checkin
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -215,6 +216,7 @@ function initForms() {
         document.getElementById('front-preview').innerHTML = 'Tap to take photo or select image';
         document.getElementById('back-preview').innerHTML = 'Tap to take photo or select image';
         clearRawLabelText();
+        lastScanResult = null;  // Clear stored scan result
     });
 
     // Image previews - make clickable to trigger file input
@@ -317,6 +319,7 @@ async function scanLabels() {
         }
 
         const result = await response.json();
+        lastScanResult = result;  // Store for checkin
         populateFormFromScan(result);
         const methodName = result.method === 'claude_vision' ? 'Claude Vision' : 'Tesseract OCR';
         showToast(`Label scanned with ${methodName}`, 'success');
@@ -426,6 +429,16 @@ async function handleCheckin(e) {
     const form = e.target;
     const formData = new FormData(form);
 
+    // Include pre-scanned OCR text to avoid rescanning (saves API costs)
+    if (lastScanResult && lastScanResult.ocr) {
+        if (lastScanResult.ocr.front_label_text) {
+            formData.append('front_label_text', lastScanResult.ocr.front_label_text);
+        }
+        if (lastScanResult.ocr.back_label_text) {
+            formData.append('back_label_text', lastScanResult.ocr.back_label_text);
+        }
+    }
+
     try {
         const response = await fetchWithAuth(`${API_BASE}/wines/checkin`, {
             method: 'POST',
@@ -440,6 +453,7 @@ async function handleCheckin(e) {
         const wine = await response.json();
         showCheckinConfirmation(wine);
         form.reset();
+        lastScanResult = null;  // Clear stored scan result
     } catch (error) {
         showToast(error.message, 'error');
     }

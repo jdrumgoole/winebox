@@ -143,75 +143,93 @@ async def checkin_wine(
     country: Annotated[str | None, Form()] = None,
     alcohol_percentage: Annotated[float | None, Form(ge=0, le=100)] = None,
     notes: Annotated[str | None, Form(description="Check-in notes")] = None,
+    front_label_text: Annotated[str | None, Form(description="Pre-scanned front label text")] = None,
+    back_label_text: Annotated[str | None, Form(description="Pre-scanned back label text")] = None,
 ) -> WineWithInventory:
     """Check in wine bottles to the cellar.
 
     Upload front (required) and back (optional) label images.
-    Uses Claude Vision for intelligent label analysis when available.
+    If front_label_text is provided (from a prior /scan call), scanning is skipped.
+    Otherwise, uses Claude Vision for intelligent label analysis when available.
     You can override any auto-detected values.
     """
-    # Read image data for analysis
-    front_data = await front_label.read()
-    await front_label.seek(0)
-
-    back_data = None
-    if back_label and back_label.filename:
-        back_data = await back_label.read()
-        await back_label.seek(0)
-
     # Save images
     front_image_path = await image_storage.save_image(front_label)
     back_image_path = None
     if back_label and back_label.filename:
         back_image_path = await image_storage.save_image(back_label)
 
-    # Try Claude Vision first
-    parsed_data = {}
-    front_text = ""
-    back_text = None
+    # Use pre-scanned text if provided (avoids duplicate API calls)
+    front_text = front_label_text or ""
+    back_text = back_label_text
 
-    if vision_service.is_available():
-        logger.info("Using Claude Vision for checkin analysis")
-        try:
-            front_media_type = get_media_type(front_label.filename)
-            back_media_type = get_media_type(back_label.filename if back_label else None)
+    # Only scan if no pre-scanned text was provided and no name given
+    if not front_label_text and not name:
+        logger.info("No pre-scanned text provided, scanning labels...")
 
-            result = await vision_service.analyze_labels(
-                front_image_data=front_data,
-                back_image_data=back_data,
-                front_media_type=front_media_type,
-                back_media_type=back_media_type,
-            )
-            parsed_data = result
-            front_text = result.get("raw_text", "")
-            back_text = result.get("back_label_text")
-        except Exception as e:
-            logger.warning(f"Claude Vision failed, falling back to Tesseract: {e}")
+        # Read image data for analysis
+        await front_label.seek(0)
+        front_data = await front_label.read()
 
-    # Fall back to Tesseract if needed
-    if not parsed_data.get("name"):
-        logger.info("Using Tesseract OCR for checkin analysis")
-        front_text = await ocr_service.extract_text(front_image_path)
-        if back_image_path:
-            back_text = await ocr_service.extract_text(back_image_path)
+        back_data = None
+        if back_label and back_label.filename:
+            await back_label.seek(0)
+            back_data = await back_label.read()
 
-        combined_text = front_text
-        if back_text:
-            combined_text = f"{front_text}\n{back_text}"
-        parsed_data = wine_parser.parse(combined_text)
+        # Try Claude Vision first
+        parsed_data = {}
 
-    # Use provided values or fall back to parsed values
-    wine_name = name or parsed_data.get("name") or "Unknown Wine"
+        if vision_service.is_available():
+            logger.info("Using Claude Vision for checkin analysis")
+            try:
+                front_media_type = get_media_type(front_label.filename)
+                back_media_type = get_media_type(back_label.filename if back_label else None)
+
+                result = await vision_service.analyze_labels(
+                    front_image_data=front_data,
+                    back_image_data=back_data,
+                    front_media_type=front_media_type,
+                    back_media_type=back_media_type,
+                )
+                parsed_data = result
+                front_text = result.get("raw_text", "")
+                back_text = result.get("back_label_text")
+            except Exception as e:
+                logger.warning(f"Claude Vision failed, falling back to Tesseract: {e}")
+
+        # Fall back to Tesseract if needed
+        if not parsed_data.get("name"):
+            logger.info("Using Tesseract OCR for checkin analysis")
+            front_text = await ocr_service.extract_text(front_image_path)
+            if back_image_path:
+                back_text = await ocr_service.extract_text(back_image_path)
+
+            combined_text = front_text
+            if back_text:
+                combined_text = f"{front_text}\n{back_text}"
+            parsed_data = wine_parser.parse(combined_text)
+
+        # Use parsed values for fields not provided
+        name = name or parsed_data.get("name")
+        winery = winery or parsed_data.get("winery")
+        vintage = vintage or parsed_data.get("vintage")
+        grape_variety = grape_variety or parsed_data.get("grape_variety")
+        region = region or parsed_data.get("region")
+        country = country or parsed_data.get("country")
+        alcohol_percentage = alcohol_percentage or parsed_data.get("alcohol_percentage")
+
+    # Use provided values
+    wine_name = name or "Unknown Wine"
 
     # Create wine record
     wine = Wine(
         name=wine_name,
-        winery=winery or parsed_data.get("winery"),
-        vintage=vintage or parsed_data.get("vintage"),
-        grape_variety=grape_variety or parsed_data.get("grape_variety"),
-        region=region or parsed_data.get("region"),
-        country=country or parsed_data.get("country"),
-        alcohol_percentage=alcohol_percentage or parsed_data.get("alcohol_percentage"),
+        winery=winery,
+        vintage=vintage,
+        grape_variety=grape_variety,
+        region=region,
+        country=country,
+        alcohol_percentage=alcohol_percentage,
         front_label_text=front_text,
         back_label_text=back_text,
         front_label_image_path=front_image_path,
