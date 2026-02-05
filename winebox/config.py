@@ -1,13 +1,15 @@
 """Configuration settings for WineBox application."""
 
+import logging
 import secrets
 from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+logger = logging.getLogger(__name__)
 
-def generate_secret_key() -> str:
-    """Generate a random secret key."""
-    return secrets.token_urlsafe(32)
+# Marker value to detect if secret_key was not explicitly set
+_SECRET_KEY_NOT_SET = "__NOT_SET__"
 
 
 class Settings(BaseSettings):
@@ -27,6 +29,7 @@ class Settings(BaseSettings):
 
     # Image storage
     image_storage_path: Path = Path("data/images")
+    max_upload_size_mb: int = 10  # Maximum file upload size in MB
 
     # Server
     host: str = "0.0.0.0"
@@ -40,8 +43,36 @@ class Settings(BaseSettings):
     use_claude_vision: bool = True  # Fall back to Tesseract if False or no API key
 
     # Authentication
-    secret_key: str = generate_secret_key()  # Override with WINEBOX_SECRET_KEY env var
+    # SECURITY: Set WINEBOX_SECRET_KEY environment variable for production!
+    # If not set, a random key will be generated (tokens invalidate on restart)
+    secret_key: str = _SECRET_KEY_NOT_SET
     auth_enabled: bool = True  # Set to False to disable authentication
 
+    # Security
+    enforce_https: bool = False  # Set to True in production to enable HSTS header
+    rate_limit_per_minute: int = 60  # Global rate limit per IP per minute
+    auth_rate_limit_per_minute: int = 10  # Stricter rate limit for auth endpoints
 
-settings = Settings()
+    @property
+    def max_upload_size_bytes(self) -> int:
+        """Get max upload size in bytes."""
+        return self.max_upload_size_mb * 1024 * 1024
+
+
+def _initialize_settings() -> Settings:
+    """Initialize settings with security warnings."""
+    s = Settings()
+
+    # Handle secret key - generate if not set, but warn
+    if s.secret_key == _SECRET_KEY_NOT_SET:
+        s.secret_key = secrets.token_urlsafe(32)
+        logger.warning(
+            "SECURITY WARNING: No WINEBOX_SECRET_KEY environment variable set. "
+            "A random secret key has been generated. JWT tokens will be invalidated "
+            "when the server restarts. Set WINEBOX_SECRET_KEY for production use."
+        )
+
+    return s
+
+
+settings = _initialize_settings()

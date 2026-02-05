@@ -22,7 +22,7 @@
                 <a href="#" data-page="search" class="nav-link">Search</a>
             </nav>
             <div id="user-info" class="user-info" style="display: none;">
-                <span id="username-display"></span>
+                <a href="#" id="username-display" data-page="settings" class="username-link"></a>
                 <button id="logout-btn" class="btn btn-small btn-secondary">Logout</button>
             </div>
         </div>
@@ -268,6 +268,122 @@
                 </div>
             </form>
             <div id="search-results" class="wine-grid"></div>
+        </section>
+
+        <!-- Settings Page -->
+        <section id="page-settings" class="page">
+            <h2>Settings</h2>
+
+            <!-- Profile Section -->
+            <div class="settings-section">
+                <h3>Profile</h3>
+                <form id="profile-form">
+                    <div class="form-group">
+                        <label for="settings-username">Username</label>
+                        <input type="text" id="settings-username" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="settings-fullname">Full Name</label>
+                        <input type="text" id="settings-fullname" name="full_name" placeholder="Enter your full name">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Profile</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Password Section -->
+            <div class="settings-section">
+                <h3>Change Password</h3>
+                <form id="password-form">
+                    <div class="form-group">
+                        <label for="current-password">Current Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="current-password" name="current_password" required autocomplete="current-password">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-password">New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="new-password" name="new_password" required autocomplete="new-password">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-password">Confirm New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="confirm-password" name="confirm_password" required autocomplete="new-password">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Change Password</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- API Key Section -->
+            <div class="settings-section">
+                <h3>Anthropic API Key</h3>
+                <p class="settings-description">
+                    Add your Anthropic API key for Claude Vision wine label scanning.
+                    Once saved, the key cannot be viewed again for security reasons.
+                </p>
+                <div id="api-key-status" class="api-key-status">
+                    <span class="status-indicator"></span>
+                    <span class="status-text">Loading...</span>
+                </div>
+                <form id="api-key-form">
+                    <div class="form-group">
+                        <label for="api-key">API Key</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="api-key" name="api_key" placeholder="sk-ant-..." autocomplete="off">
+                            <button type="button" class="password-toggle" aria-label="Show API key">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save API Key</button>
+                        <button type="button" id="delete-api-key-btn" class="btn btn-danger" style="display: none;">Delete API Key</button>
+                    </div>
+                </form>
+            </div>
         </section>
     </main>
 

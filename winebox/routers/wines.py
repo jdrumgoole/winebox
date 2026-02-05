@@ -9,11 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from winebox.config import settings
 from winebox.database import get_db
 from winebox.models import CellarInventory, Transaction, TransactionType, Wine
 from winebox.schemas.wine import WineCreate, WineResponse, WineUpdate, WineWithInventory
 from winebox.services.auth import RequireAuth
-from winebox.services.image_storage import ImageStorageService
+from winebox.services.image_storage import ALLOWED_MIME_TYPES, ImageStorageService
 from winebox.services.ocr import OCRService
 from winebox.services.vision import ClaudeVisionService
 from winebox.services.wine_parser import WineParserService
@@ -21,6 +22,31 @@ from winebox.services.wine_parser import WineParserService
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def validate_upload_size(upload_file: UploadFile, field_name: str) -> bytes:
+    """Validate file size and return content.
+
+    Args:
+        upload_file: The uploaded file.
+        field_name: Name of the field for error messages.
+
+    Returns:
+        The file content as bytes.
+
+    Raises:
+        HTTPException: If file exceeds size limit.
+    """
+    content = await upload_file.read()
+    await upload_file.seek(0)
+
+    if len(content) > settings.max_upload_size_bytes:
+        max_mb = settings.max_upload_size_bytes / (1024 * 1024)
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"{field_name} exceeds maximum allowed size of {max_mb:.1f} MB",
+        )
+    return content
 
 # Service dependencies
 image_storage = ImageStorageService()
@@ -54,14 +80,12 @@ async def scan_label(
     Uses Claude Vision for intelligent label analysis when available,
     falls back to Tesseract OCR otherwise.
     """
-    # Read image data
-    front_data = await front_label.read()
-    await front_label.seek(0)
+    # Validate and read image data with size limits
+    front_data = await validate_upload_size(front_label, "Front label")
 
     back_data = None
     if back_label and back_label.filename:
-        back_data = await back_label.read()
-        await back_label.seek(0)
+        back_data = await validate_upload_size(back_label, "Back label")
 
     # Try Claude Vision first
     if vision_service.is_available():
@@ -128,23 +152,30 @@ async def scan_label(
     }
 
 
+# Maximum lengths for form fields (security limits)
+MAX_NAME_LENGTH = 500
+MAX_FIELD_LENGTH = 200
+MAX_NOTES_LENGTH = 2000
+MAX_OCR_TEXT_LENGTH = 10000
+
+
 @router.post("/checkin", response_model=WineWithInventory, status_code=status.HTTP_201_CREATED)
 async def checkin_wine(
     _: RequireAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
     front_label: Annotated[UploadFile, File(description="Front label image")],
-    quantity: Annotated[int, Form(ge=1, description="Number of bottles")] = 1,
+    quantity: Annotated[int, Form(ge=1, le=10000, description="Number of bottles")] = 1,
     back_label: Annotated[UploadFile | None, File(description="Back label image")] = None,
-    name: Annotated[str | None, Form(description="Wine name (auto-detected if not provided)")] = None,
-    winery: Annotated[str | None, Form()] = None,
+    name: Annotated[str | None, Form(max_length=MAX_NAME_LENGTH, description="Wine name (auto-detected if not provided)")] = None,
+    winery: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
     vintage: Annotated[int | None, Form(ge=1900, le=2100)] = None,
-    grape_variety: Annotated[str | None, Form()] = None,
-    region: Annotated[str | None, Form()] = None,
-    country: Annotated[str | None, Form()] = None,
+    grape_variety: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
+    region: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
+    country: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
     alcohol_percentage: Annotated[float | None, Form(ge=0, le=100)] = None,
-    notes: Annotated[str | None, Form(description="Check-in notes")] = None,
-    front_label_text: Annotated[str | None, Form(description="Pre-scanned front label text")] = None,
-    back_label_text: Annotated[str | None, Form(description="Pre-scanned back label text")] = None,
+    notes: Annotated[str | None, Form(max_length=MAX_NOTES_LENGTH, description="Check-in notes")] = None,
+    front_label_text: Annotated[str | None, Form(max_length=MAX_OCR_TEXT_LENGTH, description="Pre-scanned front label text")] = None,
+    back_label_text: Annotated[str | None, Form(max_length=MAX_OCR_TEXT_LENGTH, description="Pre-scanned back label text")] = None,
 ) -> WineWithInventory:
     """Check in wine bottles to the cellar.
 
@@ -272,8 +303,8 @@ async def checkout_wine(
     wine_id: str,
     _: RequireAuth,
     db: Annotated[AsyncSession, Depends(get_db)],
-    quantity: Annotated[int, Form(ge=1, description="Number of bottles to remove")] = 1,
-    notes: Annotated[str | None, Form(description="Check-out notes")] = None,
+    quantity: Annotated[int, Form(ge=1, le=10000, description="Number of bottles to remove")] = 1,
+    notes: Annotated[str | None, Form(max_length=MAX_NOTES_LENGTH, description="Check-out notes")] = None,
 ) -> WineWithInventory:
     """Check out wine bottles from the cellar.
 

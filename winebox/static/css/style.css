@@ -1178,6 +1178,19 @@ h3 {
     font-weight: 500;
 }
 
+.user-info .username-link {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--radius);
+    transition: all 0.2s ease;
+}
+
+.user-info .username-link:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+}
+
 .user-info .btn {
     padding: 0.4rem 0.75rem;
     font-size: 0.85rem;
@@ -1188,6 +1201,60 @@ h3 {
 
 .user-info .btn:hover {
     background: rgba(255, 255, 255, 0.3);
+}
+
+/* Settings Page */
+.settings-section {
+    background: var(--card-background);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+}
+
+.settings-section h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-description {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.api-key-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--background-color);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+}
+
+.api-key-status .status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+
+.api-key-status.configured .status-indicator {
+    background: var(--success-color);
+}
+
+.api-key-status.not-configured .status-indicator {
+    background: var(--warning-color);
+}
+
+.api-key-status .status-text {
+    font-size: 0.9rem;
+    color: var(--text-color);
 }
 
 /* Hide main content when not logged in */
