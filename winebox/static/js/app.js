@@ -199,6 +199,7 @@ function initForms() {
     checkinForm.addEventListener('reset', () => {
         document.getElementById('front-preview').innerHTML = 'Tap to take photo or select image';
         document.getElementById('back-preview').innerHTML = 'Tap to take photo or select image';
+        clearRawLabelText();
     });
 
     // Image previews - make clickable to trigger file input
@@ -223,6 +224,25 @@ function initForms() {
     backPreview.addEventListener('click', () => {
         backLabel.click();
     });
+
+    // Label text collapsible toggle
+    const labelTextToggle = document.getElementById('label-text-toggle');
+    if (labelTextToggle) {
+        labelTextToggle.addEventListener('click', () => {
+            const section = document.getElementById('label-text-section');
+            const content = document.getElementById('label-text-content');
+            const icon = section.querySelector('.collapse-icon');
+
+            section.classList.toggle('open');
+            if (section.classList.contains('open')) {
+                content.style.display = 'block';
+                icon.textContent = '-';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '+';
+            }
+        });
+    }
 
     // Search form
     document.getElementById('search-form').addEventListener('submit', handleSearch);
@@ -317,6 +337,43 @@ function populateFormFromScan(result) {
             }
         }
     }
+
+    // Populate raw label text section
+    populateRawLabelText(result.ocr);
+}
+
+function populateRawLabelText(ocr) {
+    const section = document.getElementById('label-text-section');
+    const frontText = document.getElementById('raw-front-label-text');
+    const backSection = document.getElementById('raw-back-label-section');
+    const backText = document.getElementById('raw-back-label-text');
+
+    if (ocr.front_label_text) {
+        frontText.textContent = ocr.front_label_text;
+        section.style.display = 'block';
+    }
+
+    if (ocr.back_label_text) {
+        backText.textContent = ocr.back_label_text;
+        backSection.style.display = 'block';
+    } else {
+        backSection.style.display = 'none';
+    }
+}
+
+function clearRawLabelText() {
+    const section = document.getElementById('label-text-section');
+    const frontText = document.getElementById('raw-front-label-text');
+    const backSection = document.getElementById('raw-back-label-section');
+    const backText = document.getElementById('raw-back-label-text');
+
+    section.style.display = 'none';
+    section.classList.remove('open');
+    document.getElementById('label-text-content').style.display = 'none';
+    document.querySelector('#label-text-section .collapse-icon').textContent = '+';
+    frontText.textContent = '';
+    backText.textContent = '';
+    backSection.style.display = 'none';
 }
 
 function showScanningIndicator(show) {
@@ -737,9 +794,25 @@ async function showWineDetail(wineId) {
                 ` : ''}
 
                 ${wine.front_label_text ? `
-                    <div class="wine-detail-field">
-                        <div class="label">OCR Text (Front Label)</div>
-                        <div class="wine-detail-ocr">${wine.front_label_text}</div>
+                    <div class="wine-detail-label-text collapsible">
+                        <div class="collapsible-header" onclick="toggleWineDetailLabelText(this)">
+                            <span class="label">Show Raw Label Text</span>
+                            <span class="collapse-icon">+</span>
+                        </div>
+                        <div class="collapsible-content" style="display: none;">
+                            <div class="ocr-raw-text">
+                                <div class="ocr-raw-section">
+                                    <label>Front Label:</label>
+                                    <pre>${escapeHtml(wine.front_label_text)}</pre>
+                                </div>
+                                ${wine.back_label_text ? `
+                                    <div class="ocr-raw-section">
+                                        <label>Back Label:</label>
+                                        <pre>${escapeHtml(wine.back_label_text)}</pre>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
                     </div>
                 ` : ''}
 
@@ -855,6 +928,30 @@ function formatDate(dateString) {
         hour: '2-digit',
         minute: '2-digit'
     });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function toggleWineDetailLabelText(header) {
+    const section = header.parentElement;
+    const content = section.querySelector('.collapsible-content');
+    const icon = header.querySelector('.collapse-icon');
+    const label = header.querySelector('.label');
+
+    section.classList.toggle('open');
+    if (section.classList.contains('open')) {
+        content.style.display = 'block';
+        icon.textContent = '-';
+        label.textContent = 'Hide Raw Label Text';
+    } else {
+        content.style.display = 'none';
+        icon.textContent = '+';
+        label.textContent = 'Show Raw Label Text';
+    }
 }
 
 function showToast(message, type = 'info') {

@@ -1268,6 +1268,103 @@ body.logged-out #user-info {
     }
 }
 
+/* Collapsible Sections */
+.collapsible {
+    margin-bottom: 1.5rem;
+}
+
+.collapsible-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    user-select: none;
+}
+
+.collapsible-header h3 {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+.collapsible-header:hover h3 {
+    color: var(--primary-color);
+}
+
+.collapse-icon {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.collapsible.open .collapse-icon {
+    transform: rotate(45deg);
+}
+
+.collapsible-content {
+    padding-top: 1rem;
+}
+
+/* Raw OCR Text Display */
+.ocr-raw-text {
+    background: var(--background-color);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+
+.ocr-raw-section {
+    margin-bottom: 1rem;
+}
+
+.ocr-raw-section:last-child {
+    margin-bottom: 0;
+}
+
+.ocr-raw-section label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.ocr-raw-section pre {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    font-family: monospace;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 150px;
+    overflow-y: auto;
+    margin: 0;
+}
+
+/* Wine Detail Label Text */
+.wine-detail-label-text {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.wine-detail-label-text .collapsible-header {
+    padding: 0;
+}
+
+.wine-detail-label-text .collapsible-header .label {
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    cursor: pointer;
+}
+
+.wine-detail-label-text .collapsible-header .label:hover {
+    text-decoration: underline;
+}
+
 /* Auto-fill Animation */
 .auto-filled {
     animation: autoFillPulse 0.5s ease;
