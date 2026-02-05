@@ -102,6 +102,63 @@ Full REST API available at `/api`:
 
 See `/docs` for interactive API documentation.
 
+## Data Storage
+
+### Database
+
+The SQLite database is stored at `data/winebox.db` by default. This can be configured via the `WINEBOX_DATABASE_URL` environment variable.
+
+### Images
+
+Wine label images are stored in the `data/images/` directory by default. Each image is saved with a UUID filename to avoid conflicts.
+
+| Item | Default Location | Environment Variable |
+|------|------------------|---------------------|
+| Database | `data/winebox.db` | `WINEBOX_DATABASE_URL` |
+| Images | `data/images/` | `WINEBOX_IMAGE_STORAGE_PATH` |
+
+Images are served via the API at `/api/images/{filename}`.
+
+**Note:** The `data/` directory is excluded from git (see `.gitignore`). Make sure to back up this directory to preserve your wine collection data.
+
+## Authentication
+
+WineBox requires authentication for all API endpoints (except `/health`).
+
+### Creating Users
+
+Use the `user_admin.py` script to manage users:
+
+```bash
+# Create an admin user
+uv run python user_admin.py add admin --email admin@example.com --admin --password yourpassword
+
+# Create a regular user
+uv run python user_admin.py add username --email user@example.com --password yourpassword
+
+# List all users
+uv run python user_admin.py list
+
+# Disable/enable a user
+uv run python user_admin.py disable username
+uv run python user_admin.py enable username
+
+# Change password
+uv run python user_admin.py passwd username --password newpassword
+
+# Remove a user
+uv run python user_admin.py remove username
+```
+
+### API Authentication
+
+The API uses JWT bearer tokens. To authenticate:
+
+1. POST to `/api/auth/token` with `username` and `password` (form-urlencoded)
+2. Include the returned token in subsequent requests: `Authorization: Bearer <token>`
+
+Tokens expire after 24 hours.
+
 ## Development
 
 ### Running Tests
