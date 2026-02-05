@@ -209,9 +209,11 @@ function initForms() {
 
     frontLabel.addEventListener('change', (e) => {
         previewImage(e.target, 'front-preview');
+        scanLabels();
     });
     backLabel.addEventListener('change', (e) => {
         previewImage(e.target, 'back-preview');
+        scanLabels();
     });
 
     // Click on preview to trigger file input
@@ -246,6 +248,101 @@ function previewImage(input, previewId) {
         reader.readAsDataURL(input.files[0]);
     } else {
         preview.innerHTML = '';
+    }
+}
+
+async function scanLabels() {
+    const frontLabel = document.getElementById('front-label');
+
+    // Only scan if front label is present
+    if (!frontLabel.files || !frontLabel.files[0]) {
+        return;
+    }
+
+    const backLabel = document.getElementById('back-label');
+    const formData = new FormData();
+    formData.append('front_label', frontLabel.files[0]);
+
+    if (backLabel.files && backLabel.files[0]) {
+        formData.append('back_label', backLabel.files[0]);
+    }
+
+    // Show scanning indicator
+    showScanningIndicator(true);
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/wines/scan`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Scan failed');
+        }
+
+        const result = await response.json();
+        populateFormFromScan(result);
+        showToast('Label scanned successfully', 'success');
+    } catch (error) {
+        showToast(`Scan failed: ${error.message}`, 'error');
+    } finally {
+        showScanningIndicator(false);
+    }
+}
+
+function populateFormFromScan(result) {
+    const parsed = result.parsed;
+
+    // Only fill in fields that are currently empty
+    const fields = {
+        'wine-name': parsed.name,
+        'winery': parsed.winery,
+        'vintage': parsed.vintage,
+        'grape-variety': parsed.grape_variety,
+        'region': parsed.region,
+        'country': parsed.country,
+        'alcohol': parsed.alcohol_percentage
+    };
+
+    for (const [fieldId, value] of Object.entries(fields)) {
+        const input = document.getElementById(fieldId);
+        if (input && value !== null && value !== undefined) {
+            // Only update if the field is empty
+            if (!input.value) {
+                input.value = value;
+                // Add visual indicator that field was auto-filled
+                input.classList.add('auto-filled');
+                setTimeout(() => input.classList.remove('auto-filled'), 2000);
+            }
+        }
+    }
+}
+
+function showScanningIndicator(show) {
+    const submitBtn = document.querySelector('#checkin-form button[type="submit"]');
+    const formNote = document.querySelector('#checkin-form .form-note');
+
+    if (show) {
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.dataset.originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Scanning...';
+        }
+        if (formNote) {
+            formNote.dataset.originalText = formNote.textContent;
+            formNote.textContent = 'Scanning label with OCR...';
+            formNote.classList.add('scanning');
+        }
+    } else {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = submitBtn.dataset.originalText || 'Check In Wine';
+        }
+        if (formNote) {
+            formNote.textContent = formNote.dataset.originalText || 'Leave fields blank to use OCR-detected values';
+            formNote.classList.remove('scanning');
+        }
     }
 }
 

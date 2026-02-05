@@ -24,6 +24,53 @@ ocr_service = OCRService()
 wine_parser = WineParserService()
 
 
+@router.post("/scan")
+async def scan_label(
+    _: RequireAuth,
+    front_label: Annotated[UploadFile, File(description="Front label image")],
+    back_label: Annotated[UploadFile | None, File(description="Back label image")] = None,
+) -> dict:
+    """Scan wine label images and extract text without creating a wine record.
+
+    Returns parsed wine details and raw OCR text for preview before check-in.
+    Images are temporarily processed but not permanently stored.
+    """
+    # Read image data
+    front_data = await front_label.read()
+    await front_label.seek(0)  # Reset for potential later use
+
+    # Extract text via OCR (using in-memory processing)
+    front_text = await ocr_service.extract_text_from_bytes(front_data)
+
+    back_text = None
+    if back_label and back_label.filename:
+        back_data = await back_label.read()
+        await back_label.seek(0)
+        back_text = await ocr_service.extract_text_from_bytes(back_data)
+
+    # Parse wine details from OCR text
+    combined_text = front_text
+    if back_text:
+        combined_text = f"{front_text}\n{back_text}"
+    parsed_data = wine_parser.parse(combined_text)
+
+    return {
+        "parsed": {
+            "name": parsed_data.get("name"),
+            "winery": parsed_data.get("winery"),
+            "vintage": parsed_data.get("vintage"),
+            "grape_variety": parsed_data.get("grape_variety"),
+            "region": parsed_data.get("region"),
+            "country": parsed_data.get("country"),
+            "alcohol_percentage": parsed_data.get("alcohol_percentage"),
+        },
+        "ocr": {
+            "front_label_text": front_text,
+            "back_label_text": back_text,
+        }
+    }
+
+
 @router.post("/checkin", response_model=WineWithInventory, status_code=status.HTTP_201_CREATED)
 async def checkin_wine(
     _: RequireAuth,

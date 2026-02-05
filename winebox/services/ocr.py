@@ -1,5 +1,6 @@
 """OCR service for extracting text from wine label images."""
 
+import io
 import logging
 from pathlib import Path
 
@@ -44,6 +45,42 @@ class OCRService:
 
             # Open image and extract text
             image = Image.open(full_path)
+
+            # Preprocess image for better OCR results
+            # Convert to grayscale
+            if image.mode != "L":
+                image = image.convert("L")
+
+            # Extract text
+            text = pytesseract.image_to_string(
+                image,
+                lang="eng",
+                config="--psm 6",  # Assume uniform block of text
+            )
+
+            return text.strip()
+
+        except ImportError:
+            logger.error("pytesseract is not installed")
+            return ""
+        except Exception as e:
+            logger.error(f"OCR extraction failed: {e}")
+            return ""
+
+    async def extract_text_from_bytes(self, image_data: bytes) -> str:
+        """Extract text from image bytes without saving to disk.
+
+        Args:
+            image_data: Raw image data as bytes.
+
+        Returns:
+            Extracted text from the image.
+        """
+        try:
+            import pytesseract
+
+            # Open image from bytes
+            image = Image.open(io.BytesIO(image_data))
 
             # Preprocess image for better OCR results
             # Convert to grayscale

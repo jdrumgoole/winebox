@@ -1267,3 +1267,29 @@ body.logged-out #user-info {
         grid-template-columns: 1fr;
     }
 }
+
+/* Auto-fill Animation */
+.auto-filled {
+    animation: autoFillPulse 0.5s ease;
+    background-color: rgba(74, 124, 89, 0.1) !important;
+}
+
+@keyframes autoFillPulse {
+    0% {
+        background-color: rgba(74, 124, 89, 0.3);
+    }
+    100% {
+        background-color: rgba(74, 124, 89, 0.1);
+    }
+}
+
+/* Scanning Indicator */
+.form-note.scanning {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.form-note.scanning::after {
+    content: '';
+    animation: dots 1.5s steps(4, end) infinite;
+}
