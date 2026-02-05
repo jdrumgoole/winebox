@@ -300,6 +300,87 @@ asyncio.run(delete_wine_data())
     print("\nWine data purge complete. User accounts preserved.")
 
 
+# User Management Tasks
+@task(name="add-user")
+def add_user(
+    ctx: Context,
+    username: str,
+    password: str,
+    email: str = "",
+    admin: bool = False,
+) -> None:
+    """Add a new user to the system.
+
+    Args:
+        ctx: Invoke context
+        username: Username for the new user
+        password: Password for the new user
+        email: Optional email address
+        admin: Make user an admin (default: False)
+    """
+    cmd = f"uv run winebox-admin add {username} --password {password}"
+    if email:
+        cmd += f" --email {email}"
+    if admin:
+        cmd += " --admin"
+    ctx.run(cmd)
+
+
+@task(name="remove-user")
+def remove_user(ctx: Context, username: str, force: bool = False) -> None:
+    """Remove a user from the system.
+
+    Args:
+        ctx: Invoke context
+        username: Username to remove
+        force: Skip confirmation prompt
+    """
+    cmd = f"uv run winebox-admin remove {username}"
+    if force:
+        cmd += " --force"
+    ctx.run(cmd, pty=True)
+
+
+@task(name="list-users")
+def list_users(ctx: Context) -> None:
+    """List all users in the system."""
+    ctx.run("uv run winebox-admin list")
+
+
+@task(name="disable-user")
+def disable_user(ctx: Context, username: str) -> None:
+    """Disable a user account.
+
+    Args:
+        ctx: Invoke context
+        username: Username to disable
+    """
+    ctx.run(f"uv run winebox-admin disable {username}")
+
+
+@task(name="enable-user")
+def enable_user(ctx: Context, username: str) -> None:
+    """Enable a user account.
+
+    Args:
+        ctx: Invoke context
+        username: Username to enable
+    """
+    ctx.run(f"uv run winebox-admin enable {username}")
+
+
+@task(name="passwd")
+def change_password(ctx: Context, username: str, password: str) -> None:
+    """Change a user's password.
+
+    Args:
+        ctx: Invoke context
+        username: Username to change password for
+        password: New password
+    """
+    ctx.run(f"uv run winebox-admin passwd {username} --password {password}")
+
+
 @task(name="docs-build")
 def docs_build(ctx: Context) -> None:
     """Build the Sphinx documentation."""
