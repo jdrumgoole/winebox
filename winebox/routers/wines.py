@@ -1,5 +1,6 @@
 """Wine management endpoints."""
 
+import logging
 from typing import Annotated
 from uuid import UUID
 
@@ -14,7 +15,10 @@ from winebox.schemas.wine import WineCreate, WineResponse, WineUpdate, WineWithI
 from winebox.services.auth import RequireAuth
 from winebox.services.image_storage import ImageStorageService
 from winebox.services.ocr import OCRService
+from winebox.services.vision import ClaudeVisionService
 from winebox.services.wine_parser import WineParserService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -22,6 +26,21 @@ router = APIRouter()
 image_storage = ImageStorageService()
 ocr_service = OCRService()
 wine_parser = WineParserService()
+vision_service = ClaudeVisionService()
+
+
+def get_media_type(filename: str | None) -> str:
+    """Get media type from filename."""
+    if not filename:
+        return "image/jpeg"
+    ext = filename.lower().split(".")[-1]
+    return {
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "gif": "image/gif",
+        "webp": "image/webp",
+    }.get(ext, "image/jpeg")
 
 
 @router.post("/scan")
@@ -32,20 +51,57 @@ async def scan_label(
 ) -> dict:
     """Scan wine label images and extract text without creating a wine record.
 
-    Returns parsed wine details and raw OCR text for preview before check-in.
-    Images are temporarily processed but not permanently stored.
+    Uses Claude Vision for intelligent label analysis when available,
+    falls back to Tesseract OCR otherwise.
     """
     # Read image data
     front_data = await front_label.read()
-    await front_label.seek(0)  # Reset for potential later use
+    await front_label.seek(0)
 
-    # Extract text via OCR (using in-memory processing)
-    front_text = await ocr_service.extract_text_from_bytes(front_data)
-
-    back_text = None
+    back_data = None
     if back_label and back_label.filename:
         back_data = await back_label.read()
         await back_label.seek(0)
+
+    # Try Claude Vision first
+    if vision_service.is_available():
+        logger.info("Using Claude Vision for label analysis")
+        try:
+            front_media_type = get_media_type(front_label.filename)
+            back_media_type = get_media_type(back_label.filename if back_label else None)
+
+            result = await vision_service.analyze_labels(
+                front_image_data=front_data,
+                back_image_data=back_data,
+                front_media_type=front_media_type,
+                back_media_type=back_media_type,
+            )
+
+            return {
+                "parsed": {
+                    "name": result.get("name"),
+                    "winery": result.get("winery"),
+                    "vintage": result.get("vintage"),
+                    "grape_variety": result.get("grape_variety"),
+                    "region": result.get("region"),
+                    "country": result.get("country"),
+                    "alcohol_percentage": result.get("alcohol_percentage"),
+                },
+                "ocr": {
+                    "front_label_text": result.get("raw_text", ""),
+                    "back_label_text": result.get("back_label_text"),
+                },
+                "method": "claude_vision",
+            }
+        except Exception as e:
+            logger.warning(f"Claude Vision failed, falling back to Tesseract: {e}")
+
+    # Fall back to Tesseract OCR
+    logger.info("Using Tesseract OCR for label analysis")
+    front_text = await ocr_service.extract_text_from_bytes(front_data)
+
+    back_text = None
+    if back_data:
         back_text = await ocr_service.extract_text_from_bytes(back_data)
 
     # Parse wine details from OCR text
@@ -67,7 +123,8 @@ async def scan_label(
         "ocr": {
             "front_label_text": front_text,
             "back_label_text": back_text,
-        }
+        },
+        "method": "tesseract",
     }
 
 
@@ -90,26 +147,58 @@ async def checkin_wine(
     """Check in wine bottles to the cellar.
 
     Upload front (required) and back (optional) label images.
-    OCR will extract text and attempt to identify wine details.
+    Uses Claude Vision for intelligent label analysis when available.
     You can override any auto-detected values.
     """
+    # Read image data for analysis
+    front_data = await front_label.read()
+    await front_label.seek(0)
+
+    back_data = None
+    if back_label and back_label.filename:
+        back_data = await back_label.read()
+        await back_label.seek(0)
+
     # Save images
     front_image_path = await image_storage.save_image(front_label)
     back_image_path = None
     if back_label and back_label.filename:
         back_image_path = await image_storage.save_image(back_label)
 
-    # Extract text via OCR
-    front_text = await ocr_service.extract_text(front_image_path)
+    # Try Claude Vision first
+    parsed_data = {}
+    front_text = ""
     back_text = None
-    if back_image_path:
-        back_text = await ocr_service.extract_text(back_image_path)
 
-    # Parse wine details from OCR text
-    combined_text = front_text
-    if back_text:
-        combined_text = f"{front_text}\n{back_text}"
-    parsed_data = wine_parser.parse(combined_text)
+    if vision_service.is_available():
+        logger.info("Using Claude Vision for checkin analysis")
+        try:
+            front_media_type = get_media_type(front_label.filename)
+            back_media_type = get_media_type(back_label.filename if back_label else None)
+
+            result = await vision_service.analyze_labels(
+                front_image_data=front_data,
+                back_image_data=back_data,
+                front_media_type=front_media_type,
+                back_media_type=back_media_type,
+            )
+            parsed_data = result
+            front_text = result.get("raw_text", "")
+            back_text = result.get("back_label_text")
+        except Exception as e:
+            logger.warning(f"Claude Vision failed, falling back to Tesseract: {e}")
+
+    # Fall back to Tesseract if needed
+    if not parsed_data.get("name"):
+        logger.info("Using Tesseract OCR for checkin analysis")
+        front_text = await ocr_service.extract_text(front_image_path)
+        if back_image_path:
+            back_text = await ocr_service.extract_text(back_image_path)
+
+        combined_text = front_text
+        if back_text:
+            combined_text = f"{front_text}\n{back_text}"
+        parsed_data = wine_parser.parse(combined_text)
 
     # Use provided values or fall back to parsed values
     wine_name = name or parsed_data.get("name") or "Unknown Wine"

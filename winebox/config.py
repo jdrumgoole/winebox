@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     # OCR
     tesseract_cmd: str | None = None  # Use system default if None
 
+    # Claude Vision (for wine label scanning)
+    anthropic_api_key: str | None = None  # Set WINEBOX_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY
+    use_claude_vision: bool = True  # Fall back to Tesseract if False or no API key
+
     # Authentication
     secret_key: str = generate_secret_key()  # Override with WINEBOX_SECRET_KEY env var
     auth_enabled: bool = True  # Set to False to disable authentication
