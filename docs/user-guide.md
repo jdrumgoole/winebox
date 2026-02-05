@@ -224,6 +224,12 @@ invoke init-db            # Initialize database
 invoke purge --force      # Delete database and images
 invoke purge-wines --force # Delete wines but keep users
 
+# Database migrations
+uv run python -m scripts.migrations.runner status      # Show version
+uv run python -m scripts.migrations.runner up          # Migrate to latest
+uv run python -m scripts.migrations.runner down --to 0 # Revert to version
+uv run python -m scripts.migrations.runner history     # Show history
+
 # User management
 invoke add-user <username> --password <pass>
 invoke remove-user <username> --force

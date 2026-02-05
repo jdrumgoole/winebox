@@ -162,6 +162,8 @@ winebox/
 │   ├── routers/      # API endpoints
 │   ├── services/     # Business logic
 │   └── static/       # Web interface
+├── scripts/          # Utility scripts
+│   └── migrations/   # Database migration system
 ├── tests/            # Test suite
 ├── docs/             # Documentation
 ├── data/             # Database and images
