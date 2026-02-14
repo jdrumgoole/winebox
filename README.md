@@ -5,6 +5,7 @@ A wine cellar management application with OCR label scanning.
 ## Features
 
 - **Label Scanning**: Upload wine label images for automatic text extraction via OCR
+- **Wine Autocomplete**: Search 100K+ wines from the [X-Wines dataset](https://github.com/rogerioxavier/X-Wines) with community ratings
 - **Inventory Tracking**: Check-in and check-out bottles with full history
 - **Smart Parsing**: Automatically identifies vintage, grape variety, region, and more
 - **Search**: Find wines by any criteria
@@ -105,6 +106,9 @@ Full REST API available at `/api`:
 | `/api/cellar/summary` | GET | Cellar statistics |
 | `/api/transactions` | GET | Transaction history |
 | `/api/search` | GET | Search wines |
+| `/api/xwines/search` | GET | Autocomplete wine search |
+| `/api/xwines/wines/{id}` | GET | X-Wines wine details |
+| `/api/xwines/stats` | GET | Dataset statistics |
 
 See `/docs` for interactive API documentation.
 
@@ -126,6 +130,32 @@ Wine label images are stored in the `data/images/` directory by default. Each im
 Images are served via the API at `/api/images/{filename}`.
 
 **Note:** The `data/` directory is excluded from git (see `.gitignore`). Make sure to back up this directory to preserve your wine collection data.
+
+## X-Wines Dataset
+
+WineBox integrates the [X-Wines dataset](https://github.com/rogerioxavier/X-Wines) for wine autocomplete, providing suggestions from 100,646 wines with 21 million community ratings.
+
+### Installing the Dataset
+
+```bash
+# Run database migration (if not already done)
+uv run python -m scripts.migrations.runner up
+
+# Option 1: Test dataset (100 wines, for development)
+uv run python -m scripts.import_xwines --version test
+
+# Option 2: Full dataset (100K+ wines, for production)
+# First, install gdown and download from Google Drive
+uv pip install gdown
+mkdir -p data/xwines
+uv run gdown --folder "https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMVx5ELA61LPfGfuu_?usp=sharing" -O data/xwines/
+cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_*.csv data/xwines/
+
+# Then import
+uv run python -m scripts.import_xwines --version full
+```
+
+The autocomplete appears when typing in the Wine Name field during check-in.
 
 ## Label Scanning
 

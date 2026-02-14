@@ -1616,6 +1616,14 @@ body.logged-out #user-info {
     margin-top: 2rem;
 }
 
+#app-footer .footer-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
 #app-footer #app-info {
     display: flex;
     justify-content: center;
@@ -1623,9 +1631,106 @@ body.logged-out #user-info {
     gap: 0.5rem;
 }
 
+#app-footer .footer-separator {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#app-footer #data-credits {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+#app-footer #data-credits a {
+    color: var(--secondary-color);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+#app-footer #data-credits a:hover {
+    color: #e8c49a;
+    text-decoration: underline;
+}
+
 #app-footer .version {
     background: rgba(255, 255, 255, 0.15);
     padding: 0.15rem 0.5rem;
     border-radius: 4px;
     font-size: 0.75rem;
+}
+
+/* Autocomplete Dropdown */
+.autocomplete-wrapper {
+    position: relative;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-hover);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.autocomplete-dropdown.active {
+    display: block;
+}
+
+.autocomplete-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.15s;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.selected {
+    background-color: var(--background-color);
+}
+
+.autocomplete-item-name {
+    font-weight: 500;
+    color: var(--text-color);
+    margin-bottom: 0.25rem;
+}
+
+.autocomplete-item-details {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.autocomplete-item-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.autocomplete-item-rating {
+    color: var(--warning-color);
+    font-weight: 500;
+}
+
+.autocomplete-loading {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.autocomplete-no-results {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
 }

@@ -7,6 +7,7 @@ Welcome to WineBox, a wine cellar management application with OCR label scanning
 WineBox helps you manage your wine collection by:
 
 - **Scanning wine labels** using Claude Vision AI (with Tesseract OCR fallback) to automatically extract wine details
+- **Wine autocomplete** powered by the [X-Wines dataset](https://github.com/rogerioxavier/X-Wines) with 100K+ wines and 21M+ ratings
 - **Tracking inventory** with check-in and check-out functionality
 - **Searching your cellar** by vintage, grape variety, region, and more
 - **Maintaining history** of all bottle movements
@@ -75,10 +76,11 @@ api-reference
 
 1. Upload front label image (required) and back label (optional)
 2. Claude Vision AI (or Tesseract OCR fallback) automatically analyzes the labels
-3. Form fields are instantly populated with: wine name, vintage, winery, grape variety, region, country, alcohol %
-4. Review and edit auto-detected values
-5. Specify quantity of bottles
-6. Wine is added to your cellar with a CHECK_IN transaction
+3. **Wine Autocomplete**: Start typing in the wine name field to search 100K+ wines from the X-Wines dataset
+4. Form fields are instantly populated with: wine name, vintage, winery, grape variety, region, country, alcohol %
+5. Review and edit auto-detected values
+6. Specify quantity of bottles
+7. Wine is added to your cellar with a CHECK_IN transaction
 
 ### Check-Out Process
 
@@ -123,6 +125,16 @@ The API provides the following endpoints:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/search` | Search wines by criteria |
+
+### X-Wines Dataset
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/xwines/search` | Autocomplete wine search |
+| GET | `/api/xwines/wines/{id}` | Get X-Wines wine details |
+| GET | `/api/xwines/stats` | Dataset statistics |
+| GET | `/api/xwines/types` | List wine types |
+| GET | `/api/xwines/countries` | List countries |
 
 ## Development
 

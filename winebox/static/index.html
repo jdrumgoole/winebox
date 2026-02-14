@@ -125,9 +125,10 @@
                     <p class="form-note">Leave fields blank to use OCR-detected values</p>
 
                     <div class="form-grid">
-                        <div class="form-group">
+                        <div class="form-group autocomplete-wrapper">
                             <label for="wine-name">Wine Name</label>
-                            <input type="text" id="wine-name" name="name" placeholder="Auto-detected from label">
+                            <input type="text" id="wine-name" name="name" placeholder="Start typing to search..." autocomplete="off">
+                            <div id="wine-autocomplete" class="autocomplete-dropdown"></div>
                         </div>
                         <div class="form-group">
                             <label for="winery">Winery</label>
@@ -156,6 +157,51 @@
                         <div class="form-group">
                             <label for="quantity">Quantity (Bottles)</label>
                             <input type="number" id="quantity" name="quantity" min="1" value="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-type">Wine Type</label>
+                            <select id="wine-type" name="wine_type_id">
+                                <option value="">Auto-detected</option>
+                                <option value="red">Red</option>
+                                <option value="white">White</option>
+                                <option value="rosé">Rosé</option>
+                                <option value="sparkling">Sparkling</option>
+                                <option value="fortified">Fortified</option>
+                                <option value="dessert">Dessert</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="classification">Classification</label>
+                            <input type="text" id="classification" name="classification" placeholder="e.g., Grand Cru, DOCG, Reserve">
+                        </div>
+                        <div class="form-group">
+                            <label for="price-tier">Price Tier</label>
+                            <select id="price-tier" name="price_tier">
+                                <option value="">Unknown</option>
+                                <option value="budget">Budget (&lt; $15)</option>
+                                <option value="value">Value ($15-25)</option>
+                                <option value="mid_range">Mid-Range ($25-50)</option>
+                                <option value="premium">Premium ($50-100)</option>
+                                <option value="luxury">Luxury ($100-250)</option>
+                                <option value="ultra_premium">Ultra Premium (&gt; $250)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="producer-type">Producer Type</label>
+                            <select id="producer-type" name="producer_type">
+                                <option value="">Unknown</option>
+                                <option value="estate">Estate</option>
+                                <option value="negociant">Négociant</option>
+                                <option value="cooperative">Cooperative</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="drink-window-start">Drink Window Start</label>
+                            <input type="number" id="drink-window-start" name="drink_window_start" min="1900" max="2200" placeholder="Year">
+                        </div>
+                        <div class="form-group">
+                            <label for="drink-window-end">Drink Window End</label>
+                            <input type="number" id="drink-window-end" name="drink_window_end" min="1900" max="2200" placeholder="Year">
                         </div>
                     </div>
 
@@ -254,6 +300,30 @@
                     <div class="form-group">
                         <label for="search-country">Country</label>
                         <input type="text" id="search-country" name="country">
+                    </div>
+                    <div class="form-group">
+                        <label for="search-wine-type">Wine Type</label>
+                        <select id="search-wine-type" name="wine_type">
+                            <option value="">All Types</option>
+                            <option value="red">Red</option>
+                            <option value="white">White</option>
+                            <option value="rosé">Rosé</option>
+                            <option value="sparkling">Sparkling</option>
+                            <option value="fortified">Fortified</option>
+                            <option value="dessert">Dessert</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="search-price-tier">Price Tier</label>
+                        <select id="search-price-tier" name="price_tier">
+                            <option value="">All Tiers</option>
+                            <option value="budget">Budget</option>
+                            <option value="value">Value</option>
+                            <option value="mid_range">Mid-Range</option>
+                            <option value="premium">Premium</option>
+                            <option value="luxury">Luxury</option>
+                            <option value="ultra_premium">Ultra Premium</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="search-in-stock">
@@ -456,6 +526,43 @@
                                 <label for="confirm-quantity">Quantity</label>
                                 <input type="number" id="confirm-quantity" min="1" value="1" required>
                             </div>
+                            <div class="form-group">
+                                <label for="confirm-wine-type">Wine Type</label>
+                                <select id="confirm-wine-type">
+                                    <option value="">Unknown</option>
+                                    <option value="red">Red</option>
+                                    <option value="white">White</option>
+                                    <option value="rosé">Rosé</option>
+                                    <option value="sparkling">Sparkling</option>
+                                    <option value="fortified">Fortified</option>
+                                    <option value="dessert">Dessert</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-classification">Classification</label>
+                                <input type="text" id="confirm-classification" placeholder="e.g., Grand Cru, DOCG">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-price-tier">Price Tier</label>
+                                <select id="confirm-price-tier">
+                                    <option value="">Unknown</option>
+                                    <option value="budget">Budget</option>
+                                    <option value="value">Value</option>
+                                    <option value="mid_range">Mid-Range</option>
+                                    <option value="premium">Premium</option>
+                                    <option value="luxury">Luxury</option>
+                                    <option value="ultra_premium">Ultra Premium</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-producer-type">Producer Type</label>
+                                <select id="confirm-producer-type">
+                                    <option value="">Unknown</option>
+                                    <option value="estate">Estate</option>
+                                    <option value="negociant">Négociant</option>
+                                    <option value="cooperative">Cooperative</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="form-group full-width">
                             <label for="confirm-notes">Notes</label>
@@ -491,7 +598,14 @@
 
     <!-- Footer -->
     <footer id="app-footer">
-        <span id="app-info">WineBox</span>
+        <div class="footer-content">
+            <span id="app-info">WineBox</span>
+            <span class="footer-separator">|</span>
+            <span id="data-credits">
+                Wine data powered by
+                <a href="https://github.com/rogerioxavier/X-Wines" target="_blank" rel="noopener">X-Wines Dataset</a>
+            </span>
+        </div>
     </footer>
 
     <!-- Toast Notifications -->

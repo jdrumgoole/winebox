@@ -31,17 +31,23 @@ The check-in process adds bottles to your cellar inventory.
 3. **Upload the back label image** (optional):
    - Back labels often contain additional details
    - Scanning updates with information from both labels
-4. **Review auto-detected values**:
+4. **Use Wine Autocomplete** (optional):
+   - Start typing in the **Wine Name** field (minimum 2 characters)
+   - A dropdown appears with matching wines from the X-Wines dataset (100K+ wines)
+   - Results show wine name, winery, type, country, and community ratings
+   - Select a wine to auto-fill: name, winery, country, and ABV
+   - Use keyboard arrows to navigate and Enter to select
+5. **Review auto-detected values**:
    - Claude Vision AI (or Tesseract OCR fallback) extracts wine details
    - A toast notification shows which scanning engine was used
    - Edit any incorrect values as needed
    - View raw label text in the collapsible "Raw Label Text" section
-5. **Set the quantity**:
+6. **Set the quantity**:
    - Enter the number of bottles you're adding
-6. **Add notes** (optional):
+7. **Add notes** (optional):
    - Where you purchased it, price, occasion, etc.
-7. Click **Check In Wine**
-8. **Review in confirmation dialog**:
+8. Click **Check In Wine**
+9. **Review in confirmation dialog**:
    - A confirmation dialog appears with all editable fields
    - Make any final adjustments to wine details
    - View raw label text by expanding the "Raw Label Text" section
@@ -183,6 +189,74 @@ Your data is stored in:
 - **Images**: `data/images/`
 
 Back up these files regularly to preserve your cellar records.
+
+## X-Wines Dataset
+
+WineBox integrates the [X-Wines dataset](https://github.com/rogerioxavier/X-Wines), providing autocomplete suggestions from a database of 100,646 wines with 21 million community ratings.
+
+### Installing the Dataset
+
+The X-Wines data must be imported before the autocomplete feature works.
+
+#### Test Dataset (Development)
+
+For development or testing, import the small test dataset (100 wines):
+
+```bash
+uv run python -m scripts.import_xwines --version test
+```
+
+#### Full Dataset (Production)
+
+For production use, install the full dataset with 100K+ wines:
+
+```bash
+# Install gdown for Google Drive downloads
+uv pip install gdown
+
+# Download the dataset from Google Drive
+mkdir -p data/xwines
+uv run gdown --folder "https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMVx5ELA61LPfGfuu_?usp=sharing" -O data/xwines/
+
+# Copy files to expected location
+cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_100K_wines.csv data/xwines/
+cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_21M_ratings.csv data/xwines/
+
+# Import the data (this may take a few minutes)
+uv run python -m scripts.import_xwines --version full --force
+```
+
+### Dataset Statistics
+
+After importing, you can check the dataset status:
+
+```bash
+# Check via API
+curl http://localhost:8000/api/xwines/stats
+
+# Or directly in database
+sqlite3 data/winebox.db "SELECT * FROM xwines_metadata;"
+```
+
+### Import Options
+
+```bash
+# Preview without importing
+uv run python -m scripts.import_xwines --version full --dry-run
+
+# Skip ratings for faster import (wines only)
+uv run python -m scripts.import_xwines --version full --skip-ratings
+
+# Re-import even if data exists
+uv run python -m scripts.import_xwines --version full --force
+
+# Use custom database path
+uv run python -m scripts.import_xwines --database /path/to/winebox.db
+```
+
+### Attribution
+
+The X-Wines dataset is an open dataset for wine recommendation research. When using the autocomplete feature, WineBox displays attribution in the footer linking to the dataset source.
 
 ## Development
 

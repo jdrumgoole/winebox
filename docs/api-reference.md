@@ -319,6 +319,122 @@ Serve stored label images.
 
 ---
 
+## X-Wines Dataset Endpoints
+
+The X-Wines endpoints provide access to a reference database of 100K+ wines with community ratings from the [X-Wines dataset](https://github.com/rogerioxavier/X-Wines).
+
+### GET /api/xwines/search
+
+Search X-Wines dataset for wine autocomplete.
+
+**Query Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| q | string | Yes | Search query (min 2 characters) |
+| limit | integer | No | Maximum results (default: 10, max: 50) |
+| wine_type | string | No | Filter by wine type (Red, White, etc.) |
+| country | string | No | Filter by country code (FR, US, etc.) |
+
+**Response**: `200 OK`
+```json
+{
+  "results": [
+    {
+      "id": 100062,
+      "name": "Origem Merlot",
+      "winery": "Casa Valduga",
+      "wine_type": "Red",
+      "country": "Brazil",
+      "region": "Vale dos Vinhedos",
+      "abv": 13.0,
+      "avg_rating": 4.12,
+      "rating_count": 21
+    }
+  ],
+  "total": 2
+}
+```
+
+---
+
+### GET /api/xwines/wines/{wine_id}
+
+Get full details for a specific X-Wines wine.
+
+**Path Parameters**:
+- `wine_id`: Integer ID of the wine
+
+**Response**: `200 OK`
+```json
+{
+  "id": 100062,
+  "name": "Origem Merlot",
+  "wine_type": "Red",
+  "elaborate": "Varietal/100%",
+  "grapes": "['Merlot']",
+  "harmonize": "['Beef', 'Lamb', 'Veal']",
+  "abv": 13.0,
+  "body": "Full-bodied",
+  "acidity": "Medium",
+  "country_code": "BR",
+  "country": "Brazil",
+  "region_id": 1002,
+  "region_name": "Vale dos Vinhedos",
+  "winery_id": 10014,
+  "winery_name": "Casa Valduga",
+  "website": "http://www.casavalduga.com.br",
+  "vintages": "[2020, 2019, 2018, 2017]",
+  "avg_rating": 4.12,
+  "rating_count": 21
+}
+```
+
+---
+
+### GET /api/xwines/stats
+
+Get X-Wines dataset statistics.
+
+**Response**: `200 OK`
+```json
+{
+  "wine_count": 100646,
+  "rating_count": 21013536,
+  "version": "full",
+  "import_date": "2024-01-15T10:30:00",
+  "source": "https://github.com/rogerioxavier/X-Wines"
+}
+```
+
+---
+
+### GET /api/xwines/types
+
+List distinct wine types in the dataset.
+
+**Response**: `200 OK`
+```json
+["Dessert/Port", "Fortified", "Red", "Rosé", "Sparkling", "White"]
+```
+
+---
+
+### GET /api/xwines/countries
+
+List countries with wine counts.
+
+**Response**: `200 OK`
+```json
+[
+  {"code": "FR", "name": "France", "count": 25432},
+  {"code": "IT", "name": "Italy", "count": 18234},
+  {"code": "US", "name": "United States", "count": 15678}
+]
+```
+
+---
+
 ## Error Responses
 
 All endpoints may return these error responses:

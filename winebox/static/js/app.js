@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initForms();
     initModals();
     initAuth();
+    initAutocomplete();
     checkAuth();
     loadAppInfo();
 });
@@ -33,6 +34,174 @@ async function loadAppInfo() {
     } catch (error) {
         console.log('Could not load app info');
     }
+}
+
+// X-Wines Autocomplete
+let autocompleteSelectedIndex = -1;
+let autocompleteResults = [];
+
+function initAutocomplete() {
+    const wineNameInput = document.getElementById('wine-name');
+    const autocompleteDropdown = document.getElementById('wine-autocomplete');
+
+    if (!wineNameInput || !autocompleteDropdown) return;
+
+    // Input event for search
+    wineNameInput.addEventListener('input', debounce(async (e) => {
+        const query = e.target.value.trim();
+        if (query.length < 2) {
+            hideAutocomplete();
+            return;
+        }
+        await searchXWines(query);
+    }, 300));
+
+    // Keyboard navigation
+    wineNameInput.addEventListener('keydown', (e) => {
+        if (!autocompleteDropdown.classList.contains('active')) return;
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                navigateAutocomplete(1);
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                navigateAutocomplete(-1);
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (autocompleteSelectedIndex >= 0) {
+                    selectAutocompleteItem(autocompleteResults[autocompleteSelectedIndex]);
+                }
+                break;
+            case 'Escape':
+                hideAutocomplete();
+                break;
+        }
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.autocomplete-wrapper')) {
+            hideAutocomplete();
+        }
+    });
+
+    // Focus shows dropdown if there are results
+    wineNameInput.addEventListener('focus', () => {
+        if (autocompleteResults.length > 0 && wineNameInput.value.length >= 2) {
+            showAutocomplete();
+        }
+    });
+}
+
+async function searchXWines(query) {
+    const autocompleteDropdown = document.getElementById('wine-autocomplete');
+
+    // Show loading state
+    autocompleteDropdown.innerHTML = '<div class="autocomplete-loading">Searching...</div>';
+    autocompleteDropdown.classList.add('active');
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/xwines/search?q=${encodeURIComponent(query)}&limit=10`);
+
+        if (!response.ok) {
+            throw new Error('Search failed');
+        }
+
+        const data = await response.json();
+        autocompleteResults = data.results;
+        autocompleteSelectedIndex = -1;
+
+        if (autocompleteResults.length === 0) {
+            autocompleteDropdown.innerHTML = '<div class="autocomplete-no-results">No wines found</div>';
+        } else {
+            renderAutocompleteResults();
+        }
+    } catch (error) {
+        console.error('X-Wines search error:', error);
+        autocompleteDropdown.innerHTML = '<div class="autocomplete-no-results">Search unavailable</div>';
+    }
+}
+
+function renderAutocompleteResults() {
+    const autocompleteDropdown = document.getElementById('wine-autocomplete');
+
+    autocompleteDropdown.innerHTML = autocompleteResults.map((wine, index) => {
+        const ratingStars = wine.avg_rating ? '★'.repeat(Math.round(wine.avg_rating)) : '';
+        return `
+            <div class="autocomplete-item ${index === autocompleteSelectedIndex ? 'selected' : ''}"
+                 data-index="${index}">
+                <div class="autocomplete-item-name">${escapeHtml(wine.name)}</div>
+                <div class="autocomplete-item-details">
+                    ${wine.winery ? `<span class="autocomplete-item-detail">${escapeHtml(wine.winery)}</span>` : ''}
+                    ${wine.wine_type ? `<span class="autocomplete-item-detail">${escapeHtml(wine.wine_type)}</span>` : ''}
+                    ${wine.country ? `<span class="autocomplete-item-detail">${escapeHtml(wine.country)}</span>` : ''}
+                    ${wine.avg_rating ? `<span class="autocomplete-item-detail autocomplete-item-rating">${ratingStars} (${wine.rating_count})</span>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add click handlers
+    autocompleteDropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const index = parseInt(item.dataset.index);
+            selectAutocompleteItem(autocompleteResults[index]);
+        });
+    });
+}
+
+function navigateAutocomplete(direction) {
+    const newIndex = autocompleteSelectedIndex + direction;
+    if (newIndex >= -1 && newIndex < autocompleteResults.length) {
+        autocompleteSelectedIndex = newIndex;
+        renderAutocompleteResults();
+
+        // Scroll selected item into view
+        const dropdown = document.getElementById('wine-autocomplete');
+        const selectedItem = dropdown.querySelector('.autocomplete-item.selected');
+        if (selectedItem) {
+            selectedItem.scrollIntoView({ block: 'nearest' });
+        }
+    }
+}
+
+function selectAutocompleteItem(wine) {
+    // Fill in the form fields with the selected wine data
+    document.getElementById('wine-name').value = wine.name || '';
+    document.getElementById('winery').value = wine.winery || '';
+    document.getElementById('grape-variety').value = wine.region || '';  // Use region as a hint for now
+    document.getElementById('country').value = wine.country || '';
+
+    // Fill alcohol percentage if available
+    const alcoholInput = document.getElementById('alcohol');
+    if (wine.abv && alcoholInput) {
+        alcoholInput.value = wine.abv;
+    }
+
+    // Add visual indicator that fields were auto-filled
+    const autoFilledFields = ['wine-name', 'winery', 'country', 'alcohol'];
+    autoFilledFields.forEach(fieldId => {
+        const input = document.getElementById(fieldId);
+        if (input && input.value) {
+            input.classList.add('auto-filled');
+            setTimeout(() => input.classList.remove('auto-filled'), 2000);
+        }
+    });
+
+    hideAutocomplete();
+    showToast(`Selected: ${wine.name}`, 'success');
+}
+
+function showAutocomplete() {
+    document.getElementById('wine-autocomplete').classList.add('active');
+}
+
+function hideAutocomplete() {
+    document.getElementById('wine-autocomplete').classList.remove('active');
+    autocompleteSelectedIndex = -1;
 }
 
 // Authentication
