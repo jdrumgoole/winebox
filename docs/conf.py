@@ -27,13 +27,23 @@ templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # Options for HTML output
-html_theme = "alabaster"
+# Use Read the Docs theme if available, otherwise fall back to alabaster
+try:
+    import sphinx_rtd_theme
+    html_theme = "sphinx_rtd_theme"
+    html_theme_options = {
+        "navigation_depth": 4,
+        "collapse_navigation": False,
+    }
+except ImportError:
+    html_theme = "alabaster"
+    html_theme_options = {
+        "description": "Wine Cellar Management Application",
+        "github_user": "jdrumgoole",
+        "github_repo": "winebox",
+    }
+
 html_static_path = ["_static"]
-html_theme_options = {
-    "description": "Wine Cellar Management Application",
-    "github_user": "winebox",
-    "github_repo": "winebox",
-}
 
 # MyST parser settings
 myst_enable_extensions = [

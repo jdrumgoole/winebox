@@ -44,6 +44,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/jdrumgoole/winebox"
+Documentation = "https://winebox.readthedocs.io"
 Repository = "https://github.com/jdrumgoole/winebox"
 Issues = "https://github.com/jdrumgoole/winebox/issues"
 
@@ -56,6 +57,7 @@ dev = [
     "httpx>=0.26.0",
     "invoke>=2.2.0",
     "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=2.0.0",
     "myst-parser>=2.0.0",
     "greenlet>=3.0.0",
 ]
