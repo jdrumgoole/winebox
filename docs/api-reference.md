@@ -10,7 +10,35 @@ http://localhost:8000/api
 
 ## Authentication
 
-Currently, the API does not require authentication.
+All API endpoints (except `/health`) require JWT authentication.
+
+### Getting a Token
+
+```bash
+curl -X POST http://localhost:8000/api/auth/token \
+  -d "username=myuser&password=mypass"
+```
+
+**Response**:
+```json
+{
+  "access_token": "eyJ...",
+  "token_type": "bearer"
+}
+```
+
+### Using the Token
+
+Include the token in the `Authorization` header for all requests:
+
+```bash
+curl -H "Authorization: Bearer <your-token>" \
+  http://localhost:8000/api/wines
+```
+
+### Token Expiration
+
+Tokens expire after 30 minutes. Request a new token when needed.
 
 ## Endpoints
 
@@ -24,7 +52,7 @@ Check if the server is running.
 ```json
 {
   "status": "healthy",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "app_name": "WineBox"
 }
 ```

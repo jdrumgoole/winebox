@@ -2,219 +2,221 @@
 
 This guide walks you through using WineBox to manage your wine cellar.
 
-## Getting Started
+## Dashboard Overview
 
-### First Time Setup
+When you log in, the **Dashboard** shows you:
 
-1. **Start the server**:
-   ```bash
-   invoke start --reload
-   ```
+- **Total Bottles** - All bottles currently in your cellar
+- **Unique Wines** - Number of different wines
+- **Wines Tracked** - Total wines you've ever recorded
 
-2. **Open the web interface**:
-   Navigate to http://localhost:8000/static/index.html in your browser.
-
-3. **Explore the dashboard**:
-   The dashboard shows your cellar summary and recent activity.
+Below the statistics, you'll see breakdowns by country, grape variety, and vintage, plus your recent activity.
 
 ## Checking In Wine
 
-The check-in process adds bottles to your cellar inventory.
+Adding wine to your cellar is easy with WineBox's AI-powered label scanning.
 
-### Using the Web Interface
+### Step-by-Step
 
-1. Click **Check In** in the navigation menu
-2. **Upload the front label image** (required):
-   - Click the file input or drag and drop an image
+1. **Click Check In** in the navigation menu
+2. **Upload the front label photo** (required)
+   - Click "Choose file" or drag and drop an image
    - Supported formats: JPG, PNG, GIF, WebP
-   - Form fields are automatically populated as soon as the image is uploaded
-3. **Upload the back label image** (optional):
-   - Back labels often contain additional details
-   - Scanning updates with information from both labels
-4. **Use Wine Autocomplete** (optional):
-   - Start typing in the **Wine Name** field (minimum 2 characters)
-   - A dropdown appears with matching wines from the X-Wines dataset (100K+ wines)
-   - Results show wine name, winery, type, country, and community ratings
-   - Select a wine to auto-fill: name, winery, country, and ABV
-   - Use keyboard arrows to navigate and Enter to select
-5. **Review auto-detected values**:
-   - Claude Vision AI (or Tesseract OCR fallback) extracts wine details
-   - A toast notification shows which scanning engine was used
-   - Edit any incorrect values as needed
-   - View raw label text in the collapsible "Raw Label Text" section
-6. **Set the quantity**:
-   - Enter the number of bottles you're adding
-7. **Add notes** (optional):
-   - Where you purchased it, price, occasion, etc.
-8. Click **Check In Wine**
-9. **Review in confirmation dialog**:
-   - A confirmation dialog appears with all editable fields
-   - Make any final adjustments to wine details
-   - View raw label text by expanding the "Raw Label Text" section
-   - Click **Confirm** to save or **Cancel** to return to the form
+3. **Wait for scanning** - the form populates automatically
+   - A notification tells you which scanner was used (Claude Vision or Tesseract OCR)
+4. **Upload back label** (optional) - adds more details
+5. **Use autocomplete** (optional)
+   - Type at least 2 characters in the Wine Name field
+   - Select a wine to auto-fill winery, country, and ABV
+6. **Review the details** - edit anything that looks incorrect
+7. **Set quantity** - how many bottles you're adding
+8. **Add notes** (optional) - where you bought it, price, occasion
+9. **Click Check In Wine**
+10. **Confirm** in the dialog that appears
 
-### Using the API
+### What Gets Detected
 
-```bash
-curl -X POST http://localhost:8000/api/wines/checkin \
-  -F "front_label=@wine_front.jpg" \
-  -F "back_label=@wine_back.jpg" \
-  -F "name=Chateau Margaux" \
-  -F "vintage=2016" \
-  -F "quantity=6"
-```
+The AI scanner looks for:
+- Wine name
+- Vintage year
+- Winery/producer
+- Grape variety
+- Region and country
+- Alcohol percentage
+- Classification (Grand Cru, DOCG, etc.)
 
-## Checking Out Wine
+### Using Wine Autocomplete
 
-Remove bottles from your cellar when you drink or sell them.
+The autocomplete feature searches over 100,000 wines from the X-Wines dataset:
 
-### Using the Web Interface
-
-1. Go to **Cellar** view
-2. Find the wine you want to check out
-3. Click the **Check Out** button on the wine card
-4. Enter the quantity to remove
-5. Add optional notes (occasion, tasting notes)
-6. Click **Check Out**
-
-### Using the API
-
-```bash
-curl -X POST http://localhost:8000/api/wines/{wine_id}/checkout \
-  -F "quantity=1" \
-  -F "notes=Dinner party with friends"
-```
+- Start typing a wine name (minimum 2 characters)
+- Results show wine name, winery, type, country, and community ratings
+- Use arrow keys to navigate, Enter to select
+- Selecting a wine fills in: name, winery, country, and ABV
 
 ## Viewing Your Cellar
 
-### Cellar View
+The **Cellar** page displays all your wines as cards.
 
-The Cellar page shows all wines currently in stock:
+### Filters
 
-- **Filter**: Show all wines, in-stock only, or out-of-stock
-- **Search**: Quick search by name, winery, or grape
-- Click any wine card to see full details
+Use the dropdown to show:
+- **All Wines** - everything you've tracked
+- **In Stock Only** - wines with bottles available
+- **Out of Stock** - wines you've finished
 
-### Wine Details
+### Quick Search
 
-Clicking a wine card shows:
+Type in the search box to filter by name or winery.
 
-- Full wine information
-- Label images
-- OCR-extracted text
-- Complete transaction history
-- Check-out and delete options
+### Wine Cards
+
+Each card shows:
+- Label image
+- Wine name and vintage
+- Region and country
+- Current bottle count
+- **Check Out** button
+
+Click anywhere on the card to see full details.
+
+## Wine Details
+
+Clicking a wine opens the detail modal showing:
+
+- **Label image** - the photo you uploaded
+- **Full wine info** - name, vintage, region, country, alcohol %
+- **Stock status** - how many bottles you have
+- **Raw label text** - expand to see what the scanner detected
+- **Transaction history** - every check-in and check-out
+- **Actions** - Check Out and Delete buttons
+
+## Checking Out Wine
+
+Remove bottles when you drink or sell them:
+
+1. Go to the **Cellar** page
+2. Find the wine (use search if needed)
+3. Click **Check Out** on the card, or open details first
+4. Enter the quantity to remove
+5. Add notes (optional) - occasion, tasting notes, who you shared it with
+6. Click **Check Out**
+
+The transaction is recorded in your history.
 
 ## Searching Your Cellar
 
-The Search page provides advanced filtering:
+The **Search** page offers advanced filtering beyond the cellar's quick search.
 
 ### Available Filters
 
-- **Text Search**: Search across name, winery, region, and label text
-- **Vintage**: Filter by year
-- **Grape Variety**: e.g., "Cabernet", "Merlot"
-- **Winery**: Filter by producer
-- **Region**: e.g., "Napa Valley", "Bordeaux"
-- **Country**: e.g., "France", "Italy"
-- **In Stock Only**: Only show wines with bottles available
+| Filter | Description |
+|--------|-------------|
+| Text Search | Searches name, winery, region, and label text |
+| Vintage | Filter by year |
+| Grape Variety | e.g., "Cabernet", "Merlot" |
+| Winery | Filter by producer |
+| Region | e.g., "Napa Valley", "Bordeaux" |
+| Country | e.g., "France", "Italy" |
+| Wine Type | Red, White, Rosé, Sparkling, Fortified, Dessert |
+| Price Tier | Budget through Ultra Premium |
+| In Stock Only | Only wines with bottles available |
 
 ### Search Tips
 
-- Partial matches work: "Cab" matches "Cabernet Sauvignon"
+- Partial matches work: "Cab" finds "Cabernet Sauvignon"
 - Searches are case-insensitive
-- Combine filters for precise results
+- Combine multiple filters for precise results
+- Click **Clear** to reset all filters
 
 ## Transaction History
 
-View all check-ins and check-outs:
+The **History** page shows a chronological log of all activity.
 
-1. Go to **History** in the navigation
-2. Use the filter to show:
-   - All transactions
-   - Check-ins only
-   - Check-outs only
+### What's Recorded
 
-Each transaction shows:
-- Transaction type (In/Out)
+- **Check In** (green "IN" badge) - bottles added
+- **Check Out** (red "OUT" badge) - bottles removed
+
+Each entry shows:
+- Transaction type
 - Wine name and vintage
 - Quantity
 - Date and time
 
-## Dashboard
+### Filtering History
 
-The Dashboard provides an overview of your cellar:
+Use the dropdown to show:
+- All transactions
+- Check-ins only
+- Check-outs only
 
-### Statistics
+## Tips for Best Results
 
-- **Total Bottles**: Sum of all bottles in stock
-- **Unique Wines**: Number of different wines
-- **Wines Tracked**: Total wines ever recorded
+### Taking Great Label Photos
 
-### Breakdowns
+For best AI scanning:
 
-- **By Country**: Bottle count per country
-- **By Grape Variety**: Distribution by grape
-- **By Vintage**: Distribution by year
+1. **Good lighting** - natural light or well-lit room
+2. **Sharp focus** - ensure text is readable
+3. **Full label** - capture the entire label
+4. **Flat angle** - photograph straight-on, not at an angle
+5. **High resolution** - more pixels = better accuracy
 
-### Recent Activity
+### AI Scanning Options
 
-Shows the last 10 transactions with quick details.
+WineBox uses two scanning engines:
 
-## Tips and Best Practices
+1. **Claude Vision AI** (recommended)
+   - More accurate label interpretation
+   - Requires Anthropic API key in `.env` file
+   - Set: `WINEBOX_ANTHROPIC_API_KEY=your-key`
 
-### Taking Good Label Photos
+2. **Tesseract OCR** (fallback)
+   - Works without API key
+   - Basic text extraction
+   - Install: `brew install tesseract` (macOS) or `apt-get install tesseract-ocr` (Linux)
 
-For best scanning results with Claude Vision:
-
-1. **Good lighting**: Natural light or well-lit room
-2. **Flat surface**: Lay the bottle on its side or hold label flat
-3. **Focus**: Ensure text is sharp and readable
-4. **Full label**: Capture the entire label in frame
-5. **High resolution**: Higher resolution improves accuracy
-
-Claude Vision provides intelligent label analysis that understands wine label context. If the Anthropic API key is not configured, the app falls back to Tesseract OCR.
-
-### Organizing Your Cellar
+### Keeping Your Cellar Organized
 
 - Use consistent naming when editing wine names
 - Always include vintage when known
-- Use standard grape variety names
+- Use standard grape variety names (Cabernet Sauvignon, not "Cab")
 - Include region and country for better searching
+- Add notes about where you purchased wines
 
 ### Data Backup
 
-Your data is stored in:
-- **Database**: `data/winebox.db`
-- **Images**: `data/images/`
+Your cellar data is stored locally:
 
-Back up these files regularly to preserve your cellar records.
+| Location | Contents |
+|----------|----------|
+| `data/winebox.db` | Database with all wines and transactions |
+| `data/images/` | Label photos you've uploaded |
 
-## X-Wines Dataset
+**Back up these files regularly** to preserve your collection records.
 
-WineBox integrates the [X-Wines dataset](https://github.com/rogerioxavier/X-Wines), providing autocomplete suggestions from a database of 100,646 wines with 21 million community ratings.
+## Installing the X-Wines Database
 
-### Installing the Dataset
+The wine autocomplete feature requires the X-Wines dataset. Without it, autocomplete won't show suggestions.
 
-The X-Wines data must be imported before the autocomplete feature works.
+### Quick Setup (Test Data)
 
-#### Test Dataset (Development)
-
-For development or testing, import the small test dataset (100 wines):
+For testing with 100 sample wines:
 
 ```bash
 uv run python -m scripts.import_xwines --version test
 ```
 
-#### Full Dataset (Production)
+### Full Setup (100K+ Wines)
 
-For production use, install the full dataset with 100K+ wines:
+For the complete database with community ratings:
 
 ```bash
-# Install gdown for Google Drive downloads
+# Install download tool
 uv pip install gdown
 
-# Download the dataset from Google Drive
+# Download dataset from Google Drive
 mkdir -p data/xwines
 uv run gdown --folder "https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMVx5ELA61LPfGfuu_?usp=sharing" -O data/xwines/
 
@@ -222,97 +224,223 @@ uv run gdown --folder "https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMV
 cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_100K_wines.csv data/xwines/
 cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_21M_ratings.csv data/xwines/
 
-# Import the data (this may take a few minutes)
+# Import (takes a few minutes)
 uv run python -m scripts.import_xwines --version full --force
 ```
 
-### Dataset Statistics
+### Verify Import
 
-After importing, you can check the dataset status:
+Check that the data imported correctly:
 
 ```bash
-# Check via API
 curl http://localhost:8000/api/xwines/stats
-
-# Or directly in database
-sqlite3 data/winebox.db "SELECT * FROM xwines_metadata;"
 ```
 
-### Import Options
+You should see `wine_count: 100646` for the full dataset.
 
-```bash
-# Preview without importing
-uv run python -m scripts.import_xwines --version full --dry-run
+---
 
-# Skip ratings for faster import (wines only)
-uv run python -m scripts.import_xwines --version full --skip-ratings
+# For Developers
 
-# Re-import even if data exists
-uv run python -m scripts.import_xwines --version full --force
+This section covers development, testing, and API documentation for contributors.
 
-# Use custom database path
-uv run python -m scripts.import_xwines --database /path/to/winebox.db
+## Project Structure
+
+```
+winebox/
+├── winebox/              # Main application package
+│   ├── main.py           # FastAPI application
+│   ├── config.py         # Configuration settings
+│   ├── database.py       # Database setup
+│   ├── models/           # SQLAlchemy models
+│   ├── schemas/          # Pydantic schemas
+│   ├── routers/          # API endpoints
+│   ├── services/         # Business logic (OCR, etc.)
+│   └── static/           # Web interface (HTML, JS, CSS)
+├── scripts/              # Utility scripts
+│   ├── migrations/       # Database migration system
+│   └── import_xwines.py  # X-Wines dataset importer
+├── tests/                # Test suite
+├── docs/                 # Sphinx documentation
+├── data/                 # Database and images
+└── tasks.py              # Invoke tasks
 ```
 
-### Attribution
-
-The X-Wines dataset is an open dataset for wine recommendation research. When using the autocomplete feature, WineBox displays attribution in the footer linking to the dataset source.
-
-## Development
-
-### Running Tests
-
-WineBox has both unit tests and end-to-end (E2E) browser tests.
+## Development Setup
 
 ```bash
-# Run all tests (unit + E2E)
-invoke test
+# Clone and install
+git clone <repository-url>
+cd winebox
+uv sync --all-extras
+
+# Set up Claude Vision (optional but recommended)
+echo "WINEBOX_ANTHROPIC_API_KEY=your-key" > .env
+
+# Install Tesseract OCR fallback
+brew install tesseract  # macOS
+# or: sudo apt-get install tesseract-ocr  # Ubuntu/Debian
+
+# Initialize database
+uv run python -m invoke init-db
+
+# Start development server with auto-reload
+uv run python -m invoke start --reload
+```
+
+## Running Tests
+
+```bash
+# Run all tests
+uv run python -m invoke test
 
 # Run only unit tests (fast, no server required)
-invoke test-unit
+uv run python -m invoke test-unit
 
 # Run only E2E tests (requires running server)
-invoke test-e2e
+uv run python -m invoke test-e2e
 
-# Run E2E tests with more workers for faster execution
-invoke test-e2e --workers 8
+# Run with verbose output
+uv run python -m invoke test --verbose
+
+# Run with coverage
+uv run python -m invoke test --coverage
 ```
 
-**Note**: E2E tests use Playwright for browser automation and create unique test users for parallel execution. The server must be running (`invoke start-background`) before running E2E tests.
+**Note**: E2E tests use Playwright for browser automation. Install browsers with:
+```bash
+uv run playwright install
+```
 
-### Invoke Tasks
+## Invoke Tasks Reference
 
-Common development tasks:
+### Server Management
 
 ```bash
-# Server management
-invoke start              # Start server in foreground
-invoke start-background   # Start server in background
-invoke stop               # Stop the server
-invoke restart            # Restart the server
-invoke status             # Check server status
-invoke logs               # View server logs
-
-# Database management
-invoke init-db            # Initialize database
-invoke purge --force      # Delete database and images
-invoke purge-wines --force # Delete wines but keep users
-
-# Database migrations
-uv run python -m scripts.migrations.runner status      # Show version
-uv run python -m scripts.migrations.runner up          # Migrate to latest
-uv run python -m scripts.migrations.runner down --to 0 # Revert to version
-uv run python -m scripts.migrations.runner history     # Show history
-
-# User management
-invoke add-user <username> --password <pass>
-invoke remove-user <username> --force
-invoke list-users
-invoke disable-user <username>
-invoke enable-user <username>
-invoke passwd <username> --password <newpass>
-
-# Documentation
-invoke docs-build         # Build Sphinx documentation
-invoke docs-serve         # Build and serve docs locally
+uv run python -m invoke start              # Start foreground
+uv run python -m invoke start --reload     # Start with auto-reload
+uv run python -m invoke start-background   # Start in background
+uv run python -m invoke stop               # Stop server
+uv run python -m invoke restart            # Restart server
+uv run python -m invoke status             # Check status
+uv run python -m invoke logs               # View logs
 ```
+
+### Database Management
+
+```bash
+uv run python -m invoke init-db              # Initialize
+uv run python -m invoke purge --force        # Delete all data
+uv run python -m invoke purge-wines --force  # Delete wines only
+```
+
+### Database Migrations
+
+```bash
+uv run python -m scripts.migrations.runner status       # Show version
+uv run python -m scripts.migrations.runner up           # Migrate to latest
+uv run python -m scripts.migrations.runner down --to 0  # Revert
+uv run python -m scripts.migrations.runner history      # Show history
+```
+
+### User Management
+
+```bash
+uv run python -m invoke add-user USERNAME --password PASS
+uv run python -m invoke remove-user USERNAME --force
+uv run python -m invoke list-users
+uv run python -m invoke disable-user USERNAME
+uv run python -m invoke enable-user USERNAME
+uv run python -m invoke passwd USERNAME --password NEWPASS
+```
+
+### Documentation
+
+```bash
+uv run python -m invoke docs-build   # Build Sphinx docs
+uv run python -m invoke docs-serve   # Build and serve locally
+```
+
+## API Reference
+
+Full API documentation is available at http://localhost:8000/docs when the server is running.
+
+### Authentication
+
+All API endpoints (except `/health`) require JWT authentication.
+
+```bash
+# Get token
+curl -X POST http://localhost:8000/api/auth/token \
+  -d "username=myuser&password=mypass"
+
+# Use token in requests
+curl -H "Authorization: Bearer <token>" http://localhost:8000/api/wines
+```
+
+### Wine Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/wines/checkin` | Add wine(s) to cellar |
+| POST | `/api/wines/{id}/checkout` | Remove wine(s) from cellar |
+| GET | `/api/wines` | List all wines |
+| GET | `/api/wines/{id}` | Get wine details |
+| PUT | `/api/wines/{id}` | Update wine metadata |
+| DELETE | `/api/wines/{id}` | Delete wine |
+
+### Cellar & History
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/cellar` | Current cellar inventory |
+| GET | `/api/cellar/summary` | Summary statistics |
+| GET | `/api/transactions` | Full transaction history |
+| GET | `/api/transactions/{id}` | Single transaction |
+
+### Search
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/search` | Search wines by criteria |
+
+### X-Wines Dataset
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/xwines/search?q=<query>` | Autocomplete wine search |
+| GET | `/api/xwines/wines/{id}` | Get X-Wines wine details |
+| GET | `/api/xwines/stats` | Dataset statistics |
+| GET | `/api/xwines/types` | List wine types |
+| GET | `/api/xwines/countries` | List countries |
+
+### Example: Check In via API
+
+```bash
+curl -X POST http://localhost:8000/api/wines/checkin \
+  -H "Authorization: Bearer <token>" \
+  -F "front_label=@wine_front.jpg" \
+  -F "back_label=@wine_back.jpg" \
+  -F "name=Chateau Margaux" \
+  -F "vintage=2016" \
+  -F "quantity=6"
+```
+
+### Example: Search via API
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:8000/api/search?country=France&wine_type=Red&in_stock=true"
+```
+
+## Building Documentation
+
+```bash
+# Build HTML docs
+uv run python -m invoke docs-build
+
+# Serve docs locally
+uv run python -m invoke docs-serve
+```
+
+Documentation is built to `docs/_build/html/`.
