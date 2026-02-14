@@ -54,6 +54,8 @@ The autocomplete feature searches over 100,000 wines from the X-Wines dataset:
 - Use arrow keys to navigate, Enter to select
 - Selecting a wine fills in: name, winery, country, and ABV
 
+**Note**: Autocomplete requires the X-Wines database to be installed. See the "For Developers" section below for setup instructions.
+
 ## Viewing Your Cellar
 
 The **Cellar** page displays all your wines as cards.
@@ -169,8 +171,8 @@ WineBox uses two scanning engines:
 
 1. **Claude Vision AI** (recommended)
    - More accurate label interpretation
-   - Requires Anthropic API key in `.env` file
-   - Set: `WINEBOX_ANTHROPIC_API_KEY=your-key`
+   - Requires Anthropic API key
+   - Set environment variable: `WINEBOX_ANTHROPIC_API_KEY=your-key`
 
 2. **Tesseract OCR** (fallback)
    - Works without API key
@@ -196,53 +198,11 @@ Your cellar data is stored locally:
 
 **Back up these files regularly** to preserve your collection records.
 
-## Installing the X-Wines Database
-
-The wine autocomplete feature requires the X-Wines dataset. Without it, autocomplete won't show suggestions.
-
-### Quick Setup (Test Data)
-
-For testing with 100 sample wines:
-
-```bash
-uv run python -m scripts.import_xwines --version test
-```
-
-### Full Setup (100K+ Wines)
-
-For the complete database with community ratings:
-
-```bash
-# Install download tool
-uv pip install gdown
-
-# Download dataset from Google Drive
-mkdir -p data/xwines
-uv run gdown --folder "https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMVx5ELA61LPfGfuu_?usp=sharing" -O data/xwines/
-
-# Copy files to expected location
-cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_100K_wines.csv data/xwines/
-cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_21M_ratings.csv data/xwines/
-
-# Import (takes a few minutes)
-uv run python -m scripts.import_xwines --version full --force
-```
-
-### Verify Import
-
-Check that the data imported correctly:
-
-```bash
-curl http://localhost:8000/api/xwines/stats
-```
-
-You should see `wine_count: 100646` for the full dataset.
-
 ---
 
 # For Developers
 
-This section covers development, testing, and API documentation for contributors.
+This section covers development setup, testing, and API documentation for contributors.
 
 ## Project Structure
 
@@ -269,8 +229,8 @@ winebox/
 ## Development Setup
 
 ```bash
-# Clone and install
-git clone <repository-url>
+# Clone and install with uv
+git clone https://github.com/jdrumgoole/winebox.git
 cd winebox
 uv sync --all-extras
 
@@ -287,6 +247,46 @@ uv run python -m invoke init-db
 # Start development server with auto-reload
 uv run python -m invoke start --reload
 ```
+
+## Installing the X-Wines Database
+
+The wine autocomplete feature requires the X-Wines dataset. This is only available when running from source.
+
+### Test Dataset (Development)
+
+For development with 100 sample wines:
+
+```bash
+uv run python -m scripts.import_xwines --version test
+```
+
+### Full Dataset (100K+ Wines)
+
+For the complete database with community ratings:
+
+```bash
+# Install download tool
+uv pip install gdown
+
+# Download dataset from Google Drive
+mkdir -p data/xwines
+uv run gdown --folder "https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMVx5ELA61LPfGfuu_?usp=sharing" -O data/xwines/
+
+# Copy files to expected location
+cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_100K_wines.csv data/xwines/
+cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_21M_ratings.csv data/xwines/
+
+# Import (takes a few minutes)
+uv run python -m scripts.import_xwines --version full --force
+```
+
+### Verify Import
+
+```bash
+curl http://localhost:8000/api/xwines/stats
+```
+
+You should see `wine_count: 100646` for the full dataset.
 
 ## Running Tests
 
@@ -343,7 +343,7 @@ uv run python -m scripts.migrations.runner down --to 0  # Revert
 uv run python -m scripts.migrations.runner history      # Show history
 ```
 
-### User Management
+### User Management (Development)
 
 ```bash
 uv run python -m invoke add-user USERNAME --password PASS

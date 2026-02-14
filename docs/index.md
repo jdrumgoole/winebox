@@ -19,29 +19,61 @@ WineBox helps you keep track of your wine collection with ease:
 
 ### Installation
 
+Install WineBox using pip:
+
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd winebox
+pip install winebox
+```
 
-# Install dependencies
-uv sync --all-extras
+Or with pipx for isolated installation:
 
-# Start the server
-uv run python -m invoke start
+```bash
+pipx install winebox
+```
+
+### Starting the Server
+
+```bash
+# Start WineBox server
+winebox-server start
+
+# Start on a different port
+winebox-server start --port 8080
+
+# Check server status
+winebox-server status
+
+# Stop the server
+winebox-server stop
+```
+
+### Creating Your First User
+
+```bash
+winebox-admin add myusername --password mypassword
 ```
 
 ### First Login
 
 1. Open your browser to **http://localhost:8000/static/index.html**
-2. Create a user account:
-   ```bash
-   uv run winebox-admin add myusername --password mypassword
-   ```
-3. Log in with your username and password
+2. Log in with the username and password you created
 
 ![Login Page](images/login-page.png)
 *The WineBox login page*
+
+### Setting Up AI Label Scanning (Optional)
+
+WineBox can use Claude Vision AI for intelligent label scanning. To enable it:
+
+1. Get an API key from [Anthropic](https://console.anthropic.com/)
+2. Set the environment variable:
+   ```bash
+   export WINEBOX_ANTHROPIC_API_KEY=your-api-key-here
+   ```
+
+Without an API key, WineBox falls back to Tesseract OCR. Install it with:
+- **macOS**: `brew install tesseract`
+- **Ubuntu/Debian**: `sudo apt-get install tesseract-ocr`
 
 ## Using WineBox
 
@@ -151,35 +183,35 @@ For the best AI scanning results:
 
 ### Backing Up Your Data
 
-Your data is stored in:
+Your data is stored in your working directory:
 - **Database**: `data/winebox.db`
 - **Images**: `data/images/`
 
 Back up these files regularly to preserve your collection records.
 
-## Installing the Full Wine Database
+## Command Reference
 
-WineBox includes autocomplete powered by the [X-Wines dataset](https://github.com/rogerioxavier/X-Wines). To enable this feature with 100K+ wines:
+### Server Management
 
 ```bash
-# Install gdown for downloading
-uv pip install gdown
-
-# Download the dataset
-mkdir -p data/xwines
-uv run gdown --folder "https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMVx5ELA61LPfGfuu_?usp=sharing" -O data/xwines/
-
-# Copy to expected location
-cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_100K_wines.csv data/xwines/
-cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_21M_ratings.csv data/xwines/
-
-# Import the data
-uv run python -m scripts.import_xwines --version full --force
+winebox-server start              # Start server (background)
+winebox-server start --foreground # Start in foreground
+winebox-server start --port 8080  # Use different port
+winebox-server start --reload     # Auto-reload on changes (dev)
+winebox-server stop               # Stop server
+winebox-server restart            # Restart server
+winebox-server status             # Check if running
 ```
 
-For development, use the small test dataset instead:
+### User Management
+
 ```bash
-uv run python -m scripts.import_xwines --version test
+winebox-admin add USERNAME --password PASS    # Create user
+winebox-admin list                            # List all users
+winebox-admin passwd USERNAME --password PASS # Change password
+winebox-admin disable USERNAME                # Disable user
+winebox-admin enable USERNAME                 # Enable user
+winebox-admin remove USERNAME                 # Delete user
 ```
 
 ## Contents
