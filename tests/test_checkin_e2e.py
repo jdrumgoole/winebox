@@ -7,13 +7,14 @@ Note: These tests use real wine label images and will call the configured
 OCR/Vision API if WINEBOX_ANTHROPIC_API_KEY is set.
 
 For parallel execution, run with: pytest -n auto tests/test_checkin_e2e.py
-Each worker gets its own test user to avoid conflicts.
+Each worker gets its own test user (created once per session for speed).
 """
 
 import os
 import re
 import subprocess
 from pathlib import Path
+from typing import Generator
 
 import pytest
 from playwright.sync_api import Page, expect
@@ -23,6 +24,9 @@ TEST_DATA_DIR = Path(__file__).parent / "data" / "wine_labels"
 
 # Server URL - can be overridden with WINEBOX_TEST_URL env var
 BASE_URL = os.environ.get("WINEBOX_TEST_URL", "http://localhost:8000")
+
+# Project directory for running CLI commands
+PROJECT_DIR = Path(__file__).parent.parent
 
 
 def get_worker_id(request: pytest.FixtureRequest) -> str:
@@ -38,48 +42,67 @@ def base_url() -> str:
     return BASE_URL
 
 
-@pytest.fixture(scope="function")
-def test_user(request: pytest.FixtureRequest) -> tuple[str, str]:
-    """Create a unique test user for this test function.
+@pytest.fixture(scope="session")
+def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], None, None]:
+    """Create a test user for this worker session.
 
     Returns (username, password) tuple.
-    Uses worker ID + test name to create unique users for parallel execution.
+    User is created once per worker and reused across all tests in that worker.
+    This is much faster than creating a user per test.
     """
     import time
+    import sys
 
     worker_id = get_worker_id(request)
-    # Create a unique username based on worker and test name
-    test_name = request.node.name.replace("[", "_").replace("]", "_").replace("-", "_")
-    # Keep it short but unique
-    username = f"e2e_{worker_id}_{hash(test_name) % 10000:04d}"
+    username = f"e2e_worker_{worker_id}"
     password = "testpass123"
 
-    # Create the user via CLI (ignore errors if user exists)
-    project_dir = Path(__file__).parent.parent
-    try:
+    # Create the user via CLI
+    # Retry a few times in case of transient issues
+    max_retries = 3
+    created = False
+    for attempt in range(max_retries):
         result = subprocess.run(
             ["uv", "run", "winebox-admin", "add", username, "--password", password],
-            cwd=project_dir,
+            cwd=PROJECT_DIR,
             capture_output=True,
             timeout=30,
+            text=True,
         )
-        # Small delay to ensure database commits the user
-        time.sleep(0.5)
-    except subprocess.TimeoutExpired:
-        pass
+        # Check if user was created or already exists
+        if result.returncode == 0:
+            created = True
+            break
+        if "already exists" in (result.stdout + result.stderr):
+            created = True
+            break
+        # Wait before retry
+        if attempt < max_retries - 1:
+            time.sleep(1.0)
+
+    if not created:
+        print(f"WARNING: Failed to create user {username}", file=sys.stderr)
+        print(f"  stdout: {result.stdout}", file=sys.stderr)
+        print(f"  stderr: {result.stderr}", file=sys.stderr)
+
+    # Longer delay to ensure database has committed
+    time.sleep(0.5)
 
     yield username, password
 
-    # Cleanup: remove the test user after the test
-    try:
-        subprocess.run(
-            ["uv", "run", "winebox-admin", "remove", username, "--force"],
-            cwd=project_dir,
-            capture_output=True,
-            timeout=30,
-        )
-    except subprocess.TimeoutExpired:
-        pass
+    # Note: We don't clean up users here - let invoke purge-wines handle it
+    # This avoids race conditions when running tests in parallel
+
+
+# Alias for backwards compatibility
+@pytest.fixture(scope="function")
+def test_user(worker_user: tuple[str, str]) -> tuple[str, str]:
+    """Return the worker's test user credentials.
+
+    This is a function-scoped wrapper around the session-scoped worker_user
+    to maintain compatibility with existing tests.
+    """
+    return worker_user
 
 
 @pytest.fixture(scope="function")
@@ -87,20 +110,35 @@ def authenticated_page(page: Page, test_user: tuple[str, str]) -> Page:
     """Log in and return an authenticated page with a unique test user."""
     username, password = test_user
 
+    # Clear all browser state to ensure clean login
+    page.context.clear_cookies()
+    # Also clear localStorage which stores the JWT token
     page.goto(BASE_URL)
+    page.evaluate("localStorage.clear()")
+
+    # Reload to get fresh login page
+    page.reload()
 
     # Wait for login form
-    page.wait_for_selector("#login-form", state="visible")
+    page.wait_for_selector("#login-form", state="visible", timeout=10000)
 
-    # Fill in credentials (correct IDs from index.html)
+    # Fill in credentials
     page.fill("#login-username", username)
     page.fill("#login-password", password)
 
     # Click login
     page.click("#login-form button[type='submit']")
 
-    # Wait for main content to become visible (login successful)
-    page.wait_for_selector("#main-content", state="visible", timeout=10000)
+    # Wait for either successful login or error message
+    try:
+        page.wait_for_selector("#main-content", state="visible", timeout=15000)
+    except Exception:
+        # Check if there's a login error
+        error_elem = page.locator("#login-error")
+        if error_elem.is_visible():
+            error_text = error_elem.text_content()
+            raise AssertionError(f"Login failed for user '{username}': {error_text}")
+        raise
 
     return page
 
@@ -120,6 +158,7 @@ def wine_images() -> list[Path]:
     return images
 
 
+@pytest.mark.e2e
 class TestCheckinFlow:
     """Test the complete wine checkin flow."""
 
@@ -301,6 +340,7 @@ class TestCheckinFlow:
         page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
 
 
+@pytest.mark.e2e
 class TestWineImageUploads:
     """Test uploading each wine label image from test data."""
 

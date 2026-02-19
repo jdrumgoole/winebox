@@ -7,7 +7,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
+from pwdlib.hashers.bcrypt import BcryptHasher
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,8 +16,8 @@ from winebox.config import settings
 from winebox.database import get_db
 from winebox.models.user import User
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing using pwdlib (compatible with fastapi-users)
+password_hash = PasswordHash((BcryptHasher(),))
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=False)
@@ -31,12 +32,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    return password_hash.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password."""
-    return pwd_context.hash(password)
+    return password_hash.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
@@ -57,9 +58,38 @@ async def get_user_by_username(db: AsyncSession, username: str) -> User | None:
     return result.scalar_one_or_none()
 
 
+async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
+    """Get a user by email."""
+    result = await db.execute(select(User).where(User.email == email))
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_username_or_email(db: AsyncSession, identifier: str) -> User | None:
+    """Get a user by username or email.
+
+    This supports login with either username or email address.
+    """
+    # First try username
+    user = await get_user_by_username(db, identifier)
+    if user:
+        return user
+
+    # Then try email
+    return await get_user_by_email(db, identifier)
+
+
 async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
-    """Authenticate a user with username and password."""
-    user = await get_user_by_username(db, username)
+    """Authenticate a user with username/email and password.
+
+    Args:
+        db: Database session.
+        username: Username or email address.
+        password: Plain text password.
+
+    Returns:
+        User if authentication successful, None otherwise.
+    """
+    user = await get_user_by_username_or_email(db, username)
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -73,19 +103,34 @@ async def get_current_user(
     token: Annotated[str | None, Depends(oauth2_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User | None:
-    """Get the current user from the JWT token."""
+    """Get the current user from the JWT token.
+
+    Supports tokens with 'sub' containing either username or user_id (UUID string).
+    """
     if not token:
         return None
 
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
-        username: str | None = payload.get("sub")
-        if username is None:
+        subject: str | None = payload.get("sub")
+        if subject is None:
             return None
     except JWTError:
         return None
 
-    user = await get_user_by_username(db, username)
+    # Try to find user - subject could be username, email, or user_id
+    user = await get_user_by_username_or_email(db, subject)
+
+    # If not found by username/email, try as user_id (UUID)
+    if user is None:
+        try:
+            from uuid import UUID
+            user_id = UUID(subject)
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+        except (ValueError, TypeError):
+            pass  # Not a valid UUID
+
     if user is None or not user.is_active:
         return None
 

@@ -1,10 +1,11 @@
 """Pytest configuration and fixtures for WineBox tests."""
 
-import asyncio
+import uuid
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Generator
 import tempfile
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -20,14 +21,6 @@ from winebox.services.auth import get_password_hash, create_access_token
 
 # Test database URL (in-memory SQLite)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -80,14 +73,16 @@ async def client(db_engine) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # Create a test user
+    # Create a test user with fastapi-users compatible fields
     async with async_session_maker() as session:
         test_user = User(
+            id=uuid.uuid4(),
             username="testuser",
             email="test@example.com",
             hashed_password=get_password_hash("testpassword"),
             is_active=True,
-            is_admin=False,
+            is_verified=True,  # Verified for testing
+            is_superuser=False,
         )
         session.add(test_user)
         await session.commit()
@@ -144,3 +139,61 @@ def sample_image_bytes() -> bytes:
         0xAE, 0x42, 0x60, 0x82,  # CRC
     ])
     return png_data
+
+
+@pytest.fixture
+def test_user() -> dict:
+    """Return test user credentials."""
+    return {
+        "username": "testuser",
+        "email": "test@example.com",
+        "password": "testpassword",
+    }
+
+
+@pytest.fixture
+def auth_headers(test_user) -> dict:
+    """Return authorization headers for the test user."""
+    access_token = create_access_token(data={"sub": test_user["username"]})
+    return {"Authorization": f"Bearer {access_token}"}
+
+
+@pytest.fixture
+def mock_email_service():
+    """Mock email service to prevent actual email sending in tests."""
+    with patch("winebox.auth.users.get_email_service") as mock:
+        mock_service = AsyncMock()
+        mock_service.send_verification_email = AsyncMock(return_value=True)
+        mock_service.send_password_reset_email = AsyncMock(return_value=True)
+        mock.return_value = mock_service
+        yield mock_service
+
+
+@pytest_asyncio.fixture(scope="function")
+async def unauthenticated_client(db_engine) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client without authentication."""
+    async_session_maker = async_sessionmaker(
+        db_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with async_session_maker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+    ) as ac:
+        yield ac
+
+    app.dependency_overrides.clear()

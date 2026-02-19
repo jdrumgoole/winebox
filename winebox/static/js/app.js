@@ -220,6 +220,53 @@ function initAuth() {
 
     // Password toggle for all password fields
     initPasswordToggles();
+
+    // Registration form
+    const registerForm = document.getElementById('register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', handleRegister);
+    }
+
+    // Forgot password form
+    const forgotForm = document.getElementById('forgot-password-form');
+    if (forgotForm) {
+        forgotForm.addEventListener('submit', handleForgotPassword);
+    }
+
+    // Reset password form
+    const resetForm = document.getElementById('reset-password-form');
+    if (resetForm) {
+        resetForm.addEventListener('submit', handleResetPassword);
+    }
+
+    // Card navigation links
+    document.getElementById('show-register')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showAuthCard('register-card');
+    });
+
+    document.getElementById('show-forgot-password')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showAuthCard('forgot-password-card');
+    });
+
+    document.getElementById('show-login-from-register')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showAuthCard('login-card');
+    });
+
+    document.getElementById('show-login-from-forgot')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showAuthCard('login-card');
+    });
+
+    document.getElementById('show-login-from-verify')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showAuthCard('login-card');
+    });
+
+    // Check for hash parameters (email verification or password reset)
+    handleHashParams();
 }
 
 function initPasswordToggles() {
@@ -305,7 +352,15 @@ async function handleLogin(e) {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || 'Login failed');
+            const errorMessage = error.detail || 'Login failed';
+
+            // Check if account needs verification
+            if (errorMessage.toLowerCase().includes('not verified') ||
+                errorMessage.toLowerCase().includes('email not verified')) {
+                throw new Error('Email not verified. Please check your email for the verification link.');
+            }
+
+            throw new Error(errorMessage);
         }
 
         const data = await response.json();
@@ -325,6 +380,229 @@ function handleLogout() {
     authToken = null;
     currentUser = null;
     showLoginPage();
+}
+
+// Show different auth cards (login, register, forgot password, etc.)
+function showAuthCard(cardId) {
+    const cards = ['login-card', 'register-card', 'forgot-password-card', 'reset-password-card', 'verify-card'];
+    cards.forEach(id => {
+        const card = document.getElementById(id);
+        if (card) {
+            card.style.display = id === cardId ? 'block' : 'none';
+        }
+    });
+
+    // Clear any error/success messages when switching cards
+    document.querySelectorAll('.login-error, .login-success').forEach(el => {
+        el.style.display = 'none';
+    });
+}
+
+// Handle hash parameters for email verification and password reset
+function handleHashParams() {
+    const hash = window.location.hash;
+    if (!hash) return;
+
+    const params = new URLSearchParams(hash.slice(1).split('?')[1] || '');
+    const action = hash.slice(1).split('?')[0];
+
+    if (action === 'verify' && params.get('token')) {
+        handleEmailVerification(params.get('token'));
+    } else if (action === 'reset-password' && params.get('token')) {
+        document.getElementById('reset-token').value = params.get('token');
+        showAuthCard('reset-password-card');
+    }
+}
+
+// Handle user registration
+async function handleRegister(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('register-username').value.trim();
+    const email = document.getElementById('register-email').value.trim();
+    const password = document.getElementById('register-password').value;
+    const confirmPassword = document.getElementById('register-confirm-password').value;
+    const errorDiv = document.getElementById('register-error');
+
+    errorDiv.style.display = 'none';
+
+    // Validate passwords match
+    if (password !== confirmPassword) {
+        errorDiv.textContent = 'Passwords do not match';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    // Validate password length
+    if (password.length < 8) {
+        errorDiv.textContent = 'Password must be at least 8 characters';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: username,
+                email: email,
+                password: password,
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Registration failed');
+        }
+
+        // Registration successful
+        showToast('Account created! Please check your email to verify your account.', 'success');
+        showAuthCard('login-card');
+        document.getElementById('register-form').reset();
+
+    } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Handle forgot password request
+async function handleForgotPassword(e) {
+    e.preventDefault();
+
+    const email = document.getElementById('forgot-email').value.trim();
+    const errorDiv = document.getElementById('forgot-error');
+    const successDiv = document.getElementById('forgot-success');
+
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/forgot-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: email })
+        });
+
+        // Note: fastapi-users returns 202 for security (doesn't reveal if email exists)
+        if (response.ok || response.status === 202) {
+            successDiv.textContent = 'If an account exists with this email, a password reset link has been sent.';
+            successDiv.style.display = 'block';
+            document.getElementById('forgot-password-form').reset();
+        } else {
+            const error = await response.json();
+            throw new Error(error.detail || 'Request failed');
+        }
+
+    } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Handle password reset
+async function handleResetPassword(e) {
+    e.preventDefault();
+
+    const token = document.getElementById('reset-token').value;
+    const password = document.getElementById('reset-password').value;
+    const confirmPassword = document.getElementById('reset-confirm-password').value;
+    const errorDiv = document.getElementById('reset-error');
+
+    errorDiv.style.display = 'none';
+
+    // Validate passwords match
+    if (password !== confirmPassword) {
+        errorDiv.textContent = 'Passwords do not match';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    // Validate password length
+    if (password.length < 8) {
+        errorDiv.textContent = 'Password must be at least 8 characters';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/reset-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                token: token,
+                password: password,
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Password reset failed');
+        }
+
+        // Clear the hash
+        window.location.hash = '';
+
+        showToast('Password reset successful! You can now sign in with your new password.', 'success');
+        showAuthCard('login-card');
+        document.getElementById('reset-password-form').reset();
+
+    } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Handle email verification
+async function handleEmailVerification(token) {
+    showAuthCard('verify-card');
+
+    const titleEl = document.getElementById('verify-title');
+    const messageEl = document.getElementById('verify-message');
+    const spinnerEl = document.getElementById('verify-spinner');
+    const successEl = document.getElementById('verify-success');
+    const errorEl = document.getElementById('verify-error');
+    const loginLink = document.getElementById('verify-login-link');
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/verify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: token })
+        });
+
+        spinnerEl.style.display = 'none';
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Verification failed');
+        }
+
+        titleEl.textContent = 'Email Verified!';
+        messageEl.textContent = 'Your email has been verified successfully.';
+        successEl.textContent = 'You can now sign in to your account.';
+        successEl.style.display = 'block';
+        loginLink.style.display = 'block';
+
+        // Clear the hash
+        window.location.hash = '';
+
+    } catch (error) {
+        titleEl.textContent = 'Verification Failed';
+        messageEl.textContent = 'Unable to verify your email address.';
+        errorEl.textContent = error.message;
+        errorEl.style.display = 'block';
+        loginLink.style.display = 'block';
+    }
 }
 
 // Fetch with authentication

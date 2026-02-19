@@ -1,42 +1,48 @@
-"""User model for authentication."""
+"""User model for authentication with fastapi-users integration."""
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import Boolean, DateTime, String, func
-from sqlalchemy.dialects.sqlite import CHAR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from winebox.database import Base
 
 
-class User(Base):
-    """User model for authentication."""
+class User(SQLAlchemyBaseUserTableUUID, Base):
+    """User model for authentication.
+
+    Inherits from SQLAlchemyBaseUserTableUUID which provides:
+    - id: UUID primary key
+    - email: unique email (required by fastapi-users)
+    - hashed_password: password hash
+    - is_active: account active status
+    - is_verified: email verification status
+    - is_superuser: admin/superuser status
+
+    Custom fields added for WineBox:
+    - username: unique username for display
+    - full_name: optional full name
+    - anthropic_api_key: user's API key for Claude Vision
+    - created_at, updated_at: timestamps
+    - last_login: last login timestamp
+    """
 
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(
-        CHAR(36),
-        primary_key=True,
-        default=lambda: str(uuid.uuid4()),
-    )
+    # Custom fields for WineBox
     username: Mapped[str] = mapped_column(
         String(50),
         unique=True,
         nullable=False,
         index=True,
     )
-    email: Mapped[str | None] = mapped_column(
-        String(255),
-        unique=True,
-        nullable=True,
-        index=True,
-    )
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     anthropic_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -53,5 +59,16 @@ class User(Base):
         nullable=True,
     )
 
+    # Alias is_superuser as is_admin for backward compatibility
+    @property
+    def is_admin(self) -> bool:
+        """Alias for is_superuser for backward compatibility."""
+        return self.is_superuser
+
+    @is_admin.setter
+    def is_admin(self, value: bool) -> None:
+        """Set is_superuser via is_admin alias."""
+        self.is_superuser = value
+
     def __repr__(self) -> str:
-        return f"<User(id={self.id}, username={self.username}, is_active={self.is_active})>"
+        return f"<User(id={self.id}, username={self.username}, email={self.email}, is_active={self.is_active})>"

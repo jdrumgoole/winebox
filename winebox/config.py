@@ -51,7 +51,22 @@ class Settings(BaseSettings):
     # Security
     enforce_https: bool = False  # Set to True in production to enable HSTS header
     rate_limit_per_minute: int = 60  # Global rate limit per IP per minute
-    auth_rate_limit_per_minute: int = 10  # Stricter rate limit for auth endpoints
+    auth_rate_limit_per_minute: int = 30  # Stricter rate limit for auth endpoints
+
+    # Email settings
+    email_backend: str = "console"  # "console" for dev/test, "ses" for production
+    email_sender: str = "support@winebox.app"
+    email_sender_name: str = "WineBox"
+    frontend_url: str = "http://localhost:8000"
+
+    # AWS SES settings (only needed when email_backend="ses")
+    aws_region: str = "eu-west-1"  # Ireland region
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+
+    # Registration settings
+    email_verification_required: bool = True
+    registration_enabled: bool = True  # Open registration
 
     @property
     def max_upload_size_bytes(self) -> int:
