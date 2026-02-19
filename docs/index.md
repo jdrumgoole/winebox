@@ -61,14 +61,29 @@ winebox-admin add myusername --password mypassword
 ![Login Page](images/login-page.png)
 *The WineBox login page*
 
+### Configuration
+
+WineBox uses TOML-based configuration. Create a `config.toml` file in your project root or use environment variables:
+
+```bash
+# Copy example configuration
+cp config/config.toml.example config.toml
+cp config/secrets.env.example secrets.env
+
+# Edit secrets (add your API keys)
+nano secrets.env
+```
+
+See [Configuration](configuration.md) for full details.
+
 ### Setting Up AI Label Scanning (Optional)
 
 WineBox can use Claude Vision AI for intelligent label scanning. To enable it:
 
 1. Get an API key from [Anthropic](https://console.anthropic.com/)
-2. Set the environment variable:
+2. Add to your `secrets.env` file:
    ```bash
-   export WINEBOX_ANTHROPIC_API_KEY=your-api-key-here
+   WINEBOX_ANTHROPIC_API_KEY=your-api-key-here
    ```
 
 Without an API key, WineBox falls back to Tesseract OCR. Install it with:
@@ -183,11 +198,19 @@ For the best AI scanning results:
 
 ### Backing Up Your Data
 
-Your data is stored in your working directory:
-- **Database**: `data/winebox.db`
+Your data is stored in MongoDB and the filesystem:
+- **Database**: MongoDB database `winebox` (default)
 - **Images**: `data/images/`
 
-Back up these files regularly to preserve your collection records.
+Back up your MongoDB database and images directory regularly:
+
+```bash
+# Backup MongoDB
+mongodump --db winebox --out backups/
+
+# Backup images
+tar -czf backups/images.tar.gz data/images/
+```
 
 ## Command Reference
 
@@ -221,6 +244,8 @@ winebox-admin remove USERNAME                 # Delete user
 :caption: Documentation
 
 user-guide
+configuration
+deployment
 api-reference
 ```
 

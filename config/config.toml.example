@@ -1,0 +1,88 @@
+# WineBox Configuration
+#
+# Copy this file to one of the following locations:
+#   - ./config.toml (project root - for development)
+#   - ~/.config/winebox/config.toml (user config)
+#   - /etc/winebox/config.toml (system config - production)
+#
+# All values shown here are defaults. Uncomment and modify as needed.
+# Environment variables can override any setting (see README for details).
+
+# Application name
+# app_name = "WineBox"
+
+[server]
+# Server binding address
+# host = "127.0.0.1"
+
+# Server port
+# port = 8000
+
+# Number of uvicorn workers (production only)
+# workers = 2
+
+# Enable debug mode (disable in production!)
+# debug = false
+
+# Enforce HTTPS (enable in production for HSTS header)
+# enforce_https = false
+
+# Rate limit per IP per minute
+# rate_limit_per_minute = 60
+
+[database]
+# MongoDB connection URL
+# mongodb_url = "mongodb://localhost:27017"
+
+# MongoDB database name
+# mongodb_database = "winebox"
+
+[storage]
+# Data directory for uploads and other data
+# data_dir = "data"
+
+# Log directory
+# log_dir = "data/logs"
+
+# Maximum upload size in MB
+# max_upload_mb = 10
+
+[ocr]
+# Use Claude Vision for OCR (requires ANTHROPIC_API_KEY in secrets.env)
+# Falls back to Tesseract if disabled or API key not set
+# use_claude_vision = true
+
+# Tesseract language code
+# tesseract_lang = "eng"
+
+# Path to tesseract executable (uses system default if not set)
+# tesseract_cmd = ""
+
+[auth]
+# Enable authentication (disable for development/testing only)
+# enabled = true
+
+# Allow new user registration
+# registration_enabled = true
+
+# Require email verification for new accounts
+# email_verification_required = true
+
+# Rate limit for auth endpoints (login, register) per minute
+# auth_rate_limit_per_minute = 30
+
+[email]
+# Email backend: "console" (dev) or "ses" (production with AWS SES)
+# backend = "console"
+
+# From address for emails
+# from_address = "noreply@winebox.app"
+
+# From name for emails
+# from_name = "WineBox"
+
+# Frontend URL for email links (password reset, verification)
+# frontend_url = "http://localhost:8000"
+
+# AWS region for SES (only used when backend = "ses")
+# aws_region = "eu-west-1"

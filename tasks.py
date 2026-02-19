@@ -363,7 +363,7 @@ def deploy_setup(ctx: Context, host: str = "", domain: str = "winebox.app") -> N
         host: Droplet IP (or set WINEBOX_DROPLET_IP in .env)
         domain: Domain name (default: winebox.app)
     """
-    cmd = f"uv run python deploy/setup_droplet.py --domain {domain}"
+    cmd = f"uv run python -m deploy.setup --domain {domain}"
     if host:
         cmd += f" --host {host}"
     ctx.run(cmd, pty=True)
@@ -374,34 +374,71 @@ def deploy(
     ctx: Context,
     host: str = "",
     droplet_name: str = "",
-    branch: str = "main",
+    version: str = "",
     no_secrets: bool = False,
     setup_dns: bool = False,
     dry_run: bool = False,
 ) -> None:
     """Deploy WineBox to the Digital Ocean droplet.
 
-    Pulls latest code, installs dependencies, syncs secrets, and restarts the service.
+    Installs/upgrades winebox from PyPI, syncs secrets, and restarts the service.
     Droplet IP is auto-discovered from the API using WINEBOX_DO_TOKEN.
 
     Args:
         ctx: Invoke context
         host: Droplet IP (optional, auto-discovered if not set)
         droplet_name: Droplet name for IP lookup (default: winebox-droplet)
-        branch: Git branch to deploy (default: main)
+        version: Package version to install (default: latest)
         no_secrets: Skip syncing secrets to production
         setup_dns: Configure DNS A records (first-time setup)
         dry_run: Preview changes without applying
     """
-    cmd = f"uv run python deploy/deploy.py --branch {branch}"
+    cmd = "uv run python -m deploy.app"
     if host:
         cmd += f" --host {host}"
     if droplet_name:
         cmd += f" --droplet-name {droplet_name}"
+    if version:
+        cmd += f" --version {version}"
     if no_secrets:
         cmd += " --no-secrets"
     if setup_dns:
         cmd += " --setup-dns"
+    if dry_run:
+        cmd += " --dry-run"
+    ctx.run(cmd, pty=True)
+
+
+@task(name="deploy-xwines")
+def deploy_xwines(
+    ctx: Context,
+    host: str = "",
+    droplet_name: str = "",
+    test: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Deploy X-Wines dataset to the production server.
+
+    Downloads and imports the X-Wines dataset (100K+ wines with community
+    ratings) to the production MongoDB database.
+
+    This is a one-time operation that only needs to be run once after initial
+    server setup, or when updating to a newer version of the dataset.
+
+    Args:
+        ctx: Invoke context
+        host: Droplet IP (optional, auto-discovered if not set)
+        droplet_name: Droplet name for IP lookup (default: winebox-droplet)
+        test: Use test dataset (100 wines) instead of full dataset
+        dry_run: Preview changes without applying
+    """
+    cmd = "uv run python -m deploy.xwines"
+    if host:
+        cmd += f" --host {host}"
+    if droplet_name:
+        cmd += f" --droplet-name {droplet_name}"
+    if test:
+        cmd += " --test"
     if dry_run:
         cmd += " --dry-run"
     ctx.run(cmd, pty=True)

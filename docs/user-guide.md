@@ -172,12 +172,14 @@ WineBox uses two scanning engines:
 1. **Claude Vision AI** (recommended)
    - More accurate label interpretation
    - Requires Anthropic API key
-   - Set environment variable: `WINEBOX_ANTHROPIC_API_KEY=your-key`
+   - Add to `secrets.env`: `WINEBOX_ANTHROPIC_API_KEY=your-key`
+   - Or set in `config.toml`: `[ocr] use_claude_vision = true`
 
 2. **Tesseract OCR** (fallback)
    - Works without API key
    - Basic text extraction
    - Install: `brew install tesseract` (macOS) or `apt-get install tesseract-ocr` (Linux)
+   - To force Tesseract only: set `[ocr] use_claude_vision = false` in config.toml
 
 ### Keeping Your Cellar Organized
 
@@ -189,14 +191,22 @@ WineBox uses two scanning engines:
 
 ### Data Backup
 
-Your cellar data is stored locally:
+Your cellar data is stored in MongoDB and the filesystem:
 
 | Location | Contents |
 |----------|----------|
-| `data/winebox.db` | Database with all wines and transactions |
+| MongoDB `winebox` database | All wines, transactions, and users |
 | `data/images/` | Label photos you've uploaded |
 
-**Back up these files regularly** to preserve your collection records.
+**Back up regularly** to preserve your collection records:
+
+```bash
+# Backup MongoDB
+mongodump --db winebox --out backups/
+
+# Backup images
+tar -czf backups/images.tar.gz data/images/
+```
 
 ---
 
@@ -210,19 +220,33 @@ This section covers development setup, testing, and API documentation for contri
 winebox/
 ├── winebox/              # Main application package
 │   ├── main.py           # FastAPI application
-│   ├── config.py         # Configuration settings
-│   ├── database.py       # Database setup
-│   ├── models/           # SQLAlchemy models
-│   ├── schemas/          # Pydantic schemas
+│   ├── config/           # Configuration module
+│   │   ├── schema.py     # Pydantic config models
+│   │   ├── loader.py     # TOML loading logic
+│   │   └── settings.py   # Global settings instance
+│   ├── database.py       # MongoDB/Beanie setup
+│   ├── models/           # Beanie document models
+│   ├── schemas/          # Pydantic API schemas
 │   ├── routers/          # API endpoints
 │   ├── services/         # Business logic (OCR, etc.)
+│   ├── auth/             # Authentication (fastapi-users)
 │   └── static/           # Web interface (HTML, JS, CSS)
+├── config/               # Configuration templates
+│   ├── config.toml.example
+│   └── secrets.env.example
+├── deploy/               # Deployment module
+│   ├── __init__.py       # Package exports
+│   ├── common.py         # Shared utilities
+│   ├── app.py            # Deploy application
+│   ├── setup.py          # Initial server setup
+│   ├── xwines.py         # Deploy X-Wines dataset
+│   ├── winebox.service   # systemd service
+│   └── nginx-winebox.conf # nginx config
 ├── scripts/              # Utility scripts
-│   ├── migrations/       # Database migration system
 │   └── import_xwines.py  # X-Wines dataset importer
 ├── tests/                # Test suite
 ├── docs/                 # Sphinx documentation
-├── data/                 # Database and images
+├── data/                 # Images and local data
 └── tasks.py              # Invoke tasks
 ```
 
@@ -234,8 +258,19 @@ git clone https://github.com/jdrumgoole/winebox.git
 cd winebox
 uv sync --all-extras
 
-# Set up Claude Vision (optional but recommended)
-echo "WINEBOX_ANTHROPIC_API_KEY=your-key" > .env
+# Start MongoDB (using Docker)
+docker run -d -p 27017:27017 --name mongodb mongo:7
+
+# Or install locally:
+# macOS: brew tap mongodb/brew && brew install mongodb-community
+# Ubuntu: see https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-ubuntu/
+
+# Set up configuration
+cp config/config.toml.example config.toml
+cp config/secrets.env.example secrets.env
+
+# Edit secrets.env and add your API key (optional)
+# WINEBOX_ANTHROPIC_API_KEY=your-key
 
 # Install Tesseract OCR fallback
 brew install tesseract  # macOS

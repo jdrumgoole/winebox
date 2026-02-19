@@ -4,7 +4,7 @@ A wine cellar management application with OCR label scanning.
 
 ## Features
 
-- **Label Scanning**: Upload wine label images for automatic text extraction via OCR
+- **Label Scanning**: Upload wine label images for automatic text extraction via AI
 - **Wine Autocomplete**: Search 100K+ wines from the [X-Wines dataset](https://github.com/rogerioxavier/X-Wines) with community ratings
 - **Inventory Tracking**: Check-in and check-out bottles with full history
 - **Smart Parsing**: Automatically identifies vintage, grape variety, region, and more
@@ -16,7 +16,8 @@ A wine cellar management application with OCR label scanning.
 ### Prerequisites
 
 - Python 3.11+
-- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract)
+- MongoDB 7.0+
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) (optional fallback)
 
 ### Installation
 
@@ -34,13 +35,31 @@ cd winebox
 # Install dependencies
 uv sync --all-extras
 
-# Install Tesseract OCR
+# Start MongoDB (using Docker)
+docker run -d -p 27017:27017 --name mongodb mongo:7
+
+# Install Tesseract OCR (optional)
 # macOS:
 brew install tesseract
 
 # Ubuntu/Debian:
 sudo apt-get install tesseract-ocr
 ```
+
+### Configuration
+
+WineBox uses TOML configuration files:
+
+```bash
+# Copy example configuration
+cp config/config.toml.example config.toml
+cp config/secrets.env.example secrets.env
+
+# Edit secrets.env with your API keys
+nano secrets.env
+```
+
+See the [Configuration Guide](https://winebox.readthedocs.io/configuration.html) for full details.
 
 ### Running the Server
 
@@ -63,6 +82,51 @@ invoke stop
 - **Web Interface**: http://localhost:8000/static/index.html
 - **API Documentation**: http://localhost:8000/docs
 - **Health Check**: http://localhost:8000/health
+
+## Configuration
+
+WineBox uses a TOML-based configuration system with separate secrets management:
+
+| File | Purpose |
+|------|---------|
+| `config.toml` | Main configuration (server, database, features) |
+| `secrets.env` | Sensitive credentials (API keys) |
+
+### Configuration Locations
+
+Files are searched in priority order:
+
+1. `./config.toml` - Project root (development)
+2. `~/.config/winebox/config.toml` - User config
+3. `/etc/winebox/config.toml` - System config (production)
+
+### Example config.toml
+
+```toml
+[server]
+host = "127.0.0.1"
+port = 8000
+debug = false
+
+[database]
+mongodb_url = "mongodb://localhost:27017"
+mongodb_database = "winebox"
+
+[ocr]
+use_claude_vision = true
+
+[email]
+backend = "console"
+```
+
+### Example secrets.env
+
+```bash
+WINEBOX_SECRET_KEY=your-secret-key-here
+WINEBOX_ANTHROPIC_API_KEY=sk-ant-api03-...
+```
+
+Environment variables can override any configuration value.
 
 ## Usage
 
@@ -116,20 +180,24 @@ See `/docs` for interactive API documentation.
 
 ### Database
 
-The SQLite database is stored at `data/winebox.db` by default. This can be configured via the `WINEBOX_DATABASE_URL` environment variable.
+WineBox uses MongoDB for data storage. Configure the connection in `config.toml`:
+
+```toml
+[database]
+mongodb_url = "mongodb://localhost:27017"
+mongodb_database = "winebox"
+```
 
 ### Images
 
-Wine label images are stored in the `data/images/` directory by default. Each image is saved with a UUID filename to avoid conflicts.
+Wine label images are stored in the `data/images/` directory by default.
 
-| Item | Default Location | Environment Variable |
-|------|------------------|---------------------|
-| Database | `data/winebox.db` | `WINEBOX_DATABASE_URL` |
-| Images | `data/images/` | `WINEBOX_IMAGE_STORAGE_PATH` |
+| Item | Default Location | Config Key |
+|------|------------------|------------|
+| Database | MongoDB `winebox` | `database.mongodb_database` |
+| Images | `data/images/` | `storage.data_dir` |
 
-Images are served via the API at `/api/images/{filename}`.
-
-**Note:** The `data/` directory is excluded from git (see `.gitignore`). Make sure to back up this directory to preserve your wine collection data.
+**Note:** Back up your MongoDB database and images directory regularly.
 
 ## X-Wines Dataset
 
@@ -138,14 +206,11 @@ WineBox integrates the [X-Wines dataset](https://github.com/rogerioxavier/X-Wine
 ### Installing the Dataset
 
 ```bash
-# Run database migration (if not already done)
-uv run python -m scripts.migrations.runner up
-
 # Option 1: Test dataset (100 wines, for development)
 uv run python -m scripts.import_xwines --version test
 
 # Option 2: Full dataset (100K+ wines, for production)
-# First, install gdown and download from Google Drive
+# First, download from Google Drive
 uv pip install gdown
 mkdir -p data/xwines
 uv run gdown --folder "https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMVx5ELA61LPfGfuu_?usp=sharing" -O data/xwines/
@@ -163,12 +228,10 @@ WineBox uses AI-powered label scanning to extract wine information from photos.
 
 ### Claude Vision (Recommended)
 
-For best results, configure Claude Vision by setting your Anthropic API key:
+For best results, configure Claude Vision by adding your API key to `secrets.env`:
 
 ```bash
-export ANTHROPIC_API_KEY=your-api-key
-# or
-export WINEBOX_ANTHROPIC_API_KEY=your-api-key
+WINEBOX_ANTHROPIC_API_KEY=your-api-key
 ```
 
 Claude Vision provides intelligent label analysis that:
@@ -179,7 +242,7 @@ Claude Vision provides intelligent label analysis that:
 
 ### Tesseract OCR (Fallback)
 
-If no Anthropic API key is configured, WineBox falls back to Tesseract OCR. This requires Tesseract to be installed on your system:
+If no Anthropic API key is configured, WineBox falls back to Tesseract OCR:
 
 ```bash
 # macOS
@@ -189,13 +252,19 @@ brew install tesseract
 sudo apt-get install tesseract-ocr
 ```
 
+To force Tesseract only (save API costs during development):
+
+```toml
+# config.toml
+[ocr]
+use_claude_vision = false
+```
+
 ## Authentication
 
 WineBox requires authentication for all API endpoints (except `/health`).
 
 ### Creating Users
-
-Use the `winebox-admin` command to manage users:
 
 ```bash
 # Create an admin user
@@ -219,8 +288,6 @@ uv run winebox-admin remove username
 ```
 
 ### Server Management
-
-Use the `winebox-server` command to manage the server:
 
 ```bash
 # Start server (foreground)
@@ -248,6 +315,20 @@ The API uses JWT bearer tokens. To authenticate:
 
 Tokens expire after 24 hours.
 
+## Deployment
+
+WineBox includes deployment scripts for Digital Ocean:
+
+```bash
+# Initial server setup
+uv run python -m invoke deploy-setup --host YOUR_DROPLET_IP
+
+# Deploy to production
+uv run python -m invoke deploy
+```
+
+See the [Deployment Guide](https://winebox.readthedocs.io/deployment.html) for full instructions.
+
 ## Development
 
 ### Running Tests
@@ -261,6 +342,9 @@ invoke test --verbose
 
 # With coverage
 invoke test --coverage
+
+# Run without Claude Vision (save API costs)
+WINEBOX_USE_CLAUDE_VISION=false invoke test
 ```
 
 ### Project Structure
@@ -269,11 +353,14 @@ invoke test --coverage
 winebox/
 ├── winebox/          # Application package
 │   ├── main.py       # FastAPI app
-│   ├── models/       # Database models
+│   ├── config/       # Configuration module
+│   ├── models/       # MongoDB/Beanie models
 │   ├── schemas/      # API schemas
 │   ├── routers/      # API endpoints
 │   ├── services/     # Business logic
 │   └── static/       # Web interface
+├── config/           # Configuration templates
+├── deploy/           # Deployment module
 ├── tests/            # Test suite
 ├── docs/             # Documentation
 └── tasks.py          # Build tasks
@@ -289,9 +376,10 @@ invoke docs-serve
 ## Tech Stack
 
 - **FastAPI**: Web framework
-- **SQLAlchemy**: ORM
-- **SQLite**: Database
-- **Tesseract**: OCR engine
+- **MongoDB**: Document database
+- **Beanie**: MongoDB ODM
+- **fastapi-users**: Authentication
+- **Tesseract/Claude Vision**: OCR engines
 - **Vanilla JS**: Frontend (no frameworks)
 
 ## License
