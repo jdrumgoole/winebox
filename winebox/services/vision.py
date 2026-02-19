@@ -17,16 +17,36 @@ Return ONLY a valid JSON object with these fields (use null for any field you ca
     "name": "The wine name/title",
     "winery": "The winery or producer name",
     "vintage": 2020,
-    "grape_variety": "The grape variety (e.g., Cabernet Sauvignon, Chardonnay)",
+    "grape_variety": "Primary grape if single varietal, or dominant grape if blend",
+    "grape_varieties": [
+        {"name": "Cabernet Sauvignon", "percentage": 70},
+        {"name": "Merlot", "percentage": 30}
+    ],
     "region": "The wine region (e.g., Napa Valley, Bordeaux)",
+    "appellation": "Specific appellation/AOC/DOC if shown (e.g., Margaux, Pomerol)",
     "country": "The country of origin",
+    "wine_type": "red, white, rosé, sparkling, fortified, or dessert",
+    "classification": "Quality classification if shown (e.g., Grand Cru, DOCG, Reserve)",
     "alcohol_percentage": 13.5,
+    "drink_window": "2025-2040",
+    "producer_type": "estate, negociant, or cooperative",
     "raw_text": "All readable text from the label, preserving line breaks"
 }
 
 Important:
 - vintage should be a number (year) or null
 - alcohol_percentage should be a number or null
+- grape_varieties is an array with name and percentage (percentage can be null if not shown)
+- wine_type should be one of: red, white, rosé, sparkling, fortified, dessert (infer from grape, color, region if not explicit)
+- classification: look for quality indicators like:
+  - France: Grand Cru, Premier Cru, AOC, AOP, Cru Classé, Cru Bourgeois
+  - Italy: DOCG, DOC, IGT, Riserva
+  - Spain: Crianza, Reserva, Gran Reserva, DOCa, DO
+  - Germany: Kabinett, Spätlese, Auslese, GG (Grosses Gewächs)
+  - USA: Estate Bottled, Reserve
+- appellation: extract the specific sub-region/appellation (more specific than region)
+- drink_window: if suggested drinking years are shown (e.g., "Best 2025-2040")
+- producer_type: "estate" if estate-bottled/grown, "negociant" if merchant bottler, "cooperative" if co-op
 - Extract ALL visible text for raw_text, including small print
 - If you see multiple wines or labels, focus on the main/primary one
 - Be thorough - wine labels often have text in multiple locations"""
@@ -142,15 +162,34 @@ class ClaudeVisionService:
 
             result = json.loads(response_text.strip())
 
+            # Parse drink window if present
+            drink_window = result.get("drink_window")
+            drink_window_start = None
+            drink_window_end = None
+            if drink_window and isinstance(drink_window, str) and "-" in drink_window:
+                parts = drink_window.split("-")
+                try:
+                    drink_window_start = int(parts[0].strip())
+                    drink_window_end = int(parts[1].strip())
+                except (ValueError, IndexError):
+                    pass
+
             # Ensure all expected fields exist
             return {
                 "name": result.get("name"),
                 "winery": result.get("winery"),
                 "vintage": result.get("vintage"),
                 "grape_variety": result.get("grape_variety"),
+                "grape_varieties": result.get("grape_varieties", []),
                 "region": result.get("region"),
+                "appellation": result.get("appellation"),
                 "country": result.get("country"),
+                "wine_type": result.get("wine_type"),
+                "classification": result.get("classification"),
                 "alcohol_percentage": result.get("alcohol_percentage"),
+                "drink_window_start": drink_window_start,
+                "drink_window_end": drink_window_end,
+                "producer_type": result.get("producer_type"),
                 "raw_text": result.get("raw_text", ""),
             }
 
@@ -242,14 +281,33 @@ class ClaudeVisionService:
 
             result = json.loads(response_text.strip())
 
+            # Parse drink window if present
+            drink_window = result.get("drink_window")
+            drink_window_start = None
+            drink_window_end = None
+            if drink_window and isinstance(drink_window, str) and "-" in drink_window:
+                parts = drink_window.split("-")
+                try:
+                    drink_window_start = int(parts[0].strip())
+                    drink_window_end = int(parts[1].strip())
+                except (ValueError, IndexError):
+                    pass
+
             return {
                 "name": result.get("name"),
                 "winery": result.get("winery"),
                 "vintage": result.get("vintage"),
                 "grape_variety": result.get("grape_variety"),
+                "grape_varieties": result.get("grape_varieties", []),
                 "region": result.get("region"),
+                "appellation": result.get("appellation"),
                 "country": result.get("country"),
+                "wine_type": result.get("wine_type"),
+                "classification": result.get("classification"),
                 "alcohol_percentage": result.get("alcohol_percentage"),
+                "drink_window_start": drink_window_start,
+                "drink_window_end": drink_window_end,
+                "producer_type": result.get("producer_type"),
                 "raw_text": result.get("raw_text", ""),
                 "front_label_text": result.get("raw_text", ""),
                 "back_label_text": None,  # Combined in raw_text
@@ -269,9 +327,16 @@ class ClaudeVisionService:
             "winery": None,
             "vintage": None,
             "grape_variety": None,
+            "grape_varieties": [],
             "region": None,
+            "appellation": None,
             "country": None,
+            "wine_type": None,
+            "classification": None,
             "alcohol_percentage": None,
+            "drink_window_start": None,
+            "drink_window_end": None,
+            "producer_type": None,
             "raw_text": "",
             "front_label_text": "",
             "back_label_text": None,

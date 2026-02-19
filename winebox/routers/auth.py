@@ -1,13 +1,13 @@
 """Authentication endpoints with fastapi-users integration."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from winebox.auth import (
     UserCreate,
@@ -17,9 +17,15 @@ from winebox.auth import (
     fastapi_users,
 )
 from winebox.config import settings
-from winebox.database import get_db
 from winebox.models.user import User
-from winebox.services.auth import RequireAuth, verify_password, get_password_hash
+from winebox.services.auth import (
+    RequireAuth,
+    verify_password,
+    get_password_hash,
+    authenticate_user,
+    create_access_token,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+)
 
 router = APIRouter()
 
@@ -115,6 +121,14 @@ class ApiKeyUpdateRequest(BaseModel):
     api_key: str
 
 
+class Token(BaseModel):
+    """Token response model."""
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int = ACCESS_TOKEN_EXPIRE_MINUTES * 60  # seconds
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
     current_user: RequireAuth,
@@ -127,7 +141,6 @@ async def get_current_user_info(
 async def change_password(
     request: PasswordChangeRequest,
     current_user: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     """Change the current user's password."""
     # Verify current password
@@ -137,9 +150,10 @@ async def change_password(
             detail="Current password is incorrect",
         )
 
-    # Update password
+    # Update password using Beanie
     current_user.hashed_password = get_password_hash(request.new_password)
-    await db.commit()
+    current_user.updated_at = datetime.utcnow()
+    await current_user.save()
 
     return {"message": "Password updated successfully"}
 
@@ -148,14 +162,13 @@ async def change_password(
 async def update_profile(
     request: ProfileUpdateRequest,
     current_user: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserResponse:
     """Update the current user's profile."""
     if request.full_name is not None:
         current_user.full_name = request.full_name
 
-    await db.commit()
-    await db.refresh(current_user)
+    current_user.updated_at = datetime.utcnow()
+    await current_user.save()
 
     return UserResponse.from_user(current_user)
 
@@ -164,14 +177,14 @@ async def update_profile(
 async def update_api_key(
     request: ApiKeyUpdateRequest,
     current_user: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     """Update the current user's Anthropic API key.
 
     Note: The API key is stored but cannot be retrieved after setting.
     """
     current_user.anthropic_api_key = request.api_key
-    await db.commit()
+    current_user.updated_at = datetime.utcnow()
+    await current_user.save()
 
     return {"message": "API key updated successfully"}
 
@@ -179,11 +192,11 @@ async def update_api_key(
 @router.delete("/api-key")
 async def delete_api_key(
     current_user: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     """Delete the current user's Anthropic API key."""
     current_user.anthropic_api_key = None
-    await db.commit()
+    current_user.updated_at = datetime.utcnow()
+    await current_user.save()
 
     return {"message": "API key deleted successfully"}
 
@@ -198,34 +211,18 @@ async def logout() -> dict:
     return {"message": "Successfully logged out"}
 
 
-# Keep the old /token endpoint working for backward compatibility
-# The frontend uses this endpoint, so we keep the old implementation
-from fastapi.security import OAuth2PasswordRequestForm
-from winebox.services.auth import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from datetime import timedelta
-
-
-class Token(BaseModel):
-    """Token response model."""
-
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int = ACCESS_TOKEN_EXPIRE_MINUTES * 60  # seconds
-
-
 @router.post("/token", response_model=Token)
 @limiter.limit(f"{settings.auth_rate_limit_per_minute}/minute")
 async def login_token(
     request: Request,  # Required for rate limiting
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
     """Login with username and password to get an access token.
 
     This is the legacy endpoint kept for backward compatibility.
     New clients should use POST /api/auth/login instead.
     """
-    user = await authenticate_user(db, form_data.username, form_data.password)
+    user = await authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -242,7 +239,7 @@ async def login_token(
 
     # Update last login time
     user.last_login = datetime.now(timezone.utc)
-    await db.commit()
+    await user.save()
 
     # Create access token
     access_token = create_access_token(

@@ -1,21 +1,19 @@
-"""User model for authentication with fastapi-users integration."""
+"""User document model for authentication with fastapi-users integration."""
 
-import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import Optional
 
-from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
-from sqlalchemy import Boolean, DateTime, String, func
-from sqlalchemy.orm import Mapped, mapped_column
-
-from winebox.database import Base
+from beanie import Document, Indexed
+from pydantic import Field
 
 
-class User(SQLAlchemyBaseUserTableUUID, Base):
-    """User model for authentication.
+class User(Document):
+    """User document model for authentication.
 
-    Inherits from SQLAlchemyBaseUserTableUUID which provides:
-    - id: UUID primary key
+    This model is compatible with fastapi-users BeanieUserDatabase.
+
+    Fields:
+    - id: ObjectId primary key (from Document)
     - email: unique email (required by fastapi-users)
     - hashed_password: password hash
     - is_active: account active status
@@ -30,34 +28,27 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     - last_login: last login timestamp
     """
 
-    __tablename__ = "users"
+    # Required fields for fastapi-users
+    email: Indexed(str, unique=True)
+    hashed_password: str
+    is_active: bool = True
+    is_superuser: bool = False
+    is_verified: bool = False
 
     # Custom fields for WineBox
-    username: Mapped[str] = mapped_column(
-        String(50),
-        unique=True,
-        nullable=False,
-        index=True,
-    )
-    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    anthropic_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    username: Indexed(str, unique=True)
+    full_name: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-    last_login: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    last_login: Optional[datetime] = None
+
+    class Settings:
+        name = "users"
+        use_state_management = True
+        email_collation = None  # Use default case-insensitive collation
 
     # Alias is_superuser as is_admin for backward compatibility
     @property

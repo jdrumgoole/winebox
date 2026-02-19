@@ -1,7 +1,7 @@
-"""Pytest configuration and fixtures for WineBox tests."""
+"""Pytest configuration and fixtures for WineBox tests with MongoDB."""
 
-import uuid
 from collections.abc import AsyncGenerator
+from datetime import datetime
 from pathlib import Path
 from typing import Generator
 import tempfile
@@ -9,83 +9,55 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
+from beanie import init_beanie, PydanticObjectId
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from mongomock_motor import AsyncMongoMockClient
 
-from winebox.database import Base, get_db
+from winebox.database import get_document_models
 from winebox.main import app
-from winebox.models.user import User
+from winebox.models import User
 from winebox.services.auth import get_password_hash, create_access_token
 
 
-# Test database URL (in-memory SQLite)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+@pytest_asyncio.fixture(scope="function")
+async def mongo_client():
+    """Create a mock MongoDB client for testing."""
+    client = AsyncMongoMockClient()
+    yield client
+    client.close()
 
 
 @pytest_asyncio.fixture(scope="function")
-async def db_engine():
-    """Create a test database engine."""
-    engine = create_async_engine(
-        TEST_DATABASE_URL,
-        echo=False,
+async def init_test_db(mongo_client):
+    """Initialize Beanie with test database."""
+    db = mongo_client["test_winebox"]
+    await init_beanie(
+        database=db,
+        document_models=get_document_models(),
     )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    yield db
 
-    yield engine
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+    # Cleanup: drop all collections
+    for name in await db.list_collection_names():
+        await db[name].drop()
 
 
 @pytest_asyncio.fixture(scope="function")
-async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
-    """Create a test database session."""
-    async_session_maker = async_sessionmaker(
-        db_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-
-    async with async_session_maker() as session:
-        yield session
-
-
-@pytest_asyncio.fixture(scope="function")
-async def client(db_engine) -> AsyncGenerator[AsyncClient, None]:
+async def client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client with overridden database and auth."""
-    async_session_maker = async_sessionmaker(
-        db_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
+    # Create a test user
+    test_user = User(
+        username="testuser",
+        email="test@example.com",
+        hashed_password=get_password_hash("testpassword"),
+        is_active=True,
+        is_verified=True,
+        is_superuser=False,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
     )
-
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        async with async_session_maker() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    # Create a test user with fastapi-users compatible fields
-    async with async_session_maker() as session:
-        test_user = User(
-            id=uuid.uuid4(),
-            username="testuser",
-            email="test@example.com",
-            hashed_password=get_password_hash("testpassword"),
-            is_active=True,
-            is_verified=True,  # Verified for testing
-            is_superuser=False,
-        )
-        session.add(test_user)
-        await session.commit()
+    await test_user.insert()
 
     # Create auth token
     access_token = create_access_token(data={"sub": "testuser"})
@@ -97,8 +69,6 @@ async def client(db_engine) -> AsyncGenerator[AsyncClient, None]:
         headers={"Authorization": f"Bearer {access_token}"}
     ) as ac:
         yield ac
-
-    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -170,30 +140,11 @@ def mock_email_service():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def unauthenticated_client(db_engine) -> AsyncGenerator[AsyncClient, None]:
+async def unauthenticated_client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client without authentication."""
-    async_session_maker = async_sessionmaker(
-        db_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        async with async_session_maker() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-
-    app.dependency_overrides[get_db] = override_get_db
-
     transport = ASGITransport(app=app)
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
     ) as ac:
         yield ac
-
-    app.dependency_overrides.clear()

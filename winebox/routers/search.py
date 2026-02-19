@@ -1,15 +1,13 @@
 """Search endpoints."""
 
+import re
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from beanie import PydanticObjectId
+from fastapi import APIRouter, Query
 
-from winebox.database import get_db
-from winebox.models import CellarInventory, Transaction, TransactionType, Wine
+from winebox.models import Transaction, TransactionType, Wine
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
 
@@ -19,7 +17,6 @@ router = APIRouter()
 @router.get("", response_model=list[WineWithInventory])
 async def search_wines(
     _: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
     q: Annotated[str | None, Query(description="Full-text search query")] = None,
     vintage: Annotated[int | None, Query(description="Wine vintage year")] = None,
     grape: Annotated[str | None, Query(description="Grape variety")] = None,
@@ -39,89 +36,96 @@ async def search_wines(
     Use `q` for full-text search across name, winery, region, and label text.
     Other parameters filter on specific fields.
     """
-    query = select(Wine).options(selectinload(Wine.inventory))
-    conditions = []
+    # Build filter conditions
+    conditions = {}
 
-    # Full-text search (simple LIKE-based search for SQLite)
+    # Full-text search using MongoDB text search or regex fallback
     if q:
-        search_pattern = f"%{q}%"
-        conditions.append(
-            or_(
-                Wine.name.ilike(search_pattern),
-                Wine.winery.ilike(search_pattern),
-                Wine.region.ilike(search_pattern),
-                Wine.country.ilike(search_pattern),
-                Wine.grape_variety.ilike(search_pattern),
-                Wine.front_label_text.ilike(search_pattern),
-                Wine.back_label_text.ilike(search_pattern),
-            )
-        )
+        # Use regex for case-insensitive search (MongoDB text search requires text index)
+        search_pattern = re.compile(re.escape(q), re.IGNORECASE)
+        conditions["$or"] = [
+            {"name": {"$regex": search_pattern}},
+            {"winery": {"$regex": search_pattern}},
+            {"region": {"$regex": search_pattern}},
+            {"country": {"$regex": search_pattern}},
+            {"grape_variety": {"$regex": search_pattern}},
+            {"front_label_text": {"$regex": search_pattern}},
+            {"back_label_text": {"$regex": search_pattern}},
+        ]
 
     # Exact/partial matches on specific fields
     if vintage:
-        conditions.append(Wine.vintage == vintage)
+        conditions["vintage"] = vintage
 
     if grape:
-        conditions.append(Wine.grape_variety.ilike(f"%{grape}%"))
+        conditions["grape_variety"] = {"$regex": re.compile(re.escape(grape), re.IGNORECASE)}
 
     if winery:
-        conditions.append(Wine.winery.ilike(f"%{winery}%"))
+        conditions["winery"] = {"$regex": re.compile(re.escape(winery), re.IGNORECASE)}
 
     if region:
-        conditions.append(Wine.region.ilike(f"%{region}%"))
+        conditions["region"] = {"$regex": re.compile(re.escape(region), re.IGNORECASE)}
 
     if country:
-        conditions.append(Wine.country.ilike(f"%{country}%"))
-
-    # Date-based filters (based on transactions)
-    if checked_in_after or checked_in_before:
-        # Subquery to find wines with check-in transactions in date range
-        checkin_subquery = (
-            select(Transaction.wine_id)
-            .where(Transaction.transaction_type == TransactionType.CHECK_IN)
-        )
-        if checked_in_after:
-            checkin_subquery = checkin_subquery.where(
-                Transaction.transaction_date >= checked_in_after
-            )
-        if checked_in_before:
-            checkin_subquery = checkin_subquery.where(
-                Transaction.transaction_date <= checked_in_before
-            )
-        conditions.append(Wine.id.in_(checkin_subquery))
-
-    if checked_out_after or checked_out_before:
-        # Subquery to find wines with check-out transactions in date range
-        checkout_subquery = (
-            select(Transaction.wine_id)
-            .where(Transaction.transaction_type == TransactionType.CHECK_OUT)
-        )
-        if checked_out_after:
-            checkout_subquery = checkout_subquery.where(
-                Transaction.transaction_date >= checked_out_after
-            )
-        if checked_out_before:
-            checkout_subquery = checkout_subquery.where(
-                Transaction.transaction_date <= checked_out_before
-            )
-        conditions.append(Wine.id.in_(checkout_subquery))
+        conditions["country"] = {"$regex": re.compile(re.escape(country), re.IGNORECASE)}
 
     # Stock filter
     if in_stock is True:
-        query = query.join(CellarInventory).where(CellarInventory.quantity > 0)
+        conditions["inventory.quantity"] = {"$gt": 0}
     elif in_stock is False:
-        query = query.outerjoin(CellarInventory).where(
-            (CellarInventory.quantity == 0) | (CellarInventory.quantity.is_(None))
-        )
+        conditions["inventory.quantity"] = {"$lte": 0}
 
-    # Apply all conditions
-    if conditions:
-        query = query.where(and_(*conditions))
+    # Get wine IDs filtered by transaction dates
+    wine_ids_from_transactions = None
 
-    # Pagination and ordering
-    query = query.offset(skip).limit(limit).order_by(Wine.created_at.desc())
+    if checked_in_after or checked_in_before:
+        # Find wines with check-in transactions in date range
+        checkin_filter = {"transaction_type": TransactionType.CHECK_IN}
+        if checked_in_after:
+            checkin_filter["transaction_date"] = {"$gte": checked_in_after}
+        if checked_in_before:
+            if "transaction_date" in checkin_filter:
+                checkin_filter["transaction_date"]["$lte"] = checked_in_before
+            else:
+                checkin_filter["transaction_date"] = {"$lte": checked_in_before}
 
-    result = await db.execute(query)
-    wines = result.scalars().all()
+        checkin_transactions = await Transaction.find(checkin_filter).to_list()
+        checkin_wine_ids = {t.wine_id for t in checkin_transactions}
+
+        if wine_ids_from_transactions is None:
+            wine_ids_from_transactions = checkin_wine_ids
+        else:
+            wine_ids_from_transactions &= checkin_wine_ids
+
+    if checked_out_after or checked_out_before:
+        # Find wines with check-out transactions in date range
+        checkout_filter = {"transaction_type": TransactionType.CHECK_OUT}
+        if checked_out_after:
+            checkout_filter["transaction_date"] = {"$gte": checked_out_after}
+        if checked_out_before:
+            if "transaction_date" in checkout_filter:
+                checkout_filter["transaction_date"]["$lte"] = checked_out_before
+            else:
+                checkout_filter["transaction_date"] = {"$lte": checked_out_before}
+
+        checkout_transactions = await Transaction.find(checkout_filter).to_list()
+        checkout_wine_ids = {t.wine_id for t in checkout_transactions}
+
+        if wine_ids_from_transactions is None:
+            wine_ids_from_transactions = checkout_wine_ids
+        else:
+            wine_ids_from_transactions &= checkout_wine_ids
+
+    # Add wine ID filter if we filtered by transactions
+    if wine_ids_from_transactions is not None:
+        if not wine_ids_from_transactions:
+            # No wines match the transaction criteria
+            return []
+        conditions["_id"] = {"$in": list(wine_ids_from_transactions)}
+
+    # Execute query
+    wines = await Wine.find(
+        conditions
+    ).skip(skip).limit(limit).sort(-Wine.created_at).to_list()
 
     return [WineWithInventory.model_validate(wine) for wine in wines]

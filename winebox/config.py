@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     app_name: str = "WineBox"
     debug: bool = False
 
-    # Database
-    database_url: str = "sqlite+aiosqlite:///./data/winebox.db"
+    # MongoDB Database
+    mongodb_url: str = "mongodb://localhost:27017"
+    mongodb_database: str = "winebox"
 
     # Image storage
     image_storage_path: Path = Path("data/images")

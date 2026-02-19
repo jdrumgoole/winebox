@@ -6,6 +6,73 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Wine type indicators
+WINE_TYPE_INDICATORS = {
+    "red": [
+        "red wine", "vin rouge", "vino rosso", "vino tinto", "rotwein",
+        "cabernet", "merlot", "pinot noir", "syrah", "shiraz", "malbec",
+        "sangiovese", "nebbiolo", "tempranillo", "zinfandel", "primitivo",
+    ],
+    "white": [
+        "white wine", "vin blanc", "vino bianco", "vino blanco", "weisswein",
+        "chardonnay", "sauvignon blanc", "riesling", "pinot grigio", "pinot gris",
+        "gewurztraminer", "viognier", "chenin blanc", "semillon", "gruner veltliner",
+    ],
+    "rosé": [
+        "rosé", "rose", "rosado", "rosato", "vin rosé",
+        "white zinfandel", "blush",
+    ],
+    "sparkling": [
+        "sparkling", "champagne", "prosecco", "cava", "crémant", "cremant",
+        "spumante", "sekt", "méthode traditionnelle", "brut", "extra brut",
+        "demi-sec", "mousseux",
+    ],
+    "fortified": [
+        "fortified", "port", "porto", "sherry", "jerez", "madeira",
+        "marsala", "vermouth", "vin doux naturel",
+    ],
+    "dessert": [
+        "dessert wine", "late harvest", "ice wine", "eiswein", "vin santo",
+        "sauternes", "barsac", "tokaji", "trockenbeerenauslese", "beerenauslese",
+        "passito", "recioto",
+    ],
+}
+
+# Classification patterns by country/system
+CLASSIFICATION_PATTERNS = {
+    # France
+    "grand_cru": ["grand cru", "grand cru classé"],
+    "premier_cru": ["premier cru", "1er cru", "premier cru classé"],
+    "cru_classe": ["cru classé", "cru classe", "classé growth"],
+    "cru_bourgeois": ["cru bourgeois"],
+    "aoc_aop": ["aoc", "aop", "appellation", "contrôlée", "controlee", "protégée"],
+    "igp": ["igp", "vin de pays"],
+    # Italy
+    "docg": ["docg", "denominazione di origine controllata e garantita"],
+    "doc": ["doc", "denominazione di origine controllata"],
+    "igt": ["igt", "indicazione geografica tipica"],
+    "riserva": ["riserva"],
+    "superiore": ["superiore"],
+    # Spain
+    "doca": ["doca", "denominación de origen calificada"],
+    "do": ["denominación de origen", "d.o."],
+    "gran_reserva": ["gran reserva"],
+    "reserva": ["reserva"],
+    "crianza": ["crianza"],
+    "joven": ["joven"],
+    # Germany
+    "grosses_gewachs": ["grosses gewächs", "grosses gewachs", "gg"],
+    "erstes_gewachs": ["erstes gewächs", "erstes gewachs"],
+    "trockenbeerenauslese": ["trockenbeerenauslese", "tba"],
+    "beerenauslese": ["beerenauslese", "ba"],
+    "auslese": ["auslese"],
+    "spatlese": ["spätlese", "spatlese"],
+    "kabinett": ["kabinett"],
+    # USA/General
+    "estate_bottled": ["estate bottled", "estate grown", "estate produced"],
+    "reserve": ["reserve", "reserva"],
+}
+
 # Common grape varieties
 GRAPE_VARIETIES = [
     "Cabernet Sauvignon",
@@ -182,8 +249,6 @@ class WineParserService:
 
         # Clean text
         text_clean = text.strip()
-        text_upper = text_clean.upper()
-        text_lower = text_clean.lower()
 
         # Extract vintage year
         vintage = self._extract_vintage(text_clean)
@@ -199,6 +264,11 @@ class WineParserService:
         grape = self._extract_grape_variety(text_clean)
         if grape:
             result["grape_variety"] = grape
+
+        # Extract grape blend (multiple grapes with percentages)
+        grape_blend = self._extract_grape_blend(text_clean)
+        if grape_blend:
+            result["grape_varieties"] = grape_blend
 
         # Extract region
         region = self._extract_region(text_clean)
@@ -219,6 +289,27 @@ class WineParserService:
         name = self._extract_name(text_clean, result)
         if name:
             result["name"] = name
+
+        # Extract wine type (red, white, etc.)
+        wine_type = self._extract_wine_type(text_clean, result)
+        if wine_type:
+            result["wine_type"] = wine_type
+
+        # Extract classification
+        classification = self._extract_classification(text_clean)
+        if classification:
+            result["classification"] = classification
+
+        # Extract producer type
+        producer_type = self._extract_producer_type(text_clean)
+        if producer_type:
+            result["producer_type"] = producer_type
+
+        # Extract drink window
+        drink_window = self._extract_drink_window(text_clean)
+        if drink_window:
+            result["drink_window_start"] = drink_window[0]
+            result["drink_window_end"] = drink_window[1]
 
         return result
 
@@ -407,5 +498,192 @@ class WineParserService:
                     return candidate
 
             return candidates[0] if candidates else None
+
+        return None
+
+    def _extract_wine_type(self, text: str, parsed: dict) -> str | None:
+        """Extract wine type from text or infer from grape variety."""
+        text_lower = text.lower()
+
+        # Check for explicit wine type indicators
+        for wine_type, indicators in WINE_TYPE_INDICATORS.items():
+            for indicator in indicators:
+                if indicator in text_lower:
+                    return wine_type
+
+        # Try to infer from grape variety
+        grape = parsed.get("grape_variety", "").lower()
+        if grape:
+            red_grapes = [
+                "cabernet", "merlot", "pinot noir", "syrah", "shiraz", "malbec",
+                "sangiovese", "nebbiolo", "tempranillo", "zinfandel", "primitivo",
+                "barbera", "grenache", "mourvedre", "gamay",
+            ]
+            white_grapes = [
+                "chardonnay", "sauvignon blanc", "riesling", "pinot grigio",
+                "gewurztraminer", "viognier", "chenin blanc", "semillon",
+                "gruner veltliner", "albarino", "verdejo",
+            ]
+
+            for red_grape in red_grapes:
+                if red_grape in grape:
+                    return "red"
+            for white_grape in white_grapes:
+                if white_grape in grape:
+                    return "white"
+
+        return None
+
+    def _extract_classification(self, text: str) -> str | None:
+        """Extract wine classification from text."""
+        text_lower = text.lower()
+
+        # Check patterns in order of specificity
+        # More specific classifications first
+        priority_order = [
+            "trockenbeerenauslese", "beerenauslese", "auslese", "spatlese", "kabinett",
+            "grosses_gewachs", "erstes_gewachs",
+            "grand_cru", "premier_cru", "cru_classe", "cru_bourgeois",
+            "docg", "doc", "igt", "riserva", "superiore",
+            "doca", "gran_reserva", "reserva", "crianza", "joven",
+            "aoc_aop", "igp",
+            "estate_bottled", "reserve",
+        ]
+
+        for classification_key in priority_order:
+            patterns = CLASSIFICATION_PATTERNS.get(classification_key, [])
+            for pattern in patterns:
+                if pattern in text_lower:
+                    # Return the display-friendly version
+                    display_names = {
+                        "grand_cru": "Grand Cru",
+                        "premier_cru": "Premier Cru",
+                        "cru_classe": "Cru Classé",
+                        "cru_bourgeois": "Cru Bourgeois",
+                        "aoc_aop": "AOC/AOP",
+                        "igp": "IGP",
+                        "docg": "DOCG",
+                        "doc": "DOC",
+                        "igt": "IGT",
+                        "riserva": "Riserva",
+                        "superiore": "Superiore",
+                        "doca": "DOCa",
+                        "gran_reserva": "Gran Reserva",
+                        "reserva": "Reserva",
+                        "crianza": "Crianza",
+                        "joven": "Joven",
+                        "grosses_gewachs": "Grosses Gewächs",
+                        "erstes_gewachs": "Erstes Gewächs",
+                        "trockenbeerenauslese": "Trockenbeerenauslese",
+                        "beerenauslese": "Beerenauslese",
+                        "auslese": "Auslese",
+                        "spatlese": "Spätlese",
+                        "kabinett": "Kabinett",
+                        "estate_bottled": "Estate Bottled",
+                        "reserve": "Reserve",
+                    }
+                    return display_names.get(classification_key, classification_key)
+
+        return None
+
+    def _extract_grape_blend(self, text: str) -> list[dict[str, Any]] | None:
+        """Extract grape blend with percentages from text.
+
+        Looks for patterns like:
+        - "70% Cabernet Sauvignon, 30% Merlot"
+        - "Cabernet Sauvignon 60%, Merlot 40%"
+        """
+        text_lower = text.lower()
+        blend = []
+
+        # Pattern: percentage before grape
+        pattern1 = r"(\d{1,3})\s*%\s*([A-Za-z][A-Za-z\s\''-]+)"
+        matches1 = re.findall(pattern1, text)
+
+        for pct, grape_text in matches1:
+            grape_clean = grape_text.strip().rstrip(",;")
+            # Check if it's a known grape
+            for grape in GRAPE_VARIETIES:
+                if grape.lower() in grape_clean.lower():
+                    blend.append({"name": grape, "percentage": int(pct)})
+                    break
+
+        # Pattern: grape before percentage
+        pattern2 = r"([A-Za-z][A-Za-z\s\''-]+)\s+(\d{1,3})\s*%"
+        matches2 = re.findall(pattern2, text)
+
+        for grape_text, pct in matches2:
+            grape_clean = grape_text.strip()
+            # Check if it's a known grape and not already added
+            for grape in GRAPE_VARIETIES:
+                if grape.lower() in grape_clean.lower():
+                    if not any(b["name"] == grape for b in blend):
+                        blend.append({"name": grape, "percentage": int(pct)})
+                    break
+
+        return blend if blend else None
+
+    def _extract_producer_type(self, text: str) -> str | None:
+        """Extract producer type from text."""
+        text_lower = text.lower()
+
+        # Estate indicators
+        estate_indicators = [
+            "estate bottled", "estate grown", "estate produced",
+            "mis en bouteille au château", "mis en bouteille au domaine",
+            "erzeugerabfüllung", "gutsabfüllung",
+            "imbottigliato all'origine", "imbottigliato dal produttore",
+        ]
+
+        for indicator in estate_indicators:
+            if indicator in text_lower:
+                return "estate"
+
+        # Negociant indicators
+        negociant_indicators = [
+            "négociant", "negociant", "selected by", "bottled by",
+            "mis en bouteille par", "elevé par",
+        ]
+
+        for indicator in negociant_indicators:
+            if indicator in text_lower:
+                return "negociant"
+
+        # Cooperative indicators
+        coop_indicators = [
+            "cooperative", "coopérative", "cantina sociale",
+            "bodega cooperativa", "cave coopérative",
+        ]
+
+        for indicator in coop_indicators:
+            if indicator in text_lower:
+                return "cooperative"
+
+        return None
+
+    def _extract_drink_window(self, text: str) -> tuple[int, int] | None:
+        """Extract drink window (recommended drinking years) from text.
+
+        Looks for patterns like:
+        - "Drink 2025-2040"
+        - "Best 2020-2035"
+        - "Optimal drinking: 2022-2030"
+        """
+        # Pattern for year ranges
+        patterns = [
+            r"(?:drink|best|optimal|drinking)[:\s]+(\d{4})\s*[-–]\s*(\d{4})",
+            r"(\d{4})\s*[-–]\s*(\d{4})\s*(?:drinking|drink)",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                try:
+                    start_year = int(match.group(1))
+                    end_year = int(match.group(2))
+                    if 2000 <= start_year <= 2100 and 2000 <= end_year <= 2100:
+                        return (start_year, end_year)
+                except (ValueError, IndexError):
+                    continue
 
         return None

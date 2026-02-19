@@ -1,20 +1,36 @@
 """Wine management endpoints."""
 
 import logging
+import uuid
+from datetime import datetime
 from typing import Annotated
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from beanie import PydanticObjectId
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from winebox.config import settings
-from winebox.database import get_db
-from winebox.models import CellarInventory, Transaction, TransactionType, Wine
-from winebox.schemas.wine import WineCreate, WineResponse, WineUpdate, WineWithInventory
+from winebox.models import (
+    GrapeVariety,
+    Transaction,
+    TransactionType,
+    Wine,
+    GrapeBlendEntry,
+    InventoryInfo,
+    ScoreEntry,
+)
+from winebox.schemas.reference import (
+    GrapeVarietyResponse,
+    WineGrapeBlend,
+    WineGrapeBlendUpdate,
+    WineGrapeResponse,
+    WineScoreCreate,
+    WineScoreResponse,
+    WineScoresResponse,
+    WineScoreUpdate,
+)
+from winebox.schemas.wine import WineResponse, WineUpdate, WineWithInventory
 from winebox.services.auth import RequireAuth
-from winebox.services.image_storage import ALLOWED_MIME_TYPES, ImageStorageService
+from winebox.services.image_storage import ImageStorageService
 from winebox.services.ocr import OCRService
 from winebox.services.vision import ClaudeVisionService
 from winebox.services.wine_parser import WineParserService
@@ -47,6 +63,7 @@ async def validate_upload_size(upload_file: UploadFile, field_name: str) -> byte
             detail=f"{field_name} exceeds maximum allowed size of {max_mb:.1f} MB",
         )
     return content
+
 
 # Service dependencies
 image_storage = ImageStorageService()
@@ -167,7 +184,6 @@ MAX_OCR_TEXT_LENGTH = 10000
 @router.post("/checkin", response_model=WineWithInventory, status_code=status.HTTP_201_CREATED)
 async def checkin_wine(
     current_user: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
     front_label: Annotated[UploadFile, File(description="Front label image")],
     quantity: Annotated[int, Form(ge=1, le=10000, description="Number of bottles")] = 1,
     back_label: Annotated[UploadFile | None, File(description="Back label image")] = None,
@@ -262,7 +278,7 @@ async def checkin_wine(
     # Use provided values
     wine_name = name or "Unknown Wine"
 
-    # Create wine record
+    # Create wine document with embedded inventory
     wine = Wine(
         name=wine_name,
         winery=winery,
@@ -275,9 +291,9 @@ async def checkin_wine(
         back_label_text=back_text,
         front_label_image_path=front_image_path,
         back_label_image_path=back_image_path,
+        inventory=InventoryInfo(quantity=quantity, updated_at=datetime.utcnow()),
     )
-    db.add(wine)
-    await db.flush()  # Get the wine ID
+    await wine.insert()
 
     # Create transaction
     transaction = Transaction(
@@ -286,24 +302,7 @@ async def checkin_wine(
         quantity=quantity,
         notes=notes,
     )
-    db.add(transaction)
-
-    # Create or update inventory
-    inventory = CellarInventory(
-        wine_id=wine.id,
-        quantity=quantity,
-    )
-    db.add(inventory)
-
-    await db.commit()
-
-    # Re-query with eager loading for relationships
-    result = await db.execute(
-        select(Wine)
-        .options(selectinload(Wine.inventory))
-        .where(Wine.id == wine.id)
-    )
-    wine = result.scalar_one()
+    await transaction.insert()
 
     return WineWithInventory.model_validate(wine)
 
@@ -312,7 +311,6 @@ async def checkin_wine(
 async def checkout_wine(
     wine_id: str,
     _: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
     quantity: Annotated[int, Form(ge=1, le=10000, description="Number of bottles to remove")] = 1,
     notes: Annotated[str | None, Form(max_length=MAX_NOTES_LENGTH, description="Check-out notes")] = None,
 ) -> WineWithInventory:
@@ -321,13 +319,11 @@ async def checkout_wine(
     Remove bottles from inventory. If quantity reaches 0, the wine
     remains in history but shows as out of stock.
     """
-    # Get wine with inventory
-    result = await db.execute(
-        select(Wine)
-        .options(selectinload(Wine.inventory))
-        .where(Wine.id == wine_id)
-    )
-    wine = result.scalar_one_or_none()
+    # Get wine
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
 
     if not wine:
         raise HTTPException(
@@ -335,11 +331,10 @@ async def checkout_wine(
             detail=f"Wine with ID {wine_id} not found",
         )
 
-    if not wine.inventory or wine.inventory.quantity < quantity:
-        available = wine.inventory.quantity if wine.inventory else 0
+    if wine.inventory.quantity < quantity:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not enough bottles in stock. Available: {available}, Requested: {quantity}",
+            detail=f"Not enough bottles in stock. Available: {wine.inventory.quantity}, Requested: {quantity}",
         )
 
     # Create transaction
@@ -349,20 +344,13 @@ async def checkout_wine(
         quantity=quantity,
         notes=notes,
     )
-    db.add(transaction)
+    await transaction.insert()
 
     # Update inventory
     wine.inventory.quantity -= quantity
-
-    await db.commit()
-
-    # Re-query with eager loading for relationships
-    result = await db.execute(
-        select(Wine)
-        .options(selectinload(Wine.inventory))
-        .where(Wine.id == wine_id)
-    )
-    wine = result.scalar_one()
+    wine.inventory.updated_at = datetime.utcnow()
+    wine.updated_at = datetime.utcnow()
+    await wine.save()
 
     return WineWithInventory.model_validate(wine)
 
@@ -370,24 +358,19 @@ async def checkout_wine(
 @router.get("", response_model=list[WineWithInventory])
 async def list_wines(
     _: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = 0,
     limit: int = 100,
     in_stock: bool | None = None,
 ) -> list[WineWithInventory]:
     """List all wines with optional filtering."""
-    query = select(Wine).options(selectinload(Wine.inventory))
+    query = Wine.find()
 
     if in_stock is True:
-        query = query.join(CellarInventory).where(CellarInventory.quantity > 0)
+        query = Wine.find(Wine.inventory.quantity > 0)
     elif in_stock is False:
-        query = query.outerjoin(CellarInventory).where(
-            (CellarInventory.quantity == 0) | (CellarInventory.quantity.is_(None))
-        )
+        query = Wine.find(Wine.inventory.quantity == 0)
 
-    query = query.offset(skip).limit(limit).order_by(Wine.created_at.desc())
-    result = await db.execute(query)
-    wines = result.scalars().all()
+    wines = await query.skip(skip).limit(limit).sort(-Wine.created_at).to_list()
 
     return [WineWithInventory.model_validate(wine) for wine in wines]
 
@@ -396,18 +379,12 @@ async def list_wines(
 async def get_wine(
     wine_id: str,
     _: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> WineResponse:
     """Get wine details with full transaction history."""
-    result = await db.execute(
-        select(Wine)
-        .options(
-            selectinload(Wine.inventory),
-            selectinload(Wine.transactions),
-        )
-        .where(Wine.id == wine_id)
-    )
-    wine = result.scalar_one_or_none()
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
 
     if not wine:
         raise HTTPException(
@@ -415,7 +392,16 @@ async def get_wine(
             detail=f"Wine with ID {wine_id} not found",
         )
 
-    return WineResponse.model_validate(wine)
+    # Get transactions for this wine
+    transactions = await Transaction.find(
+        Transaction.wine_id == wine.id
+    ).sort(-Transaction.transaction_date).to_list()
+
+    # Build response with transactions
+    response_data = wine.model_dump()
+    response_data["transactions"] = transactions
+
+    return WineResponse.model_validate(response_data)
 
 
 @router.put("/{wine_id}", response_model=WineWithInventory)
@@ -423,15 +409,12 @@ async def update_wine(
     wine_id: str,
     _: RequireAuth,
     wine_update: WineUpdate,
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> WineWithInventory:
     """Update wine metadata."""
-    result = await db.execute(
-        select(Wine)
-        .options(selectinload(Wine.inventory))
-        .where(Wine.id == wine_id)
-    )
-    wine = result.scalar_one_or_none()
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
 
     if not wine:
         raise HTTPException(
@@ -444,15 +427,8 @@ async def update_wine(
     for field, value in update_data.items():
         setattr(wine, field, value)
 
-    await db.commit()
-
-    # Re-query with eager loading for relationships
-    result = await db.execute(
-        select(Wine)
-        .options(selectinload(Wine.inventory))
-        .where(Wine.id == wine_id)
-    )
-    wine = result.scalar_one()
+    wine.updated_at = datetime.utcnow()
+    await wine.save()
 
     return WineWithInventory.model_validate(wine)
 
@@ -461,11 +437,12 @@ async def update_wine(
 async def delete_wine(
     wine_id: str,
     _: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Delete wine and all associated history."""
-    result = await db.execute(select(Wine).where(Wine.id == wine_id))
-    wine = result.scalar_one_or_none()
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
 
     if not wine:
         raise HTTPException(
@@ -478,5 +455,322 @@ async def delete_wine(
     if wine.back_label_image_path:
         await image_storage.delete_image(wine.back_label_image_path)
 
-    await db.delete(wine)
-    await db.commit()
+    # Delete transactions
+    await Transaction.find(Transaction.wine_id == wine.id).delete()
+
+    # Delete wine
+    await wine.delete()
+
+
+# =============================================================================
+# GRAPE BLEND ENDPOINTS
+# =============================================================================
+
+
+@router.get("/{wine_id}/grapes", response_model=WineGrapeBlend)
+async def get_wine_grapes(
+    wine_id: str,
+    _: RequireAuth,
+) -> WineGrapeBlend:
+    """Get the grape blend for a wine."""
+    # Verify wine exists
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
+
+    if not wine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Wine with ID {wine_id} not found",
+        )
+
+    # Build response from embedded grape_blends
+    grapes_response = []
+    for blend in wine.grape_blends:
+        grapes_response.append(WineGrapeResponse(
+            id=blend.grape_variety_id,  # Use grape_variety_id as the ID
+            grape_variety_id=blend.grape_variety_id,
+            percentage=blend.percentage,
+            grape_variety=GrapeVarietyResponse(
+                id=blend.grape_variety_id,
+                name=blend.grape_name,
+                color=blend.color or "unknown",
+                category=None,
+                origin_country=None,
+            ),
+        ))
+
+    # Calculate total percentage
+    total_pct = None
+    if wine.grape_blends:
+        percentages = [g.percentage for g in wine.grape_blends if g.percentage is not None]
+        if percentages:
+            total_pct = sum(percentages)
+
+    return WineGrapeBlend(
+        wine_id=wine_id,
+        grapes=grapes_response,
+        total_percentage=total_pct,
+    )
+
+
+@router.post("/{wine_id}/grapes", response_model=WineGrapeBlend)
+async def set_wine_grapes(
+    wine_id: str,
+    _: RequireAuth,
+    blend: WineGrapeBlendUpdate,
+) -> WineGrapeBlend:
+    """Set the grape blend for a wine (replaces all existing grapes)."""
+    # Verify wine exists
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
+
+    if not wine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Wine with ID {wine_id} not found",
+        )
+
+    # Verify all grape varieties exist and get their details
+    grape_ids = [g.grape_variety_id for g in blend.grapes]
+    new_blends = []
+
+    for grape_data in blend.grapes:
+        # Try to find grape variety
+        try:
+            grape = await GrapeVariety.get(PydanticObjectId(grape_data.grape_variety_id))
+        except Exception:
+            grape = None
+
+        if not grape:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Grape variety not found: {grape_data.grape_variety_id}",
+            )
+
+        new_blends.append(GrapeBlendEntry(
+            grape_variety_id=str(grape.id),
+            grape_name=grape.name,
+            percentage=grape_data.percentage,
+            color=grape.color,
+        ))
+
+    # Update wine with new grape blends
+    wine.grape_blends = new_blends
+    wine.updated_at = datetime.utcnow()
+    await wine.save()
+
+    # Return updated blend
+    return await get_wine_grapes(wine_id, _)
+
+
+# =============================================================================
+# WINE SCORE ENDPOINTS
+# =============================================================================
+
+
+@router.get("/{wine_id}/scores", response_model=WineScoresResponse)
+async def get_wine_scores(
+    wine_id: str,
+    _: RequireAuth,
+) -> WineScoresResponse:
+    """Get all scores for a wine."""
+    # Verify wine exists
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
+
+    if not wine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Wine with ID {wine_id} not found",
+        )
+
+    # Build response from embedded scores
+    scores_response = []
+    for score in wine.scores:
+        scores_response.append(WineScoreResponse(
+            id=score.id,
+            wine_id=wine_id,
+            source=score.source,
+            score=score.score,
+            score_type=score.score_type,
+            review_date=score.review_date,
+            reviewer=score.reviewer,
+            notes=score.notes,
+            created_at=score.created_at,
+            normalized_score=score.normalized_score,
+        ))
+
+    # Calculate average normalized score
+    average_score = None
+    if wine.scores:
+        normalized_scores = [s.normalized_score for s in wine.scores]
+        average_score = sum(normalized_scores) / len(normalized_scores)
+
+    return WineScoresResponse(
+        wine_id=wine_id,
+        scores=scores_response,
+        average_score=average_score,
+    )
+
+
+@router.post("/{wine_id}/scores", response_model=WineScoreResponse, status_code=status.HTTP_201_CREATED)
+async def add_wine_score(
+    wine_id: str,
+    _: RequireAuth,
+    score_data: WineScoreCreate,
+) -> WineScoreResponse:
+    """Add a score/rating for a wine."""
+    # Verify wine exists
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
+
+    if not wine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Wine with ID {wine_id} not found",
+        )
+
+    # Validate score type
+    valid_score_types = ["100_point", "20_point", "5_star"]
+    if score_data.score_type not in valid_score_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid score_type. Must be one of: {valid_score_types}",
+        )
+
+    # Create score entry
+    score = ScoreEntry(
+        id=str(uuid.uuid4()),
+        source=score_data.source,
+        score=score_data.score,
+        score_type=score_data.score_type,
+        review_date=score_data.review_date,
+        reviewer=score_data.reviewer,
+        notes=score_data.notes,
+        created_at=datetime.utcnow(),
+    )
+
+    # Add to wine's scores
+    wine.scores.append(score)
+    wine.updated_at = datetime.utcnow()
+    await wine.save()
+
+    return WineScoreResponse(
+        id=score.id,
+        wine_id=wine_id,
+        source=score.source,
+        score=score.score,
+        score_type=score.score_type,
+        review_date=score.review_date,
+        reviewer=score.reviewer,
+        notes=score.notes,
+        created_at=score.created_at,
+        normalized_score=score.normalized_score,
+    )
+
+
+@router.put("/{wine_id}/scores/{score_id}", response_model=WineScoreResponse)
+async def update_wine_score(
+    wine_id: str,
+    score_id: str,
+    _: RequireAuth,
+    score_update: WineScoreUpdate,
+) -> WineScoreResponse:
+    """Update a score for a wine."""
+    # Get wine
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
+
+    if not wine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Wine with ID {wine_id} not found",
+        )
+
+    # Find score
+    score_index = None
+    for i, s in enumerate(wine.scores):
+        if s.id == score_id:
+            score_index = i
+            break
+
+    if score_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Score with ID {score_id} not found for wine {wine_id}",
+        )
+
+    # Update fields
+    update_data = score_update.model_dump(exclude_unset=True)
+
+    # Validate score type if updating
+    if "score_type" in update_data:
+        valid_score_types = ["100_point", "20_point", "5_star"]
+        if update_data["score_type"] not in valid_score_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid score_type. Must be one of: {valid_score_types}",
+            )
+
+    # Update the score entry
+    score = wine.scores[score_index]
+    for field, value in update_data.items():
+        setattr(score, field, value)
+
+    wine.updated_at = datetime.utcnow()
+    await wine.save()
+
+    return WineScoreResponse(
+        id=score.id,
+        wine_id=wine_id,
+        source=score.source,
+        score=score.score,
+        score_type=score.score_type,
+        review_date=score.review_date,
+        reviewer=score.reviewer,
+        notes=score.notes,
+        created_at=score.created_at,
+        normalized_score=score.normalized_score,
+    )
+
+
+@router.delete("/{wine_id}/scores/{score_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_wine_score(
+    wine_id: str,
+    score_id: str,
+    _: RequireAuth,
+) -> None:
+    """Delete a score from a wine."""
+    try:
+        wine = await Wine.get(PydanticObjectId(wine_id))
+    except Exception:
+        wine = None
+
+    if not wine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Wine with ID {wine_id} not found",
+        )
+
+    # Find and remove score
+    original_count = len(wine.scores)
+    wine.scores = [s for s in wine.scores if s.id != score_id]
+
+    if len(wine.scores) == original_count:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Score with ID {score_id} not found for wine {wine_id}",
+        )
+
+    wine.updated_at = datetime.utcnow()
+    await wine.save()

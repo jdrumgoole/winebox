@@ -1,8 +1,10 @@
 """Pydantic schemas for Wine model."""
 
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from beanie import PydanticObjectId
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from winebox.schemas.transaction import TransactionResponse
 
@@ -17,6 +19,16 @@ class WineBase(BaseModel):
     region: str | None = Field(None, max_length=255)
     country: str | None = Field(None, max_length=255)
     alcohol_percentage: float | None = Field(None, ge=0, le=100)
+
+    # New taxonomy fields (v2)
+    wine_type_id: str | None = Field(None, description="Wine type (red, white, etc.)")
+    wine_subtype: str | None = Field(None, max_length=50, description="Subtype (e.g., full_bodied, champagne)")
+    appellation_id: str | None = Field(None, description="Appellation/region reference ID")
+    classification_id: str | None = Field(None, description="Classification reference ID")
+    price_tier: str | None = Field(None, description="Price tier: budget, value, mid_range, premium, luxury, ultra_premium")
+    drink_window_start: int | None = Field(None, ge=1900, le=2200, description="Start year of drink window")
+    drink_window_end: int | None = Field(None, ge=1900, le=2200, description="End year of drink window")
+    producer_type: str | None = Field(None, description="Producer type: estate, negociant, cooperative")
 
 
 class WineCreate(WineBase):
@@ -35,6 +47,16 @@ class WineUpdate(BaseModel):
     region: str | None = Field(None, max_length=255)
     country: str | None = Field(None, max_length=255)
     alcohol_percentage: float | None = Field(None, ge=0, le=100)
+
+    # New taxonomy fields (v2)
+    wine_type_id: str | None = Field(None, description="Wine type (red, white, etc.)")
+    wine_subtype: str | None = Field(None, max_length=50)
+    appellation_id: str | None = Field(None, description="Appellation/region reference ID")
+    classification_id: str | None = Field(None, description="Classification reference ID")
+    price_tier: str | None = Field(None)
+    drink_window_start: int | None = Field(None, ge=1900, le=2200)
+    drink_window_end: int | None = Field(None, ge=1900, le=2200)
+    producer_type: str | None = Field(None)
 
 
 class InventoryInfo(BaseModel):
@@ -59,6 +81,14 @@ class WineWithInventory(WineBase):
     inventory: InventoryInfo | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_objectid_to_str(cls, v: Any) -> str:
+        """Convert ObjectId to string."""
+        if isinstance(v, PydanticObjectId):
+            return str(v)
+        return v
 
     @property
     def current_quantity(self) -> int:

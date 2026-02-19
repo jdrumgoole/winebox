@@ -1,8 +1,10 @@
 """Pydantic schemas for Transaction model."""
 
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from beanie import PydanticObjectId
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from winebox.models.transaction import TransactionType
 
@@ -24,6 +26,14 @@ class WineBasicInfo(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_objectid_to_str(cls, v: Any) -> str:
+        """Convert ObjectId to string."""
+        if isinstance(v, PydanticObjectId):
+            return str(v)
+        return v
+
 
 class TransactionResponse(BaseModel):
     """Schema for transaction response."""
@@ -38,3 +48,11 @@ class TransactionResponse(BaseModel):
     wine: WineBasicInfo | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("id", "wine_id", mode="before")
+    @classmethod
+    def convert_objectid_to_str(cls, v: Any) -> str:
+        """Convert ObjectId to string."""
+        if isinstance(v, PydanticObjectId):
+            return str(v)
+        return v

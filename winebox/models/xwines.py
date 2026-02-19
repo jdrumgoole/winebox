@@ -1,65 +1,77 @@
-"""X-Wines dataset models for wine autocomplete and reference data.
+"""X-Wines dataset document models for wine autocomplete and reference data.
 
 These models represent read-only reference data from the X-Wines dataset.
 Source: https://github.com/rogerioxavier/X-Wines
 """
 
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column
-
-from winebox.database import Base
+from beanie import Document, Indexed
+from pydantic import Field
 
 
-class XWinesWine(Base):
+class XWinesWine(Document):
     """X-Wines wine reference data.
 
     External wine data from the X-Wines dataset for autocomplete and auto-fill.
-    This is read-only reference data - user's own wines remain in the wines table.
+    This is read-only reference data - user's own wines remain in the wines collection.
     """
 
-    __tablename__ = "xwines_wines"
+    # Use the original X-Wines integer ID
+    xwines_id: Indexed(int, unique=True)
+    name: Indexed(str)
+    wine_type: Indexed(str)
+    elaborate: Optional[str] = None
+    grapes: Optional[str] = None
+    harmonize: Optional[str] = None
+    abv: Optional[float] = None
+    body: Optional[str] = None
+    acidity: Optional[str] = None
+    country_code: Optional[Indexed(str)] = None
+    country: Optional[str] = None
+    region_id: Optional[int] = None
+    region_name: Optional[str] = None
+    winery_id: Optional[int] = None
+    winery_name: Optional[Indexed(str)] = None
+    website: Optional[str] = None
+    vintages: Optional[str] = None
+    avg_rating: Optional[float] = None
+    rating_count: int = 0
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
-    wine_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    elaborate: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    grapes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    harmonize: Mapped[str | None] = mapped_column(Text, nullable=True)
-    abv: Mapped[float | None] = mapped_column(Float, nullable=True)
-    body: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    acidity: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    country_code: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
-    country: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    region_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    region_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    winery_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    winery_name: Mapped[str | None] = mapped_column(String(300), nullable=True, index=True)
-    website: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    vintages: Mapped[str | None] = mapped_column(Text, nullable=True)
-    avg_rating: Mapped[float | None] = mapped_column(Float, nullable=True)
-    rating_count: Mapped[int] = mapped_column(Integer, default=0)
+    class Settings:
+        name = "xwines_wines"
+        indexes = [
+            "xwines_id",
+            "name",
+            "wine_type",
+            "country_code",
+            "winery_name",
+            [
+                ("name", "text"),
+                ("winery_name", "text"),
+            ],
+        ]
 
     def __repr__(self) -> str:
-        return f"<XWinesWine(id={self.id}, name={self.name}, winery={self.winery_name})>"
+        return f"<XWinesWine(xwines_id={self.xwines_id}, name={self.name}, winery={self.winery_name})>"
 
 
-class XWinesMetadata(Base):
+class XWinesMetadata(Document):
     """X-Wines dataset metadata for version tracking.
 
     Stores information about the imported X-Wines dataset version.
     """
 
-    __tablename__ = "xwines_metadata"
+    key: Indexed(str, unique=True)
+    value: str
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    key: Mapped[str] = mapped_column(String(100), primary_key=True)
-    value: Mapped[str] = mapped_column(Text, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
+    class Settings:
+        name = "xwines_metadata"
+        indexes = [
+            "key",
+        ]
 
     def __repr__(self) -> str:
         return f"<XWinesMetadata(key={self.key}, value={self.value})>"

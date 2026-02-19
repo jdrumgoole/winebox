@@ -195,69 +195,24 @@ def clean(ctx: Context, all: bool = False) -> None:
 
 
 @task
-def purge(ctx: Context, include_images: bool = False, force: bool = False) -> None:
-    """Purge the database and optionally images. Stops the server if running.
+def purge(ctx: Context, include_images: bool = True, yes: bool = False) -> None:
+    """Purge the entire database. Stops the server if running.
 
     Args:
         ctx: Invoke context
-        include_images: Also delete all uploaded wine label images
-        force: Skip confirmation prompt
+        include_images: Also delete all uploaded wine label images (default: True)
+        yes: Skip confirmation prompt (-y)
     """
-    import shutil
-    import time
-
-    db_path = Path("data/winebox.db")
-    images_path = Path("data/images")
-
-    # Check what will be deleted
-    items_to_delete = []
-    if db_path.exists():
-        items_to_delete.append(f"Database: {db_path}")
-    if include_images and images_path.exists():
-        image_count = len(list(images_path.glob("*")))
-        if image_count > 0:
-            items_to_delete.append(f"Images: {image_count} files in {images_path}")
-
-    if not items_to_delete:
-        print("Nothing to purge. Database and images directory are already empty.")
-        return
-
-    # Confirm unless --force is used
-    if not force:
-        print("The following will be deleted:")
-        for item in items_to_delete:
-            print(f"  - {item}")
-        response = input("\nAre you sure you want to purge? [y/N]: ").strip().lower()
-        if response not in ("y", "yes"):
-            print("Purge cancelled.")
-            return
-
-    # Stop the server if running (SQLite requires exclusive access)
-    print("Stopping server if running...")
-    ctx.run("uv run winebox-server stop", warn=True)
-    time.sleep(1)
-
-    # Delete database
-    if db_path.exists():
-        try:
-            db_path.unlink()
-            print(f"Deleted database: {db_path}")
-        except PermissionError:
-            print(f"Error: Could not delete {db_path} - file may still be locked")
-            return
-
-    # Delete images if requested
-    if include_images and images_path.exists():
-        shutil.rmtree(images_path)
-        images_path.mkdir(parents=True)
-        print(f"Deleted all images and recreated: {images_path}")
-
-    print("\nPurge complete.")
-    print("\nNote: Run 'invoke start' to restart the server.")
+    cmd = "uv run winebox-purge --all"
+    if yes:
+        cmd += " -y"
+    if not include_images:
+        cmd += " --no-images"
+    ctx.run(cmd, pty=not yes)
 
 
 @task(name="purge-wines")
-def purge_wines(ctx: Context, include_images: bool = True, force: bool = False) -> None:
+def purge_wines(ctx: Context, include_images: bool = True, yes: bool = False) -> None:
     """Purge all wine data from the database without affecting users.
 
     This deletes all wines, transactions, and inventory records but keeps
@@ -266,91 +221,32 @@ def purge_wines(ctx: Context, include_images: bool = True, force: bool = False) 
     Args:
         ctx: Invoke context
         include_images: Also delete all uploaded wine label images (default: True)
-        force: Skip confirmation prompt
+        yes: Skip confirmation prompt (-y)
     """
-    import shutil
+    cmd = "uv run winebox-purge --wine"
+    if yes:
+        cmd += " -y"
+    if not include_images:
+        cmd += " --no-images"
+    ctx.run(cmd, pty=not yes)
 
-    db_path = Path("data/winebox.db")
-    images_path = Path("data/images")
 
-    if not db_path.exists():
-        print("Database does not exist. Nothing to purge.")
-        return
+@task(name="purge-user")
+def purge_user(ctx: Context, username: str, yes: bool = False) -> None:
+    """Purge all data for a specific user.
 
-    # Count records to be deleted
-    count_script = """
-import asyncio
-from sqlalchemy import text
-from winebox.database import async_session_maker
+    This deletes all wines, transactions, and inventory records for the
+    specified user but keeps the user account.
 
-async def count_records():
-    async with async_session_maker() as session:
-        wines = (await session.execute(text('SELECT COUNT(*) FROM wines'))).scalar()
-        transactions = (await session.execute(text('SELECT COUNT(*) FROM transactions'))).scalar()
-        inventory = (await session.execute(text('SELECT COUNT(*) FROM cellar_inventory'))).scalar()
-        return wines, transactions, inventory
-
-wines, transactions, inventory = asyncio.run(count_records())
-print(f'{wines},{transactions},{inventory}')
-"""
-    result = ctx.run(f'uv run python -c "{count_script}"', hide=True, warn=True)
-
-    if result.ok:
-        counts = result.stdout.strip().split(',')
-        wine_count, transaction_count, inventory_count = int(counts[0]), int(counts[1]), int(counts[2])
-    else:
-        wine_count, transaction_count, inventory_count = 0, 0, 0
-
-    # Check images
-    image_count = 0
-    if include_images and images_path.exists():
-        image_count = len(list(images_path.glob("*")))
-
-    if wine_count == 0 and transaction_count == 0 and inventory_count == 0 and image_count == 0:
-        print("No wine data to purge.")
-        return
-
-    # Show what will be deleted
-    print("The following wine data will be deleted:")
-    print(f"  - Wines: {wine_count} records")
-    print(f"  - Transactions: {transaction_count} records")
-    print(f"  - Inventory: {inventory_count} records")
-    if include_images:
-        print(f"  - Images: {image_count} files")
-    print("\nUser accounts will NOT be affected.")
-
-    # Confirm unless --force is used
-    if not force:
-        response = input("\nAre you sure you want to purge wine data? [y/N]: ").strip().lower()
-        if response not in ("y", "yes"):
-            print("Purge cancelled.")
-            return
-
-    # Delete wine data from database
-    delete_script = """
-import asyncio
-from sqlalchemy import text
-from winebox.database import async_session_maker
-
-async def delete_wine_data():
-    async with async_session_maker() as session:
-        await session.execute(text('DELETE FROM transactions'))
-        await session.execute(text('DELETE FROM cellar_inventory'))
-        await session.execute(text('DELETE FROM wines'))
-        await session.commit()
-        print('Wine data deleted from database.')
-
-asyncio.run(delete_wine_data())
-"""
-    ctx.run(f'uv run python -c "{delete_script}"')
-
-    # Delete images if requested
-    if include_images and images_path.exists() and image_count > 0:
-        shutil.rmtree(images_path)
-        images_path.mkdir(parents=True)
-        print(f"Deleted {image_count} images and recreated: {images_path}")
-
-    print("\nWine data purge complete. User accounts preserved.")
+    Args:
+        ctx: Invoke context
+        username: Username whose data to purge
+        yes: Skip confirmation prompt (-y)
+    """
+    cmd = f"uv run winebox-purge --user {username}"
+    if yes:
+        cmd += " -y"
+    ctx.run(cmd, pty=not yes)
 
 
 # User Management Tasks

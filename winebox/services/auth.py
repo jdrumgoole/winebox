@@ -1,19 +1,16 @@
 """Authentication service for user management and JWT tokens."""
 
-import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
+from beanie import PydanticObjectId
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
+from fastapi.security import HTTPBasic, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pwdlib import PasswordHash
 from pwdlib.hashers.bcrypt import BcryptHasher
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from winebox.config import settings
-from winebox.database import get_db
 from winebox.models.user import User
 
 # Password hashing using pwdlib (compatible with fastapi-users)
@@ -52,44 +49,41 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return encoded_jwt
 
 
-async def get_user_by_username(db: AsyncSession, username: str) -> User | None:
+async def get_user_by_username(username: str) -> User | None:
     """Get a user by username."""
-    result = await db.execute(select(User).where(User.username == username))
-    return result.scalar_one_or_none()
+    return await User.find_one(User.username == username)
 
 
-async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
+async def get_user_by_email(email: str) -> User | None:
     """Get a user by email."""
-    result = await db.execute(select(User).where(User.email == email))
-    return result.scalar_one_or_none()
+    return await User.find_one(User.email == email)
 
 
-async def get_user_by_username_or_email(db: AsyncSession, identifier: str) -> User | None:
+async def get_user_by_username_or_email(identifier: str) -> User | None:
     """Get a user by username or email.
 
     This supports login with either username or email address.
     """
     # First try username
-    user = await get_user_by_username(db, identifier)
+    user = await get_user_by_username(identifier)
     if user:
         return user
 
     # Then try email
-    return await get_user_by_email(db, identifier)
+    return await get_user_by_email(identifier)
 
 
-async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
+async def authenticate_user(username: str, password: str) -> User | None:
     """Authenticate a user with username/email and password.
 
     Args:
-        db: Database session.
         username: Username or email address.
         password: Plain text password.
 
     Returns:
         User if authentication successful, None otherwise.
     """
-    user = await get_user_by_username_or_email(db, username)
+    user = await get_user_by_username_or_email(username)
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -101,11 +95,10 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> U
 
 async def get_current_user(
     token: Annotated[str | None, Depends(oauth2_scheme)],
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User | None:
     """Get the current user from the JWT token.
 
-    Supports tokens with 'sub' containing either username or user_id (UUID string).
+    Supports tokens with 'sub' containing either username or user_id (ObjectId string).
     """
     if not token:
         return None
@@ -119,17 +112,15 @@ async def get_current_user(
         return None
 
     # Try to find user - subject could be username, email, or user_id
-    user = await get_user_by_username_or_email(db, subject)
+    user = await get_user_by_username_or_email(subject)
 
-    # If not found by username/email, try as user_id (UUID)
+    # If not found by username/email, try as user_id (ObjectId)
     if user is None:
         try:
-            from uuid import UUID
-            user_id = UUID(subject)
-            result = await db.execute(select(User).where(User.id == user_id))
-            user = result.scalar_one_or_none()
-        except (ValueError, TypeError):
-            pass  # Not a valid UUID
+            user_id = PydanticObjectId(subject)
+            user = await User.get(user_id)
+        except Exception:
+            pass  # Not a valid ObjectId
 
     if user is None or not user.is_active:
         return None

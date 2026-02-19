@@ -1,13 +1,13 @@
 """User manager for fastapi-users with email callbacks."""
 
 import logging
-import uuid
 from collections.abc import AsyncGenerator
 from typing import Optional
 
+from beanie import PydanticObjectId
 from fastapi import Depends, Request
-from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
-from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
+from fastapi_users import BaseUserManager, FastAPIUsers
+from fastapi_users_db_beanie import BeanieUserDatabase, ObjectIDIDMixin
 
 from winebox.auth.backend import auth_backend
 from winebox.auth.db import get_user_db
@@ -18,7 +18,7 @@ from winebox.services.email import get_email_service
 logger = logging.getLogger(__name__)
 
 
-class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
+class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
     """Custom user manager with email verification and password reset callbacks."""
 
     reset_password_token_secret = settings.secret_key
@@ -99,12 +99,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
 
 async def get_user_manager(
-    user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
+    user_db: BeanieUserDatabase = Depends(get_user_db),
 ) -> AsyncGenerator[UserManager, None]:
     """Get the user manager instance.
 
     Args:
-        user_db: SQLAlchemy user database adapter.
+        user_db: Beanie user database adapter.
 
     Yields:
         UserManager instance.
@@ -113,4 +113,4 @@ async def get_user_manager(
 
 
 # FastAPIUsers instance
-fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
+fastapi_users = FastAPIUsers[User, PydanticObjectId](get_user_manager, [auth_backend])

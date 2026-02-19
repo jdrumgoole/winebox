@@ -2,7 +2,6 @@
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from winebox.models import XWinesMetadata, XWinesWine
 
@@ -25,12 +24,12 @@ async def test_xwines_search_query_too_short(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_xwines_search_with_data(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_xwines_search_with_data(client: AsyncClient, init_test_db) -> None:
     """Test search with X-Wines data in database."""
-    # Add test wines to database
+    # Add test wines to database using Beanie
     test_wines = [
         XWinesWine(
-            id=1,
+            xwines_id=1,
             name="Chateau Margaux",
             wine_type="Red",
             winery_name="Chateau Margaux",
@@ -42,7 +41,7 @@ async def test_xwines_search_with_data(client: AsyncClient, db_session: AsyncSes
             rating_count=1000,
         ),
         XWinesWine(
-            id=2,
+            xwines_id=2,
             name="Opus One",
             wine_type="Red",
             winery_name="Opus One Winery",
@@ -54,7 +53,7 @@ async def test_xwines_search_with_data(client: AsyncClient, db_session: AsyncSes
             rating_count=500,
         ),
         XWinesWine(
-            id=3,
+            xwines_id=3,
             name="Merlot Reserve",
             wine_type="Red",
             winery_name="Test Winery",
@@ -67,8 +66,7 @@ async def test_xwines_search_with_data(client: AsyncClient, db_session: AsyncSes
         ),
     ]
     for wine in test_wines:
-        db_session.add(wine)
-    await db_session.commit()
+        await wine.insert()
 
     # Search for "Chateau"
     response = await client.get("/api/xwines/search?q=Chateau")
@@ -80,10 +78,10 @@ async def test_xwines_search_with_data(client: AsyncClient, db_session: AsyncSes
 
 
 @pytest.mark.asyncio
-async def test_xwines_search_by_winery(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_xwines_search_by_winery(client: AsyncClient, init_test_db) -> None:
     """Test search matches winery name."""
     wine = XWinesWine(
-        id=1,
+        xwines_id=1,
         name="Reserve Red",
         wine_type="Red",
         winery_name="Silver Oak Cellars",
@@ -92,8 +90,7 @@ async def test_xwines_search_by_winery(client: AsyncClient, db_session: AsyncSes
         avg_rating=4.2,
         rating_count=300,
     )
-    db_session.add(wine)
-    await db_session.commit()
+    await wine.insert()
 
     # Search for winery name
     response = await client.get("/api/xwines/search?q=Silver%20Oak")
@@ -104,11 +101,11 @@ async def test_xwines_search_by_winery(client: AsyncClient, db_session: AsyncSes
 
 
 @pytest.mark.asyncio
-async def test_xwines_search_with_filters(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_xwines_search_with_filters(client: AsyncClient, init_test_db) -> None:
     """Test search with wine_type and country filters."""
     wines = [
         XWinesWine(
-            id=1,
+            xwines_id=1,
             name="Test Red Wine",
             wine_type="Red",
             country="France",
@@ -117,7 +114,7 @@ async def test_xwines_search_with_filters(client: AsyncClient, db_session: Async
             rating_count=100,
         ),
         XWinesWine(
-            id=2,
+            xwines_id=2,
             name="Test White Wine",
             wine_type="White",
             country="France",
@@ -127,8 +124,7 @@ async def test_xwines_search_with_filters(client: AsyncClient, db_session: Async
         ),
     ]
     for wine in wines:
-        db_session.add(wine)
-    await db_session.commit()
+        await wine.insert()
 
     # Search with wine_type filter
     response = await client.get("/api/xwines/search?q=Test&wine_type=Red")
@@ -139,10 +135,10 @@ async def test_xwines_search_with_filters(client: AsyncClient, db_session: Async
 
 
 @pytest.mark.asyncio
-async def test_xwines_get_wine_detail(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_xwines_get_wine_detail(client: AsyncClient, init_test_db) -> None:
     """Test getting full wine details."""
     wine = XWinesWine(
-        id=12345,
+        xwines_id=12345,
         name="Test Wine",
         wine_type="Red",
         elaborate="100%",
@@ -158,8 +154,7 @@ async def test_xwines_get_wine_detail(client: AsyncClient, db_session: AsyncSess
         avg_rating=4.3,
         rating_count=250,
     )
-    db_session.add(wine)
-    await db_session.commit()
+    await wine.insert()
 
     response = await client.get("/api/xwines/wines/12345")
     assert response.status_code == 200
@@ -190,18 +185,18 @@ async def test_xwines_stats_empty(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_xwines_stats_with_data(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_xwines_stats_with_data(client: AsyncClient, init_test_db) -> None:
     """Test stats endpoint with data."""
     # Add wines
     for i in range(5):
         wine = XWinesWine(
-            id=i + 1,
+            xwines_id=i + 1,
             name=f"Wine {i}",
             wine_type="Red",
             avg_rating=4.0,
             rating_count=100,
         )
-        db_session.add(wine)
+        await wine.insert()
 
     # Add metadata
     metadata = [
@@ -210,9 +205,7 @@ async def test_xwines_stats_with_data(client: AsyncClient, db_session: AsyncSess
         XWinesMetadata(key="import_date", value="2024-01-15T10:30:00"),
     ]
     for m in metadata:
-        db_session.add(m)
-
-    await db_session.commit()
+        await m.insert()
 
     response = await client.get("/api/xwines/stats")
     assert response.status_code == 200
@@ -223,17 +216,16 @@ async def test_xwines_stats_with_data(client: AsyncClient, db_session: AsyncSess
 
 
 @pytest.mark.asyncio
-async def test_xwines_types_endpoint(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_xwines_types_endpoint(client: AsyncClient, init_test_db) -> None:
     """Test listing wine types."""
     wines = [
-        XWinesWine(id=1, name="Red Wine", wine_type="Red"),
-        XWinesWine(id=2, name="White Wine", wine_type="White"),
-        XWinesWine(id=3, name="Another Red", wine_type="Red"),
-        XWinesWine(id=4, name="Rosé Wine", wine_type="Rosé"),
+        XWinesWine(xwines_id=1, name="Red Wine", wine_type="Red"),
+        XWinesWine(xwines_id=2, name="White Wine", wine_type="White"),
+        XWinesWine(xwines_id=3, name="Another Red", wine_type="Red"),
+        XWinesWine(xwines_id=4, name="Rosé Wine", wine_type="Rosé"),
     ]
     for wine in wines:
-        db_session.add(wine)
-    await db_session.commit()
+        await wine.insert()
 
     response = await client.get("/api/xwines/types")
     assert response.status_code == 200
@@ -245,16 +237,15 @@ async def test_xwines_types_endpoint(client: AsyncClient, db_session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_xwines_countries_endpoint(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_xwines_countries_endpoint(client: AsyncClient, init_test_db) -> None:
     """Test listing countries with wine counts."""
     wines = [
-        XWinesWine(id=1, name="Wine 1", wine_type="Red", country="France", country_code="FR"),
-        XWinesWine(id=2, name="Wine 2", wine_type="Red", country="France", country_code="FR"),
-        XWinesWine(id=3, name="Wine 3", wine_type="White", country="Italy", country_code="IT"),
+        XWinesWine(xwines_id=1, name="Wine 1", wine_type="Red", country="France", country_code="FR"),
+        XWinesWine(xwines_id=2, name="Wine 2", wine_type="Red", country="France", country_code="FR"),
+        XWinesWine(xwines_id=3, name="Wine 3", wine_type="White", country="Italy", country_code="IT"),
     ]
     for wine in wines:
-        db_session.add(wine)
-    await db_session.commit()
+        await wine.insert()
 
     response = await client.get("/api/xwines/countries")
     assert response.status_code == 200
@@ -272,25 +263,25 @@ async def test_xwines_countries_endpoint(client: AsyncClient, db_session: AsyncS
 
 
 @pytest.mark.asyncio
-async def test_xwines_search_ordering(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_xwines_search_ordering(client: AsyncClient, init_test_db) -> None:
     """Test search results are ordered by popularity then rating."""
     wines = [
         XWinesWine(
-            id=1,
+            xwines_id=1,
             name="Popular Wine",
             wine_type="Red",
             avg_rating=4.0,
             rating_count=1000,
         ),
         XWinesWine(
-            id=2,
+            xwines_id=2,
             name="Quality Wine",
             wine_type="Red",
             avg_rating=4.9,
             rating_count=100,
         ),
         XWinesWine(
-            id=3,
+            xwines_id=3,
             name="Unknown Wine",
             wine_type="Red",
             avg_rating=3.5,
@@ -298,8 +289,7 @@ async def test_xwines_search_ordering(client: AsyncClient, db_session: AsyncSess
         ),
     ]
     for wine in wines:
-        db_session.add(wine)
-    await db_session.commit()
+        await wine.insert()
 
     response = await client.get("/api/xwines/search?q=Wine")
     assert response.status_code == 200

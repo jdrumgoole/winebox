@@ -1,13 +1,13 @@
-"""Custom Pydantic schemas for fastapi-users."""
+"""Custom Pydantic schemas for fastapi-users with MongoDB/Beanie."""
 
-import uuid
 from datetime import datetime
 
+from beanie import PydanticObjectId
 from fastapi_users import schemas
-from pydantic import ConfigDict, EmailStr, Field
+from pydantic import ConfigDict, Field
 
 
-class UserRead(schemas.BaseUser[uuid.UUID]):
+class UserRead(schemas.BaseUser[PydanticObjectId]):
     """Schema for reading user data.
 
     Includes all fastapi-users base fields plus WineBox custom fields.

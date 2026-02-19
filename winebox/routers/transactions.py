@@ -1,14 +1,9 @@
 """Transaction history endpoints."""
 
-from typing import Annotated
+from beanie import PydanticObjectId
+from fastapi import APIRouter, HTTPException, status
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
-from winebox.database import get_db
-from winebox.models import Transaction, TransactionType
+from winebox.models import Transaction, TransactionType, Wine
 from winebox.schemas.transaction import TransactionResponse
 from winebox.services.auth import RequireAuth
 
@@ -18,41 +13,58 @@ router = APIRouter()
 @router.get("", response_model=list[TransactionResponse])
 async def list_transactions(
     _: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
     skip: int = 0,
     limit: int = 100,
     transaction_type: TransactionType | None = None,
     wine_id: str | None = None,
 ) -> list[TransactionResponse]:
     """List all transactions with optional filtering."""
-    query = select(Transaction).options(selectinload(Transaction.wine))
+    conditions = {}
 
     if transaction_type:
-        query = query.where(Transaction.transaction_type == transaction_type)
+        conditions["transaction_type"] = transaction_type
 
     if wine_id:
-        query = query.where(Transaction.wine_id == wine_id)
+        try:
+            conditions["wine_id"] = PydanticObjectId(wine_id)
+        except Exception:
+            pass
 
-    query = query.offset(skip).limit(limit).order_by(Transaction.transaction_date.desc())
-    result = await db.execute(query)
-    transactions = result.scalars().all()
+    transactions = await Transaction.find(
+        conditions
+    ).skip(skip).limit(limit).sort(-Transaction.transaction_date).to_list()
 
-    return [TransactionResponse.model_validate(t) for t in transactions]
+    # Get wine details for each transaction
+    results = []
+    for t in transactions:
+        wine = await Wine.get(t.wine_id)
+        response_data = t.model_dump()
+        if wine:
+            response_data["wine"] = {
+                "id": str(wine.id),
+                "name": wine.name,
+                "vintage": wine.vintage,
+                "winery": wine.winery,
+            }
+        else:
+            response_data["wine"] = None
+        response_data["id"] = str(t.id)
+        response_data["wine_id"] = str(t.wine_id)
+        results.append(TransactionResponse.model_validate(response_data))
+
+    return results
 
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)
 async def get_transaction(
     transaction_id: str,
     _: RequireAuth,
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TransactionResponse:
     """Get a single transaction by ID."""
-    result = await db.execute(
-        select(Transaction)
-        .options(selectinload(Transaction.wine))
-        .where(Transaction.id == transaction_id)
-    )
-    transaction = result.scalar_one_or_none()
+    try:
+        transaction = await Transaction.get(PydanticObjectId(transaction_id))
+    except Exception:
+        transaction = None
 
     if not transaction:
         raise HTTPException(
@@ -60,4 +72,19 @@ async def get_transaction(
             detail=f"Transaction with ID {transaction_id} not found",
         )
 
-    return TransactionResponse.model_validate(transaction)
+    # Get wine details
+    wine = await Wine.get(transaction.wine_id)
+    response_data = transaction.model_dump()
+    if wine:
+        response_data["wine"] = {
+            "id": str(wine.id),
+            "name": wine.name,
+            "vintage": wine.vintage,
+            "winery": wine.winery,
+        }
+    else:
+        response_data["wine"] = None
+    response_data["id"] = str(transaction.id)
+    response_data["wine_id"] = str(transaction.wine_id)
+
+    return TransactionResponse.model_validate(response_data)
