@@ -348,3 +348,60 @@ def docs_serve(ctx: Context, port: int = 8080) -> None:
     docs_build(ctx)
     print(f"Serving documentation at http://localhost:{port}")
     ctx.run(f"uv run python -m http.server {port} --directory docs/_build/html", pty=True)
+
+
+# Deployment Tasks
+@task(name="deploy-setup")
+def deploy_setup(ctx: Context, host: str = "", domain: str = "winebox.app") -> None:
+    """Run initial setup on a Digital Ocean droplet.
+
+    This installs MongoDB, nginx, uv, and configures the server.
+    Run this once on a fresh Ubuntu droplet.
+
+    Args:
+        ctx: Invoke context
+        host: Droplet IP (or set WINEBOX_DROPLET_IP in .env)
+        domain: Domain name (default: winebox.app)
+    """
+    cmd = f"uv run python deploy/setup_droplet.py --domain {domain}"
+    if host:
+        cmd += f" --host {host}"
+    ctx.run(cmd, pty=True)
+
+
+@task
+def deploy(
+    ctx: Context,
+    host: str = "",
+    droplet_name: str = "",
+    branch: str = "main",
+    no_secrets: bool = False,
+    setup_dns: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Deploy WineBox to the Digital Ocean droplet.
+
+    Pulls latest code, installs dependencies, syncs secrets, and restarts the service.
+    Droplet IP is auto-discovered from the API using WINEBOX_DO_TOKEN.
+
+    Args:
+        ctx: Invoke context
+        host: Droplet IP (optional, auto-discovered if not set)
+        droplet_name: Droplet name for IP lookup (default: winebox-droplet)
+        branch: Git branch to deploy (default: main)
+        no_secrets: Skip syncing secrets to production
+        setup_dns: Configure DNS A records (first-time setup)
+        dry_run: Preview changes without applying
+    """
+    cmd = f"uv run python deploy/deploy.py --branch {branch}"
+    if host:
+        cmd += f" --host {host}"
+    if droplet_name:
+        cmd += f" --droplet-name {droplet_name}"
+    if no_secrets:
+        cmd += " --no-secrets"
+    if setup_dns:
+        cmd += " --setup-dns"
+    if dry_run:
+        cmd += " --dry-run"
+    ctx.run(cmd, pty=True)
