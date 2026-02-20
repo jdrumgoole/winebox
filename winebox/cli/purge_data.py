@@ -1,7 +1,7 @@
 """Data purge script for WineBox.
 
 Commands:
-    --user USERNAME   Purge all data for a specific user
+    --user EMAIL      Purge all data for a specific user (by email)
     --wine            Purge all wine data for all users (keeps user accounts)
     --all             Purge the entire database
 
@@ -48,15 +48,15 @@ async def get_db_session() -> AsyncSession:
     return async_session()
 
 
-async def count_user_data(username: str) -> dict:
+async def count_user_data(email: str) -> dict:
     """Count data records for a specific user."""
     async with await get_db_session() as db:
         # Check if user exists
-        result = await db.execute(select(User).where(User.username == username))
+        result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
         if not user:
-            return {"error": f"User '{username}' not found."}
+            return {"error": f"User '{email}' not found."}
 
         # Count wines
         wines_result = await db.execute(
@@ -89,7 +89,7 @@ async def count_user_data(username: str) -> dict:
 
         return {
             "user_id": user.id,
-            "username": username,
+            "email": email,
             "wines": wine_count,
             "transactions": transaction_count,
             "inventory": inventory_count,
@@ -121,15 +121,15 @@ async def count_wine_data() -> dict:
         }
 
 
-async def purge_user_data(username: str) -> dict:
+async def purge_user_data(email: str) -> dict:
     """Purge all data for a specific user."""
     async with await get_db_session() as db:
         # Get user
-        result = await db.execute(select(User).where(User.username == username))
+        result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
         if not user:
-            return {"error": f"User '{username}' not found."}
+            return {"error": f"User '{email}' not found."}
 
         user_id = user.id
 
@@ -264,8 +264,8 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         "--user", "-u",
-        metavar="USERNAME",
-        help="Purge all data for a specific user"
+        metavar="EMAIL",
+        help="Purge all data for a specific user (by email)"
     )
     group.add_argument(
         "--wine", "-w",

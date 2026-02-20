@@ -109,7 +109,6 @@ async def client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client with overridden database and auth."""
     # Create a test user
     test_user = User(
-        username="testuser",
         email="test@example.com",
         hashed_password=get_password_hash("testpassword"),
         is_active=True,
@@ -120,8 +119,8 @@ async def client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
     )
     await test_user.insert()
 
-    # Create auth token
-    access_token = create_access_token(data={"sub": "testuser"})
+    # Create auth token with email as subject
+    access_token = create_access_token(data={"sub": "test@example.com"})
 
     # Use test app instead of main app
     app = get_test_app()
@@ -171,7 +170,6 @@ def sample_image_bytes() -> bytes:
 def test_user() -> dict:
     """Return test user credentials."""
     return {
-        "username": "testuser",
         "email": "test@example.com",
         "password": "testpassword",
     }
@@ -180,7 +178,7 @@ def test_user() -> dict:
 @pytest.fixture
 def auth_headers(test_user) -> dict:
     """Return authorization headers for the test user."""
-    access_token = create_access_token(data={"sub": test_user["username"]})
+    access_token = create_access_token(data={"sub": test_user["email"]})
     return {"Authorization": f"Bearer {access_token}"}
 
 

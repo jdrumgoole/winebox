@@ -322,8 +322,8 @@ function showMainApp() {
     document.body.classList.remove('logged-out');
     document.getElementById('page-login').classList.remove('active');
     document.getElementById('user-info').style.display = 'flex';
-    // Display full name if available, otherwise username
-    const displayName = currentUser.full_name || currentUser.username;
+    // Display full name if available, otherwise email
+    const displayName = currentUser.full_name || currentUser.email;
     document.getElementById('username-display').textContent = displayName;
     loadDashboard();
 }
@@ -331,7 +331,7 @@ function showMainApp() {
 async function handleLogin(e) {
     e.preventDefault();
     const form = e.target;
-    const username = document.getElementById('login-username').value;
+    const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
     const errorDiv = document.getElementById('login-error');
 
@@ -339,7 +339,7 @@ async function handleLogin(e) {
 
     try {
         const formData = new URLSearchParams();
-        formData.append('username', username);
+        formData.append('username', email);  // OAuth2 spec uses 'username' field
         formData.append('password', password);
 
         const response = await fetch(`${API_BASE}/auth/token`, {
@@ -432,7 +432,6 @@ window.addEventListener('hashchange', handleHashNavigation);
 async function handleRegister(e) {
     e.preventDefault();
 
-    const username = document.getElementById('register-username').value.trim();
     const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
     const confirmPassword = document.getElementById('register-confirm-password').value;
@@ -461,7 +460,6 @@ async function handleRegister(e) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                username: username,
                 email: email,
                 password: password,
             })
@@ -472,7 +470,7 @@ async function handleRegister(e) {
             // Map API error codes to user-friendly messages
             let message = error.detail || 'Registration failed';
             if (message === 'REGISTER_USER_ALREADY_EXISTS') {
-                message = 'A user with this email or username already exists';
+                message = 'A user with this email already exists';
             } else if (message === 'REGISTER_INVALID_PASSWORD') {
                 message = 'Password does not meet requirements';
             }
@@ -1580,7 +1578,7 @@ function debounce(func, wait) {
 // Settings
 function loadSettings() {
     // Populate profile form with current user data
-    document.getElementById('settings-username').value = currentUser.username;
+    document.getElementById('settings-email').value = currentUser.email;
     document.getElementById('settings-fullname').value = currentUser.full_name || '';
 
     // Update API key status
@@ -1634,7 +1632,7 @@ async function handleProfileUpdate(e) {
         currentUser = updatedUser;
 
         // Update display name in header
-        const displayName = currentUser.full_name || currentUser.username;
+        const displayName = currentUser.full_name || currentUser.email;
         document.getElementById('username-display').textContent = displayName;
 
         showToast('Profile updated successfully', 'success');

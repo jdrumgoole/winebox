@@ -268,23 +268,23 @@ WineBox requires authentication for all API endpoints (except `/health`).
 
 ```bash
 # Create an admin user
-uv run winebox-admin add admin --email admin@example.com --admin --password yourpassword
+uv run winebox-admin add admin@example.com --admin --password yourpassword
 
 # Create a regular user
-uv run winebox-admin add username --email user@example.com --password yourpassword
+uv run winebox-admin add user@example.com --password yourpassword
 
 # List all users
 uv run winebox-admin list
 
 # Disable/enable a user
-uv run winebox-admin disable username
-uv run winebox-admin enable username
+uv run winebox-admin disable user@example.com
+uv run winebox-admin enable user@example.com
 
 # Change password
-uv run winebox-admin passwd username --password newpassword
+uv run winebox-admin passwd user@example.com --password newpassword
 
 # Remove a user
-uv run winebox-admin remove username
+uv run winebox-admin remove user@example.com
 ```
 
 ### Server Management
@@ -310,7 +310,7 @@ uv run winebox-server status
 
 The API uses JWT bearer tokens. To authenticate:
 
-1. POST to `/api/auth/token` with `username` and `password` (form-urlencoded)
+1. POST to `/api/auth/token` with email (in the `username` field per OAuth2 spec) and `password` (form-urlencoded)
 2. Include the returned token in subsequent requests: `Authorization: Bearer <token>`
 
 Tokens expire after 24 hours.

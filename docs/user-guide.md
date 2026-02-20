@@ -381,12 +381,12 @@ uv run python -m scripts.migrations.runner history      # Show history
 ### User Management (Development)
 
 ```bash
-uv run python -m invoke add-user USERNAME --password PASS
-uv run python -m invoke remove-user USERNAME --force
+uv run python -m invoke add-user EMAIL --password PASS
+uv run python -m invoke remove-user EMAIL --force
 uv run python -m invoke list-users
-uv run python -m invoke disable-user USERNAME
-uv run python -m invoke enable-user USERNAME
-uv run python -m invoke passwd USERNAME --password NEWPASS
+uv run python -m invoke disable-user EMAIL
+uv run python -m invoke enable-user EMAIL
+uv run python -m invoke passwd EMAIL --password NEWPASS
 ```
 
 ### Documentation
@@ -405,9 +405,9 @@ Full API documentation is available at http://localhost:8000/docs when the serve
 All API endpoints (except `/health`) require JWT authentication.
 
 ```bash
-# Get token
+# Get token (note: OAuth2 spec uses 'username' field, but WineBox expects email)
 curl -X POST http://localhost:8000/api/auth/token \
-  -d "username=myuser&password=mypass"
+  -d "username=myemail@example.com&password=mypass"
 
 # Use token in requests
 curl -H "Authorization: Bearer <token>" http://localhost:8000/api/wines

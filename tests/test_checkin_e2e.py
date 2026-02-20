@@ -46,7 +46,7 @@ def base_url() -> str:
 def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], None, None]:
     """Create a test user for this worker session.
 
-    Returns (username, password) tuple.
+    Returns (email, password) tuple.
     User is created once per worker and reused across all tests in that worker.
     This is much faster than creating a user per test.
     """
@@ -54,7 +54,7 @@ def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], No
     import sys
 
     worker_id = get_worker_id(request)
-    username = f"e2e_worker_{worker_id}"
+    email = f"e2e_worker_{worker_id}@test.example.com"
     password = "testpass123"
 
     # Create the user via CLI
@@ -63,7 +63,7 @@ def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], No
     created = False
     for attempt in range(max_retries):
         result = subprocess.run(
-            ["uv", "run", "winebox-admin", "add", username, "--password", password],
+            ["uv", "run", "winebox-admin", "add", email, "--password", password],
             cwd=PROJECT_DIR,
             capture_output=True,
             timeout=30,
@@ -81,14 +81,14 @@ def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], No
             time.sleep(1.0)
 
     if not created:
-        print(f"WARNING: Failed to create user {username}", file=sys.stderr)
+        print(f"WARNING: Failed to create user {email}", file=sys.stderr)
         print(f"  stdout: {result.stdout}", file=sys.stderr)
         print(f"  stderr: {result.stderr}", file=sys.stderr)
 
     # Longer delay to ensure database has committed
     time.sleep(0.5)
 
-    yield username, password
+    yield email, password
 
     # Note: We don't clean up users here - let invoke purge-wines handle it
     # This avoids race conditions when running tests in parallel
@@ -108,7 +108,7 @@ def test_user(worker_user: tuple[str, str]) -> tuple[str, str]:
 @pytest.fixture(scope="function")
 def authenticated_page(page: Page, test_user: tuple[str, str]) -> Page:
     """Log in and return an authenticated page with a unique test user."""
-    username, password = test_user
+    email, password = test_user
 
     # Clear all browser state to ensure clean login
     page.context.clear_cookies()
@@ -123,7 +123,7 @@ def authenticated_page(page: Page, test_user: tuple[str, str]) -> Page:
     page.wait_for_selector("#login-form", state="visible", timeout=10000)
 
     # Fill in credentials
-    page.fill("#login-username", username)
+    page.fill("#login-email", email)
     page.fill("#login-password", password)
 
     # Click login
@@ -137,7 +137,7 @@ def authenticated_page(page: Page, test_user: tuple[str, str]) -> Page:
         error_elem = page.locator("#login-error")
         if error_elem.is_visible():
             error_text = error_elem.text_content()
-            raise AssertionError(f"Login failed for user '{username}': {error_text}")
+            raise AssertionError(f"Login failed for user '{email}': {error_text}")
         raise
 
     return page
@@ -164,7 +164,7 @@ class TestCheckinFlow:
 
     def test_login(self, page: Page, test_user: tuple[str, str]) -> None:
         """Test that login works correctly."""
-        username, password = test_user
+        email, password = test_user
 
         page.goto(BASE_URL)
 
@@ -172,7 +172,7 @@ class TestCheckinFlow:
         expect(page.locator("#login-form")).to_be_visible()
 
         # Fill credentials
-        page.fill("#login-username", username)
+        page.fill("#login-email", email)
         page.fill("#login-password", password)
         page.click("#login-form button[type='submit']")
 

@@ -13,7 +13,6 @@ class UserRead(schemas.BaseUser[PydanticObjectId]):
     Includes all fastapi-users base fields plus WineBox custom fields.
     """
 
-    username: str
     full_name: str | None = None
     has_api_key: bool = False
     created_at: datetime
@@ -25,10 +24,9 @@ class UserRead(schemas.BaseUser[PydanticObjectId]):
 class UserCreate(schemas.BaseUserCreate):
     """Schema for creating a new user.
 
-    Includes email, password from base, plus username for WineBox.
+    Includes email, password from base.
     """
 
-    username: str = Field(..., min_length=3, max_length=50)
     full_name: str | None = None
 
 
@@ -38,5 +36,4 @@ class UserUpdate(schemas.BaseUserUpdate):
     All fields are optional for partial updates.
     """
 
-    username: str | None = Field(None, min_length=3, max_length=50)
     full_name: str | None = None

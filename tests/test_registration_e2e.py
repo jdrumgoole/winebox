@@ -7,21 +7,13 @@ For parallel execution, run with: pytest -n auto tests/test_registration_e2e.py
 """
 
 import os
-import re
-import time
 import uuid
-from typing import Generator
 
 import pytest
 from playwright.sync_api import Page, expect
 
 # Server URL - can be overridden with WINEBOX_TEST_URL env var
 BASE_URL = os.environ.get("WINEBOX_TEST_URL", "http://localhost:8000")
-
-
-def generate_unique_username() -> str:
-    """Generate a unique username for testing."""
-    return f"e2e_reg_{uuid.uuid4().hex[:8]}"
 
 
 def generate_unique_email() -> str:
@@ -33,7 +25,6 @@ def generate_unique_email() -> str:
 def unique_user_data() -> dict:
     """Generate unique user credentials for each test."""
     return {
-        "username": generate_unique_username(),
         "email": generate_unique_email(),
         "password": "TestPassword123!",
     }
@@ -77,8 +68,7 @@ class TestRegistrationE2E:
         # Should show registration form
         expect(page.locator("#register-card")).to_be_visible()
 
-        # Verify all form fields are present
-        expect(page.locator("#register-username")).to_be_visible()
+        # Verify form fields are present (no username field)
         expect(page.locator("#register-email")).to_be_visible()
         expect(page.locator("#register-password")).to_be_visible()
         expect(page.locator("#register-confirm-password")).to_be_visible()
@@ -91,8 +81,7 @@ class TestRegistrationE2E:
         """Complete registration flow without email verification."""
         page = registration_page
 
-        # Fill in registration form
-        page.fill("#register-username", unique_user_data["username"])
+        # Fill in registration form (email only, no username)
         page.fill("#register-email", unique_user_data["email"])
         page.fill("#register-password", unique_user_data["password"])
         page.fill("#register-confirm-password", unique_user_data["password"])
@@ -101,17 +90,12 @@ class TestRegistrationE2E:
         page.click("#register-form button[type='submit']")
 
         # Wait for success - should redirect to login or show success message
-        # With email verification disabled, user should be able to login immediately
-        # The app may show a success toast or redirect to login form
-        page.wait_for_timeout(2000)  # Give time for registration to process
+        page.wait_for_timeout(2000)
 
         # Check if we got redirected back to login form or if there's a success indicator
-        # Registration success typically shows login form with a message
         login_visible = page.locator("#login-card").is_visible()
         main_content_visible = page.locator("#main-content").is_visible()
 
-        # Either login form should be visible (for manual login after registration)
-        # or main content should be visible (if auto-logged in)
         assert login_visible or main_content_visible, \
             "Expected to see login form or main content after registration"
 
@@ -120,7 +104,6 @@ class TestRegistrationE2E:
         page = registration_page
 
         # First registration
-        page.fill("#register-username", unique_user_data["username"])
         page.fill("#register-email", unique_user_data["email"])
         page.fill("#register-password", unique_user_data["password"])
         page.fill("#register-confirm-password", unique_user_data["password"])
@@ -136,9 +119,7 @@ class TestRegistrationE2E:
         page.click("#show-register")
         page.wait_for_selector("#register-card", state="visible", timeout=5000)
 
-        # Try to register with same email but different username
-        new_username = generate_unique_username()
-        page.fill("#register-username", new_username)
+        # Try to register with same email
         page.fill("#register-email", unique_user_data["email"])
         page.fill("#register-password", unique_user_data["password"])
         page.fill("#register-confirm-password", unique_user_data["password"])
@@ -152,60 +133,15 @@ class TestRegistrationE2E:
         expect(error_element).to_be_visible(timeout=5000)
 
         error_text = error_element.text_content() or ""
-        # Error should mention email already exists or user already exists
         assert "already" in error_text.lower() or "exists" in error_text.lower() or \
                "registered" in error_text.lower(), \
             f"Expected duplicate email error, got: {error_text}"
-
-    def test_registration_duplicate_username(self, registration_page: Page, unique_user_data: dict) -> None:
-        """Verify error message for duplicate username."""
-        page = registration_page
-
-        # First registration
-        page.fill("#register-username", unique_user_data["username"])
-        page.fill("#register-email", unique_user_data["email"])
-        page.fill("#register-password", unique_user_data["password"])
-        page.fill("#register-confirm-password", unique_user_data["password"])
-        page.click("#register-form button[type='submit']")
-
-        # Wait for first registration to complete
-        page.wait_for_timeout(2000)
-
-        # Navigate back to registration page
-        page.goto(BASE_URL)
-        page.evaluate("localStorage.clear()")
-        page.wait_for_selector("#login-card", state="visible", timeout=10000)
-        page.click("#show-register")
-        page.wait_for_selector("#register-card", state="visible", timeout=5000)
-
-        # Try to register with same username but different email
-        new_email = generate_unique_email()
-        page.fill("#register-username", unique_user_data["username"])
-        page.fill("#register-email", new_email)
-        page.fill("#register-password", unique_user_data["password"])
-        page.fill("#register-confirm-password", unique_user_data["password"])
-        page.click("#register-form button[type='submit']")
-
-        # Should show error message
-        page.wait_for_timeout(2000)
-
-        # Check for error message
-        error_element = page.locator("#register-error")
-        expect(error_element).to_be_visible(timeout=5000)
-
-        error_text = error_element.text_content() or ""
-        # Error should indicate user already exists
-        # fastapi-users returns "REGISTER_USER_ALREADY_EXISTS" which the frontend displays
-        assert "already" in error_text.lower() or "exists" in error_text.lower() or \
-               "taken" in error_text.lower() or "register_user_already_exists" in error_text.lower(), \
-            f"Expected duplicate username error, got: {error_text}"
 
     def test_registration_invalid_email_format(self, registration_page: Page) -> None:
         """Verify browser validation for invalid email."""
         page = registration_page
 
         # Fill form with invalid email
-        page.fill("#register-username", generate_unique_username())
         page.fill("#register-email", "not-a-valid-email")
         page.fill("#register-password", "TestPassword123!")
         page.fill("#register-confirm-password", "TestPassword123!")
@@ -214,7 +150,6 @@ class TestRegistrationE2E:
         page.click("#register-form button[type='submit']")
 
         # The form should not be submitted - email field should be invalid
-        # Check that we're still on registration page
         expect(page.locator("#register-card")).to_be_visible()
 
         # Check email field validity using JavaScript
@@ -228,7 +163,6 @@ class TestRegistrationE2E:
         page = registration_page
 
         # Fill form with mismatched passwords
-        page.fill("#register-username", generate_unique_username())
         page.fill("#register-email", generate_unique_email())
         page.fill("#register-password", "TestPassword123!")
         page.fill("#register-confirm-password", "DifferentPassword456!")
@@ -251,56 +185,11 @@ class TestRegistrationE2E:
             assert "password" in error_text.lower() or "match" in error_text.lower(), \
                 f"Expected password mismatch error, got: {error_text}"
 
-    def test_registration_short_username(self, registration_page: Page) -> None:
-        """Verify username length validation."""
-        page = registration_page
-
-        # Fill form with short username (less than 3 chars)
-        page.fill("#register-username", "ab")
-        page.fill("#register-email", generate_unique_email())
-        page.fill("#register-password", "TestPassword123!")
-        page.fill("#register-confirm-password", "TestPassword123!")
-
-        # Try to submit - browser validation should prevent submission
-        page.click("#register-form button[type='submit']")
-
-        # Check that form validation prevents submission
-        expect(page.locator("#register-card")).to_be_visible()
-
-        # Check username field validity
-        is_valid = page.evaluate(
-            "document.getElementById('register-username').checkValidity()"
-        )
-        assert not is_valid, "Username field should be invalid for short username"
-
-    def test_registration_invalid_username_characters(self, registration_page: Page) -> None:
-        """Verify username pattern validation (alphanumeric and underscores only)."""
-        page = registration_page
-
-        # Fill form with invalid username (contains special chars)
-        page.fill("#register-username", "user@name!")
-        page.fill("#register-email", generate_unique_email())
-        page.fill("#register-password", "TestPassword123!")
-        page.fill("#register-confirm-password", "TestPassword123!")
-
-        # Try to submit - browser validation should prevent submission
-        page.click("#register-form button[type='submit']")
-
-        # Check that form validation prevents submission
-        expect(page.locator("#register-card")).to_be_visible()
-
-        # Check username field validity
-        is_valid = page.evaluate(
-            "document.getElementById('register-username').checkValidity()"
-        )
-        assert not is_valid, "Username field should be invalid for 'user@name!'"
-
     def test_registration_short_password(self, registration_page: Page) -> None:
         """Verify password minimum length validation."""
         page = registration_page
 
         # Fill form with short password (less than 8 chars)
-        page.fill("#register-username", generate_unique_username())
         page.fill("#register-email", generate_unique_email())
         page.fill("#register-password", "short")
         page.fill("#register-confirm-password", "short")
@@ -322,7 +211,6 @@ class TestRegistrationE2E:
         page = registration_page
 
         # Register new user
-        page.fill("#register-username", unique_user_data["username"])
         page.fill("#register-email", unique_user_data["email"])
         page.fill("#register-password", unique_user_data["password"])
         page.fill("#register-confirm-password", unique_user_data["password"])
@@ -337,15 +225,15 @@ class TestRegistrationE2E:
             page.evaluate("localStorage.clear()")
             page.wait_for_selector("#login-card", state="visible", timeout=10000)
 
-        # Now login with registered credentials
-        page.fill("#login-username", unique_user_data["username"])
+        # Now login with registered credentials (email in the email field)
+        page.fill("#login-email", unique_user_data["email"])
         page.fill("#login-password", unique_user_data["password"])
         page.click("#login-form button[type='submit']")
 
         # Should show main content after successful login
         expect(page.locator("#main-content")).to_be_visible(timeout=15000)
 
-        # Verify user info shows username
+        # Verify user info shows
         expect(page.locator("#user-info")).to_be_visible()
 
     def test_back_to_login_link(self, registration_page: Page) -> None:
@@ -373,9 +261,6 @@ class TestRegistrationE2E:
         expect(page.locator("#register-card")).to_be_visible()
 
         # Check that required fields are invalid when empty
-        username_valid = page.evaluate(
-            "document.getElementById('register-username').checkValidity()"
-        )
         email_valid = page.evaluate(
             "document.getElementById('register-email').checkValidity()"
         )
@@ -383,7 +268,6 @@ class TestRegistrationE2E:
             "document.getElementById('register-password').checkValidity()"
         )
 
-        assert not username_valid, "Empty username should be invalid"
         assert not email_valid, "Empty email should be invalid"
         assert not password_valid, "Empty password should be invalid"
 
@@ -440,24 +324,3 @@ class TestRegistrationValidationMessages:
 
         # Should have a validation message
         assert validation_message, "Should have validation message for invalid email"
-
-    def test_username_pattern_validation_message(self, registration_page: Page) -> None:
-        """Verify username pattern validation message is helpful."""
-        page = registration_page
-
-        # Fill invalid username
-        username_input = page.locator("#register-username")
-        username_input.fill("user@name!")
-        username_input.blur()
-
-        # Get the validation message or title
-        validation_message = page.evaluate(
-            "document.getElementById('register-username').validationMessage"
-        )
-        title = page.evaluate(
-            "document.getElementById('register-username').title"
-        )
-
-        # Should have validation message or title explaining the pattern
-        assert validation_message or title, \
-            "Should have validation message or title for invalid username pattern"

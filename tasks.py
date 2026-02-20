@@ -236,7 +236,7 @@ def purge_wines(ctx: Context, include_images: bool = True, yes: bool = False) ->
 
 
 @task(name="purge-user")
-def purge_user(ctx: Context, username: str, yes: bool = False) -> None:
+def purge_user(ctx: Context, email: str, yes: bool = False) -> None:
     """Purge all data for a specific user.
 
     This deletes all wines, transactions, and inventory records for the
@@ -244,10 +244,10 @@ def purge_user(ctx: Context, username: str, yes: bool = False) -> None:
 
     Args:
         ctx: Invoke context
-        username: Username whose data to purge
+        email: Email of user whose data to purge
         yes: Skip confirmation prompt (-y)
     """
-    cmd = f"uv run winebox-purge --user {username}"
+    cmd = f"uv run winebox-purge --user {email}"
     if yes:
         cmd += " -y"
     ctx.run(cmd, pty=not yes)
@@ -257,38 +257,34 @@ def purge_user(ctx: Context, username: str, yes: bool = False) -> None:
 @task(name="add-user")
 def add_user(
     ctx: Context,
-    username: str,
+    email: str,
     password: str,
-    email: str = "",
     admin: bool = False,
 ) -> None:
     """Add a new user to the system.
 
     Args:
         ctx: Invoke context
-        username: Username for the new user
+        email: Email address for the new user
         password: Password for the new user
-        email: Optional email address
         admin: Make user an admin (default: False)
     """
-    cmd = f"uv run winebox-admin add {username} --password {password}"
-    if email:
-        cmd += f" --email {email}"
+    cmd = f"uv run winebox-admin add {email} --password {password}"
     if admin:
         cmd += " --admin"
     ctx.run(cmd)
 
 
 @task(name="remove-user")
-def remove_user(ctx: Context, username: str, force: bool = False) -> None:
+def remove_user(ctx: Context, email: str, force: bool = False) -> None:
     """Remove a user from the system.
 
     Args:
         ctx: Invoke context
-        username: Username to remove
+        email: Email of user to remove
         force: Skip confirmation prompt
     """
-    cmd = f"uv run winebox-admin remove {username}"
+    cmd = f"uv run winebox-admin remove {email}"
     if force:
         cmd += " --force"
     ctx.run(cmd, pty=True)
@@ -301,37 +297,37 @@ def list_users(ctx: Context) -> None:
 
 
 @task(name="disable-user")
-def disable_user(ctx: Context, username: str) -> None:
+def disable_user(ctx: Context, email: str) -> None:
     """Disable a user account.
 
     Args:
         ctx: Invoke context
-        username: Username to disable
+        email: Email of user to disable
     """
-    ctx.run(f"uv run winebox-admin disable {username}")
+    ctx.run(f"uv run winebox-admin disable {email}")
 
 
 @task(name="enable-user")
-def enable_user(ctx: Context, username: str) -> None:
+def enable_user(ctx: Context, email: str) -> None:
     """Enable a user account.
 
     Args:
         ctx: Invoke context
-        username: Username to enable
+        email: Email of user to enable
     """
-    ctx.run(f"uv run winebox-admin enable {username}")
+    ctx.run(f"uv run winebox-admin enable {email}")
 
 
 @task(name="passwd")
-def change_password(ctx: Context, username: str, password: str) -> None:
+def change_password(ctx: Context, email: str, password: str) -> None:
     """Change a user's password.
 
     Args:
         ctx: Invoke context
-        username: Username to change password for
+        email: Email of user to change password for
         password: New password
     """
-    ctx.run(f"uv run winebox-admin passwd {username} --password {password}")
+    ctx.run(f"uv run winebox-admin passwd {email} --password {password}")
 
 
 @task(name="docs-build")

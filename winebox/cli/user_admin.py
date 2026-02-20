@@ -37,29 +37,20 @@ async def get_db_session() -> AsyncSession:
 
 
 async def add_user(
-    username: str,
+    email: str,
     password: str,
-    email: Optional[str] = None,
     is_admin: bool = False,
 ) -> None:
     """Add a new user."""
     async with await get_db_session() as db:
-        # Check if user already exists
-        result = await db.execute(select(User).where(User.username == username))
-        if result.scalar_one_or_none():
-            print(f"Error: User '{username}' already exists.")
-            sys.exit(1)
-
         # Check if email already exists
-        if email:
-            result = await db.execute(select(User).where(User.email == email))
-            if result.scalar_one_or_none():
-                print(f"Error: Email '{email}' already in use.")
-                sys.exit(1)
+        result = await db.execute(select(User).where(User.email == email))
+        if result.scalar_one_or_none():
+            print(f"Error: Email '{email}' already in use.")
+            sys.exit(1)
 
         # Create user
         user = User(
-            username=username,
             email=email,
             hashed_password=get_password_hash(password),
             is_admin=is_admin,
@@ -69,102 +60,101 @@ async def add_user(
         await db.commit()
 
         role = "admin" if is_admin else "user"
-        print(f"User '{username}' created successfully as {role}.")
+        print(f"User '{email}' created successfully as {role}.")
 
 
 async def list_users() -> None:
     """List all users."""
     async with await get_db_session() as db:
-        result = await db.execute(select(User).order_by(User.username))
+        result = await db.execute(select(User).order_by(User.email))
         users = result.scalars().all()
 
         if not users:
             print("No users found.")
             return
 
-        print(f"{'Username':<20} {'Email':<30} {'Admin':<6} {'Active':<6} {'Last Login':<20}")
-        print("-" * 90)
+        print(f"{'Email':<40} {'Admin':<6} {'Active':<6} {'Last Login':<20}")
+        print("-" * 80)
 
         for user in users:
             last_login = user.last_login.strftime("%Y-%m-%d %H:%M") if user.last_login else "Never"
             admin = "Yes" if user.is_admin else "No"
             active = "Yes" if user.is_active else "No"
-            email = user.email or ""
-            print(f"{user.username:<20} {email:<30} {admin:<6} {active:<6} {last_login:<20}")
+            print(f"{user.email:<40} {admin:<6} {active:<6} {last_login:<20}")
 
 
-async def disable_user(username: str) -> None:
+async def disable_user(email: str) -> None:
     """Disable a user account."""
     async with await get_db_session() as db:
-        result = await db.execute(select(User).where(User.username == username))
+        result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
         if not user:
-            print(f"Error: User '{username}' not found.")
+            print(f"Error: User '{email}' not found.")
             sys.exit(1)
 
         if not user.is_active:
-            print(f"User '{username}' is already disabled.")
+            print(f"User '{email}' is already disabled.")
             return
 
         user.is_active = False
         await db.commit()
-        print(f"User '{username}' has been disabled.")
+        print(f"User '{email}' has been disabled.")
 
 
-async def enable_user(username: str) -> None:
+async def enable_user(email: str) -> None:
     """Enable a user account."""
     async with await get_db_session() as db:
-        result = await db.execute(select(User).where(User.username == username))
+        result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
         if not user:
-            print(f"Error: User '{username}' not found.")
+            print(f"Error: User '{email}' not found.")
             sys.exit(1)
 
         if user.is_active:
-            print(f"User '{username}' is already active.")
+            print(f"User '{email}' is already active.")
             return
 
         user.is_active = True
         await db.commit()
-        print(f"User '{username}' has been enabled.")
+        print(f"User '{email}' has been enabled.")
 
 
-async def remove_user(username: str, force: bool = False) -> None:
+async def remove_user(email: str, force: bool = False) -> None:
     """Remove a user account."""
     async with await get_db_session() as db:
-        result = await db.execute(select(User).where(User.username == username))
+        result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
         if not user:
-            print(f"Error: User '{username}' not found.")
+            print(f"Error: User '{email}' not found.")
             sys.exit(1)
 
         if not force:
-            confirm = input(f"Are you sure you want to remove user '{username}'? [y/N]: ")
+            confirm = input(f"Are you sure you want to remove user '{email}'? [y/N]: ")
             if confirm.lower() != "y":
                 print("Aborted.")
                 return
 
         await db.delete(user)
         await db.commit()
-        print(f"User '{username}' has been removed.")
+        print(f"User '{email}' has been removed.")
 
 
-async def change_password(username: str, password: str) -> None:
+async def change_password(email: str, password: str) -> None:
     """Change a user's password."""
     async with await get_db_session() as db:
-        result = await db.execute(select(User).where(User.username == username))
+        result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
         if not user:
-            print(f"Error: User '{username}' not found.")
+            print(f"Error: User '{email}' not found.")
             sys.exit(1)
 
         user.hashed_password = get_password_hash(password)
         await db.commit()
-        print(f"Password for user '{username}' has been updated.")
+        print(f"Password for user '{email}' has been updated.")
 
 
 def get_password_interactive(confirm: bool = True) -> str:
@@ -194,8 +184,7 @@ def main() -> int:
 
     # Add user command
     add_parser = subparsers.add_parser("add", help="Add a new user")
-    add_parser.add_argument("username", help="Username for the new user")
-    add_parser.add_argument("--email", "-e", help="Email address")
+    add_parser.add_argument("email", help="Email address for the new user")
     add_parser.add_argument("--admin", "-a", action="store_true", help="Make user an admin")
     add_parser.add_argument("--password", "-p", help="Password (will prompt if not provided)")
 
@@ -204,20 +193,20 @@ def main() -> int:
 
     # Disable user command
     disable_parser = subparsers.add_parser("disable", help="Disable a user account")
-    disable_parser.add_argument("username", help="Username to disable")
+    disable_parser.add_argument("email", help="Email of user to disable")
 
     # Enable user command
     enable_parser = subparsers.add_parser("enable", help="Enable a user account")
-    enable_parser.add_argument("username", help="Username to enable")
+    enable_parser.add_argument("email", help="Email of user to enable")
 
     # Remove user command
     remove_parser = subparsers.add_parser("remove", help="Remove a user account")
-    remove_parser.add_argument("username", help="Username to remove")
+    remove_parser.add_argument("email", help="Email of user to remove")
     remove_parser.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
 
     # Change password command
     passwd_parser = subparsers.add_parser("passwd", help="Change a user's password")
-    passwd_parser.add_argument("username", help="Username to change password for")
+    passwd_parser.add_argument("email", help="Email of user to change password for")
     passwd_parser.add_argument("--password", "-p", help="New password (will prompt if not provided)")
 
     args = parser.parse_args()
@@ -229,23 +218,23 @@ def main() -> int:
     try:
         if args.command == "add":
             password = args.password if args.password else get_password_interactive()
-            asyncio.run(add_user(args.username, password, args.email, args.admin))
+            asyncio.run(add_user(args.email, password, args.admin))
 
         elif args.command == "list":
             asyncio.run(list_users())
 
         elif args.command == "disable":
-            asyncio.run(disable_user(args.username))
+            asyncio.run(disable_user(args.email))
 
         elif args.command == "enable":
-            asyncio.run(enable_user(args.username))
+            asyncio.run(enable_user(args.email))
 
         elif args.command == "remove":
-            asyncio.run(remove_user(args.username, args.force))
+            asyncio.run(remove_user(args.email, args.force))
 
         elif args.command == "passwd":
             password = args.password if args.password else get_password_interactive()
-            asyncio.run(change_password(args.username, password))
+            asyncio.run(change_password(args.email, password))
 
     except KeyboardInterrupt:
         print("\nAborted.")

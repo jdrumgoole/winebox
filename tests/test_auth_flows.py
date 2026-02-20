@@ -27,7 +27,6 @@ class TestRegistration:
         response = await client.post(
             "/api/auth/register",
             json={
-                "username": "newuser",
                 "email": "newuser@example.com",
                 "password": "securepassword123",
             },
@@ -37,7 +36,6 @@ class TestRegistration:
         assert response.status_code in [200, 201]
 
         data = response.json()
-        assert data["username"] == "newuser"
         assert data["email"] == "newuser@example.com"
         assert "id" in data
 
@@ -47,7 +45,6 @@ class TestRegistration:
         response = await client.post(
             "/api/auth/register",
             json={
-                "username": "differentuser",
                 "email": test_user["email"],  # Duplicate email
                 "password": "securepassword123",
             },
@@ -57,43 +54,12 @@ class TestRegistration:
         assert "already" in response.json()["detail"].lower()
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="fastapi-users doesn't validate username uniqueness - needs custom handler")
-    async def test_register_duplicate_username(self, client: AsyncClient, test_user):
-        """Test registering with an existing username."""
-        response = await client.post(
-            "/api/auth/register",
-            json={
-                "username": test_user["username"],  # Duplicate username
-                "email": "different@example.com",
-                "password": "securepassword123",
-            },
-        )
-
-        # Can be 400 (user-friendly error) or 500 (database constraint violation)
-        assert response.status_code in [400, 500]
-
-    @pytest.mark.asyncio
     async def test_register_invalid_email(self, client: AsyncClient):
         """Test registering with an invalid email."""
         response = await client.post(
             "/api/auth/register",
             json={
-                "username": "validuser",
                 "email": "not-an-email",
-                "password": "securepassword123",
-            },
-        )
-
-        assert response.status_code == 422  # Validation error
-
-    @pytest.mark.asyncio
-    async def test_register_short_username(self, client: AsyncClient):
-        """Test registering with a short username."""
-        response = await client.post(
-            "/api/auth/register",
-            json={
-                "username": "ab",  # Too short (min 3)
-                "email": "valid@example.com",
                 "password": "securepassword123",
             },
         )
@@ -105,12 +71,12 @@ class TestLogin:
     """Tests for user login flow."""
 
     @pytest.mark.asyncio
-    async def test_login_with_username(self, client: AsyncClient, test_user):
-        """Test login with username."""
+    async def test_login_with_email(self, client: AsyncClient, test_user):
+        """Test login with email."""
         response = await client.post(
             "/api/auth/token",
             data={
-                "username": test_user["username"],
+                "username": test_user["email"],  # OAuth2 uses 'username' field
                 "password": test_user["password"],
             },
         )
@@ -121,27 +87,12 @@ class TestLogin:
         assert data["token_type"] == "bearer"
 
     @pytest.mark.asyncio
-    async def test_login_with_email(self, client: AsyncClient, test_user):
-        """Test login with email."""
-        response = await client.post(
-            "/api/auth/token",
-            data={
-                "username": test_user["email"],  # Use email instead
-                "password": test_user["password"],
-            },
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "access_token" in data
-
-    @pytest.mark.asyncio
     async def test_login_invalid_password(self, client: AsyncClient, test_user):
         """Test login with invalid password."""
         response = await client.post(
             "/api/auth/token",
             data={
-                "username": test_user["username"],
+                "username": test_user["email"],
                 "password": "wrongpassword",
             },
         )
@@ -150,11 +101,11 @@ class TestLogin:
 
     @pytest.mark.asyncio
     async def test_login_nonexistent_user(self, client: AsyncClient):
-        """Test login with nonexistent user."""
+        """Test login with nonexistent email."""
         response = await client.post(
             "/api/auth/token",
             data={
-                "username": "nonexistent",
+                "username": "nonexistent@example.com",
                 "password": "anypassword",
             },
         )
@@ -203,7 +154,6 @@ class TestCurrentUser:
         assert response.status_code == 200
         data = response.json()
         assert "id" in data
-        assert "username" in data
         assert "email" in data
         assert "is_active" in data
         assert "is_verified" in data

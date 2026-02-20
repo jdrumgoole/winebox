@@ -24,7 +24,6 @@ class User(Document):
     - is_superuser: admin/superuser status
 
     Custom fields added for WineBox:
-    - username: unique username for display
     - full_name: optional full name
     - anthropic_api_key: user's API key for Claude Vision (encrypted at rest)
     - created_at, updated_at: timestamps
@@ -42,7 +41,6 @@ class User(Document):
     is_verified: bool = False
 
     # Custom fields for WineBox
-    username: Indexed(str, unique=True)
     full_name: Optional[str] = None
     # API key is stored encrypted at rest
     anthropic_api_key: Optional[str] = None
@@ -111,4 +109,4 @@ class User(Document):
         self.is_superuser = value
 
     def __repr__(self) -> str:
-        return f"<User(id={self.id}, username={self.username}, email={self.email}, is_active={self.is_active})>"
+        return f"<User(id={self.id}, email={self.email}, is_active={self.is_active})>"

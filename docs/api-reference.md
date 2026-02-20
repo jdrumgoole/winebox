@@ -15,8 +15,9 @@ All API endpoints (except `/health`) require JWT authentication.
 ### Getting a Token
 
 ```bash
+# Note: OAuth2 spec uses 'username' field, but WineBox expects email
 curl -X POST http://localhost:8000/api/auth/token \
-  -d "username=myuser&password=mypass"
+  -d "username=myemail@example.com&password=mypass"
 ```
 
 **Response**:

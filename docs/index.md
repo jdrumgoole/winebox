@@ -50,13 +50,13 @@ winebox-server stop
 ### Creating Your First User
 
 ```bash
-winebox-admin add myusername --password mypassword
+winebox-admin add myemail@example.com --password mypassword
 ```
 
 ### First Login
 
 1. Open your browser to **http://localhost:8000/static/index.html**
-2. Log in with the username and password you created
+2. Log in with the email and password you created
 
 ![Login Page](images/login-page.png)
 *The WineBox login page*
@@ -229,12 +229,12 @@ winebox-server status             # Check if running
 ### User Management
 
 ```bash
-winebox-admin add USERNAME --password PASS    # Create user
-winebox-admin list                            # List all users
-winebox-admin passwd USERNAME --password PASS # Change password
-winebox-admin disable USERNAME                # Disable user
-winebox-admin enable USERNAME                 # Enable user
-winebox-admin remove USERNAME                 # Delete user
+winebox-admin add EMAIL --password PASS    # Create user
+winebox-admin list                         # List all users
+winebox-admin passwd EMAIL --password PASS # Change password
+winebox-admin disable EMAIL                # Disable user
+winebox-admin enable EMAIL                 # Enable user
+winebox-admin remove EMAIL                 # Delete user
 ```
 
 ## Contents

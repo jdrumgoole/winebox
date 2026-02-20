@@ -73,8 +73,7 @@ class UserResponse(BaseModel):
     """User response model for custom endpoints."""
 
     id: str
-    username: str
-    email: str | None
+    email: str
     full_name: str | None
     is_active: bool
     is_admin: bool
@@ -90,7 +89,6 @@ class UserResponse(BaseModel):
         """Create UserResponse from User model."""
         return cls(
             id=str(user.id),
-            username=user.username,
             email=user.email,
             full_name=user.full_name,
             is_active=user.is_active,
@@ -238,16 +236,18 @@ async def login_token(
     request: Request,  # Required for rate limiting
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:
-    """Login with username and password to get an access token.
+    """Login with email and password to get an access token.
 
     This is the legacy endpoint kept for backward compatibility.
     New clients should use POST /api/auth/login instead.
+
+    Note: OAuth2 spec uses 'username' field name, but we accept email here.
     """
     user = await authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -262,9 +262,9 @@ async def login_token(
     user.last_login = datetime.now(timezone.utc)
     await user.save()
 
-    # Create access token
+    # Create access token with email as subject
     access_token = create_access_token(
-        data={"sub": user.username},
+        data={"sub": user.email},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 

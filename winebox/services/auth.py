@@ -52,41 +52,22 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return encoded_jwt
 
 
-async def get_user_by_username(username: str) -> User | None:
-    """Get a user by username."""
-    return await User.find_one(User.username == username)
-
-
 async def get_user_by_email(email: str) -> User | None:
     """Get a user by email."""
     return await User.find_one(User.email == email)
 
 
-async def get_user_by_username_or_email(identifier: str) -> User | None:
-    """Get a user by username or email.
-
-    This supports login with either username or email address.
-    """
-    # First try username
-    user = await get_user_by_username(identifier)
-    if user:
-        return user
-
-    # Then try email
-    return await get_user_by_email(identifier)
-
-
-async def authenticate_user(username: str, password: str) -> User | None:
-    """Authenticate a user with username/email and password.
+async def authenticate_user(email: str, password: str) -> User | None:
+    """Authenticate a user with email and password.
 
     Args:
-        username: Username or email address.
+        email: User's email address.
         password: Plain text password.
 
     Returns:
         User if authentication successful, None otherwise.
     """
-    user = await get_user_by_username_or_email(username)
+    user = await get_user_by_email(email)
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -101,7 +82,7 @@ async def get_current_user(
 ) -> User | None:
     """Get the current user from the JWT token.
 
-    Supports tokens with 'sub' containing either username or user_id (ObjectId string).
+    Supports tokens with 'sub' containing email or user_id (ObjectId string).
     Also checks if the token has been revoked.
     """
     if not token:
@@ -123,10 +104,10 @@ async def get_current_user(
         if await RevokedToken.is_revoked(jti):
             return None
 
-    # Try to find user - subject could be username, email, or user_id
-    user = await get_user_by_username_or_email(subject)
+    # Try to find user - subject could be email or user_id
+    user = await get_user_by_email(subject)
 
-    # If not found by username/email, try as user_id (ObjectId)
+    # If not found by email, try as user_id (ObjectId)
     if user is None:
         try:
             user_id = PydanticObjectId(subject)
