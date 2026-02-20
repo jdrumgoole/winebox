@@ -28,8 +28,15 @@ jobs:
             echo "Upgrading WineBox..."
             sudo -u winebox /opt/winebox/.venv/bin/pip install winebox --upgrade --no-cache-dir
 
+            echo "Updating static files symlink..."
+            rm -f /opt/winebox/static
+            ln -sf /opt/winebox/.venv/lib/python3.*/site-packages/winebox/static /opt/winebox/static
+
             echo "Restarting service..."
             systemctl restart winebox
+
+            echo "Reloading nginx..."
+            nginx -t && systemctl reload nginx
 
             echo "Waiting for service to start..."
             sleep 5
