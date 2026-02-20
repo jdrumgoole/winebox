@@ -1,0 +1,42 @@
+name: Deploy to Digital Ocean
+
+on:
+  workflow_run:
+    workflows: ["Publish to PyPI"]
+    types: [completed]
+  workflow_dispatch:  # Allow manual trigger
+    inputs:
+      version:
+        description: 'Version to deploy (leave empty for latest)'
+        required: false
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Deploy to Digital Ocean
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_DROPLET_IP }}
+          username: root
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            echo "Upgrading WineBox..."
+            sudo -u winebox /opt/winebox/.venv/bin/pip install winebox --upgrade
+
+            echo "Restarting service..."
+            systemctl restart winebox
+
+            echo "Waiting for service to start..."
+            sleep 3
+
+            echo "Checking service status..."
+            systemctl is-active winebox
+
+            echo "Health check..."
+            curl -sf http://localhost:8000/health || exit 1
+
+            echo "Deployment complete!"
