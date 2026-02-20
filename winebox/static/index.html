@@ -73,11 +73,13 @@
                 <form id="register-form">
                     <div class="form-group">
                         <label for="register-username">Username</label>
-                        <input type="text" id="register-username" name="username" required minlength="3" maxlength="50" autocomplete="username">
+                        <input type="text" id="register-username" name="username" required minlength="3" maxlength="50" autocomplete="username"
+                               pattern="[a-zA-Z0-9_]+" title="Username can only contain letters, numbers, and underscores">
                     </div>
                     <div class="form-group">
                         <label for="register-email">Email</label>
-                        <input type="email" id="register-email" name="email" required autocomplete="email">
+                        <input type="email" id="register-email" name="email" required autocomplete="email"
+                               title="Please enter a valid email address (e.g., name@example.com)">
                     </div>
                     <div class="form-group">
                         <label for="register-password">Password</label>

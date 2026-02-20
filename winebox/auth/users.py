@@ -7,10 +7,13 @@ from typing import Optional
 from beanie import PydanticObjectId
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, FastAPIUsers
+from fastapi_users.exceptions import UserAlreadyExists
 from fastapi_users_db_beanie import BeanieUserDatabase, ObjectIDIDMixin
+from pymongo.errors import DuplicateKeyError
 
 from winebox.auth.backend import auth_backend
 from winebox.auth.db import get_user_db
+from winebox.auth.schemas import UserCreate
 from winebox.config import settings
 from winebox.models.user import User
 from winebox.services.email import get_email_service
@@ -23,6 +26,42 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
 
     reset_password_token_secret = settings.secret_key
     verification_token_secret = settings.secret_key
+
+    async def create(
+        self,
+        user_create: UserCreate,
+        safe: bool = False,
+        request: Optional[Request] = None,
+    ) -> User:
+        """Create a new user with duplicate username handling.
+
+        Overrides the base create method to catch MongoDB DuplicateKeyError
+        for username and convert it to UserAlreadyExists exception.
+
+        Args:
+            user_create: User creation schema with username, email, password.
+            safe: If True, only allow setting safe fields.
+            request: Optional request object.
+
+        Returns:
+            Created User object.
+
+        Raises:
+            UserAlreadyExists: If email or username already exists.
+        """
+        try:
+            return await super().create(user_create, safe=safe, request=request)
+        except DuplicateKeyError as e:
+            # Handle duplicate username error
+            error_msg = str(e)
+            if "username" in error_msg:
+                logger.warning(
+                    "Registration failed: username '%s' already exists",
+                    user_create.username
+                )
+                raise UserAlreadyExists() from e
+            # Re-raise for other duplicate key errors (e.g., email)
+            raise
 
     async def on_after_register(
         self, user: User, request: Optional[Request] = None

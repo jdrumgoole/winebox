@@ -128,7 +128,7 @@ def test_unit(ctx: Context, verbose: bool = False, coverage: bool = False) -> No
         verbose: Enable verbose output
         coverage: Run with coverage report
     """
-    cmd = "uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py"
+    cmd = "uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py --ignore=tests/test_registration_e2e.py"
     if verbose:
         cmd += " -v"
     if coverage:
@@ -145,8 +145,12 @@ def test_e2e(ctx: Context, verbose: bool = False, workers: int = 4, no_purge: bo
         verbose: Enable verbose output
         workers: Number of parallel workers (default: 4)
         no_purge: Skip purging test data after tests (default: False)
+
+    Note: Server should be started with registration enabled for registration tests:
+        WINEBOX_AUTH_REGISTRATION_ENABLED=true invoke start-background
     """
-    cmd = f"uv run python -m pytest tests/test_checkin_e2e.py -n {workers}"
+    # Run all E2E tests (checkin and registration)
+    cmd = f"uv run python -m pytest tests/test_checkin_e2e.py tests/test_registration_e2e.py -n {workers}"
     if verbose:
         cmd += " -v"
     ctx.run(cmd, pty=True)

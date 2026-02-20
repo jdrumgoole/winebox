@@ -469,7 +469,14 @@ async function handleRegister(e) {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || 'Registration failed');
+            // Map API error codes to user-friendly messages
+            let message = error.detail || 'Registration failed';
+            if (message === 'REGISTER_USER_ALREADY_EXISTS') {
+                message = 'A user with this email or username already exists';
+            } else if (message === 'REGISTER_INVALID_PASSWORD') {
+                message = 'Password does not meet requirements';
+            }
+            throw new Error(message);
         }
 
         // Registration successful
