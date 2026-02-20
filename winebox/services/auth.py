@@ -9,13 +9,16 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pwdlib import PasswordHash
+from pwdlib.hashers.argon2 import Argon2Hasher
 from pwdlib.hashers.bcrypt import BcryptHasher
 
 from winebox.config import settings
 from winebox.models.user import User
 
 # Password hashing using pwdlib (compatible with fastapi-users)
-password_hash = PasswordHash((BcryptHasher(),))
+# Include both Argon2 (fastapi-users default) and Bcrypt for compatibility
+# The first hasher is used for new hashes, others are for verification only
+password_hash = PasswordHash((Argon2Hasher(), BcryptHasher()))
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=False)

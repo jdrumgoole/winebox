@@ -449,7 +449,7 @@ def rebuild_droplet(
     ctx: Context,
     droplet_name: str = "winebox-droplet",
     image: str = "ubuntu-24-04-x64",
-    confirm: bool = False,
+    confirm: bool = True,
 ) -> None:
     """Rebuild DO droplet for clean deploy testing.
 
@@ -460,7 +460,7 @@ def rebuild_droplet(
         ctx: Invoke context
         droplet_name: Droplet name (default: winebox-droplet)
         image: OS image to rebuild with (default: ubuntu-24-04-x64)
-        confirm: Skip confirmation prompt
+        confirm: Skip confirmation prompt (default: True)
     """
     cmd = f"uv run python -m deploy.rebuild --droplet-name {droplet_name} --image {image}"
     if confirm:

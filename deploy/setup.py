@@ -201,9 +201,10 @@ def create_virtualenv(host: str, user: str) -> None:
     step("Creating virtual environment")
 
     # Create venv as winebox user
+    # UV_NO_CONFIG=1 prevents uv from trying to read /root/uv.toml
     run_ssh(
         host, user,
-        'su -s /bin/bash winebox -c "HOME=/opt/winebox /usr/local/bin/uv venv /opt/winebox/.venv"'
+        'su -s /bin/bash winebox -c "HOME=/opt/winebox UV_NO_CONFIG=1 /usr/local/bin/uv venv /opt/winebox/.venv"'
     )
     print("Virtual environment created")
 
@@ -212,7 +213,7 @@ def create_virtualenv(host: str, user: str) -> None:
     run_ssh(
         host, user,
         'su -s /bin/bash winebox -c "'
-        'HOME=/opt/winebox /usr/local/bin/uv pip install pip winebox '
+        'HOME=/opt/winebox UV_NO_CONFIG=1 /usr/local/bin/uv pip install pip winebox '
         '--python /opt/winebox/.venv/bin/python"'
     )
     print("winebox installed")
