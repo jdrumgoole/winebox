@@ -202,17 +202,38 @@ async def delete_api_key(
 
 
 @router.post("/logout")
-async def logout() -> dict:
-    """Logout the current user.
+async def logout(
+    request: Request,
+    current_user: RequireAuth,
+) -> dict:
+    """Logout the current user by revoking their token.
 
-    Note: Since we use JWT tokens, logout is handled client-side
-    by discarding the token. This endpoint is provided for API completeness.
+    The token is added to a blacklist so it cannot be used again.
     """
+    from winebox.services.auth import revoke_token
+
+    # Extract token from Authorization header
+    auth_header = request.headers.get("Authorization", "")
+    token = None
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+
+    if token:
+        success = await revoke_token(
+            token=token,
+            user_id=str(current_user.id),
+            reason="logout",
+        )
+        if success:
+            return {"message": "Successfully logged out"}
+        else:
+            return {"message": "Logged out (token could not be revoked)"}
+
     return {"message": "Successfully logged out"}
 
 
 @router.post("/token", response_model=Token)
-@limiter.limit(f"{settings.auth_rate_limit_per_minute}/minute")
+@limiter.limit("5/minute;20/hour")  # Strict rate limiting for login attempts
 async def login_token(
     request: Request,  # Required for rate limiting
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],

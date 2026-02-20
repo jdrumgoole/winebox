@@ -18,6 +18,8 @@ class ServerConfig(BaseModel):
     debug: bool = False
     enforce_https: bool = False
     rate_limit_per_minute: int = 60
+    # CORS configuration - empty list means same-origin only
+    cors_origins: list[str] = []
 
 
 class DatabaseConfig(BaseModel):
@@ -25,6 +27,9 @@ class DatabaseConfig(BaseModel):
 
     mongodb_url: str = "mongodb://localhost:27017"
     mongodb_database: str = "winebox"
+    # Connection pool settings
+    min_pool_size: int = 10
+    max_pool_size: int = 100
 
 
 class StorageConfig(BaseModel):

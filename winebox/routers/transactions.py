@@ -34,10 +34,15 @@ async def list_transactions(
         conditions
     ).skip(skip).limit(limit).sort(-Transaction.transaction_date).to_list()
 
-    # Get wine details for each transaction
+    # Batch fetch all wine details (fixes N+1 query)
+    wine_ids = list({t.wine_id for t in transactions})
+    wines = await Wine.find({"_id": {"$in": wine_ids}}).to_list() if wine_ids else []
+    wines_by_id = {wine.id: wine for wine in wines}
+
+    # Build response with pre-fetched wine data
     results = []
     for t in transactions:
-        wine = await Wine.get(t.wine_id)
+        wine = wines_by_id.get(t.wine_id)
         response_data = t.model_dump()
         if wine:
             response_data["wine"] = {

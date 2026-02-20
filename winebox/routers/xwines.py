@@ -128,33 +128,61 @@ async def get_stats() -> XWinesStats:
 @router.get("/types", response_model=list[str])
 async def list_wine_types() -> list[str]:
     """List distinct wine types in the X-Wines dataset."""
-    # Fetch wines with wine_type and extract distinct values
-    wines = await XWinesWine.find(
-        XWinesWine.wine_type != None  # noqa: E711
-    ).to_list()
-    types = set(wine.wine_type for wine in wines if wine.wine_type)
-    return sorted(list(types))
+    # Use MongoDB aggregation for efficient distinct values
+    # Falls back to Python aggregation if aggregation is not supported (e.g., mongomock)
+    try:
+        pipeline = [
+            {"$match": {"wine_type": {"$ne": None}}},
+            {"$group": {"_id": "$wine_type"}},
+            {"$sort": {"_id": 1}},
+        ]
+        results = await XWinesWine.aggregate(pipeline).to_list()
+        return [doc["_id"] for doc in results if doc["_id"]]
+    except Exception:
+        # Fallback to Python aggregation for compatibility
+        wines = await XWinesWine.find(
+            XWinesWine.wine_type != None  # noqa: E711
+        ).to_list()
+        types = set(wine.wine_type for wine in wines if wine.wine_type)
+        return sorted(list(types))
 
 
 @router.get("/countries", response_model=list[dict])
 async def list_countries() -> list[dict]:
     """List countries with wine counts in the X-Wines dataset."""
-    from collections import Counter
+    # Use MongoDB aggregation for efficient grouping
+    # Falls back to Python aggregation if aggregation is not supported (e.g., mongomock)
+    try:
+        pipeline = [
+            {"$match": {"country_code": {"$ne": None}, "country": {"$ne": None}}},
+            {
+                "$group": {
+                    "_id": {"code": "$country_code", "name": "$country"},
+                    "count": {"$sum": 1},
+                }
+            },
+            {"$sort": {"count": -1, "_id.name": 1}},
+        ]
+        results = await XWinesWine.aggregate(pipeline).to_list()
+        return [
+            {"code": doc["_id"]["code"], "name": doc["_id"]["name"], "count": doc["count"]}
+            for doc in results
+        ]
+    except Exception:
+        # Fallback to Python aggregation for compatibility
+        from collections import Counter
 
-    # Fetch wines with country_code and group in Python
-    wines = await XWinesWine.find(
-        XWinesWine.country_code != None  # noqa: E711
-    ).to_list()
+        wines = await XWinesWine.find(
+            XWinesWine.country_code != None  # noqa: E711
+        ).to_list()
 
-    # Count by country code
-    country_counts: Counter[tuple[str, str]] = Counter()
-    for wine in wines:
-        if wine.country_code and wine.country:
-            country_counts[(wine.country_code, wine.country)] += 1
+        country_counts: Counter[tuple[str, str]] = Counter()
+        for wine in wines:
+            if wine.country_code and wine.country:
+                country_counts[(wine.country_code, wine.country)] += 1
 
-    # Sort by count descending and convert to result format
-    sorted_countries = sorted(country_counts.items(), key=lambda x: (-x[1], x[0][1]))
-    return [
-        {"code": code, "name": name, "count": count}
-        for (code, name), count in sorted_countries
-    ]
+        sorted_countries = sorted(country_counts.items(), key=lambda x: (-x[1], x[0][1]))
+        return [
+            {"code": code, "name": name, "count": count}
+            for (code, name), count in sorted_countries
+        ]

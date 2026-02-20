@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -38,20 +39,33 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
-        # Content Security Policy - allow self and inline styles for the UI
+        # Additional security headers
+        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+        response.headers["Permissions-Policy"] = (
+            "accelerometer=(), camera=(), geolocation=(), gyroscope=(), "
+            "magnetometer=(), microphone=(), payment=(), usb=()"
+        )
+
+        # Content Security Policy
+        # Note: 'unsafe-inline' for scripts/styles is needed for the current UI
+        # In production, consider using nonces or hashes for inline scripts
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob:; "
             "font-src 'self'; "
-            "frame-ancestors 'none';"
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "form-action 'self'; "
+            "base-uri 'self'; "
+            "object-src 'none';"
         )
 
         # HTTPS enforcement header (browsers will upgrade to HTTPS)
         if settings.enforce_https:
             response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
+                "max-age=31536000; includeSubDomains; preload"
             )
 
         return response
@@ -155,6 +169,19 @@ app = FastAPI(
 # Add rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Add CORS middleware with explicit configuration
+# Only allow origins from the whitelist; empty list means same-origin only
+if settings.cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        allow_headers=["Authorization", "Content-Type"],
+        expose_headers=["X-Request-ID"],
+        max_age=600,  # Cache preflight for 10 minutes
+    )
 
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)

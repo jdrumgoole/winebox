@@ -8,6 +8,7 @@ from winebox.models.grape_variety import GrapeVariety
 from winebox.models.region import Region
 from winebox.models.classification import Classification
 from winebox.models.xwines import XWinesWine, XWinesMetadata
+from winebox.models.token_blacklist import RevokedToken
 
 __all__ = [
     # Main documents
@@ -15,6 +16,7 @@ __all__ = [
     "Transaction",
     "TransactionType",
     "User",
+    "RevokedToken",
     # Embedded subdocuments
     "InventoryInfo",
     "GrapeBlendEntry",

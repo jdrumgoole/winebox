@@ -1,5 +1,6 @@
 """Wine management endpoints."""
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime
@@ -98,12 +99,16 @@ async def scan_label(
     falls back to Tesseract OCR otherwise.
     Uses user's API key if configured, otherwise falls back to system key.
     """
-    # Validate and read image data with size limits
-    front_data = await validate_upload_size(front_label, "Front label")
+    # Validate and read image data with size limits concurrently
+    async def validate_front() -> bytes:
+        return await validate_upload_size(front_label, "Front label")
 
-    back_data = None
-    if back_label and back_label.filename:
-        back_data = await validate_upload_size(back_label, "Back label")
+    async def validate_back() -> bytes | None:
+        if back_label and back_label.filename:
+            return await validate_upload_size(back_label, "Back label")
+        return None
+
+    front_data, back_data = await asyncio.gather(validate_front(), validate_back())
 
     # Get user's API key (if they have one configured) - decrypted
     user_api_key = current_user.get_decrypted_api_key()
@@ -223,14 +228,18 @@ async def checkin_wine(
     if not front_label_text and not name:
         logger.info("No pre-scanned text provided, scanning labels...")
 
-        # Read image data for analysis
-        await front_label.seek(0)
-        front_data = await front_label.read()
+        # Read image data for analysis concurrently
+        async def read_front() -> bytes:
+            await front_label.seek(0)
+            return await front_label.read()
 
-        back_data = None
-        if back_label and back_label.filename:
-            await back_label.seek(0)
-            back_data = await back_label.read()
+        async def read_back() -> bytes | None:
+            if back_label and back_label.filename:
+                await back_label.seek(0)
+                return await back_label.read()
+            return None
+
+        front_data, back_data = await asyncio.gather(read_front(), read_back())
 
         # Try Claude Vision first
         parsed_data = {}

@@ -31,7 +31,7 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
 
         Sends verification email if email verification is required.
         """
-        logger.info("User %s (id=%s) has registered", user.email, user.id)
+        logger.info("User registered (id=%s, username=%s)", user.id, user.username)
 
         if settings.email_verification_required and not user.is_verified:
             await self.request_verify(user, request)
@@ -43,7 +43,7 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
 
         Sends password reset email.
         """
-        logger.info("User %s requested password reset", user.email)
+        logger.info("Password reset requested for user (id=%s)", user.id)
 
         email_service = get_email_service()
         success = await email_service.send_password_reset_email(
@@ -52,15 +52,15 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
         )
 
         if success:
-            logger.info("Password reset email sent to %s", user.email)
+            logger.info("Password reset email sent for user (id=%s)", user.id)
         else:
-            logger.error("Failed to send password reset email to %s", user.email)
+            logger.error("Failed to send password reset email for user (id=%s)", user.id)
 
     async def on_after_reset_password(
         self, user: User, request: Optional[Request] = None
     ) -> None:
         """Called after password was reset successfully."""
-        logger.info("User %s successfully reset their password", user.email)
+        logger.info("User password reset successfully (id=%s)", user.id)
 
     async def on_after_request_verify(
         self, user: User, token: str, request: Optional[Request] = None
@@ -69,7 +69,7 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
 
         Sends verification email.
         """
-        logger.info("Verification requested for user %s", user.email)
+        logger.info("Verification requested for user (id=%s)", user.id)
 
         email_service = get_email_service()
         success = await email_service.send_verification_email(
@@ -78,15 +78,15 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
         )
 
         if success:
-            logger.info("Verification email sent to %s", user.email)
+            logger.info("Verification email sent for user (id=%s)", user.id)
         else:
-            logger.error("Failed to send verification email to %s", user.email)
+            logger.error("Failed to send verification email for user (id=%s)", user.id)
 
     async def on_after_verify(
         self, user: User, request: Optional[Request] = None
     ) -> None:
         """Called after a user was verified."""
-        logger.info("User %s has been verified", user.email)
+        logger.info("User verified (id=%s)", user.id)
 
     async def on_after_login(
         self,
@@ -95,7 +95,7 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
         response: Optional[object] = None,
     ) -> None:
         """Called after successful login."""
-        logger.info("User %s logged in", user.email)
+        logger.info("User logged in (id=%s)", user.id)
 
 
 async def get_user_manager(

@@ -104,6 +104,10 @@ class Settings:
     def rate_limit_per_minute(self) -> int:
         return self._config.server.rate_limit_per_minute
 
+    @property
+    def cors_origins(self) -> list[str]:
+        return self._config.server.cors_origins
+
     # Database
     @property
     def mongodb_url(self) -> str:
@@ -112,6 +116,14 @@ class Settings:
     @property
     def mongodb_database(self) -> str:
         return self._config.database.mongodb_database
+
+    @property
+    def min_pool_size(self) -> int:
+        return self._config.database.min_pool_size
+
+    @property
+    def max_pool_size(self) -> int:
+        return self._config.database.max_pool_size
 
     # Storage
     @property

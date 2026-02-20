@@ -25,6 +25,7 @@ def get_document_models() -> list[type["Document"]]:
         Classification,
         GrapeVariety,
         Region,
+        RevokedToken,
         Transaction,
         User,
         Wine,
@@ -43,6 +44,7 @@ def get_document_models() -> list[type["Document"]]:
         Classification,
         XWinesWine,
         XWinesMetadata,
+        RevokedToken,
     ]
 
 
@@ -64,9 +66,13 @@ async def init_db(
         # Use provided client (e.g., for testing with mongomock)
         client = motor_client
     else:
-        # Create new client from settings
+        # Create new client from settings with connection pool configuration
         url = mongodb_url or settings.mongodb_url
-        client = AsyncIOMotorClient(url)
+        client = AsyncIOMotorClient(
+            url,
+            minPoolSize=settings.min_pool_size,
+            maxPoolSize=settings.max_pool_size,
+        )
 
     db_name = mongodb_database or settings.mongodb_database
     database = client[db_name]

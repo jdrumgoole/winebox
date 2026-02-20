@@ -1,5 +1,6 @@
 """Authentication service for user management and JWT tokens."""
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -24,7 +25,7 @@ http_basic = HTTPBasic(auto_error=False)
 
 # JWT settings
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 2  # 2 hours (reduced for security)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -38,13 +39,15 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
-    """Create a JWT access token."""
+    """Create a JWT access token with a unique JWT ID for revocation support."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    # Add JWT ID for revocation support
+    jti = str(uuid.uuid4())
+    to_encode.update({"exp": expire, "jti": jti})
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -99,6 +102,7 @@ async def get_current_user(
     """Get the current user from the JWT token.
 
     Supports tokens with 'sub' containing either username or user_id (ObjectId string).
+    Also checks if the token has been revoked.
     """
     if not token:
         return None
@@ -106,10 +110,18 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
         subject: str | None = payload.get("sub")
+        jti: str | None = payload.get("jti")
         if subject is None:
             return None
     except JWTError:
         return None
+
+    # Check if token is revoked
+    if jti:
+        from winebox.models.token_blacklist import RevokedToken
+
+        if await RevokedToken.is_revoked(jti):
+            return None
 
     # Try to find user - subject could be username, email, or user_id
     user = await get_user_by_username_or_email(subject)
@@ -151,6 +163,41 @@ async def require_admin(
             detail="Admin privileges required",
         )
     return user
+
+
+async def revoke_token(token: str, user_id: str | None = None, reason: str = "logout") -> bool:
+    """Revoke a JWT token by adding it to the blacklist.
+
+    Args:
+        token: The JWT token to revoke.
+        user_id: Optional user ID for audit purposes.
+        reason: Reason for revocation.
+
+    Returns:
+        True if token was successfully revoked, False otherwise.
+    """
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+        jti: str | None = payload.get("jti")
+        exp: int | None = payload.get("exp")
+
+        if not jti or not exp:
+            return False
+
+        from winebox.models.token_blacklist import RevokedToken
+
+        expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+        await RevokedToken.revoke_token(
+            jti=jti,
+            expires_at=expires_at,
+            user_id=user_id,
+            reason=reason,
+        )
+        return True
+    except JWTError:
+        return False
+    except Exception:
+        return False
 
 
 # Type aliases for dependency injection

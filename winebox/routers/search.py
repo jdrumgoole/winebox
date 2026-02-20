@@ -39,19 +39,29 @@ async def search_wines(
     # Build filter conditions
     conditions = {}
 
-    # Full-text search using MongoDB text search or regex fallback
+    # Use MongoDB text search for full-text queries when available
+    # Falls back to regex for compatibility (e.g., mongomock in tests)
+    use_text_search = False
     if q:
-        # Use regex for case-insensitive search (MongoDB text search requires text index)
-        search_pattern = re.compile(re.escape(q), re.IGNORECASE)
-        conditions["$or"] = [
-            {"name": {"$regex": search_pattern}},
-            {"winery": {"$regex": search_pattern}},
-            {"region": {"$regex": search_pattern}},
-            {"country": {"$regex": search_pattern}},
-            {"grape_variety": {"$regex": search_pattern}},
-            {"front_label_text": {"$regex": search_pattern}},
-            {"back_label_text": {"$regex": search_pattern}},
-        ]
+        # Try to use MongoDB $text search which uses the text index
+        # This is much faster than regex but requires a text index
+        try:
+            # Check if we can use text search (won't work in mongomock)
+            test_result = await Wine.find({"$text": {"$search": q}}).limit(1).to_list()
+            conditions["$text"] = {"$search": q}
+            use_text_search = True
+        except Exception:
+            # Fall back to regex for case-insensitive search
+            search_pattern = re.compile(re.escape(q), re.IGNORECASE)
+            conditions["$or"] = [
+                {"name": {"$regex": search_pattern}},
+                {"winery": {"$regex": search_pattern}},
+                {"region": {"$regex": search_pattern}},
+                {"country": {"$regex": search_pattern}},
+                {"grape_variety": {"$regex": search_pattern}},
+                {"front_label_text": {"$regex": search_pattern}},
+                {"back_label_text": {"$regex": search_pattern}},
+            ]
 
     # Exact/partial matches on specific fields
     if vintage:
@@ -123,9 +133,17 @@ async def search_wines(
             return []
         conditions["_id"] = {"$in": list(wine_ids_from_transactions)}
 
-    # Execute query
-    wines = await Wine.find(
-        conditions
-    ).skip(skip).limit(limit).sort(-Wine.created_at).to_list()
+    # Execute query - use text score for sorting when using text search
+    if use_text_search:
+        # For text search, sort by relevance (text score) then by created_at
+        wines = await Wine.find(
+            conditions
+        ).skip(skip).limit(limit).sort(
+            [("score", {"$meta": "textScore"}), ("created_at", -1)]
+        ).to_list()
+    else:
+        wines = await Wine.find(
+            conditions
+        ).skip(skip).limit(limit).sort(-Wine.created_at).to_list()
 
     return [WineWithInventory.model_validate(wine) for wine in wines]
