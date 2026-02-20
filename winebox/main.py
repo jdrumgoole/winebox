@@ -1,5 +1,7 @@
 """FastAPI application entry point for WineBox."""
 
+import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
@@ -16,6 +18,8 @@ from starlette.responses import Response
 from winebox import __version__
 from winebox.config import settings
 from winebox.database import close_db, init_db
+
+logger = logging.getLogger(__name__)
 
 
 # Rate limiter configuration
@@ -53,10 +57,81 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def _is_production() -> bool:
+    """Check if we're running in production mode.
+
+    Returns:
+        True if running in production (not debug mode and not testing).
+    """
+    return not settings.debug and not os.getenv("PYTEST_CURRENT_TEST")
+
+
+def _validate_security_configuration() -> None:
+    """Validate security configuration at startup.
+
+    Raises:
+        RuntimeError: If critical security issues are detected in production.
+    """
+    issues = []
+    warnings = []
+
+    # Check for weak/missing secret key
+    secret_key = settings.secret_key
+    if not secret_key or len(secret_key) < 32:
+        issues.append(
+            "SECRET_KEY is missing or too short (minimum 32 characters). "
+            "Set WINEBOX_SECRET_KEY environment variable."
+        )
+
+    # Check for insecure defaults in production
+    if _is_production():
+        # Debug mode should be off in production
+        if settings.debug:
+            issues.append(
+                "Debug mode is enabled in production. "
+                "Set debug=false in config.toml or WINEBOX_DEBUG=false."
+            )
+
+        # Localhost MongoDB is suspicious in production
+        mongodb_url = settings.mongodb_url
+        if "localhost" in mongodb_url or "127.0.0.1" in mongodb_url:
+            warnings.append(
+                "MongoDB URL points to localhost in production. "
+                "This may indicate an insecure configuration."
+            )
+
+        # HTTPS should be enforced in production
+        if not settings.enforce_https:
+            warnings.append(
+                "HTTPS enforcement is disabled. "
+                "Consider enabling enforce_https=true for production."
+            )
+
+    # Log warnings
+    for warning in warnings:
+        logger.warning("SECURITY WARNING: %s", warning)
+
+    # Fail on critical issues in production
+    if issues and _is_production():
+        for issue in issues:
+            logger.error("SECURITY ERROR: %s", issue)
+        raise RuntimeError(
+            "Application startup blocked due to security configuration issues. "
+            "See logs for details."
+        )
+    elif issues:
+        # Log as warnings in development
+        for issue in issues:
+            logger.warning("SECURITY WARNING (development mode): %s", issue)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
     # Startup
+    # Validate security configuration before proceeding
+    _validate_security_configuration()
+
     # Ensure data directories exist
     settings.image_storage_path.mkdir(parents=True, exist_ok=True)
     Path("data").mkdir(parents=True, exist_ok=True)

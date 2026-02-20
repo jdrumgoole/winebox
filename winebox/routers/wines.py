@@ -105,8 +105,8 @@ async def scan_label(
     if back_label and back_label.filename:
         back_data = await validate_upload_size(back_label, "Back label")
 
-    # Get user's API key (if they have one configured)
-    user_api_key = current_user.anthropic_api_key
+    # Get user's API key (if they have one configured) - decrypted
+    user_api_key = current_user.get_decrypted_api_key()
 
     # Try Claude Vision first
     if vision_service.is_available(user_api_key):
@@ -216,8 +216,8 @@ async def checkin_wine(
     front_text = front_label_text or ""
     back_text = back_label_text
 
-    # Get user's API key (if they have one configured)
-    user_api_key = current_user.anthropic_api_key
+    # Get user's API key (if they have one configured) - decrypted
+    user_api_key = current_user.get_decrypted_api_key()
 
     # Only scan if no pre-scanned text was provided and no name given
     if not front_label_text and not name:

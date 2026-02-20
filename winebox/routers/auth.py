@@ -180,9 +180,9 @@ async def update_api_key(
 ) -> dict:
     """Update the current user's Anthropic API key.
 
-    Note: The API key is stored but cannot be retrieved after setting.
+    Note: The API key is stored encrypted and cannot be retrieved after setting.
     """
-    current_user.anthropic_api_key = request.api_key
+    current_user.set_encrypted_api_key(request.api_key)
     current_user.updated_at = datetime.utcnow()
     await current_user.save()
 
