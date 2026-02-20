@@ -352,7 +352,7 @@ def docs_serve(ctx: Context, port: int = 8080) -> None:
 
 # Deployment Tasks
 @task(name="deploy-setup")
-def deploy_setup(ctx: Context, host: str = "", domain: str = "winebox.app") -> None:
+def deploy_setup(ctx: Context, host: str = "", domain: str = "booze.winebox.app") -> None:
     """Run initial setup on a Digital Ocean droplet.
 
     This installs MongoDB, nginx, uv, and configures the server.
@@ -361,7 +361,7 @@ def deploy_setup(ctx: Context, host: str = "", domain: str = "winebox.app") -> N
     Args:
         ctx: Invoke context
         host: Droplet IP (or set WINEBOX_DROPLET_IP in .env)
-        domain: Domain name (default: winebox.app)
+        domain: Domain name for the app (default: booze.winebox.app)
     """
     cmd = f"uv run python -m deploy.setup --domain {domain}"
     if host:
@@ -441,4 +441,28 @@ def deploy_xwines(
         cmd += " --test"
     if dry_run:
         cmd += " --dry-run"
+    ctx.run(cmd, pty=True)
+
+
+@task
+def rebuild_droplet(
+    ctx: Context,
+    droplet_name: str = "winebox-droplet",
+    image: str = "ubuntu-24-04-x64",
+    confirm: bool = False,
+) -> None:
+    """Rebuild DO droplet for clean deploy testing.
+
+    Uses Digital Ocean's rebuild action to reinstall the OS while keeping
+    the same IP address (no DNS changes needed).
+
+    Args:
+        ctx: Invoke context
+        droplet_name: Droplet name (default: winebox-droplet)
+        image: OS image to rebuild with (default: ubuntu-24-04-x64)
+        confirm: Skip confirmation prompt
+    """
+    cmd = f"uv run python -m deploy.rebuild --droplet-name {droplet_name} --image {image}"
+    if confirm:
+        cmd += " --confirm"
     ctx.run(cmd, pty=True)

@@ -62,7 +62,7 @@ def get_env_config(
         user=user or os.environ.get("WINEBOX_DROPLET_USER", "root"),
         droplet_name=droplet_name or os.environ.get("WINEBOX_DROPLET_NAME", "winebox-droplet"),
         do_token=os.environ.get("WINEBOX_DO_TOKEN"),
-        domain=domain or os.environ.get("WINEBOX_DOMAIN", "winebox.app"),
+        domain=domain or os.environ.get("WINEBOX_DOMAIN", "booze.winebox.app"),
         env_values=env_values,
     )
 
@@ -106,15 +106,32 @@ class DigitalOceanAPI:
 
     BASE_URL = "https://api.digitalocean.com/v2"
 
-    def __init__(self, token: str):
-        """Initialize API client with token."""
+    def __init__(self, token: str | None = None):
+        """Initialize API client with token.
+
+        Args:
+            token: Digital Ocean API token. If not provided, reads from
+                   WINEBOX_DO_TOKEN environment variable or .env file.
+        """
+        if token is None:
+            token = os.environ.get("WINEBOX_DO_TOKEN")
+            if not token:
+                # Try loading from .env
+                env_path = Path(".env")
+                if env_path.exists():
+                    for line in env_path.read_text().splitlines():
+                        if line.startswith("WINEBOX_DO_TOKEN="):
+                            token = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            break
+        if not token:
+            raise ValueError("Digital Ocean API token not provided")
         self.token = token
         self.headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
 
-    def get_droplets(self) -> list[dict]:
+    def list_droplets(self) -> list[dict]:
         """List all droplets."""
         response = requests.get(
             f"{self.BASE_URL}/droplets",
@@ -123,14 +140,76 @@ class DigitalOceanAPI:
         response.raise_for_status()
         return response.json()["droplets"]
 
+    # Alias for backwards compatibility
+    get_droplets = list_droplets
+
+    def get_droplet(self, droplet_id: int) -> dict | None:
+        """Get a specific droplet by ID.
+
+        Args:
+            droplet_id: Droplet ID
+
+        Returns:
+            Droplet data dict or None if not found
+        """
+        response = requests.get(
+            f"{self.BASE_URL}/droplets/{droplet_id}",
+            headers=self.headers,
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return response.json()["droplet"]
+
     def get_droplet_ip(self, droplet_name: str) -> str | None:
         """Get public IPv4 address for a droplet by name."""
-        for droplet in self.get_droplets():
+        for droplet in self.list_droplets():
             if droplet["name"] == droplet_name:
                 for network in droplet["networks"]["v4"]:
                     if network["type"] == "public":
                         return network["ip_address"]
         return None
+
+    def rebuild_droplet(self, droplet_id: int, image: str) -> dict | None:
+        """Rebuild a droplet with a new image.
+
+        This reinstalls the OS while keeping the same IP address.
+
+        Args:
+            droplet_id: Droplet ID to rebuild
+            image: Image slug to rebuild with (e.g., 'ubuntu-24-04-x64')
+
+        Returns:
+            Action data dict or None on failure
+        """
+        response = requests.post(
+            f"{self.BASE_URL}/droplets/{droplet_id}/actions",
+            headers=self.headers,
+            json={"type": "rebuild", "image": image},
+        )
+        if response.status_code not in (200, 201):
+            print(f"Error rebuilding droplet: {response.status_code} {response.text}")
+            return None
+        return response.json()["action"]
+
+    def get_droplet_action(self, droplet_id: int, action_id: int) -> dict | None:
+        """Get the status of a droplet action.
+
+        Args:
+            droplet_id: Droplet ID
+            action_id: Action ID
+
+        Returns:
+            Action data dict or None if not found
+        """
+        response = requests.get(
+            f"{self.BASE_URL}/droplets/{droplet_id}/actions/{action_id}",
+            headers=self.headers,
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return response.json()["action"]
 
     def list_dns_records(self, domain: str) -> list[dict]:
         """List all DNS records for a domain."""
@@ -186,7 +265,8 @@ def run_ssh(
     command: str | list[str],
     check: bool = True,
     verbose: bool = True,
-) -> int:
+    capture: bool = False,
+) -> int | str:
     """Run command(s) on remote host via SSH.
 
     Args:
@@ -195,9 +275,10 @@ def run_ssh(
         command: Single command string or list of commands to chain with &&
         check: If True, exit on command failure
         verbose: If True, print command being run
+        capture: If True, capture and return stdout as string instead of return code
 
     Returns:
-        Command return code
+        Command return code (int) if capture=False, stdout (str) if capture=True
     """
     if isinstance(command, list):
         remote_cmd = " && ".join(command)
@@ -212,45 +293,22 @@ def run_ssh(
         remote_cmd,
     ]
 
-    if verbose:
+    if verbose and not capture:
         display_cmd = remote_cmd[:80] + "..." if len(remote_cmd) > 80 else remote_cmd
         print(f"  $ {display_cmd}")
 
-    result = subprocess.run(ssh_cmd, check=False)
-
-    if check and result.returncode != 0:
-        print(f"Error: Command failed with exit code {result.returncode}")
-        sys.exit(result.returncode)
-
-    return result.returncode
-
-
-def run_ssh_script(host: str, user: str, script: str) -> int:
-    """Run a multi-line bash script on remote host via SSH.
-
-    Args:
-        host: Remote host IP or hostname
-        user: SSH username
-        script: Multi-line bash script
-
-    Returns:
-        Script return code
-    """
-    ssh_cmd = [
-        "ssh",
-        "-o", "StrictHostKeyChecking=accept-new",
-        f"{user}@{host}",
-        "bash -s",
-    ]
-
-    result = subprocess.run(
-        ssh_cmd,
-        input=script,
-        text=True,
-        check=False,
-    )
-
-    return result.returncode
+    if capture:
+        result = subprocess.run(ssh_cmd, check=False, capture_output=True, text=True)
+        if check and result.returncode != 0:
+            print(f"Error: Command failed with exit code {result.returncode}")
+            sys.exit(result.returncode)
+        return result.stdout
+    else:
+        result = subprocess.run(ssh_cmd, check=False)
+        if check and result.returncode != 0:
+            print(f"Error: Command failed with exit code {result.returncode}")
+            sys.exit(result.returncode)
+        return result.returncode
 
 
 def upload_file(host: str, user: str, local_path: Path, remote_path: str) -> None:

@@ -112,7 +112,7 @@ def deploy(
     env_values: dict[str, str | None] | None = None,
     skip_secrets: bool = False,
     setup_dns_flag: bool = False,
-    domain: str = "winebox.app",
+    domain: str = "booze.winebox.app",
     dry_run: bool = False,
 ) -> None:
     """Deploy WineBox to the production server.
@@ -247,8 +247,8 @@ Examples:
     )
     parser.add_argument(
         "--domain",
-        default="winebox.app",
-        help="Domain name (default: winebox.app)",
+        default="booze.winebox.app",
+        help="Domain name for the app (default: booze.winebox.app)",
     )
     parser.add_argument(
         "--no-secrets",

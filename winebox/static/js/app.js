@@ -398,7 +398,7 @@ function showAuthCard(cardId) {
     });
 }
 
-// Handle hash parameters for email verification and password reset
+// Handle hash parameters for email verification, password reset, and login/register navigation
 function handleHashParams() {
     const hash = window.location.hash;
     if (!hash) return;
@@ -411,8 +411,22 @@ function handleHashParams() {
     } else if (action === 'reset-password' && params.get('token')) {
         document.getElementById('reset-token').value = params.get('token');
         showAuthCard('reset-password-card');
+    } else if (action === 'login') {
+        // Show login card when coming from landing page
+        showAuthCard('login-card');
+    } else if (action === 'register') {
+        // Show register card when coming from landing page
+        showAuthCard('register-card');
     }
 }
+
+// Handle hash navigation on page load and hash changes
+function handleHashNavigation() {
+    handleHashParams();
+}
+
+// Listen for hash changes (when user clicks back/forward)
+window.addEventListener('hashchange', handleHashNavigation);
 
 // Handle user registration
 async function handleRegister(e) {

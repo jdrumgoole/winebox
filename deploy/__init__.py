@@ -25,7 +25,6 @@ from deploy.common import (
     get_droplet_ip,
     get_env_config,
     run_ssh,
-    run_ssh_script,
     upload_file,
 )
 
@@ -34,6 +33,5 @@ __all__ = [
     "get_droplet_ip",
     "get_env_config",
     "run_ssh",
-    "run_ssh_script",
     "upload_file",
 ]
