@@ -1,6 +1,8 @@
 """Pytest configuration and fixtures for WineBox tests with MongoDB."""
 
+import asyncio
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Generator
@@ -9,15 +11,74 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
-from beanie import init_beanie, PydanticObjectId
-from fastapi.testclient import TestClient
+from beanie import init_beanie
 from httpx import ASGITransport, AsyncClient
 from mongomock_motor import AsyncMongoMockClient
 
 from winebox.database import get_document_models
-from winebox.main import app
 from winebox.models import User
 from winebox.services.auth import get_password_hash, create_access_token
+
+
+# Create a test-specific app to avoid lifespan conflicts
+def create_test_app():
+    """Create a FastAPI app configured for testing (no database lifespan)."""
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse, RedirectResponse
+    from winebox import __version__
+    from winebox.config import settings
+
+    # Empty lifespan for testing - we manage the database ourselves
+    @asynccontextmanager
+    async def test_lifespan(app: FastAPI):
+        yield
+
+    test_app = FastAPI(
+        title="WineBox Test",
+        version=__version__,
+        lifespan=test_lifespan,
+    )
+
+    # Copy routes from the main app
+    from winebox.main import app as main_app
+
+    # Copy all routes
+    for route in main_app.routes:
+        test_app.routes.append(route)
+
+    # Add health check
+    @test_app.get("/health", tags=["Health"])
+    async def health_check() -> JSONResponse:
+        return JSONResponse(
+            content={
+                "status": "healthy",
+                "version": __version__,
+                "app_name": settings.app_name,
+            }
+        )
+
+    @test_app.get("/", tags=["Root"])
+    async def root() -> RedirectResponse:
+        return RedirectResponse(url="/static/index.html")
+
+    return test_app
+
+
+# Get or create test app (singleton for test session)
+_test_app = None
+
+def get_test_app():
+    """Get the test app singleton."""
+    global _test_app
+    if _test_app is None:
+        _test_app = create_test_app()
+    return _test_app
+
+
+@pytest.fixture(scope="session")
+def event_loop_policy():
+    """Use the default event loop policy."""
+    return asyncio.DefaultEventLoopPolicy()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -62,6 +123,8 @@ async def client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
     # Create auth token
     access_token = create_access_token(data={"sub": "testuser"})
 
+    # Use test app instead of main app
+    app = get_test_app()
     transport = ASGITransport(app=app)
     async with AsyncClient(
         transport=transport,
@@ -69,13 +132,6 @@ async def client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
         headers={"Authorization": f"Bearer {access_token}"}
     ) as ac:
         yield ac
-
-
-@pytest.fixture
-def sync_client() -> Generator[TestClient, None, None]:
-    """Create a synchronous test client."""
-    with TestClient(app) as client:
-        yield client
 
 
 @pytest.fixture
@@ -142,6 +198,7 @@ def mock_email_service():
 @pytest_asyncio.fixture(scope="function")
 async def unauthenticated_client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client without authentication."""
+    app = get_test_app()
     transport = ASGITransport(app=app)
     async with AsyncClient(
         transport=transport,

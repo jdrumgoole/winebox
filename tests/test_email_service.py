@@ -27,10 +27,6 @@ def mock_settings():
     return settings
 
 
-@pytest.fixture(autouse=True)
-def enable_logging(caplog):
-    """Enable logging capture for tests."""
-    caplog.set_level(logging.INFO)
 
 
 class TestConsoleEmailService:
@@ -43,9 +39,9 @@ class TestConsoleEmailService:
         assert service.sender_name == "Test App"
         assert service.frontend_url == "http://localhost:8000"
 
-    @pytest.mark.asyncio
     async def test_send_email(self, mock_settings, caplog):
         """Test sending email logs to console."""
+        caplog.set_level(logging.INFO)
         service = ConsoleEmailService(mock_settings)
 
         result = await service.send_email(
@@ -60,9 +56,9 @@ class TestConsoleEmailService:
         assert "user@example.com" in caplog.text
         assert "Test Subject" in caplog.text
 
-    @pytest.mark.asyncio
     async def test_send_verification_email(self, mock_settings, caplog):
         """Test sending verification email."""
+        caplog.set_level(logging.INFO)
         service = ConsoleEmailService(mock_settings)
 
         result = await service.send_verification_email(
@@ -74,9 +70,9 @@ class TestConsoleEmailService:
         assert "user@example.com" in caplog.text
         assert "verify" in caplog.text.lower()
 
-    @pytest.mark.asyncio
     async def test_send_password_reset_email(self, mock_settings, caplog):
         """Test sending password reset email."""
+        caplog.set_level(logging.INFO)
         service = ConsoleEmailService(mock_settings)
 
         result = await service.send_password_reset_email(
@@ -99,7 +95,6 @@ class TestSESEmailService:
         assert service.access_key_id == "test-key-id"
         assert service.secret_access_key == "test-secret-key"
 
-    @pytest.mark.asyncio
     async def test_send_email_success(self, mock_settings):
         """Test successful email send via SES."""
         service = SESEmailService(mock_settings)
@@ -123,7 +118,6 @@ class TestSESEmailService:
         assert result is True
         mock_ses_client.send_email.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_send_email_failure(self, mock_settings):
         """Test email send failure via SES."""
         service = SESEmailService(mock_settings)

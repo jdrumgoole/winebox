@@ -76,8 +76,11 @@ build-backend = "hatchling.build"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+# Exclude E2E tests by default - they use sync Playwright which conflicts with pytest-asyncio
+# Run E2E tests separately with: pytest -m e2e
+addopts = "-m 'not e2e'"
 markers = [
-    "e2e: marks tests as end-to-end tests (deselect with '-m \"not e2e\"')",
+    "e2e: marks tests as end-to-end tests (run separately with '-m e2e')",
 ]
 
 [tool.hatch.build.targets.wheel]
