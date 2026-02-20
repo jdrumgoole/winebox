@@ -22,3 +22,8 @@
   3. Create and push a git tag (e.g., `git tag -a v0.4.0 -m "message"`)
   4. Create a GitHub release with `gh release create`
   5. GitHub Actions will handle PyPI publishing automatically
+
+## Deployment
+- After every deployment, flush all web caches to ensure users see the latest build
+- Browser caches can serve stale static files (HTML, JS, CSS) even after server updates
+- When taking screenshots of deployed apps, use cache-busting query parameters (e.g., `?v=0.5.0`) or clear browser cache first

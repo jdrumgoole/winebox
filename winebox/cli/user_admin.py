@@ -12,149 +12,160 @@ Commands:
 import argparse
 import asyncio
 import sys
+from datetime import datetime, timezone
 from getpass import getpass
-from typing import Optional
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from beanie import init_beanie
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from winebox.config import settings
-from winebox.database import Base
 from winebox.models.user import User
 from winebox.services.auth import get_password_hash
 
+# Track if database is initialized (for CLI use)
+_db_initialized = False
 
-async def get_db_session() -> AsyncSession:
-    """Create a database session, ensuring tables exist."""
-    engine = create_async_engine(settings.database_url, echo=False)
 
-    # Create tables if they don't exist
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    return async_session()
+async def init_db() -> None:
+    """Initialize the database connection."""
+    global _db_initialized
+    if _db_initialized:
+        return
+    client = AsyncIOMotorClient(settings.mongodb_url)
+    db = client[settings.mongodb_database]
+    await init_beanie(database=db, document_models=[User])
+    _db_initialized = True
 
 
 async def add_user(
     email: str,
     password: str,
     is_admin: bool = False,
+    skip_db_init: bool = False,
 ) -> None:
     """Add a new user."""
-    async with await get_db_session() as db:
-        # Check if email already exists
-        result = await db.execute(select(User).where(User.email == email))
-        if result.scalar_one_or_none():
-            print(f"Error: Email '{email}' already in use.")
-            sys.exit(1)
+    if not skip_db_init:
+        await init_db()
 
-        # Create user
-        user = User(
-            email=email,
-            hashed_password=get_password_hash(password),
-            is_admin=is_admin,
-            is_active=True,
-        )
-        db.add(user)
-        await db.commit()
+    # Check if email already exists
+    existing = await User.find_one(User.email == email)
+    if existing:
+        print(f"Error: Email '{email}' already in use.")
+        sys.exit(1)
 
-        role = "admin" if is_admin else "user"
-        print(f"User '{email}' created successfully as {role}.")
+    # Create user
+    now = datetime.now(timezone.utc)
+    user = User(
+        email=email,
+        hashed_password=get_password_hash(password),
+        is_superuser=is_admin,
+        is_active=True,
+        is_verified=True,  # CLI-created users are pre-verified
+        created_at=now,
+        updated_at=now,
+    )
+    await user.insert()
+
+    role = "admin" if is_admin else "user"
+    print(f"User '{email}' created successfully as {role}.")
 
 
-async def list_users() -> None:
+async def list_users(skip_db_init: bool = False) -> None:
     """List all users."""
-    async with await get_db_session() as db:
-        result = await db.execute(select(User).order_by(User.email))
-        users = result.scalars().all()
+    if not skip_db_init:
+        await init_db()
 
-        if not users:
-            print("No users found.")
-            return
+    users = await User.find_all().sort("+email").to_list()
 
-        print(f"{'Email':<40} {'Admin':<6} {'Active':<6} {'Last Login':<20}")
-        print("-" * 80)
+    if not users:
+        print("No users found.")
+        return
 
-        for user in users:
-            last_login = user.last_login.strftime("%Y-%m-%d %H:%M") if user.last_login else "Never"
-            admin = "Yes" if user.is_admin else "No"
-            active = "Yes" if user.is_active else "No"
-            print(f"{user.email:<40} {admin:<6} {active:<6} {last_login:<20}")
+    print(f"{'Email':<40} {'Admin':<6} {'Active':<6} {'Verified':<8} {'Last Login':<20}")
+    print("-" * 90)
+
+    for user in users:
+        last_login = user.last_login.strftime("%Y-%m-%d %H:%M") if user.last_login else "Never"
+        admin = "Yes" if user.is_superuser else "No"
+        active = "Yes" if user.is_active else "No"
+        verified = "Yes" if user.is_verified else "No"
+        print(f"{user.email:<40} {admin:<6} {active:<6} {verified:<8} {last_login:<20}")
 
 
-async def disable_user(email: str) -> None:
+async def disable_user(email: str, skip_db_init: bool = False) -> None:
     """Disable a user account."""
-    async with await get_db_session() as db:
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalar_one_or_none()
+    if not skip_db_init:
+        await init_db()
 
-        if not user:
-            print(f"Error: User '{email}' not found.")
-            sys.exit(1)
+    user = await User.find_one(User.email == email)
+    if not user:
+        print(f"Error: User '{email}' not found.")
+        sys.exit(1)
 
-        if not user.is_active:
-            print(f"User '{email}' is already disabled.")
-            return
+    if not user.is_active:
+        print(f"User '{email}' is already disabled.")
+        return
 
-        user.is_active = False
-        await db.commit()
-        print(f"User '{email}' has been disabled.")
+    user.is_active = False
+    user.updated_at = datetime.now(timezone.utc)
+    await user.save()
+    print(f"User '{email}' has been disabled.")
 
 
-async def enable_user(email: str) -> None:
+async def enable_user(email: str, skip_db_init: bool = False) -> None:
     """Enable a user account."""
-    async with await get_db_session() as db:
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalar_one_or_none()
+    if not skip_db_init:
+        await init_db()
 
-        if not user:
-            print(f"Error: User '{email}' not found.")
-            sys.exit(1)
+    user = await User.find_one(User.email == email)
+    if not user:
+        print(f"Error: User '{email}' not found.")
+        sys.exit(1)
 
-        if user.is_active:
-            print(f"User '{email}' is already active.")
+    if user.is_active:
+        print(f"User '{email}' is already active.")
+        return
+
+    user.is_active = True
+    user.updated_at = datetime.now(timezone.utc)
+    await user.save()
+    print(f"User '{email}' has been enabled.")
+
+
+async def remove_user(email: str, force: bool = False, skip_db_init: bool = False) -> None:
+    """Remove a user account."""
+    if not skip_db_init:
+        await init_db()
+
+    user = await User.find_one(User.email == email)
+    if not user:
+        print(f"Error: User '{email}' not found.")
+        sys.exit(1)
+
+    if not force:
+        confirm = input(f"Are you sure you want to remove user '{email}'? [y/N]: ")
+        if confirm.lower() != "y":
+            print("Aborted.")
             return
 
-        user.is_active = True
-        await db.commit()
-        print(f"User '{email}' has been enabled.")
+    await user.delete()
+    print(f"User '{email}' has been removed.")
 
 
-async def remove_user(email: str, force: bool = False) -> None:
-    """Remove a user account."""
-    async with await get_db_session() as db:
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalar_one_or_none()
-
-        if not user:
-            print(f"Error: User '{email}' not found.")
-            sys.exit(1)
-
-        if not force:
-            confirm = input(f"Are you sure you want to remove user '{email}'? [y/N]: ")
-            if confirm.lower() != "y":
-                print("Aborted.")
-                return
-
-        await db.delete(user)
-        await db.commit()
-        print(f"User '{email}' has been removed.")
-
-
-async def change_password(email: str, password: str) -> None:
+async def change_password(email: str, password: str, skip_db_init: bool = False) -> None:
     """Change a user's password."""
-    async with await get_db_session() as db:
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalar_one_or_none()
+    if not skip_db_init:
+        await init_db()
 
-        if not user:
-            print(f"Error: User '{email}' not found.")
-            sys.exit(1)
+    user = await User.find_one(User.email == email)
+    if not user:
+        print(f"Error: User '{email}' not found.")
+        sys.exit(1)
 
-        user.hashed_password = get_password_hash(password)
-        await db.commit()
-        print(f"Password for user '{email}' has been updated.")
+    user.hashed_password = get_password_hash(password)
+    user.updated_at = datetime.now(timezone.utc)
+    await user.save()
+    print(f"Password for user '{email}' has been updated.")
 
 
 def get_password_interactive(confirm: bool = True) -> str:
