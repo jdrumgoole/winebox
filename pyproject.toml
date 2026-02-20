@@ -60,7 +60,6 @@ dev = [
     "sphinx>=7.0.0",
     "sphinx-rtd-theme>=2.0.0",
     "myst-parser>=2.0.0",
-    "mongomock-motor>=0.0.21",
 ]
 
 [project.scripts]

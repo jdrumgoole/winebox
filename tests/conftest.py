@@ -1,6 +1,8 @@
-"""Pytest configuration and fixtures for WineBox tests with MongoDB."""
+"""Pytest configuration and fixtures for WineBox tests with real MongoDB."""
 
 import asyncio
+import os
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -13,11 +15,15 @@ import pytest
 import pytest_asyncio
 from beanie import init_beanie
 from httpx import ASGITransport, AsyncClient
-from mongomock_motor import AsyncMongoMockClient
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from winebox.database import get_document_models
 from winebox.models import User
 from winebox.services.auth import get_password_hash, create_access_token
+
+
+# MongoDB connection URL for tests (can be overridden with env var)
+TEST_MONGODB_URL = os.environ.get("TEST_MONGODB_URL", "mongodb://localhost:27017")
 
 
 # Create a test-specific app to avoid lifespan conflicts
@@ -83,25 +89,30 @@ def event_loop_policy():
 
 @pytest_asyncio.fixture(scope="function")
 async def mongo_client():
-    """Create a mock MongoDB client for testing."""
-    client = AsyncMongoMockClient()
+    """Create a real MongoDB client for testing."""
+    client = AsyncIOMotorClient(TEST_MONGODB_URL)
     yield client
     client.close()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def init_test_db(mongo_client):
-    """Initialize Beanie with test database."""
-    db = mongo_client["test_winebox"]
+    """Initialize Beanie with a unique test database.
+
+    Creates a unique database for each test function and drops it after the test.
+    """
+    # Create unique database name for this test
+    db_name = f"test_winebox_{uuid.uuid4().hex[:8]}"
+    db = mongo_client[db_name]
+
     await init_beanie(
         database=db,
         document_models=get_document_models(),
     )
     yield db
 
-    # Cleanup: drop all collections
-    for name in await db.list_collection_names():
-        await db[name].drop()
+    # Cleanup: drop the entire test database
+    await mongo_client.drop_database(db_name)
 
 
 @pytest_asyncio.fixture(scope="function")
