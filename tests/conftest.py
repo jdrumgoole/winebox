@@ -89,8 +89,17 @@ def event_loop_policy():
 
 @pytest_asyncio.fixture(scope="function")
 async def mongo_client():
-    """Create a real MongoDB client for testing."""
-    client = AsyncIOMotorClient(TEST_MONGODB_URL)
+    """Create a MongoDB client for testing.
+
+    Function-scoped to avoid event loop issues with pytest-xdist.
+    Motor manages its own connection pool internally, so connections
+    are reused at the driver level even with function-scoped fixtures.
+    """
+    client = AsyncIOMotorClient(
+        TEST_MONGODB_URL,
+        maxPoolSize=10,
+        minPoolSize=1,
+    )
     yield client
     client.close()
 
@@ -100,6 +109,7 @@ async def init_test_db(mongo_client):
     """Initialize Beanie with a unique test database.
 
     Creates a unique database for each test function and drops it after the test.
+    The MongoDB client connection is reused across tests within each worker.
     """
     # Create unique database name for this test
     db_name = f"test_winebox_{uuid.uuid4().hex[:8]}"
