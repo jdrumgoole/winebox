@@ -466,3 +466,68 @@ def rebuild_droplet(
     if confirm:
         cmd += " --confirm"
     ctx.run(cmd, pty=True)
+
+
+# Production User Management Tasks
+PROD_HOST = "104.248.46.96"
+PROD_WINEBOX_ADMIN = "/opt/winebox/.venv/bin/winebox-admin"
+
+
+def _ssh_cmd(cmd: str) -> str:
+    """Build SSH command for production server."""
+    return f'ssh -o StrictHostKeyChecking=accept-new root@{PROD_HOST} "{cmd}"'
+
+
+@task(name="prod-list-users")
+def prod_list_users(ctx: Context) -> None:
+    """List all users on the production server."""
+    ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} list"), pty=True)
+
+
+@task(name="prod-add-user")
+def prod_add_user(ctx: Context, email: str, password: str, admin: bool = False) -> None:
+    """Add a user on the production server.
+
+    Args:
+        ctx: Invoke context
+        email: Email for the new user
+        password: Password for the new user
+        admin: Make user an admin
+    """
+    cmd = f"{PROD_WINEBOX_ADMIN} add {email} --password {password}"
+    if admin:
+        cmd += " --admin"
+    ctx.run(_ssh_cmd(cmd), pty=True)
+
+
+@task(name="prod-remove-user")
+def prod_remove_user(ctx: Context, email: str) -> None:
+    """Remove a user from the production server.
+
+    Args:
+        ctx: Invoke context
+        email: Email of user to remove
+    """
+    ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} remove {email} --force"), pty=True)
+
+
+@task(name="prod-disable-user")
+def prod_disable_user(ctx: Context, email: str) -> None:
+    """Disable a user on the production server.
+
+    Args:
+        ctx: Invoke context
+        email: Email of user to disable
+    """
+    ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} disable {email}"), pty=True)
+
+
+@task(name="prod-enable-user")
+def prod_enable_user(ctx: Context, email: str) -> None:
+    """Enable a user on the production server.
+
+    Args:
+        ctx: Invoke context
+        email: Email of user to enable
+    """
+    ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} enable {email}"), pty=True)
