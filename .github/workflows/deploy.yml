@@ -26,18 +26,26 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             echo "Upgrading WineBox..."
-            sudo -u winebox /opt/winebox/.venv/bin/pip install winebox --upgrade
+            sudo -u winebox /opt/winebox/.venv/bin/pip install winebox --upgrade --no-cache-dir
 
             echo "Restarting service..."
             systemctl restart winebox
 
             echo "Waiting for service to start..."
-            sleep 3
+            sleep 5
 
             echo "Checking service status..."
             systemctl is-active winebox
 
-            echo "Health check..."
-            curl -sf http://localhost:8000/health || exit 1
-
-            echo "Deployment complete!"
+            echo "Health check (with retry)..."
+            for i in 1 2 3 4 5; do
+              if curl -sf http://localhost:8000/health; then
+                echo ""
+                echo "Deployment complete!"
+                exit 0
+              fi
+              echo "Attempt $i failed, retrying in 2s..."
+              sleep 2
+            done
+            echo "Health check failed after 5 attempts"
+            exit 1
