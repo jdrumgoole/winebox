@@ -26,7 +26,8 @@ def get_config_search_paths() -> list[Path]:
     Returns paths in priority order (first found wins):
     1. ./config.toml (project root - for development)
     2. ~/.config/winebox/config.toml (user config)
-    3. /etc/winebox/config.toml (system config)
+    3. /opt/winebox/config.toml (production install)
+    4. /etc/winebox/config.toml (system config)
     """
     paths = []
 
@@ -36,6 +37,9 @@ def get_config_search_paths() -> list[Path]:
     # User config directory
     user_config = Path.home() / ".config" / "winebox" / "config.toml"
     paths.append(user_config)
+
+    # Production install directory
+    paths.append(Path("/opt/winebox/config.toml"))
 
     # System config (Linux FHS)
     system_config = Path("/etc/winebox/config.toml")
@@ -50,7 +54,8 @@ def get_secrets_search_paths() -> list[Path]:
     Returns paths in priority order (first found wins):
     1. ./secrets.env (project root - for development)
     2. ~/.config/winebox/secrets.env (user secrets)
-    3. /etc/winebox/secrets.env (system secrets)
+    3. /opt/winebox/secrets.env (production install)
+    4. /etc/winebox/secrets.env (system secrets)
     """
     paths = []
 
@@ -60,6 +65,9 @@ def get_secrets_search_paths() -> list[Path]:
     # User config directory
     user_secrets = Path.home() / ".config" / "winebox" / "secrets.env"
     paths.append(user_secrets)
+
+    # Production install directory
+    paths.append(Path("/opt/winebox/secrets.env"))
 
     # System config (Linux FHS)
     system_secrets = Path("/etc/winebox/secrets.env")
