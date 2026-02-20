@@ -280,12 +280,21 @@ h3 {
 }
 
 .form-group input[type="text"],
-.form-group input[type="email"],
 .form-group input[type="password"],
 .form-group input[type="number"],
 .form-group input[type="date"],
 .form-group select,
 .form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+/* Email input - separate rule for browser compatibility */
+.form-group input[type="email"] {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid var(--border-color);
