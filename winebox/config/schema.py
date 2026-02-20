@@ -71,7 +71,7 @@ class EmailConfig(BaseModel):
     """Email configuration."""
 
     backend: Literal["console", "ses"] = "console"
-    from_address: str = "noreply@winebox.app"
+    from_address: str = "support@winebox.app"
     from_name: str = "WineBox"
     frontend_url: str = "http://localhost:8000"
     aws_region: str = "eu-west-1"

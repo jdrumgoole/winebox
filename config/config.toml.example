@@ -76,7 +76,7 @@
 # backend = "console"
 
 # From address for emails
-# from_address = "noreply@winebox.app"
+# from_address = "support@winebox.app"
 
 # From name for emails
 # from_name = "WineBox"

@@ -127,7 +127,7 @@ auth_rate_limit_per_minute = 30
 backend = "console"
 
 # From address for emails
-from_address = "noreply@winebox.app"
+from_address = "support@winebox.app"
 
 # From name for emails
 from_name = "WineBox"
@@ -250,7 +250,7 @@ Email sending configuration.
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `backend` | string | `console` | `console` or `ses` |
-| `from_address` | string | `noreply@winebox.app` | Sender address |
+| `from_address` | string | `support@winebox.app` | Sender address |
 | `from_name` | string | `WineBox` | Sender name |
 | `frontend_url` | string | `http://localhost:8000` | URL for email links |
 | `aws_region` | string | `eu-west-1` | AWS SES region |
@@ -304,7 +304,7 @@ email_verification_required = true
 
 [email]
 backend = "ses"
-from_address = "noreply@winebox.app"
+from_address = "support@winebox.app"
 frontend_url = "https://winebox.app"
 aws_region = "eu-west-1"
 ```

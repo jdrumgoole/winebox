@@ -78,7 +78,7 @@ class TestSchemaDefaults:
         """Test EmailConfig has correct defaults."""
         config = EmailConfig()
         assert config.backend == "console"
-        assert config.from_address == "noreply@winebox.app"
+        assert config.from_address == "support@winebox.app"
         assert config.from_name == "WineBox"
         assert config.frontend_url == "http://localhost:8000"
         assert config.aws_region == "eu-west-1"
@@ -109,18 +109,20 @@ class TestConfigSearchPaths:
     def test_config_search_paths_order(self):
         """Test config search paths are in correct priority order."""
         paths = get_config_search_paths()
-        assert len(paths) == 3
+        assert len(paths) == 4
         assert paths[0] == Path.cwd() / "config.toml"
         assert paths[1] == Path.home() / ".config" / "winebox" / "config.toml"
-        assert paths[2] == Path("/etc/winebox/config.toml")
+        assert paths[2] == Path("/opt/winebox/config.toml")
+        assert paths[3] == Path("/etc/winebox/config.toml")
 
     def test_secrets_search_paths_order(self):
         """Test secrets search paths are in correct priority order."""
         paths = get_secrets_search_paths()
-        assert len(paths) == 3
+        assert len(paths) == 4
         assert paths[0] == Path.cwd() / "secrets.env"
         assert paths[1] == Path.home() / ".config" / "winebox" / "secrets.env"
-        assert paths[2] == Path("/etc/winebox/secrets.env")
+        assert paths[2] == Path("/opt/winebox/secrets.env")
+        assert paths[3] == Path("/etc/winebox/secrets.env")
 
 
 class TestTomlLoading:
