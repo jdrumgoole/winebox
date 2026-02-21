@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WineBox Brand Kit</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Cormorant Garamond', Georgia, serif; color: #2A1520; background: #FAF7F2; }
+
+  .header {
+    text-align: center; padding: 60px 40px 40px;
+    border-bottom: 1px solid #E8DDD0;
+  }
+  .header h1 { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 700; color: #5C0A2D; }
+  .header p { font-size: 18px; color: #8B1A4A; opacity: 0.6; margin-top: 8px; letter-spacing: 3px; font-style: italic; }
+
+  section { max-width: 960px; margin: 0 auto; padding: 50px 30px; }
+  section + section { border-top: 1px solid #E8DDD0; }
+  h2 { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; color: #5C0A2D; margin-bottom: 24px; }
+  h3 { font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: #999; margin-bottom: 12px; font-weight: 400; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+  .card {
+    border: 1px solid #E8DDD0; border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .card-preview { width: 100%; display: flex; align-items: center; justify-content: center; padding: 30px; min-height: 140px; }
+  .card-preview.light { background: #fff; }
+  .card-preview.dark { background: #1A0A10; }
+  .card-preview.transparent { background: repeating-conic-gradient(#e8e8e8 0% 25%, #fff 0% 50%) 50%/20px 20px; }
+  .card-label { padding: 10px 16px; font-size: 13px; color: #888; width: 100%; text-align: center; border-top: 1px solid #E8DDD0; background: #FDFBF8; letter-spacing: 1px; }
+  .card-preview img { max-width: 90%; max-height: 100px; object-fit: contain; }
+  .card-preview.icon img { max-height: 80px; }
+
+  /* Colors section */
+  .swatch-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .swatch {
+    width: 100px; height: 100px; border-radius: 10px; display: flex; align-items: flex-end;
+    padding: 8px; font-size: 12px; color: white; font-family: monospace;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  /* Typography section */
+  .type-sample { margin-bottom: 20px; }
+  .type-sample .name { font-size: 13px; color: #999; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+  .type-playfair { font-family: 'Playfair Display', serif; font-size: 36px; color: #5C0A2D; }
+  .type-cormorant { font-family: 'Cormorant Garamond', serif; font-size: 28px; color: #5C0A2D; font-style: italic; }
+
+  /* Sizes section */
+  .sizes-row { display: flex; align-items: end; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+  .size-item { text-align: center; }
+  .size-item img { display: block; margin: 0 auto 6px; }
+  .size-item span { font-size: 11px; color: #999; font-family: monospace; }
+
+  .note { font-size: 14px; color: #888; margin-top: 16px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>WineBox Brand Kit</h1>
+  <p>Logo &amp; Identity Guidelines</p>
+</div>
+
+<!-- PRIMARY LOGOS -->
+<section>
+  <h2>Primary Logos</h2>
+  <div class="grid">
+    <div class="card">
+      <div class="card-preview light"><img src="logo-on-white-2x.png" alt="Logo on white"></div>
+      <div class="card-label">Light Background</div>
+    </div>
+    <div class="card">
+      <div class="card-preview dark"><img src="logo-on-dark-2x.png" alt="Logo on dark"></div>
+      <div class="card-label">Dark Background</div>
+    </div>
+  </div>
+</section>
+
+<!-- TRANSPARENT LOGOS -->
+<section>
+  <h2>Transparent Logos</h2>
+  <div class="grid">
+    <div class="card">
+      <div class="card-preview transparent"><img src="logo-full-light-2x.png" alt="Full logo light transparent"></div>
+      <div class="card-label">Full — Light (transparent)</div>
+    </div>
+    <div class="card">
+      <div class="card-preview transparent"><img src="logo-full-dark-2x.png" alt="Full logo dark transparent"></div>
+      <div class="card-label">Full — Dark (transparent)</div>
+    </div>
+    <div class="card">
+      <div class="card-preview transparent"><img src="logo-compact-light-2x.png" alt="Compact light transparent"></div>
+      <div class="card-label">Compact — Light (transparent)</div>
+    </div>
+    <div class="card">
+      <div class="card-preview transparent"><img src="logo-compact-dark-2x.png" alt="Compact dark transparent"></div>
+      <div class="card-label">Compact — Dark (transparent)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ICON / APP ICON -->
+<section>
+  <h2>Icons &amp; App Icons</h2>
+  <div class="grid">
+    <div class="card">
+      <div class="card-preview transparent icon"><img src="icon-512.png" alt="Icon transparent"></div>
+      <div class="card-label">Icon — Transparent</div>
+    </div>
+    <div class="card">
+      <div class="card-preview transparent icon"><img src="icon-dark-512.png" alt="Icon dark transparent"></div>
+      <div class="card-label">Icon — Dark Variant (transparent)</div>
+    </div>
+    <div class="card">
+      <div class="card-preview light icon"><img src="icon-on-white-512.png" alt="App icon white"></div>
+      <div class="card-label">App Icon — Light</div>
+    </div>
+    <div class="card">
+      <div class="card-preview dark icon"><img src="icon-on-dark-512.png" alt="App icon dark"></div>
+      <div class="card-label">App Icon — Dark</div>
+    </div>
+  </div>
+</section>
+
+<!-- ICON SIZES -->
+<section>
+  <h2>Icon Sizes</h2>
+  <p class="note">Provided at standard sizes for favicons, tab bars, app icons, and display.</p>
+  <div class="sizes-row">
+    <div class="size-item"><img src="icon-16.png" width="16" height="16" alt="16px"><span>16px</span></div>
+    <div class="size-item"><img src="icon-32.png" width="32" height="32" alt="32px"><span>32px</span></div>
+    <div class="size-item"><img src="icon-64.png" width="64" height="64" alt="64px"><span>64px</span></div>
+    <div class="size-item"><img src="icon-128.png" width="128" height="128" alt="128px"><span>128px</span></div>
+    <div class="size-item"><img src="icon-256.png" width="256" height="256" alt="256px"><span>256px</span></div>
+  </div>
+</section>
+
+<!-- COLORS -->
+<section>
+  <h2>Brand Colours</h2>
+  <h3>Primary</h3>
+  <div class="swatch-row">
+    <div class="swatch" style="background:#5C0A2D;">#5C0A2D<br>Wine Dark</div>
+    <div class="swatch" style="background:#8B1A4A;">#8B1A4A<br>Burgundy</div>
+    <div class="swatch" style="background:#B82860;">#B82860<br>Bright Wine</div>
+  </div>
+  <h3>Accent</h3>
+  <div class="swatch-row">
+    <div class="swatch" style="background:#C49A3C;">#C49A3C<br>Gold</div>
+    <div class="swatch" style="background:#F0D78C; color:#5C0A2D;">#F0D78C<br>Light Gold</div>
+  </div>
+  <h3>Wood / Case</h3>
+  <div class="swatch-row">
+    <div class="swatch" style="background:#B8956A;">#B8956A<br>Tan Wood</div>
+    <div class="swatch" style="background:#9A7B54;">#9A7B54<br>Wood Grain</div>
+    <div class="swatch" style="background:#A08060;">#A08060<br>Dark Wood</div>
+  </div>
+  <h3>Backgrounds</h3>
+  <div class="swatch-row">
+    <div class="swatch" style="background:#FAF7F2; color:#5C0A2D; border:1px solid #E8DDD0;">#FAF7F2<br>Cream</div>
+    <div class="swatch" style="background:#FFFFFF; color:#5C0A2D; border:1px solid #E8DDD0;">#FFFFFF<br>White</div>
+    <div class="swatch" style="background:#1A0A10;">#1A0A10<br>Dark</div>
+  </div>
+</section>
+
+<!-- TYPOGRAPHY -->
+<section>
+  <h2>Typography</h2>
+  <div class="type-sample">
+    <div class="name">Primary — Playfair Display</div>
+    <div class="type-playfair"><span style="font-weight:700">Wine</span><span style="font-weight:400; color:#C49A3C">Box</span></div>
+  </div>
+  <div class="type-sample">
+    <div class="name">Secondary — Cormorant Garamond</div>
+    <div class="type-cormorant">Your Cellar, Curated</div>
+  </div>
+  <p class="note">Fallback stack: Georgia, 'Times New Roman', serif</p>
+</section>
+
+<!-- FILE INDEX -->
+<section>
+  <h2>File Index</h2>
+  <h3>SVG (Vector)</h3>
+  <p class="note">
+    icon-transparent.svg · icon-dark.svg · logo-full-light.svg · logo-full-dark.svg · logo-compact-light.svg · logo-compact-dark.svg · logo-on-white.svg · logo-on-dark.svg · icon-on-white.svg · icon-on-dark.svg
+  </p>
+  <h3 style="margin-top:16px">PNG (Raster)</h3>
+  <p class="note">
+    Icons: 16px · 32px · 64px · 128px · 256px · 512px (light + dark)<br>
+    Full logos: 1x + 2x (light + dark, transparent)<br>
+    Compact logos: 1x + 2x (light + dark, transparent)<br>
+    On-background: white + dark at 2x<br>
+    App icons: 512px on white + dark<br>
+    favicon.png
+  </p>
+</section>
+
+</body>
+</html>
