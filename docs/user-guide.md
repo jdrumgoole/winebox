@@ -243,7 +243,7 @@ winebox/
 │   ├── winebox.service   # systemd service
 │   └── nginx-winebox.conf # nginx config
 ├── scripts/              # Utility scripts
-│   └── import_xwines.py  # X-Wines dataset importer
+│   └── seed_reference_data.py  # Reference data seeding
 ├── tests/                # Test suite
 ├── docs/                 # Sphinx documentation
 ├── data/                 # Images and local data
@@ -292,7 +292,7 @@ The wine autocomplete feature requires the X-Wines dataset. This is only availab
 For development with 100 sample wines:
 
 ```bash
-uv run python -m scripts.import_xwines --version test
+uv run python deploy/import_xwines_mongo.py --version test
 ```
 
 ### Full Dataset (100K+ Wines)
@@ -312,7 +312,7 @@ cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_100K_wines.csv data/
 cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_21M_ratings.csv data/xwines/
 
 # Import (takes a few minutes)
-uv run python -m scripts.import_xwines --version full --force
+uv run python deploy/import_xwines_mongo.py --version full --force
 ```
 
 ### Verify Import

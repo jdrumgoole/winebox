@@ -41,8 +41,8 @@ debug = false
 enforce_https = true
 
 [database]
-mongodb_url = "mongodb://localhost:27017"
 mongodb_database = "winebox"
+# mongodb_url is set via WINEBOX_MONGODB_URL in secrets.env
 
 [storage]
 data_dir = "/opt/winebox/data"
@@ -56,12 +56,13 @@ tesseract_lang = "eng"
 [auth]
 enabled = true
 registration_enabled = true
-email_verification_required = false
+email_verification_required = true
 
 [email]
-backend = "console"
+backend = "ses"
 from_address = "support@winebox.app"
 frontend_url = "https://{domain}"
+aws_region = "eu-west-1"
 """
 
 SECRETS_ENV_TEMPLATE = """\
@@ -119,40 +120,6 @@ def install_packages(host: str, user: str) -> None:
     run_ssh(host, user, f"DEBIAN_FRONTEND=noninteractive apt-get install -y {packages}")
 
 
-def install_mongodb(host: str, user: str) -> None:
-    """Install MongoDB 7.0."""
-    step("Installing MongoDB 7.0")
-
-    # Check if MongoDB repo is already configured
-    result = run_ssh(
-        host, user,
-        "test -f /usr/share/keyrings/mongodb-server-7.0.gpg && echo 'exists'",
-        check=False, capture=True
-    )
-
-    if "exists" not in result:
-        # Add MongoDB GPG key
-        run_ssh(
-            host, user,
-            "curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | "
-            "gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor"
-        )
-
-        # Add MongoDB repository
-        repo_line = (
-            "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] "
-            "https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse"
-        )
-        run_ssh(host, user, f"echo '{repo_line}' | tee /etc/apt/sources.list.d/mongodb-org-7.0.list")
-        run_ssh(host, user, "apt-get update")
-
-    # Install MongoDB
-    run_ssh(host, user, "DEBIAN_FRONTEND=noninteractive apt-get install -y mongodb-org")
-    run_ssh(host, user, "systemctl enable mongod")
-    run_ssh(host, user, "systemctl start mongod")
-    print("MongoDB installed and started")
-
-
 def install_uv(host: str, user: str) -> None:
     """Install uv package manager."""
     step("Installing uv package manager")
@@ -200,13 +167,23 @@ def create_virtualenv(host: str, user: str) -> None:
     """Create Python virtual environment and install winebox."""
     step("Creating virtual environment")
 
-    # Create venv as winebox user
-    # UV_NO_CONFIG=1 prevents uv from trying to read /root/uv.toml
-    run_ssh(
+    # Check if venv already exists
+    result = run_ssh(
         host, user,
-        'su -s /bin/bash winebox -c "HOME=/opt/winebox UV_NO_CONFIG=1 /usr/local/bin/uv venv /opt/winebox/.venv"'
+        "test -d /opt/winebox/.venv && echo 'exists'",
+        check=False, capture=True,
     )
-    print("Virtual environment created")
+
+    if "exists" in result:
+        print("Virtual environment already exists, skipping creation")
+    else:
+        # Create venv as winebox user
+        # UV_NO_CONFIG=1 prevents uv from trying to read /root/uv.toml
+        run_ssh(
+            host, user,
+            'su -s /bin/bash winebox -c "HOME=/opt/winebox UV_NO_CONFIG=1 /usr/local/bin/uv venv /opt/winebox/.venv"'
+        )
+        print("Virtual environment created")
 
     # Install pip and winebox
     step("Installing winebox from PyPI")
@@ -380,7 +357,6 @@ def setup(host: str, user: str, domain: str) -> None:
     # Run setup steps
     update_system(host, user)
     install_packages(host, user)
-    install_mongodb(host, user)
     install_uv(host, user)
     create_winebox_user(host, user)
     setup_directories(host, user)

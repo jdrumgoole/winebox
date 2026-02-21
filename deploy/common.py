@@ -241,6 +241,50 @@ class DigitalOceanAPI:
         response.raise_for_status()
         return response.json()["domain_record"]
 
+    def list_firewalls(self) -> list[dict]:
+        """List all cloud firewalls."""
+        response = requests.get(
+            f"{self.BASE_URL}/firewalls",
+            headers=self.headers,
+        )
+        response.raise_for_status()
+        return response.json()["firewalls"]
+
+    def create_firewall(self, data: dict) -> dict:
+        """Create a cloud firewall.
+
+        Args:
+            data: Firewall configuration dict
+
+        Returns:
+            Created firewall data
+        """
+        response = requests.post(
+            f"{self.BASE_URL}/firewalls",
+            headers=self.headers,
+            json=data,
+        )
+        response.raise_for_status()
+        return response.json()["firewall"]
+
+    def update_firewall(self, firewall_id: str, data: dict) -> dict:
+        """Update a cloud firewall.
+
+        Args:
+            firewall_id: Firewall ID
+            data: Updated firewall configuration
+
+        Returns:
+            Updated firewall data
+        """
+        response = requests.put(
+            f"{self.BASE_URL}/firewalls/{firewall_id}",
+            headers=self.headers,
+            json=data,
+        )
+        response.raise_for_status()
+        return response.json()["firewall"]
+
 
 def get_droplet_ip(token: str, droplet_name: str) -> str | None:
     """Get droplet IP address from Digital Ocean API.
@@ -344,6 +388,7 @@ def upload_file(host: str, user: str, local_path: Path, remote_path: str) -> Non
 SYNCABLE_SECRETS = [
     "WINEBOX_ANTHROPIC_API_KEY",
     "WINEBOX_SECRET_KEY",
+    "WINEBOX_MONGODB_URL",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_REGION",
@@ -351,7 +396,6 @@ SYNCABLE_SECRETS = [
 
 # Secrets that should NEVER be synced (production-specific)
 NEVER_SYNC = [
-    "WINEBOX_MONGODB_URL",
     "WINEBOX_DROPLET_IP",
     "WINEBOX_DO_TOKEN",
 ]

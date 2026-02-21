@@ -23,13 +23,34 @@ Environment variables (in .env):
 """
 
 import argparse
+from pathlib import Path
 
-from deploy.common import get_env_config, resolve_host, run_ssh
+from deploy.common import get_env_config, resolve_host, run_ssh, upload_file
+
+
+# Path to the MongoDB import script (sits alongside this file)
+IMPORT_SCRIPT = Path(__file__).parent / "import_xwines_mongo.py"
+
+# Remote path where the import script gets uploaded
+REMOTE_IMPORT_SCRIPT = "/opt/winebox/import_xwines.py"
 
 
 # =============================================================================
 # X-Wines Deployment
 # =============================================================================
+
+def _upload_import_script(host: str, user: str) -> None:
+    """Upload the MongoDB import script to the server.
+
+    Args:
+        host: Droplet IP address
+        user: SSH username
+    """
+    upload_file(host, user, IMPORT_SCRIPT, "/tmp/import_xwines.py")
+    run_ssh(host, user, f"mv /tmp/import_xwines.py {REMOTE_IMPORT_SCRIPT}")
+    run_ssh(host, user, f"chown winebox:winebox {REMOTE_IMPORT_SCRIPT}")
+    run_ssh(host, user, f"chmod 755 {REMOTE_IMPORT_SCRIPT}")
+
 
 def deploy_xwines(
     host: str,
@@ -48,43 +69,65 @@ def deploy_xwines(
     print(f"Deploying X-Wines dataset ({version}) to {host}...")
     print("=" * 50)
 
+    # Upload import script first (always, to pick up any changes)
+    print("\nUploading import script...")
+    if not dry_run:
+        _upload_import_script(host, user)
+
+    import_cmd = (
+        f"sudo -u winebox /opt/winebox/.venv/bin/python "
+        f"{REMOTE_IMPORT_SCRIPT} --version {version} --force"
+    )
+
     if version == "test":
         print("\nUsing test dataset (100 wines)")
         steps = [
-            ("Importing test dataset",
-             "sudo -u winebox /opt/winebox/.venv/bin/python -m scripts.import_xwines --version test --force"),
+            ("Importing test dataset", import_cmd),
         ]
     else:
         print("\nUsing full dataset (100K+ wines)")
-        print("This will download ~500MB and may take several minutes.\n")
 
-        steps = [
-            # Install gdown for Google Drive downloads
-            ("Installing gdown",
-             "sudo -u winebox /opt/winebox/.venv/bin/pip install gdown"),
+        # Check if CSVs already exist on droplet (cached from previous run)
+        result = run_ssh(
+            host, user,
+            "ls /opt/winebox/data/xwines/XWines_Full_*.csv 2>/dev/null | wc -l",
+            check=False, capture=True,
+        )
+        cached = int(result.strip()) > 0 if result.strip().isdigit() else False
 
-            # Create xwines directory
-            ("Creating data directory",
-             "sudo -u winebox mkdir -p /opt/winebox/data/xwines"),
+        if cached:
+            print("Using cached dataset (CSVs already on droplet)\n")
+            steps = [
+                ("Importing into MongoDB (this may take several minutes)", import_cmd),
+            ]
+        else:
+            print("This will download ~500MB and may take several minutes.\n")
+            steps = [
+                # Install gdown for Google Drive downloads
+                ("Installing gdown",
+                 "sudo -u winebox /opt/winebox/.venv/bin/pip install gdown"),
 
-            # Download dataset from Google Drive
-            ("Downloading X-Wines dataset (this may take a while)",
-             'sudo -u winebox bash -c "cd /opt/winebox && '
-             '.venv/bin/gdown --folder \\"https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMVx5ELA61LPfGfuu_?usp=sharing\\" '
-             '-O data/xwines/"'),
+                # Create xwines directory
+                ("Creating data directory",
+                 "sudo -u winebox mkdir -p /opt/winebox/data/xwines"),
 
-            # Copy CSV files to expected location
-            ("Copying CSV files",
-             "sudo -u winebox bash -c 'cp /opt/winebox/data/xwines/X-Wines_Official_Repository/last/XWines_Full_*.csv /opt/winebox/data/xwines/'"),
+                # Download dataset from Google Drive
+                ("Downloading X-Wines dataset (this may take a while)",
+                 'sudo -u winebox bash -c "cd /opt/winebox && '
+                 '.venv/bin/gdown --folder \\"https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMVx5ELA61LPfGfuu_?usp=sharing\\" '
+                 '-O data/xwines/"'),
 
-            # Import into MongoDB
-            ("Importing into MongoDB (this may take several minutes)",
-             "sudo -u winebox /opt/winebox/.venv/bin/python -m scripts.import_xwines --version full --force"),
+                # Copy CSV files to expected location
+                ("Copying CSV files",
+                 "sudo -u winebox bash -c 'cp /opt/winebox/data/xwines/X-Wines_Official_Repository/last/XWines_Full_*.csv /opt/winebox/data/xwines/'"),
 
-            # Clean up downloaded files (keep CSVs)
-            ("Cleaning up",
-             "sudo -u winebox rm -rf /opt/winebox/data/xwines/X-Wines_Official_Repository"),
-        ]
+                # Import into MongoDB
+                ("Importing into MongoDB (this may take several minutes)", import_cmd),
+
+                # Clean up downloaded files (keep CSVs)
+                ("Cleaning up",
+                 "sudo -u winebox rm -rf /opt/winebox/data/xwines/X-Wines_Official_Repository"),
+            ]
 
     total_steps = len(steps)
     for i, (description, command) in enumerate(steps, 1):

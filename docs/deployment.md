@@ -7,12 +7,12 @@ This guide covers deploying WineBox to a production server using Digital Ocean.
 WineBox uses a standard production stack:
 
 ```
-Internet → nginx (HTTPS) → uvicorn (Python) → MongoDB
+Internet → nginx (HTTPS) → uvicorn (Python) → MongoDB Atlas
 ```
 
 - **nginx**: Reverse proxy with SSL termination
 - **uvicorn**: ASGI server running FastAPI
-- **MongoDB**: Document database
+- **MongoDB Atlas**: Cloud-hosted document database
 - **systemd**: Process management
 
 ## Prerequisites
@@ -20,8 +20,55 @@ Internet → nginx (HTTPS) → uvicorn (Python) → MongoDB
 - Digital Ocean account
 - Domain name (e.g., `winebox.app`)
 - Local development environment with WineBox installed
+- MongoDB Atlas cluster (connection string in `.env`)
 
-## Quick Deployment
+## One-Command Deployment
+
+The recommended way to set up a fresh droplet is with `initialise-droplet`, which
+runs all steps in sequence:
+
+```bash
+# Full initialisation (setup + DNS + firewall + SSL + deploy + X-Wines)
+uv run python -m invoke initialise-droplet
+
+# Preview without making changes
+uv run python -m invoke initialise-droplet --dry-run
+
+# Skip X-Wines dataset import
+uv run python -m invoke initialise-droplet --skip-xwines
+
+# Specify a particular version
+uv run python -m invoke initialise-droplet --version 0.5.6
+```
+
+This runs the following steps automatically:
+
+1. **Server setup** — installs packages, creates user/directories, uploads configs
+2. **Cloud firewall** — ensures ports 22/80/443 are open via DO API
+3. **DNS configuration** — creates A records for `@`, `www`, `booze` on `winebox.app`
+4. **DNS propagation** — waits until all domains resolve to the droplet IP
+5. **SSL certificates** — obtains Let's Encrypt certs via certbot
+6. **Start nginx** — starts the reverse proxy
+7. **Application deployment** — installs WineBox from PyPI, syncs secrets, starts service
+8. **X-Wines import** — imports the wine dataset (skippable with `--skip-xwines`)
+
+### Required Environment Variables
+
+Set these in your local `.env` file before running:
+
+```bash
+WINEBOX_DO_TOKEN=your-digital-ocean-api-token
+WINEBOX_DROPLET_IP=your-droplet-ip
+WINEBOX_MONGODB_URL=mongodb+srv://user:pass@cluster.mongodb.net
+WINEBOX_ANTHROPIC_API_KEY=sk-ant-...
+WINEBOX_SECRET_KEY=your-secret-key
+AWS_ACCESS_KEY_ID=AKIA...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+## Step-by-Step Deployment
+
+If you prefer to run each step individually:
 
 ### 1. Initial Server Setup
 
@@ -31,7 +78,7 @@ Run the setup script on a fresh Ubuntu 22.04/24.04 droplet:
 # Set your droplet IP
 export WINEBOX_DROPLET_IP=your-droplet-ip
 
-# Run setup (installs MongoDB, nginx, creates directories)
+# Run setup (installs nginx, creates directories)
 uv run python -m invoke deploy-setup --host $WINEBOX_DROPLET_IP
 
 # Or run directly:
@@ -39,7 +86,6 @@ uv run python -m deploy.setup --host $WINEBOX_DROPLET_IP
 ```
 
 This installs:
-- MongoDB 7.0
 - nginx with SSL support
 - Tesseract OCR
 - Python with uv package manager
@@ -57,6 +103,7 @@ uv run python -m invoke deploy --setup-dns
 Or manually add A records:
 - `@` → `<droplet-ip>`
 - `www` → `<droplet-ip>`
+- `booze` → `<droplet-ip>`
 
 ### 3. Deploy Application
 
@@ -77,6 +124,7 @@ After DNS propagates (5-10 minutes):
 
 ```bash
 ssh root@<droplet-ip> "certbot --nginx -d winebox.app -d www.winebox.app"
+ssh root@<droplet-ip> "certbot --nginx -d booze.winebox.app"
 ```
 
 ### 5. Create Admin User
@@ -103,13 +151,33 @@ The `deploy/` directory is a Python module with shared utilities and deployment 
 
 ```
 deploy/
-├── __init__.py    # Package exports
-├── common.py      # Shared utilities (SSH, DO API, secrets)
-├── app.py         # Application deployment
-├── setup.py       # Initial server setup
-├── xwines.py      # X-Wines dataset deployment
+├── __init__.py        # Package exports
+├── common.py          # Shared utilities (SSH, DO API, secrets)
+├── app.py             # Application deployment
+├── setup.py           # Initial server setup
+├── initialise.py      # Full droplet initialisation
+├── xwines.py          # X-Wines dataset deployment
 ├── winebox.service    # systemd service file
 └── nginx-winebox.conf # nginx configuration
+```
+
+### deploy.initialise
+
+Full droplet initialisation. Combines all steps into a single command.
+
+```bash
+# Via invoke task
+uv run python -m invoke initialise-droplet [options]
+
+# Or directly
+uv run python -m deploy.initialise [options]
+
+Options:
+  --host TEXT          Droplet IP (auto-discovered if not set)
+  --domain TEXT        App domain (default: booze.winebox.app)
+  --version TEXT       Package version (default: latest)
+  --skip-xwines       Skip X-Wines dataset import
+  --dry-run            Preview without applying
 ```
 
 ### deploy.setup
@@ -167,6 +235,8 @@ Actions:
 ### deploy.xwines
 
 Deploy the X-Wines dataset for wine autocomplete. Run once after setup.
+Supports download caching — if CSVs already exist on the droplet from a
+previous run, the download step is skipped automatically.
 
 ```bash
 # Via invoke task
@@ -183,10 +253,28 @@ Options:
 ```
 
 Actions:
-1. Installs gdown for Google Drive downloads
-2. Downloads X-Wines dataset (~500MB for full)
+1. Checks for cached CSVs on the droplet
+2. If not cached: installs gdown, downloads X-Wines dataset (~500MB)
 3. Imports wines into MongoDB
 4. Cleans up temporary files
+
+## Database
+
+### MongoDB Atlas
+
+WineBox uses MongoDB Atlas as its cloud database. The connection string is
+stored in `WINEBOX_MONGODB_URL` in your local `.env` file and synced to
+production `secrets.env` on deploy.
+
+The `config.toml` on the server only sets the database name:
+
+```toml
+[database]
+mongodb_database = "winebox"
+# mongodb_url is set via WINEBOX_MONGODB_URL in secrets.env
+```
+
+The environment variable `WINEBOX_MONGODB_URL` overrides any URL in config.toml.
 
 ## Configuration
 
@@ -201,6 +289,9 @@ WINEBOX_DO_TOKEN=your-digital-ocean-api-token
 # Optional: Override droplet lookup
 WINEBOX_DROPLET_IP=your-droplet-ip
 WINEBOX_DROPLET_NAME=winebox-droplet
+
+# MongoDB Atlas connection string
+WINEBOX_MONGODB_URL=mongodb+srv://user:pass@cluster.mongodb.net
 
 # Secrets to sync to production
 WINEBOX_ANTHROPIC_API_KEY=sk-ant-...
@@ -221,22 +312,24 @@ workers = 2
 enforce_https = true
 
 [database]
-mongodb_url = "mongodb://localhost:27017"
 mongodb_database = "winebox"
+# mongodb_url is set via WINEBOX_MONGODB_URL in secrets.env
 
 [storage]
 data_dir = "/opt/winebox/data"
 log_dir = "/opt/winebox/logs"
 
 [email]
-backend = "console"
-frontend_url = "https://winebox.app"
+backend = "ses"
+from_address = "support@winebox.app"
+frontend_url = "https://booze.winebox.app"
 ```
 
 **`/opt/winebox/secrets.env`**:
 ```bash
 WINEBOX_SECRET_KEY=<auto-generated>
 WINEBOX_ANTHROPIC_API_KEY=<synced-from-local>
+WINEBOX_MONGODB_URL=<synced-from-local>
 AWS_ACCESS_KEY_ID=<synced-from-local>
 AWS_SECRET_ACCESS_KEY=<synced-from-local>
 ```
@@ -272,19 +365,6 @@ sudo systemctl reload nginx
 sudo tail -f /var/log/nginx/access.log
 ```
 
-### MongoDB Commands
-
-```bash
-# Connect to MongoDB
-mongosh winebox
-
-# Backup database
-mongodump --db winebox --out /opt/winebox/backups/
-
-# Restore database
-mongorestore --db winebox /opt/winebox/backups/winebox/
-```
-
 ## File Locations
 
 | Path | Purpose |
@@ -307,12 +387,12 @@ The deploy script syncs these secrets from local `.env`:
 |--------|---------|
 | `WINEBOX_SECRET_KEY` | JWT signing key |
 | `WINEBOX_ANTHROPIC_API_KEY` | Claude Vision API |
+| `WINEBOX_MONGODB_URL` | MongoDB Atlas connection |
 | `AWS_ACCESS_KEY_ID` | AWS SES email |
 | `AWS_SECRET_ACCESS_KEY` | AWS SES email |
 | `AWS_REGION` | AWS SES region |
 
-These are **never synced** (production-specific):
-- `WINEBOX_MONGODB_URL`
+These are **never synced** (local-only):
 - `WINEBOX_DROPLET_IP`
 - `WINEBOX_DO_TOKEN`
 
@@ -369,9 +449,11 @@ ssh root@<droplet-ip> "journalctl -u winebox -n 50"
 
 ### Backup
 
+With MongoDB Atlas, database backups are handled by the Atlas service.
+You can also use `mongodump` with the Atlas connection string:
+
 ```bash
-# Backup MongoDB
-ssh root@<droplet-ip> "mongodump --db winebox --out /opt/winebox/backups/$(date +%Y%m%d)"
+mongodump --uri "mongodb+srv://user:pass@cluster.mongodb.net/winebox" --out ./backups/
 
 # Backup images
 ssh root@<droplet-ip> "tar -czf /opt/winebox/backups/images-$(date +%Y%m%d).tar.gz /opt/winebox/data/images"
@@ -384,7 +466,7 @@ scp -r root@<droplet-ip>:/opt/winebox/backups/ ./backups/
 
 ```bash
 # Restore MongoDB
-mongorestore --db winebox /path/to/backup/winebox/
+mongorestore --uri "mongodb+srv://user:pass@cluster.mongodb.net" /path/to/backup/winebox/
 
 # Restore images
 tar -xzf images-backup.tar.gz -C /opt/winebox/data/
@@ -400,9 +482,6 @@ journalctl -u winebox -n 100
 
 # Check configuration
 sudo -u winebox /opt/winebox/.venv/bin/python -c "from winebox.config import settings; print(settings)"
-
-# Check MongoDB
-mongosh --eval "db.serverStatus()"
 ```
 
 ### 502 Bad Gateway
@@ -436,21 +515,22 @@ certbot certificates
 ### Database Connection Issues
 
 ```bash
-# Check MongoDB status
-systemctl status mongod
+# Test Atlas connectivity from the droplet
+ssh root@<droplet-ip> "sudo -u winebox /opt/winebox/.venv/bin/python -c \"
+from winebox.config import settings
+print(f'MongoDB URL: {settings.database.mongodb_url[:30]}...')
+\""
 
-# Check connection
-mongosh "mongodb://localhost:27017/winebox"
-
-# Check logs
-journalctl -u mongod -n 50
+# Check if the WINEBOX_MONGODB_URL is set in secrets.env
+ssh root@<droplet-ip> "grep WINEBOX_MONGODB_URL /opt/winebox/secrets.env"
 ```
 
 ## Security
 
 ### Firewall
 
-The setup script configures UFW:
+The initialisation script configures both UFW (host-level) and a DO cloud
+firewall (network-level):
 
 ```bash
 sudo ufw status

@@ -7,14 +7,17 @@ Submodules:
     app: Main application deployment
     setup: Initial server setup
     xwines: X-Wines dataset deployment
+    initialise: Full droplet initialisation (setup + DNS + SSL + deploy)
 
 Usage:
     # From command line
+    python -m deploy.initialise   # Full droplet initialisation
     python -m deploy.app          # Deploy application
     python -m deploy.setup        # Initial server setup
     python -m deploy.xwines       # Deploy X-Wines dataset
 
     # From invoke tasks
+    invoke initialise-droplet     # Full droplet initialisation
     invoke deploy                 # Deploy application
     invoke deploy-setup           # Initial server setup
     invoke deploy-xwines          # Deploy X-Wines dataset

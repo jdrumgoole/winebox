@@ -444,6 +444,42 @@ def deploy_xwines(
     ctx.run(cmd, pty=True)
 
 
+@task(name="initialise-droplet")
+def initialise_droplet(
+    ctx: Context,
+    host: str = "",
+    domain: str = "booze.winebox.app",
+    version: str = "",
+    skip_xwines: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Initialise a fresh droplet: setup, DNS, SSL, deploy, X-Wines.
+
+    Combines deploy-setup, DNS config, cloud firewall, SSL certs,
+    deploy, and deploy-xwines into a single command.
+
+    Args:
+        ctx: Invoke context
+        host: Droplet IP (or set WINEBOX_DROPLET_IP in .env)
+        domain: App domain (default: booze.winebox.app)
+        version: Package version to install (default: latest)
+        skip_xwines: Skip X-Wines dataset import
+        dry_run: Preview changes without applying
+    """
+    cmd = "uv run python -m deploy.initialise"
+    if host:
+        cmd += f" --host {host}"
+    if domain != "booze.winebox.app":
+        cmd += f" --domain {domain}"
+    if version:
+        cmd += f" --version {version}"
+    if skip_xwines:
+        cmd += " --skip-xwines"
+    if dry_run:
+        cmd += " --dry-run"
+    ctx.run(cmd, pty=True)
+
+
 @task
 def rebuild_droplet(
     ctx: Context,

@@ -1,7 +1,6 @@
 [Unit]
 Description=WineBox FastAPI Application
-After=network.target mongod.service
-Wants=mongod.service
+After=network.target
 
 [Service]
 Type=exec

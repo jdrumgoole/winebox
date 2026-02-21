@@ -207,7 +207,7 @@ WineBox integrates the [X-Wines dataset](https://github.com/rogerioxavier/X-Wine
 
 ```bash
 # Option 1: Test dataset (100 wines, for development)
-uv run python -m scripts.import_xwines --version test
+uv run python deploy/import_xwines_mongo.py --version test
 
 # Option 2: Full dataset (100K+ wines, for production)
 # First, download from Google Drive
@@ -217,7 +217,7 @@ uv run gdown --folder "https://drive.google.com/drive/folders/1LqguJNV-aKh1PuWMV
 cp data/xwines/X-Wines_Official_Repository/last/XWines_Full_*.csv data/xwines/
 
 # Then import
-uv run python -m scripts.import_xwines --version full
+uv run python deploy/import_xwines_mongo.py --version full
 ```
 
 The autocomplete appears when typing in the Wine Name field during check-in.
