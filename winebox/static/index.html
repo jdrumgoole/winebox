@@ -283,6 +283,14 @@
                             <input type="text" id="region" name="region" placeholder="Auto-detected">
                         </div>
                         <div class="form-group">
+                            <label for="sub-region">Sub-Region</label>
+                            <input type="text" id="sub-region" name="sub_region" placeholder="e.g., C&ocirc;te de Nuits">
+                        </div>
+                        <div class="form-group">
+                            <label for="appellation">Appellation</label>
+                            <input type="text" id="appellation" name="appellation" placeholder="e.g., Nuits-St-Georges, Pomerol">
+                        </div>
+                        <div class="form-group">
                             <label for="country">Country</label>
                             <input type="text" id="country" name="country" placeholder="Auto-detected">
                         </div>
@@ -536,7 +544,30 @@
                     <button type="reset" class="btn btn-secondary">Clear</button>
                 </div>
             </form>
+            <div class="xwines-toolbar" id="xwines-toolbar" style="display: none;">
+                <div class="view-toggle">
+                    <button id="xwines-view-cards" class="active" title="Card view">Cards</button>
+                    <button id="xwines-view-table" title="Table view">Table</button>
+                </div>
+                <div class="export-dropdown" id="xwines-export-dropdown">
+                    <button class="btn btn-secondary export-dropdown-btn" id="xwines-export-btn">
+                        Export
+                        <span class="dropdown-arrow">&#9662;</span>
+                    </button>
+                    <div class="export-dropdown-menu">
+                        <a href="#" data-format="csv" data-type="xwines">CSV</a>
+                        <a href="#" data-format="xlsx" data-type="xwines">Excel</a>
+                        <a href="#" data-format="yaml" data-type="xwines">YAML</a>
+                        <a href="#" data-format="json" data-type="xwines">JSON</a>
+                    </div>
+                </div>
+            </div>
             <div id="xwines-results" class="wine-grid"></div>
+            <div id="xwines-pagination" class="pagination-controls" style="display: none;">
+                <button id="xwines-prev" class="btn btn-secondary btn-small">Previous</button>
+                <span id="xwines-page-info">Page 1 of 1</span>
+                <button id="xwines-next" class="btn btn-secondary btn-small">Next</button>
+            </div>
         </section>
 
         <!-- X-Wines Detail Modal -->
@@ -667,6 +698,14 @@
                             <div class="form-group">
                                 <label for="confirm-region">Region</label>
                                 <input type="text" id="confirm-region">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-sub-region">Sub-Region</label>
+                                <input type="text" id="confirm-sub-region">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-appellation">Appellation</label>
+                                <input type="text" id="confirm-appellation">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-country">Country</label>

@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     initAutocomplete();
     initExportDropdowns();
+    initXWinesPage();
     checkAuth();
     loadAppInfo();
 });
@@ -829,7 +830,10 @@ function populateFormFromScan(result) {
         'vintage': parsed.vintage,
         'grape-variety': parsed.grape_variety,
         'region': parsed.region,
+        'sub-region': parsed.sub_region,
+        'appellation': parsed.appellation,
         'country': parsed.country,
+        'classification': parsed.classification,
         'alcohol': parsed.alcohol_percentage
     };
 
@@ -934,7 +938,10 @@ function handleCheckin(e) {
         vintage: document.getElementById('vintage').value,
         grapeVariety: document.getElementById('grape-variety').value,
         region: document.getElementById('region').value,
+        subRegion: document.getElementById('sub-region').value,
+        appellation: document.getElementById('appellation').value,
         country: document.getElementById('country').value,
+        classification: document.getElementById('classification').value,
         alcohol: document.getElementById('alcohol').value,
         quantity: document.getElementById('quantity').value || '1',
         notes: document.getElementById('notes').value,
@@ -968,7 +975,10 @@ function showCheckinConfirmation() {
     document.getElementById('confirm-vintage').value = data.vintage || '';
     document.getElementById('confirm-grape-variety').value = data.grapeVariety || '';
     document.getElementById('confirm-region').value = data.region || '';
+    document.getElementById('confirm-sub-region').value = data.subRegion || '';
+    document.getElementById('confirm-appellation').value = data.appellation || '';
     document.getElementById('confirm-country').value = data.country || '';
+    document.getElementById('confirm-classification').value = data.classification || '';
     document.getElementById('confirm-alcohol').value = data.alcohol || '';
     document.getElementById('confirm-quantity').value = data.quantity || '1';
     document.getElementById('confirm-notes').value = data.notes || '';
@@ -1037,7 +1047,10 @@ async function submitCheckin() {
     if (vintage) formData.append('vintage', vintage);
     formData.append('grape_variety', document.getElementById('confirm-grape-variety').value);
     formData.append('region', document.getElementById('confirm-region').value);
+    formData.append('sub_region', document.getElementById('confirm-sub-region').value);
+    formData.append('appellation', document.getElementById('confirm-appellation').value);
     formData.append('country', document.getElementById('confirm-country').value);
+    formData.append('classification', document.getElementById('confirm-classification').value);
     const alcohol = document.getElementById('confirm-alcohol').value;
     if (alcohol) formData.append('alcohol_percentage', alcohol);
     formData.append('quantity', document.getElementById('confirm-quantity').value || '1');
@@ -1304,6 +1317,8 @@ function renderWineGrid(containerId, wines) {
                     <div class="wine-card-details">
                         ${wine.grape_variety ? `<span class="wine-tag">${wine.grape_variety}</span>` : ''}
                         ${wine.region ? `<span class="wine-tag">${wine.region}</span>` : ''}
+                        ${wine.appellation ? `<span class="wine-tag">${wine.appellation}</span>` : ''}
+                        ${wine.classification ? `<span class="wine-tag wine-tag-classification">${wine.classification}</span>` : ''}
                         ${wine.country ? `<span class="wine-tag">${wine.country}</span>` : ''}
                     </div>
                     <div class="wine-card-footer">
@@ -1378,10 +1393,31 @@ async function showWineDetail(wineId) {
                     </div>
                 ` : ''}
 
+                ${wine.sub_region ? `
+                    <div class="wine-detail-field">
+                        <div class="label">Sub-Region</div>
+                        <div class="value">${wine.sub_region}</div>
+                    </div>
+                ` : ''}
+
+                ${wine.appellation ? `
+                    <div class="wine-detail-field">
+                        <div class="label">Appellation</div>
+                        <div class="value">${wine.appellation}</div>
+                    </div>
+                ` : ''}
+
                 ${wine.country ? `
                     <div class="wine-detail-field">
                         <div class="label">Country</div>
                         <div class="value">${wine.country}</div>
+                    </div>
+                ` : ''}
+
+                ${wine.classification ? `
+                    <div class="wine-detail-field">
+                        <div class="label">Classification</div>
+                        <div class="value">${wine.classification}</div>
                     </div>
                 ` : ''}
 
@@ -1650,6 +1686,9 @@ function initExportDropdowns() {
     // Initialize history export dropdown
     initExportDropdown('history-export-dropdown', 'history-export-btn');
 
+    // Initialize X-Wines export dropdown
+    initExportDropdown('xwines-export-dropdown', 'xwines-export-btn');
+
     // Close dropdowns when clicking outside
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.export-dropdown')) {
@@ -1691,20 +1730,37 @@ function initExportDropdown(dropdownId, buttonId) {
 
 async function handleExport(type, format) {
     // Build export URL with current filters
-    let url = `${API_BASE}/export/${type}?format=${format}`;
+    let url;
 
-    // Add relevant filters based on export type
-    if (type === 'wines') {
-        const cellarFilter = document.getElementById('cellar-filter')?.value;
-        if (cellarFilter === 'in-stock') {
-            url += '&in_stock=true';
-        } else if (cellarFilter === 'out-of-stock') {
-            url += '&in_stock=false';
+    if (type === 'xwines') {
+        // X-Wines uses a different endpoint
+        if (!xwinesLastSearchParams || !xwinesLastSearchParams.q) {
+            showToast('Please perform a search first', 'error');
+            return;
         }
-    } else if (type === 'transactions') {
-        const historyFilter = document.getElementById('history-filter')?.value;
-        if (historyFilter && historyFilter !== 'all') {
-            url += `&transaction_type=${historyFilter}`;
+        url = `${API_BASE}/xwines/export?format=${format}&q=${encodeURIComponent(xwinesLastSearchParams.q)}`;
+        if (xwinesLastSearchParams.wine_type) {
+            url += `&wine_type=${encodeURIComponent(xwinesLastSearchParams.wine_type)}`;
+        }
+        if (xwinesLastSearchParams.country) {
+            url += `&country=${encodeURIComponent(xwinesLastSearchParams.country)}`;
+        }
+    } else {
+        url = `${API_BASE}/export/${type}?format=${format}`;
+
+        // Add relevant filters based on export type
+        if (type === 'wines') {
+            const cellarFilter = document.getElementById('cellar-filter')?.value;
+            if (cellarFilter === 'in-stock') {
+                url += '&in_stock=true';
+            } else if (cellarFilter === 'out-of-stock') {
+                url += '&in_stock=false';
+            }
+        } else if (type === 'transactions') {
+            const historyFilter = document.getElementById('history-filter')?.value;
+            if (historyFilter && historyFilter !== 'all') {
+                url += `&transaction_type=${historyFilter}`;
+            }
         }
     }
 
@@ -1759,6 +1815,21 @@ function downloadBlob(blob, filename) {
 
 // X-Wines Search
 let xwinesFiltersLoaded = false;
+let xwinesCurrentPage = 1;
+let xwinesTotal = 0;
+let xwinesLastSearchParams = null;
+let xwinesLastResults = [];
+let xwinesViewMode = 'cards';
+
+function initXWinesPage() {
+    // Pagination button handlers
+    document.getElementById('xwines-prev')?.addEventListener('click', () => goToXWinesPage('prev'));
+    document.getElementById('xwines-next')?.addEventListener('click', () => goToXWinesPage('next'));
+
+    // View toggle handlers
+    document.getElementById('xwines-view-cards')?.addEventListener('click', () => setXWinesViewMode('cards'));
+    document.getElementById('xwines-view-table')?.addEventListener('click', () => setXWinesViewMode('table'));
+}
 
 async function loadXWinesFilters() {
     if (xwinesFiltersLoaded) return;
@@ -1799,6 +1870,12 @@ async function loadXWinesFilters() {
 
 async function handleXWinesSearch(e) {
     e.preventDefault();
+    // Reset pagination when performing new search
+    xwinesCurrentPage = 1;
+    await performXWinesSearch();
+}
+
+async function performXWinesSearch() {
     const params = new URLSearchParams();
     const q = document.getElementById('xwines-q').value.trim();
     if (q.length < 2) {
@@ -1813,14 +1890,39 @@ async function handleXWinesSearch(e) {
     const country = document.getElementById('xwines-country').value;
     if (country) params.append('country', country);
 
-    const limit = document.getElementById('xwines-limit').value;
+    const limit = parseInt(document.getElementById('xwines-limit').value);
     params.append('limit', limit);
+
+    // Calculate skip for pagination
+    const skip = (xwinesCurrentPage - 1) * limit;
+    params.append('skip', skip);
+
+    // Store search params for pagination and export
+    xwinesLastSearchParams = {
+        q: q,
+        wine_type: wineType || null,
+        country: country || null,
+        limit: limit
+    };
 
     try {
         const response = await fetchWithAuth(`${API_BASE}/xwines/search?${params}`);
         if (!response.ok) throw new Error('Search failed');
         const data = await response.json();
-        renderXWinesGrid('xwines-results', data.results, data.total);
+
+        // Store results and total for view switching
+        xwinesLastResults = data.results;
+        xwinesTotal = data.total;
+
+        // Render based on current view mode
+        renderXWinesResults();
+
+        // Update pagination controls
+        renderXWinesPagination(data.total, data.skip, data.limit);
+
+        // Show toolbar if we have results
+        const toolbar = document.getElementById('xwines-toolbar');
+        toolbar.style.display = data.results.length > 0 ? 'flex' : 'none';
 
         // Update filter dropdowns with facet counts if available
         if (data.facets) {
@@ -1829,6 +1931,120 @@ async function handleXWinesSearch(e) {
     } catch (error) {
         showToast('X-Wines search failed', 'error');
     }
+}
+
+function renderXWinesResults() {
+    if (xwinesViewMode === 'table') {
+        renderXWinesTable('xwines-results', xwinesLastResults, xwinesTotal);
+    } else {
+        renderXWinesGrid('xwines-results', xwinesLastResults, xwinesTotal);
+    }
+}
+
+function renderXWinesPagination(total, skip, limit) {
+    const paginationEl = document.getElementById('xwines-pagination');
+    const pageInfoEl = document.getElementById('xwines-page-info');
+    const prevBtn = document.getElementById('xwines-prev');
+    const nextBtn = document.getElementById('xwines-next');
+
+    const totalPages = Math.ceil(total / limit);
+    const currentPage = Math.floor(skip / limit) + 1;
+
+    if (totalPages <= 1) {
+        paginationEl.style.display = 'none';
+        return;
+    }
+
+    paginationEl.style.display = 'flex';
+    pageInfoEl.textContent = `Page ${currentPage} of ${totalPages}`;
+
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+}
+
+async function goToXWinesPage(direction) {
+    const limit = parseInt(document.getElementById('xwines-limit').value);
+    const totalPages = Math.ceil(xwinesTotal / limit);
+
+    if (direction === 'prev' && xwinesCurrentPage > 1) {
+        xwinesCurrentPage--;
+    } else if (direction === 'next' && xwinesCurrentPage < totalPages) {
+        xwinesCurrentPage++;
+    }
+
+    await performXWinesSearch();
+}
+
+function setXWinesViewMode(mode) {
+    xwinesViewMode = mode;
+
+    // Update button states
+    document.getElementById('xwines-view-cards').classList.toggle('active', mode === 'cards');
+    document.getElementById('xwines-view-table').classList.toggle('active', mode === 'table');
+
+    // Re-render with current results
+    if (xwinesLastResults.length > 0) {
+        renderXWinesResults();
+    }
+}
+
+function renderXWinesTable(containerId, results, total) {
+    const container = document.getElementById(containerId);
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try a different search term or adjust filters</p></div>';
+        return;
+    }
+
+    const header = total > results.length
+        ? `<div class="xwines-results-header">Showing ${results.length} of ${total} results</div>`
+        : `<div class="xwines-results-header">${results.length} result${results.length !== 1 ? 's' : ''}</div>`;
+
+    const tableRows = results.map(wine => {
+        const ratingDisplay = wine.avg_rating
+            ? `${wine.avg_rating.toFixed(1)} (${wine.rating_count})`
+            : '-';
+
+        return `
+            <tr class="xwines-table-row" data-xwine-id="${wine.id}">
+                <td class="xwines-table-name">${escapeHtml(wine.name)}</td>
+                <td>${wine.winery ? escapeHtml(wine.winery) : '-'}</td>
+                <td>${wine.wine_type ? `<span class="xwines-type-tag xwines-type-${wine.wine_type.toLowerCase().replace(/[éè]/g, 'e')}">${escapeHtml(wine.wine_type)}</span>` : '-'}</td>
+                <td>${wine.country ? escapeHtml(wine.country) : '-'}</td>
+                <td>${wine.region ? escapeHtml(wine.region) : '-'}</td>
+                <td>${wine.abv ? `${wine.abv}%` : '-'}</td>
+                <td class="xwines-table-rating">${ratingDisplay}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        ${header}
+        <div class="xwines-table-wrapper">
+            <table class="xwines-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Winery</th>
+                        <th>Type</th>
+                        <th>Country</th>
+                        <th>Region</th>
+                        <th>ABV</th>
+                        <th>Rating</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // Add click handlers for table rows
+    container.querySelectorAll('.xwines-table-row').forEach(row => {
+        row.addEventListener('click', () => {
+            showXWinesDetail(row.dataset.xwineId);
+        });
+    });
 }
 
 function updateFilterCounts(facets) {

@@ -132,7 +132,10 @@ async def scan_label(
                     "vintage": result.get("vintage"),
                     "grape_variety": result.get("grape_variety"),
                     "region": result.get("region"),
+                    "sub_region": result.get("sub_region"),
+                    "appellation": result.get("appellation"),
                     "country": result.get("country"),
+                    "classification": result.get("classification"),
                     "alcohol_percentage": result.get("alcohol_percentage"),
                 },
                 "ocr": {
@@ -165,7 +168,10 @@ async def scan_label(
             "vintage": parsed_data.get("vintage"),
             "grape_variety": parsed_data.get("grape_variety"),
             "region": parsed_data.get("region"),
+            "sub_region": parsed_data.get("sub_region"),
+            "appellation": parsed_data.get("appellation"),
             "country": parsed_data.get("country"),
+            "classification": parsed_data.get("classification"),
             "alcohol_percentage": parsed_data.get("alcohol_percentage"),
         },
         "ocr": {
@@ -194,7 +200,10 @@ async def checkin_wine(
     vintage: Annotated[int | None, Form(ge=1900, le=2100)] = None,
     grape_variety: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
     region: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
+    sub_region: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
+    appellation: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
     country: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
+    classification: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
     alcohol_percentage: Annotated[float | None, Form(ge=0, le=100)] = None,
     notes: Annotated[str | None, Form(max_length=MAX_NOTES_LENGTH, description="Check-in notes")] = None,
     front_label_text: Annotated[str | None, Form(max_length=MAX_OCR_TEXT_LENGTH, description="Pre-scanned front label text")] = None,
@@ -273,7 +282,10 @@ async def checkin_wine(
         vintage = vintage or parsed_data.get("vintage")
         grape_variety = grape_variety or parsed_data.get("grape_variety")
         region = region or parsed_data.get("region")
+        sub_region = sub_region or parsed_data.get("sub_region")
+        appellation = appellation or parsed_data.get("appellation")
         country = country or parsed_data.get("country")
+        classification = classification or parsed_data.get("classification")
         alcohol_percentage = alcohol_percentage or parsed_data.get("alcohol_percentage")
 
     # Use provided values
@@ -286,7 +298,10 @@ async def checkin_wine(
         vintage=vintage,
         grape_variety=grape_variety,
         region=region,
+        sub_region=sub_region,
+        appellation=appellation,
         country=country,
+        classification=classification,
         alcohol_percentage=alcohol_percentage,
         front_label_text=front_text,
         back_label_text=back_text,

@@ -57,6 +57,8 @@ async def search_wines(
                 {"name": {"$regex": search_pattern}},
                 {"winery": {"$regex": search_pattern}},
                 {"region": {"$regex": search_pattern}},
+                {"sub_region": {"$regex": search_pattern}},
+                {"appellation": {"$regex": search_pattern}},
                 {"country": {"$regex": search_pattern}},
                 {"grape_variety": {"$regex": search_pattern}},
                 {"front_label_text": {"$regex": search_pattern}},

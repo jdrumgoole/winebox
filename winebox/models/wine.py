@@ -56,6 +56,8 @@ class Wine(Document):
     vintage: Optional[Indexed(int)] = None
     grape_variety: Optional[Indexed(str)] = None  # Primary grape (backward compat)
     region: Optional[str] = None
+    sub_region: Optional[str] = None
+    appellation: Optional[str] = None
     country: Optional[Indexed(str)] = None
     alcohol_percentage: Optional[float] = None
 
@@ -68,8 +70,7 @@ class Wine(Document):
     # Taxonomy fields
     wine_type_id: Optional[Indexed(str)] = None  # Reference to WineType
     wine_subtype: Optional[str] = None  # e.g., 'full_bodied', 'champagne'
-    appellation_id: Optional[str] = None  # Reference to Region
-    classification_id: Optional[str] = None  # Reference to Classification
+    classification: Optional[str] = None  # e.g., Grand Cru, DOCG, Reserve
     price_tier: Optional[str] = None  # 'budget', 'value', etc.
     drink_window_start: Optional[int] = None  # Year
     drink_window_end: Optional[int] = None  # Year
@@ -96,6 +97,8 @@ class Wine(Document):
                 ("name", "text"),
                 ("winery", "text"),
                 ("region", "text"),
+                ("sub_region", "text"),
+                ("appellation", "text"),
                 ("country", "text"),
                 ("front_label_text", "text"),
             ],
