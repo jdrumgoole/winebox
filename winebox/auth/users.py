@@ -1,5 +1,6 @@
 """User manager for fastapi-users with email callbacks."""
 
+import hashlib
 import logging
 from collections.abc import AsyncGenerator
 from typing import Optional
@@ -19,11 +20,30 @@ from winebox.services.email import get_email_service
 logger = logging.getLogger(__name__)
 
 
+def _derive_secret(base_secret: str, purpose: str) -> str:
+    """Derive a purpose-specific secret from the base secret.
+
+    This ensures that different token types use different secrets,
+    so compromising one type doesn't compromise others.
+
+    Args:
+        base_secret: The main application secret key.
+        purpose: A string identifying the purpose (e.g., 'reset_password').
+
+    Returns:
+        A derived secret string.
+    """
+    combined = f"{base_secret}:{purpose}"
+    return hashlib.sha256(combined.encode()).hexdigest()
+
+
 class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
     """Custom user manager with email verification and password reset callbacks."""
 
-    reset_password_token_secret = settings.secret_key
-    verification_token_secret = settings.secret_key
+    # Use derived secrets for different token types (security best practice)
+    # This ensures JWT secret compromise doesn't affect reset/verification tokens
+    reset_password_token_secret = _derive_secret(settings.secret_key, "reset_password")
+    verification_token_secret = _derive_secret(settings.secret_key, "verification")
 
     async def on_after_register(
         self, user: User, request: Optional[Request] = None

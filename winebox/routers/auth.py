@@ -122,22 +122,38 @@ async def get_current_user_info(
 
 
 @router.put("/password")
+@limiter.limit("5/minute;20/hour")  # Rate limiting for password changes
 async def change_password(
-    request: PasswordChangeRequest,
+    request: Request,  # Required for rate limiting
+    password_request: PasswordChangeRequest,
     current_user: RequireAuth,
 ) -> dict:
     """Change the current user's password."""
+    import logging
+    security_logger = logging.getLogger("winebox.security")
+
     # Verify current password
-    if not verify_password(request.current_password, current_user.hashed_password):
+    if not verify_password(password_request.current_password, current_user.hashed_password):
+        security_logger.warning(
+            "Password change failed - invalid current password: user_id=%s, ip=%s",
+            str(current_user.id),
+            get_remote_address(request),
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
         )
 
     # Update password using Beanie
-    current_user.hashed_password = get_password_hash(request.new_password)
-    current_user.updated_at = datetime.utcnow()
+    current_user.hashed_password = get_password_hash(password_request.new_password)
+    current_user.updated_at = datetime.now(timezone.utc)
     await current_user.save()
+
+    security_logger.info(
+        "Password changed successfully: user_id=%s, ip=%s",
+        str(current_user.id),
+        get_remote_address(request),
+    )
 
     return {"message": "Password updated successfully"}
 
@@ -186,7 +202,11 @@ async def login_token(
 
     Note: OAuth2 spec uses 'username' field name, but we accept email here.
     """
-    user = await authenticate_user(form_data.username, form_data.password)
+    # Get client IP for security logging
+    ip_address = get_remote_address(request)
+
+    # authenticate_user now raises HTTPException if account is locked
+    user = await authenticate_user(form_data.username, form_data.password, ip_address)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

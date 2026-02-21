@@ -3,11 +3,13 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 
 from beanie import PydanticObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from pydantic import ValidationError
 
 from winebox.config import settings
 from winebox.models import (
@@ -290,7 +292,7 @@ async def checkin_wine(
         back_label_text=back_text,
         front_label_image_path=front_image_path,
         back_label_image_path=back_image_path,
-        inventory=InventoryInfo(quantity=quantity, updated_at=datetime.utcnow()),
+        inventory=InventoryInfo(quantity=quantity, updated_at=datetime.now(timezone.utc)),
     )
     await wine.insert()
 
@@ -321,7 +323,8 @@ async def checkout_wine(
     # Get wine
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -347,8 +350,8 @@ async def checkout_wine(
 
     # Update inventory
     wine.inventory.quantity -= quantity
-    wine.inventory.updated_at = datetime.utcnow()
-    wine.updated_at = datetime.utcnow()
+    wine.inventory.updated_at = datetime.now(timezone.utc)
+    wine.updated_at = datetime.now(timezone.utc)
     await wine.save()
 
     return WineWithInventory.model_validate(wine)
@@ -382,7 +385,8 @@ async def get_wine(
     """Get wine details with full transaction history."""
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -412,7 +416,8 @@ async def update_wine(
     """Update wine metadata."""
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -426,7 +431,7 @@ async def update_wine(
     for field, value in update_data.items():
         setattr(wine, field, value)
 
-    wine.updated_at = datetime.utcnow()
+    wine.updated_at = datetime.now(timezone.utc)
     await wine.save()
 
     return WineWithInventory.model_validate(wine)
@@ -440,7 +445,8 @@ async def delete_wine(
     """Delete wine and all associated history."""
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -475,7 +481,8 @@ async def get_wine_grapes(
     # Verify wine exists
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -524,7 +531,8 @@ async def set_wine_grapes(
     # Verify wine exists
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -541,7 +549,8 @@ async def set_wine_grapes(
         # Try to find grape variety
         try:
             grape = await GrapeVariety.get(PydanticObjectId(grape_data.grape_variety_id))
-        except Exception:
+        except (InvalidId, ValidationError) as e:
+            logger.debug("Invalid grape variety ID format: %s - %s", grape_data.grape_variety_id, e)
             grape = None
 
         if not grape:
@@ -559,7 +568,7 @@ async def set_wine_grapes(
 
     # Update wine with new grape blends
     wine.grape_blends = new_blends
-    wine.updated_at = datetime.utcnow()
+    wine.updated_at = datetime.now(timezone.utc)
     await wine.save()
 
     # Return updated blend
@@ -580,7 +589,8 @@ async def get_wine_scores(
     # Verify wine exists
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -628,7 +638,8 @@ async def add_wine_score(
     # Verify wine exists
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -654,12 +665,12 @@ async def add_wine_score(
         review_date=score_data.review_date,
         reviewer=score_data.reviewer,
         notes=score_data.notes,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
 
     # Add to wine's scores
     wine.scores.append(score)
-    wine.updated_at = datetime.utcnow()
+    wine.updated_at = datetime.now(timezone.utc)
     await wine.save()
 
     return WineScoreResponse(
@@ -687,7 +698,8 @@ async def update_wine_score(
     # Get wine
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -726,7 +738,7 @@ async def update_wine_score(
     for field, value in update_data.items():
         setattr(score, field, value)
 
-    wine.updated_at = datetime.utcnow()
+    wine.updated_at = datetime.now(timezone.utc)
     await wine.save()
 
     return WineScoreResponse(
@@ -752,7 +764,8 @@ async def delete_wine_score(
     """Delete a score from a wine."""
     try:
         wine = await Wine.get(PydanticObjectId(wine_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
 
     if not wine:
@@ -771,5 +784,5 @@ async def delete_wine_score(
             detail=f"Score with ID {score_id} not found for wine {wine_id}",
         )
 
-    wine.updated_at = datetime.utcnow()
+    wine.updated_at = datetime.now(timezone.utc)
     await wine.save()

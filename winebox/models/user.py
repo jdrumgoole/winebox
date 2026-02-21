@@ -1,10 +1,15 @@
 """User document model for authentication with fastapi-users integration."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from beanie import Document, Indexed
 from pydantic import Field
+
+
+def _utc_now() -> datetime:
+    """Get current UTC time (timezone-aware)."""
+    return datetime.now(timezone.utc)
 
 
 class User(Document):
@@ -36,9 +41,9 @@ class User(Document):
     # Custom fields for WineBox
     full_name: Optional[str] = None
 
-    # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    # Timestamps (timezone-aware UTC)
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
     last_login: Optional[datetime] = None
 
     class Settings:

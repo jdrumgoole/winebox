@@ -1,9 +1,14 @@
 """Token blacklist model for JWT token revocation."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from beanie import Document, Indexed
 from pydantic import Field
+
+
+def _utc_now() -> datetime:
+    """Get current UTC time (timezone-aware)."""
+    return datetime.now(timezone.utc)
 
 
 class RevokedToken(Document):
@@ -16,7 +21,7 @@ class RevokedToken(Document):
     jti: Indexed(str, unique=True)
 
     # When the token was revoked
-    revoked_at: datetime = Field(default_factory=datetime.utcnow)
+    revoked_at: datetime = Field(default_factory=_utc_now)
 
     # When the token expires (for automatic cleanup)
     expires_at: Indexed(datetime)
@@ -82,5 +87,5 @@ class RevokedToken(Document):
         Returns:
             Number of tokens removed.
         """
-        result = await cls.find(cls.expires_at < datetime.utcnow()).delete()
+        result = await cls.find(cls.expires_at < _utc_now()).delete()
         return result.deleted_count if result else 0

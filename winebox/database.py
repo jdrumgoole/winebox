@@ -24,6 +24,7 @@ def get_document_models() -> list[type["Document"]]:
     from winebox.models import (
         Classification,
         GrapeVariety,
+        LoginAttempt,
         Region,
         RevokedToken,
         Transaction,
@@ -45,6 +46,7 @@ def get_document_models() -> list[type["Document"]]:
         XWinesWine,
         XWinesMetadata,
         RevokedToken,
+        LoginAttempt,
     ]
 
 

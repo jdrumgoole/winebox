@@ -1,11 +1,17 @@
 """Transaction history endpoints."""
 
+import logging
+
 from beanie import PydanticObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException, status
+from pydantic import ValidationError
 
 from winebox.models import Transaction, TransactionType, Wine
 from winebox.schemas.transaction import TransactionResponse
 from winebox.services.auth import RequireAuth
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -27,8 +33,8 @@ async def list_transactions(
     if wine_id:
         try:
             conditions["wine_id"] = PydanticObjectId(wine_id)
-        except Exception:
-            pass
+        except (InvalidId, ValidationError) as e:
+            logger.debug("Invalid wine ID format in filter: %s - %s", wine_id, e)
 
     transactions = await Transaction.find(
         conditions
@@ -68,7 +74,8 @@ async def get_transaction(
     """Get a single transaction by ID."""
     try:
         transaction = await Transaction.get(PydanticObjectId(transaction_id))
-    except Exception:
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid transaction ID format: %s - %s", transaction_id, e)
         transaction = None
 
     if not transaction:

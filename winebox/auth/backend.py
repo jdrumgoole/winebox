@@ -11,10 +11,6 @@ from winebox.config import settings
 # Bearer token transport (Authorization: Bearer <token>)
 bearer_transport = BearerTransport(tokenUrl="/api/auth/login")
 
-# Token expiration in seconds (2 hours - reduced for security)
-# Use refresh tokens or re-authentication for longer sessions
-TOKEN_LIFETIME_SECONDS = 60 * 60 * 2
-
 
 def get_jwt_strategy() -> JWTStrategy:
     """Get the JWT strategy with current settings.
@@ -22,6 +18,9 @@ def get_jwt_strategy() -> JWTStrategy:
     Returns:
         JWTStrategy configured with secret key and lifetime.
     """
+    # Import here to avoid circular dependency
+    from winebox.services.auth import TOKEN_LIFETIME_SECONDS
+
     return JWTStrategy(
         secret=settings.secret_key,
         lifetime_seconds=TOKEN_LIFETIME_SECONDS,

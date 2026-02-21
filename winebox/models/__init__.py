@@ -9,6 +9,7 @@ from winebox.models.region import Region
 from winebox.models.classification import Classification
 from winebox.models.xwines import XWinesWine, XWinesMetadata
 from winebox.models.token_blacklist import RevokedToken
+from winebox.models.login_attempt import LoginAttempt
 
 __all__ = [
     # Main documents
@@ -17,6 +18,7 @@ __all__ = [
     "TransactionType",
     "User",
     "RevokedToken",
+    "LoginAttempt",
     # Embedded subdocuments
     "InventoryInfo",
     "GrapeBlendEntry",

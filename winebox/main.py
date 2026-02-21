@@ -1,7 +1,9 @@
 """FastAPI application entry point for WineBox."""
 
+import asyncio
 import logging
 import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
@@ -21,6 +23,9 @@ from winebox.config import settings
 from winebox.database import close_db, init_db
 
 logger = logging.getLogger(__name__)
+
+# Background cleanup task handle
+_cleanup_task: asyncio.Task | None = None
 
 
 # Rate limiter configuration
@@ -47,14 +52,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
 
         # Content Security Policy
-        # Note: 'unsafe-inline' for scripts/styles is needed for the current UI
-        # In production, consider using nonces or hashes for inline scripts
+        # Note: 'unsafe-inline' is kept for style-src only (for basic inline styles
+        # like style="display: none;"). Script-src does not need unsafe-inline as
+        # all JavaScript is loaded from external files.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "img-src 'self' data: blob:; "
-            "font-src 'self'; "
+            "font-src 'self' https://fonts.gstatic.com; "
             "connect-src 'self'; "
             "frame-ancestors 'none'; "
             "form-action 'self'; "
@@ -78,6 +84,39 @@ def _is_production() -> bool:
         True if running in production (not debug mode and not testing).
     """
     return not settings.debug and not os.getenv("PYTEST_CURRENT_TEST")
+
+
+async def _run_security_cleanup() -> None:
+    """Background task to cleanup expired tokens and old login attempts.
+
+    Runs every hour to remove:
+    - Expired tokens from the blacklist
+    - Old login attempts (> 24 hours)
+    """
+    from winebox.models.login_attempt import LoginAttempt
+    from winebox.models.token_blacklist import RevokedToken
+
+    while True:
+        try:
+            # Wait 1 hour between cleanups
+            await asyncio.sleep(3600)
+
+            # Cleanup expired revoked tokens
+            tokens_cleaned = await RevokedToken.cleanup_expired()
+            if tokens_cleaned > 0:
+                logger.info("Token blacklist cleanup: removed %d expired tokens", tokens_cleaned)
+
+            # Cleanup old login attempts
+            attempts_cleaned = await LoginAttempt.cleanup_old_attempts(older_than_hours=24)
+            if attempts_cleaned > 0:
+                logger.info("Login attempts cleanup: removed %d old attempts", attempts_cleaned)
+
+        except asyncio.CancelledError:
+            logger.debug("Security cleanup task cancelled")
+            break
+        except Exception as e:
+            logger.error("Security cleanup task error: %s", str(e))
+            # Continue running despite errors
 
 
 def _validate_security_configuration() -> None:
@@ -142,6 +181,8 @@ def _validate_security_configuration() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
+    global _cleanup_task
+
     # Startup
     # Validate security configuration before proceeding
     _validate_security_configuration()
@@ -153,9 +194,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize database
     await init_db()
 
+    # Start background cleanup task
+    _cleanup_task = asyncio.create_task(_run_security_cleanup())
+    logger.info("Started security cleanup background task")
+
     yield
 
     # Shutdown
+    # Cancel cleanup task
+    if _cleanup_task:
+        _cleanup_task.cancel()
+        try:
+            await _cleanup_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Stopped security cleanup background task")
+
     await close_db()
 
 
