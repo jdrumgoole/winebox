@@ -5,21 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#722f37">
+    <meta name="theme-color" content="#8B1A4A">
     <title>WineBox - Wine Cellar Management</title>
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.5.5">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/static/logos/favicon.png">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.5.7">
 </head>
 <body>
     <header>
         <div class="header-content">
-            <h1>WineBox</h1>
+            <img src="/static/logos/logo-compact-dark.svg" alt="WineBox" class="header-logo" height="32">
             <nav id="main-nav">
                 <a href="#" data-page="dashboard" class="nav-link active">Dashboard</a>
                 <a href="#" data-page="checkin" class="nav-link">Check In</a>
                 <a href="#" data-page="cellar" class="nav-link">Cellar</a>
                 <a href="#" data-page="history" class="nav-link">History</a>
                 <a href="#" data-page="search" class="nav-link">Search</a>
+                <a href="#" data-page="xwines" class="nav-link">X-Wines</a>
             </nav>
             <div id="user-info" class="user-info" style="display: none;">
                 <a href="#" id="username-display" data-page="settings" class="username-link"></a>
@@ -33,6 +37,7 @@
         <div class="login-container">
             <!-- Login Form -->
             <div class="login-card" id="login-card">
+                <img src="/static/logos/icon-transparent.svg" alt="" class="login-icon" width="64" height="64">
                 <h2>Welcome to WineBox</h2>
                 <p class="login-subtitle">Sign in to manage your wine cellar</p>
                 <form id="login-form">
@@ -471,6 +476,53 @@
             <div id="search-results" class="wine-grid"></div>
         </section>
 
+        <!-- X-Wines Search Page -->
+        <section id="page-xwines" class="page">
+            <h2>X-Wines Database</h2>
+            <p class="page-subtitle">Search over 100,000 wines from the X-Wines reference dataset</p>
+            <form id="xwines-search-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="xwines-q">Search</label>
+                        <input type="text" id="xwines-q" name="q" placeholder="Wine name, winery..." minlength="2" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="xwines-type">Wine Type</label>
+                        <select id="xwines-type" name="wine_type">
+                            <option value="">All Types</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="xwines-country">Country</label>
+                        <select id="xwines-country" name="country">
+                            <option value="">All Countries</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="xwines-limit">Results</label>
+                        <select id="xwines-limit" name="limit">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                    <button type="reset" class="btn btn-secondary">Clear</button>
+                </div>
+            </form>
+            <div id="xwines-results" class="wine-grid"></div>
+        </section>
+
+        <!-- X-Wines Detail Modal -->
+        <div id="xwines-modal" class="modal">
+            <div class="modal-content">
+                <span class="modal-close">&times;</span>
+                <div id="xwines-detail"></div>
+            </div>
+        </div>
+
         <!-- Settings Page -->
         <section id="page-settings" class="page">
             <h2>Settings</h2>
@@ -742,6 +794,6 @@
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
-    <script src="/static/js/app.js?v=0.5.5"></script>
+    <script src="/static/js/app.js?v=0.5.8"></script>
 </body>
 </html>

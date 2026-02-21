@@ -1,11 +1,11 @@
 /* WineBox Landing Page Styles */
 
 :root {
-    --primary-color: #722f37;
-    --primary-light: #8b4049;
-    --primary-dark: #5a252c;
-    --secondary-color: #d4a373;
-    --background-color: #faf8f5;
+    --primary-color: #8B1A4A;
+    --primary-light: #B82860;
+    --primary-dark: #5C0A2D;
+    --secondary-color: #C49A3C;
+    --background-color: #FAF7F2;
     --card-background: #ffffff;
     --text-color: #2c2c2c;
     --text-muted: #666666;
@@ -28,10 +28,14 @@ html {
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    font-family: 'Cormorant Garamond', Georgia, serif;
     background-color: var(--background-color);
     color: var(--text-color);
     line-height: 1.6;
+}
+
+h1, h2, h3, h4 {
+    font-family: 'Playfair Display', Georgia, serif;
 }
 
 /* Header */
@@ -55,11 +59,14 @@ header {
 }
 
 .logo {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: white;
     text-decoration: none;
-    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+}
+
+.logo img {
+    height: 36px;
+    display: block;
 }
 
 .header-nav {
@@ -112,11 +119,11 @@ header {
 
 .btn-primary {
     background: var(--secondary-color);
-    color: var(--primary-dark);
+    color: #fff;
 }
 
 .btn-primary:hover {
-    background: #e8c49a;
+    background: #d4aa4c;
 }
 
 .btn-outline {
@@ -168,7 +175,9 @@ header {
 }
 
 .hero-subtitle {
-    font-size: 1.25rem;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic;
+    font-size: 1.35rem;
     color: var(--text-muted);
     margin-bottom: 2rem;
     line-height: 1.6;
@@ -411,7 +420,7 @@ header {
 }
 
 .wine-result:first-child {
-    background: rgba(114, 47, 55, 0.05);
+    background: rgba(139, 26, 74, 0.05);
 }
 
 .wine-name {
@@ -467,9 +476,7 @@ footer {
 }
 
 .footer-logo {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: white;
+    height: 32px;
     display: block;
     margin-bottom: 0.5rem;
 }

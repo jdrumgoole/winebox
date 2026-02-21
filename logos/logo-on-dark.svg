@@ -7,12 +7,12 @@
     <line x1="4" y1="70" x2="96" y2="70" stroke="#907050" stroke-width="0.7" opacity="0.5"/>
     <line x1="35" y1="44" x2="35" y2="92" stroke="#8A6C4E" stroke-width="1" opacity="0.45"/>
     <line x1="65" y1="44" x2="65" y2="92" stroke="#8A6C4E" stroke-width="1" opacity="0.45"/>
-    <path d="M12 72 L12 38 L12 33 Q12 29 16 27 L16 14 Q16 11 17.5 10.5 L22.5 10.5 Q24 11 24 14 L24 27 Q28 29 28 33 L28 38 L28 72 Z" fill="#B82860"/>
-    <rect x="13.5" y="44" width="13" height="14" rx="1" fill="#F0D78C" opacity="0.45"/>
+    <path d="M12 72 L12 34 Q12 27 16 23 L16 10 Q16 7 17.5 6.5 L22.5 6.5 Q24 7 24 10 L24 23 Q28 27 28 34 L28 72 Z" fill="#B82860"/>
+    <rect x="13.5" y="38" width="13" height="14" rx="1" fill="#F0D78C" opacity="0.45"/>
     <path d="M42 72 L42 34 Q42 27 46 23 L46 10 Q46 7 47.5 6.5 L52.5 6.5 Q54 7 54 10 L54 23 Q58 27 58 34 L58 72 Z" fill="#B82860"/>
     <rect x="43.5" y="38" width="13" height="14" rx="1" fill="#F0D78C" opacity="0.45"/>
-    <path d="M72 72 L72 40 L72 35 Q72 31 76 29 L76 16 Q76 13 77.5 12.5 L82.5 12.5 Q84 13 84 16 L84 29 Q88 31 88 35 L88 40 L88 72 Z" fill="#B82860"/>
-    <rect x="73.5" y="46" width="13" height="14" rx="1" fill="#F0D78C" opacity="0.45"/>
+    <path d="M72 72 L72 34 Q72 27 76 23 L76 10 Q76 7 77.5 6.5 L82.5 6.5 Q84 7 84 10 L84 23 Q88 27 88 34 L88 72 Z" fill="#B82860"/>
+    <rect x="73.5" y="38" width="13" height="14" rx="1" fill="#F0D78C" opacity="0.45"/>
   </g>
   <text x="130" y="72" font-family="Georgia, serif" font-size="64" letter-spacing="-1">
     <tspan font-weight="700" fill="#E0C0CC">Wine</tspan><tspan font-weight="400" fill="#F0D78C">Box</tspan>

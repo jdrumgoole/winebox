@@ -682,6 +682,9 @@ function navigateTo(page) {
         case 'search':
             // Search results loaded on form submit
             break;
+        case 'xwines':
+            loadXWinesFilters();
+            break;
         case 'settings':
             loadSettings();
             break;
@@ -744,6 +747,9 @@ function initForms() {
 
     // Search form
     document.getElementById('search-form').addEventListener('submit', handleSearch);
+
+    // X-Wines search form
+    document.getElementById('xwines-search-form').addEventListener('submit', handleXWinesSearch);
 
     // Checkout form
     document.getElementById('checkout-form').addEventListener('submit', handleCheckout);
@@ -1533,6 +1539,24 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function parsePythonList(str) {
+    if (!str) return '';
+    try {
+        // Try standard JSON first
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed)) return parsed.join(', ');
+        return str;
+    } catch {
+        // Handle Python-style single-quoted lists: ['Beef', 'Veal']
+        try {
+            const fixed = str.replace(/'/g, '"');
+            const parsed = JSON.parse(fixed);
+            if (Array.isArray(parsed)) return parsed.join(', ');
+        } catch { /* fall through */ }
+        return str;
+    }
+}
+
 function toggleWineDetailLabelText(header) {
     const section = header.parentElement;
     const content = section.querySelector('.collapsible-content');
@@ -1740,5 +1764,226 @@ async function handleApiKeyDelete() {
         showToast('API key deleted successfully', 'success');
     } catch (error) {
         showToast(error.message, 'error');
+    }
+}
+
+// X-Wines Search
+let xwinesFiltersLoaded = false;
+
+async function loadXWinesFilters() {
+    if (xwinesFiltersLoaded) return;
+
+    try {
+        const [typesRes, countriesRes] = await Promise.all([
+            fetchWithAuth(`${API_BASE}/xwines/types`),
+            fetchWithAuth(`${API_BASE}/xwines/countries`)
+        ]);
+
+        if (typesRes.ok) {
+            const types = await typesRes.json();
+            const typeSelect = document.getElementById('xwines-type');
+            types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                typeSelect.appendChild(opt);
+            });
+        }
+
+        if (countriesRes.ok) {
+            const countries = await countriesRes.json();
+            const countrySelect = document.getElementById('xwines-country');
+            countries.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.code;
+                opt.textContent = `${c.name} (${c.count})`;
+                countrySelect.appendChild(opt);
+            });
+        }
+
+        xwinesFiltersLoaded = true;
+    } catch (error) {
+        console.error('Failed to load X-Wines filters:', error);
+    }
+}
+
+async function handleXWinesSearch(e) {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    const q = document.getElementById('xwines-q').value.trim();
+    if (q.length < 2) {
+        showToast('Please enter at least 2 characters', 'error');
+        return;
+    }
+    params.append('q', q);
+
+    const wineType = document.getElementById('xwines-type').value;
+    if (wineType) params.append('wine_type', wineType);
+
+    const country = document.getElementById('xwines-country').value;
+    if (country) params.append('country', country);
+
+    const limit = document.getElementById('xwines-limit').value;
+    params.append('limit', limit);
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/xwines/search?${params}`);
+        if (!response.ok) throw new Error('Search failed');
+        const data = await response.json();
+        renderXWinesGrid('xwines-results', data.results, data.total);
+    } catch (error) {
+        showToast('X-Wines search failed', 'error');
+    }
+}
+
+function renderXWinesGrid(containerId, results, total) {
+    const container = document.getElementById(containerId);
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try a different search term or adjust filters</p></div>';
+        return;
+    }
+
+    const header = total > results.length
+        ? `<div class="xwines-results-header">Showing ${results.length} of ${total} results</div>`
+        : `<div class="xwines-results-header">${results.length} result${results.length !== 1 ? 's' : ''}</div>`;
+
+    container.innerHTML = header + results.map(wine => {
+        const ratingDisplay = wine.avg_rating
+            ? `<span class="xwines-rating">${'★'.repeat(Math.round(wine.avg_rating))}${'☆'.repeat(5 - Math.round(wine.avg_rating))} ${wine.avg_rating.toFixed(1)}</span><span class="xwines-rating-count">(${wine.rating_count})</span>`
+            : '<span class="xwines-rating xwines-no-rating">No ratings</span>';
+
+        return `
+            <div class="xwines-card" data-xwine-id="${wine.id}">
+                <div class="xwines-card-header">
+                    ${wine.wine_type ? `<span class="xwines-type-tag xwines-type-${wine.wine_type.toLowerCase().replace(/[éè]/g, 'e')}">${escapeHtml(wine.wine_type)}</span>` : ''}
+                </div>
+                <div class="xwines-card-content">
+                    <div class="xwines-card-title">${escapeHtml(wine.name)}</div>
+                    <div class="xwines-card-subtitle">${wine.winery ? escapeHtml(wine.winery) : ''}</div>
+                    <div class="xwines-card-details">
+                        ${wine.country ? `<span class="wine-tag">${escapeHtml(wine.country)}</span>` : ''}
+                        ${wine.region ? `<span class="wine-tag">${escapeHtml(wine.region)}</span>` : ''}
+                        ${wine.abv ? `<span class="wine-tag">${wine.abv}% ABV</span>` : ''}
+                    </div>
+                </div>
+                <div class="xwines-card-footer">
+                    ${ratingDisplay}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.xwines-card').forEach(card => {
+        card.addEventListener('click', () => {
+            showXWinesDetail(card.dataset.xwineId);
+        });
+    });
+}
+
+async function showXWinesDetail(wineId) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/xwines/wines/${wineId}`);
+        if (!response.ok) throw new Error('Failed to load wine details');
+        const wine = await response.json();
+
+        let grapes = '';
+        if (wine.grapes) {
+            grapes = parsePythonList(wine.grapes);
+        }
+
+        let harmonize = '';
+        if (wine.harmonize) {
+            harmonize = parsePythonList(wine.harmonize);
+        }
+
+        let vintages = '';
+        if (wine.vintages) {
+            try {
+                const parsed = JSON.parse(wine.vintages);
+                vintages = Array.isArray(parsed) ? parsed.join(', ') : wine.vintages;
+            } catch {
+                vintages = wine.vintages;
+            }
+        }
+
+        const ratingDisplay = wine.avg_rating
+            ? `${'★'.repeat(Math.round(wine.avg_rating))}${'☆'.repeat(5 - Math.round(wine.avg_rating))} ${wine.avg_rating.toFixed(1)} (${wine.rating_count} ratings)`
+            : 'No ratings';
+
+        document.getElementById('xwines-detail').innerHTML = `
+            <div class="xwines-detail-layout">
+                <div class="xwines-detail-header">
+                    <h3>${escapeHtml(wine.name)}</h3>
+                    ${wine.winery_name ? `<div class="xwines-detail-winery">${escapeHtml(wine.winery_name)}</div>` : ''}
+                    ${wine.wine_type ? `<span class="xwines-type-tag xwines-type-${wine.wine_type.toLowerCase().replace(/[éè]/g, 'e')}">${escapeHtml(wine.wine_type)}</span>` : ''}
+                    ${wine.elaborate ? `<span class="wine-tag">${escapeHtml(wine.elaborate)}</span>` : ''}
+                </div>
+
+                <div class="xwines-detail-rating">
+                    <div class="xwines-detail-stars">${ratingDisplay}</div>
+                </div>
+
+                <div class="xwines-detail-fields">
+                    ${wine.country ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Country</div>
+                            <div class="value">${escapeHtml(wine.country)}</div>
+                        </div>
+                    ` : ''}
+                    ${wine.region_name ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Region</div>
+                            <div class="value">${escapeHtml(wine.region_name)}</div>
+                        </div>
+                    ` : ''}
+                    ${wine.abv ? `
+                        <div class="wine-detail-field">
+                            <div class="label">ABV</div>
+                            <div class="value">${wine.abv}%</div>
+                        </div>
+                    ` : ''}
+                    ${wine.body ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Body</div>
+                            <div class="value">${escapeHtml(wine.body)}</div>
+                        </div>
+                    ` : ''}
+                    ${wine.acidity ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Acidity</div>
+                            <div class="value">${escapeHtml(wine.acidity)}</div>
+                        </div>
+                    ` : ''}
+                    ${grapes ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Grapes</div>
+                            <div class="value">${escapeHtml(grapes)}</div>
+                        </div>
+                    ` : ''}
+                    ${harmonize ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Food Pairings</div>
+                            <div class="value">${escapeHtml(harmonize)}</div>
+                        </div>
+                    ` : ''}
+                    ${vintages ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Vintages</div>
+                            <div class="value">${escapeHtml(vintages)}</div>
+                        </div>
+                    ` : ''}
+                    ${wine.website ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Website</div>
+                            <div class="value"><a href="${escapeHtml(wine.website)}" target="_blank" rel="noopener">${escapeHtml(wine.website)}</a></div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+
+        openModal('xwines-modal');
+    } catch (error) {
+        showToast('Failed to load wine details', 'error');
     }
 }

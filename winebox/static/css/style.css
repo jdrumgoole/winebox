@@ -1,11 +1,11 @@
 /* WineBox - Wine Cellar Management Styles */
 
 :root {
-    --primary-color: #722f37;
-    --primary-light: #8b4049;
-    --primary-dark: #5a252c;
-    --secondary-color: #d4a373;
-    --background-color: #faf8f5;
+    --primary-color: #8B1A4A;
+    --primary-light: #B82860;
+    --primary-dark: #5C0A2D;
+    --secondary-color: #C49A3C;
+    --background-color: #FAF7F2;
     --card-background: #ffffff;
     --text-color: #2c2c2c;
     --text-muted: #666666;
@@ -53,10 +53,9 @@ header {
     gap: 1rem;
 }
 
-header h1 {
-    font-size: 1.75rem;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+.header-logo {
+    height: 32px;
+    display: block;
 }
 
 nav {
@@ -308,7 +307,7 @@ h3 {
 .form-group textarea:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(114, 47, 55, 0.1);
+    box-shadow: 0 0 0 3px rgba(139, 26, 74, 0.1);
 }
 
 .form-group input[type="checkbox"] {
@@ -360,11 +359,11 @@ h3 {
 
 .image-preview:hover {
     border-color: var(--primary-color);
-    background-color: rgba(114, 47, 55, 0.05);
+    background-color: rgba(139, 26, 74, 0.05);
 }
 
 .image-preview:active {
-    background-color: rgba(114, 47, 55, 0.1);
+    background-color: rgba(139, 26, 74, 0.1);
 }
 
 .image-preview img {
@@ -1052,8 +1051,8 @@ h3 {
 
 /* Extra small screens */
 @media (max-width: 480px) {
-    header h1 {
-        font-size: 1.4rem;
+    .header-logo {
+        height: 28px;
     }
 
     .stats-grid {
@@ -1112,7 +1111,13 @@ h3 {
     text-align: center;
 }
 
+.login-icon {
+    display: block;
+    margin: 0 auto 1rem;
+}
+
 .login-card h2 {
+    font-family: 'Playfair Display', Georgia, serif;
     color: var(--primary-color);
     margin-bottom: 0.5rem;
 }
@@ -1798,4 +1803,183 @@ body.logged-out #user-info {
     text-align: center;
     color: var(--text-muted);
     font-style: italic;
+}
+
+/* X-Wines Search Page */
+.page-subtitle {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-top: -1rem;
+    margin-bottom: 1.5rem;
+}
+
+.xwines-results-header {
+    grid-column: 1 / -1;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding-bottom: 0.5rem;
+}
+
+/* X-Wines Cards */
+.xwines-card {
+    background: var(--card-background);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+}
+
+.xwines-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.xwines-card-header {
+    padding: 0.75rem 1.25rem 0;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.xwines-card-content {
+    padding: 0.5rem 1.25rem 1rem;
+    flex: 1;
+}
+
+.xwines-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 0.25rem;
+}
+
+.xwines-card-subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+}
+
+.xwines-card-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.xwines-card-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--border-color);
+    background: var(--background-color);
+}
+
+/* X-Wines Rating */
+.xwines-rating {
+    color: var(--warning-color);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.xwines-rating-count {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.xwines-no-rating {
+    color: var(--text-muted);
+    font-weight: normal;
+    font-style: italic;
+}
+
+/* X-Wines Type Tags */
+.xwines-type-tag {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.xwines-type-red {
+    background: rgba(139, 26, 74, 0.12);
+    color: var(--primary-color);
+}
+
+.xwines-type-white {
+    background: rgba(196, 154, 60, 0.15);
+    color: #8a6d1b;
+}
+
+.xwines-type-rose {
+    background: rgba(219, 112, 147, 0.15);
+    color: #c4607e;
+}
+
+.xwines-type-sparkling {
+    background: rgba(74, 124, 89, 0.12);
+    color: var(--success-color);
+}
+
+.xwines-type-fortified {
+    background: rgba(92, 10, 45, 0.12);
+    color: var(--primary-dark);
+}
+
+.xwines-type-dessert {
+    background: rgba(201, 162, 39, 0.15);
+    color: var(--warning-color);
+}
+
+/* X-Wines Detail Modal */
+.xwines-detail-layout {
+    max-width: 700px;
+}
+
+.xwines-detail-header {
+    margin-bottom: 1rem;
+}
+
+.xwines-detail-header h3 {
+    font-size: 1.5rem;
+    color: var(--primary-color);
+    margin-bottom: 0.25rem;
+}
+
+.xwines-detail-winery {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    margin-bottom: 0.75rem;
+}
+
+.xwines-detail-rating {
+    margin-bottom: 1.5rem;
+}
+
+.xwines-detail-stars {
+    color: var(--warning-color);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.xwines-detail-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.xwines-detail-fields .wine-detail-field .value a {
+    color: var(--primary-color);
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.xwines-detail-fields .wine-detail-field .value a:hover {
+    text-decoration: underline;
 }

@@ -231,7 +231,7 @@ async def logout(
 
 
 @router.post("/token", response_model=Token)
-@limiter.limit("5/minute;20/hour")  # Strict rate limiting for login attempts
+@limiter.limit("30/minute;200/hour")  # Rate limiting for login attempts
 async def login_token(
     request: Request,  # Required for rate limiting
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
