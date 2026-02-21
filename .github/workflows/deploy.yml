@@ -32,22 +32,6 @@ jobs:
             echo "version=" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Wait for PyPI availability
-        if: steps.version.outputs.version != ''
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          echo "Waiting for winebox==${VERSION} on PyPI..."
-          for i in $(seq 1 30); do
-            if pip index versions winebox 2>/dev/null | grep -q "${VERSION}"; then
-              echo "Version ${VERSION} is available on PyPI!"
-              exit 0
-            fi
-            echo "Attempt ${i}/30: version ${VERSION} not yet available, waiting 10s..."
-            sleep 10
-          done
-          echo "ERROR: Version ${VERSION} not available on PyPI after 5 minutes"
-          exit 1
-
       - name: Deploy to Digital Ocean
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -57,11 +41,24 @@ jobs:
           username: root
           key: ${{ secrets.DO_SSH_KEY }}
           envs: DEPLOY_VERSION
+          command_timeout: 10m
           script: |
             echo "Upgrading WineBox..."
             if [ -n "${DEPLOY_VERSION}" ]; then
               echo "Installing specific version: winebox==${DEPLOY_VERSION}"
-              sudo -u winebox /opt/winebox/.venv/bin/pip install "winebox==${DEPLOY_VERSION}" --no-cache-dir
+              # Wait for version to be available on PyPI (CDN propagation can lag)
+              for attempt in $(seq 1 30); do
+                if sudo -u winebox /opt/winebox/.venv/bin/pip install "winebox==${DEPLOY_VERSION}" --no-cache-dir 2>/dev/null; then
+                  echo "Successfully installed winebox==${DEPLOY_VERSION}"
+                  break
+                fi
+                if [ "${attempt}" -eq 30 ]; then
+                  echo "ERROR: Failed to install winebox==${DEPLOY_VERSION} after 30 attempts (5 minutes)"
+                  exit 1
+                fi
+                echo "Attempt ${attempt}/30: winebox==${DEPLOY_VERSION} not yet available, waiting 10s..."
+                sleep 10
+              done
             else
               echo "Installing latest version"
               sudo -u winebox /opt/winebox/.venv/bin/pip install winebox --upgrade --no-cache-dir
