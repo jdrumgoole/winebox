@@ -328,3 +328,190 @@ async def test_xwines_search_ordering(client: AsyncClient, init_test_db) -> None
     assert results[1]["name"] == "Quality Wine"
     # Unknown wine last
     assert results[2]["name"] == "Unknown Wine"
+
+
+@pytest.mark.asyncio
+async def test_xwines_search_pagination(client: AsyncClient, init_test_db) -> None:
+    """Test search pagination with skip and limit parameters."""
+    # Create 10 wines
+    wines = [
+        XWinesWine(
+            xwines_id=i + 1,
+            name=f"Test Wine {i}",
+            wine_type="Red",
+            avg_rating=4.0,
+            rating_count=1000 - i * 10,  # Ensure ordering
+        )
+        for i in range(10)
+    ]
+    for wine in wines:
+        await wine.insert()
+
+    # Test first page (limit=3, skip=0)
+    response = await client.get("/api/xwines/search?q=Test&limit=3&skip=0")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 10
+    assert data["skip"] == 0
+    assert data["limit"] == 3
+    assert len(data["results"]) == 3
+    assert data["results"][0]["name"] == "Test Wine 0"
+
+    # Test second page (limit=3, skip=3)
+    response = await client.get("/api/xwines/search?q=Test&limit=3&skip=3")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 10
+    assert data["skip"] == 3
+    assert data["limit"] == 3
+    assert len(data["results"]) == 3
+    assert data["results"][0]["name"] == "Test Wine 3"
+
+
+@pytest.mark.asyncio
+async def test_xwines_search_skip_validation(client: AsyncClient) -> None:
+    """Test that negative skip values are rejected."""
+    response = await client.get("/api/xwines/search?q=test&skip=-1")
+    assert response.status_code == 422  # Validation error
+
+
+@pytest.mark.asyncio
+async def test_xwines_export_json(client: AsyncClient, init_test_db) -> None:
+    """Test X-Wines export in JSON format."""
+    wines = [
+        XWinesWine(
+            xwines_id=1,
+            name="Export Test Wine",
+            wine_type="Red",
+            winery_name="Test Winery",
+            country="France",
+            country_code="FR",
+            avg_rating=4.5,
+            rating_count=100,
+        ),
+    ]
+    for wine in wines:
+        await wine.insert()
+
+    response = await client.get("/api/xwines/export?q=Export&format=json")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/json"
+    assert "attachment" in response.headers.get("content-disposition", "")
+
+    data = response.json()
+    assert "xwines" in data
+    assert "export_info" in data
+    assert len(data["xwines"]) == 1
+    assert data["xwines"][0]["name"] == "Export Test Wine"
+
+
+@pytest.mark.asyncio
+async def test_xwines_export_csv(client: AsyncClient, init_test_db) -> None:
+    """Test X-Wines export in CSV format."""
+    wine = XWinesWine(
+        xwines_id=1,
+        name="CSV Export Wine",
+        wine_type="White",
+        winery_name="CSV Winery",
+        country="Italy",
+        country_code="IT",
+        avg_rating=4.2,
+        rating_count=50,
+    )
+    await wine.insert()
+
+    response = await client.get("/api/xwines/export?q=CSV&format=csv")
+    assert response.status_code == 200
+    assert "text/csv" in response.headers["content-type"]
+    assert "attachment" in response.headers.get("content-disposition", "")
+
+    content = response.content.decode("utf-8")
+    assert "id,name,winery" in content  # Check header
+    assert "CSV Export Wine" in content
+
+
+@pytest.mark.asyncio
+async def test_xwines_export_xlsx(client: AsyncClient, init_test_db) -> None:
+    """Test X-Wines export in XLSX format."""
+    wine = XWinesWine(
+        xwines_id=1,
+        name="Excel Export Wine",
+        wine_type="Red",
+        winery_name="Excel Winery",
+        country="Spain",
+        country_code="ES",
+        avg_rating=4.0,
+        rating_count=75,
+    )
+    await wine.insert()
+
+    response = await client.get("/api/xwines/export?q=Excel&format=xlsx")
+    assert response.status_code == 200
+    assert (
+        response.headers["content-type"]
+        == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "attachment" in response.headers.get("content-disposition", "")
+    # Check it's a valid XLSX (starts with ZIP signature)
+    assert response.content[:4] == b"PK\x03\x04"
+
+
+@pytest.mark.asyncio
+async def test_xwines_export_yaml(client: AsyncClient, init_test_db) -> None:
+    """Test X-Wines export in YAML format."""
+    wine = XWinesWine(
+        xwines_id=1,
+        name="YAML Export Wine",
+        wine_type="Rosé",
+        winery_name="YAML Winery",
+        country="Portugal",
+        country_code="PT",
+        avg_rating=3.8,
+        rating_count=30,
+    )
+    await wine.insert()
+
+    response = await client.get("/api/xwines/export?q=YAML&format=yaml")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/x-yaml"
+    assert "attachment" in response.headers.get("content-disposition", "")
+
+    content = response.content.decode("utf-8")
+    assert "xwines:" in content
+    assert "YAML Export Wine" in content
+    assert "export_info:" in content
+
+
+@pytest.mark.asyncio
+async def test_xwines_export_with_filters(client: AsyncClient, init_test_db) -> None:
+    """Test X-Wines export with wine_type and country filters."""
+    wines = [
+        XWinesWine(
+            xwines_id=1,
+            name="Filter Test Red",
+            wine_type="Red",
+            country="France",
+            country_code="FR",
+            avg_rating=4.0,
+            rating_count=100,
+        ),
+        XWinesWine(
+            xwines_id=2,
+            name="Filter Test White",
+            wine_type="White",
+            country="France",
+            country_code="FR",
+            avg_rating=4.0,
+            rating_count=100,
+        ),
+    ]
+    for wine in wines:
+        await wine.insert()
+
+    # Export only Red wines
+    response = await client.get("/api/xwines/export?q=Filter&format=json&wine_type=Red")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["xwines"]) == 1
+    assert data["xwines"][0]["wine_type"] == "Red"
+    assert data["export_info"]["filters_applied"]["wine_type"] == "Red"

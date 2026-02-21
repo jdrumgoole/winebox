@@ -4,15 +4,18 @@ Provides endpoints for:
 - Wine search/autocomplete for check-in form (Atlas Search with regex fallback)
 - Wine details lookup
 - Dataset statistics for footer attribution
+- Search result exports
 """
 
 import logging
 import re
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
 
 from winebox.database import get_database
 from winebox.models import XWinesMetadata, XWinesWine
+from winebox.schemas.export import ExportFormat
 from winebox.schemas.xwines import (
     FacetBucket,
     SearchFacets,
@@ -21,6 +24,7 @@ from winebox.schemas.xwines import (
     XWinesWineDetail,
     XWinesWineSearchResult,
 )
+from winebox.services import export_service
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +36,7 @@ async def _atlas_search(
     limit: int,
     wine_type: str | None,
     country: str | None,
+    skip: int = 0,
 ) -> tuple[list[dict], int, SearchFacets | None]:
     """Attempt Atlas Search with facets.
 
@@ -68,10 +73,11 @@ async def _atlas_search(
         }
     }
 
-    # Run search pipeline for results
+    # Run search pipeline for results (with skip for pagination)
     pipeline: list[dict] = [
         search_stage,
         {"$sort": {"rating_count": -1, "avg_rating": -1}},
+        {"$skip": skip},
         {"$limit": limit},
     ]
     results = await collection.aggregate(pipeline).to_list(length=limit)
@@ -137,6 +143,7 @@ async def _regex_search(
     limit: int,
     wine_type: str | None,
     country: str | None,
+    skip: int = 0,
 ) -> tuple[list[XWinesWine], int]:
     """Fallback regex-based search for local MongoDB (no Atlas Search)."""
     search_pattern = re.compile(re.escape(q), re.IGNORECASE)
@@ -157,6 +164,7 @@ async def _regex_search(
     wines = (
         await XWinesWine.find(conditions)
         .sort([("rating_count", -1), ("avg_rating", -1), ("name", 1)])
+        .skip(skip)
         .limit(limit)
         .to_list()
     )
@@ -199,6 +207,7 @@ def _wine_model_to_result(wine: XWinesWine) -> XWinesWineSearchResult:
 async def search_wines(
     q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),
     limit: int = Query(10, ge=1, le=50, description="Maximum results to return"),
+    skip: int = Query(0, ge=0, description="Number of results to skip"),
     wine_type: str | None = Query(None, description="Filter by wine type"),
     country: str | None = Query(None, description="Filter by country code"),
 ) -> XWinesSearchResponse:
@@ -209,16 +218,20 @@ async def search_wines(
     """
     # Try Atlas Search first
     try:
-        docs, total, facets = await _atlas_search(q, limit, wine_type, country)
+        docs, total, facets = await _atlas_search(q, limit, wine_type, country, skip)
         results = [_wine_doc_to_result(doc) for doc in docs]
-        return XWinesSearchResponse(results=results, total=total, facets=facets)
+        return XWinesSearchResponse(
+            results=results, total=total, skip=skip, limit=limit, facets=facets
+        )
     except Exception as e:
         logger.debug("Atlas Search unavailable, falling back to regex: %s", e)
 
     # Fallback to regex search
-    wines, total = await _regex_search(q, limit, wine_type, country)
+    wines, total = await _regex_search(q, limit, wine_type, country, skip)
     results = [_wine_model_to_result(wine) for wine in wines]
-    return XWinesSearchResponse(results=results, total=total, facets=None)
+    return XWinesSearchResponse(
+        results=results, total=total, skip=skip, limit=limit, facets=None
+    )
 
 
 @router.get("/wines/{wine_id}", response_model=XWinesWineDetail)
@@ -332,3 +345,60 @@ async def list_countries() -> list[dict]:
             {"code": code, "name": name, "count": count}
             for (code, name), count in sorted_countries
         ]
+
+
+@router.get("/export")
+async def export_xwines_search(
+    q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),
+    format: ExportFormat = Query(default=ExportFormat.JSON, description="Export format"),
+    wine_type: str | None = Query(None, description="Filter by wine type"),
+    country: str | None = Query(None, description="Filter by country code"),
+    limit: int = Query(1000, ge=1, le=10000, description="Maximum results to export"),
+) -> Response:
+    """Export X-Wines search results in various formats.
+
+    Supports CSV, XLSX, YAML, and JSON formats.
+    """
+    # Execute search without pagination (get all results up to limit)
+    try:
+        docs, total, _ = await _atlas_search(q, limit, wine_type, country, skip=0)
+        results = [_wine_doc_to_result(doc) for doc in docs]
+    except Exception as e:
+        logger.debug("Atlas Search unavailable, falling back to regex: %s", e)
+        wines, total = await _regex_search(q, limit, wine_type, country, skip=0)
+        results = [_wine_model_to_result(wine) for wine in wines]
+
+    # Build filters applied metadata
+    filters_applied = {"q": q}
+    if wine_type:
+        filters_applied["wine_type"] = wine_type
+    if country:
+        filters_applied["country"] = country
+
+    # Convert results to dictionaries for export
+    results_dicts = [result.model_dump() for result in results]
+
+    # Generate export based on format
+    if format == ExportFormat.CSV:
+        content = export_service.export_xwines_to_csv(results_dicts)
+        media_type = "text/csv"
+    elif format == ExportFormat.XLSX:
+        content = export_service.export_xwines_to_xlsx(results_dicts)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif format == ExportFormat.YAML:
+        content = export_service.export_xwines_to_yaml(results_dicts, filters_applied)
+        media_type = "application/x-yaml"
+    else:  # JSON
+        json_data = export_service.export_xwines_to_json(results_dicts, filters_applied)
+        import json
+        content = json.dumps(json_data, indent=2).encode("utf-8")
+        media_type = "application/json"
+
+    # Generate filename
+    filename = export_service.generate_xwines_filename(format)
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

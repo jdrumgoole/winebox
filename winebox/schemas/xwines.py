@@ -68,6 +68,8 @@ class XWinesSearchResponse(BaseModel):
         default_factory=list, description="Matching wines"
     )
     total: int = Field(0, description="Total number of matches (may be more than returned)")
+    skip: int = Field(0, description="Number of results skipped")
+    limit: int = Field(10, description="Maximum results per page")
     facets: SearchFacets | None = Field(
         None, description="Facet counts (when Atlas Search is available)"
     )
