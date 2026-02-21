@@ -1,13 +1,10 @@
 """User document model for authentication with fastapi-users integration."""
 
-import logging
 from datetime import datetime
 from typing import Optional
 
 from beanie import Document, Indexed
 from pydantic import Field
-
-logger = logging.getLogger(__name__)
 
 
 class User(Document):
@@ -25,12 +22,8 @@ class User(Document):
 
     Custom fields added for WineBox:
     - full_name: optional full name
-    - anthropic_api_key: user's API key for Claude Vision (encrypted at rest)
     - created_at, updated_at: timestamps
     - last_login: last login timestamp
-
-    Note: API keys are stored encrypted at rest. Use the helper methods
-    `get_decrypted_api_key()` and `set_encrypted_api_key()` for access.
     """
 
     # Required fields for fastapi-users
@@ -42,50 +35,6 @@ class User(Document):
 
     # Custom fields for WineBox
     full_name: Optional[str] = None
-    # API key is stored encrypted at rest
-    anthropic_api_key: Optional[str] = None
-
-    def get_decrypted_api_key(self) -> Optional[str]:
-        """Get the decrypted API key.
-
-        Returns:
-            Decrypted API key or None if not set.
-        """
-        if not self.anthropic_api_key:
-            return None
-
-        try:
-            from winebox.services.crypto import decrypt_value, is_encrypted
-
-            if is_encrypted(self.anthropic_api_key):
-                return decrypt_value(self.anthropic_api_key)
-            # Handle legacy unencrypted values
-            return self.anthropic_api_key
-        except Exception as e:
-            logger.error(f"Failed to decrypt API key for user {self.id}: {e}")
-            return None
-
-    def set_encrypted_api_key(self, plaintext_key: Optional[str]) -> None:
-        """Set the API key, encrypting it for storage.
-
-        Args:
-            plaintext_key: Plaintext API key to encrypt and store.
-        """
-        if not plaintext_key:
-            self.anthropic_api_key = None
-            return
-
-        try:
-            from winebox.services.crypto import encrypt_value, is_encrypted
-
-            # Don't double-encrypt
-            if is_encrypted(plaintext_key):
-                self.anthropic_api_key = plaintext_key
-            else:
-                self.anthropic_api_key = encrypt_value(plaintext_key)
-        except Exception as e:
-            logger.error(f"Failed to encrypt API key: {e}")
-            raise ValueError("Failed to encrypt API key") from e
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)

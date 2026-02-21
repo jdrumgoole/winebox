@@ -18,15 +18,54 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
 
     steps:
+      - name: Determine version to deploy
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            # Extract version from the tag that triggered the publish workflow
+            TAG="${{ github.event.workflow_run.head_branch }}"
+            VERSION="${TAG#v}"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for PyPI availability
+        if: steps.version.outputs.version != ''
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Waiting for winebox==${VERSION} on PyPI..."
+          for i in $(seq 1 30); do
+            if pip index versions winebox 2>/dev/null | grep -q "${VERSION}"; then
+              echo "Version ${VERSION} is available on PyPI!"
+              exit 0
+            fi
+            echo "Attempt ${i}/30: version ${VERSION} not yet available, waiting 10s..."
+            sleep 10
+          done
+          echo "ERROR: Version ${VERSION} not available on PyPI after 5 minutes"
+          exit 1
+
       - name: Deploy to Digital Ocean
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DEPLOY_VERSION: ${{ steps.version.outputs.version }}
         with:
           host: ${{ secrets.DO_DROPLET_IP }}
           username: root
           key: ${{ secrets.DO_SSH_KEY }}
+          envs: DEPLOY_VERSION
           script: |
             echo "Upgrading WineBox..."
-            sudo -u winebox /opt/winebox/.venv/bin/pip install winebox --upgrade --no-cache-dir
+            if [ -n "${DEPLOY_VERSION}" ]; then
+              echo "Installing specific version: winebox==${DEPLOY_VERSION}"
+              sudo -u winebox /opt/winebox/.venv/bin/pip install "winebox==${DEPLOY_VERSION}" --no-cache-dir
+            else
+              echo "Installing latest version"
+              sudo -u winebox /opt/winebox/.venv/bin/pip install winebox --upgrade --no-cache-dir
+            fi
 
             echo "Updating static files symlink..."
             rm -f /opt/winebox/static
@@ -46,13 +85,34 @@ jobs:
 
             echo "Health check (with retry)..."
             for i in 1 2 3 4 5; do
-              if curl -sf http://localhost:8000/health; then
-                echo ""
-                echo "Deployment complete!"
-                exit 0
+              HEALTH=$(curl -sf http://localhost:8000/health)
+              if [ $? -eq 0 ]; then
+                echo "${HEALTH}"
+                # Verify correct version from API health endpoint
+                if [ -n "${DEPLOY_VERSION}" ]; then
+                  DEPLOYED=$(echo "${HEALTH}" | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])" 2>/dev/null)
+                  if [ "${DEPLOYED}" != "${DEPLOY_VERSION}" ]; then
+                    echo "ERROR: API version mismatch - expected ${DEPLOY_VERSION} but got ${DEPLOYED}"
+                    exit 1
+                  fi
+                  echo "API version ${DEPLOY_VERSION} verified."
+                fi
+                break
               fi
               echo "Attempt $i failed, retrying in 2s..."
               sleep 2
             done
-            echo "Health check failed after 5 attempts"
-            exit 1
+
+            # Verify landing page contains the expected version
+            if [ -n "${DEPLOY_VERSION}" ]; then
+              echo "Verifying landing page version..."
+              LANDING_HTML=$(cat /opt/winebox/static/landing.html)
+              if echo "${LANDING_HTML}" | grep -q "v${DEPLOY_VERSION}"; then
+                echo "Landing page version v${DEPLOY_VERSION} verified."
+              else
+                echo "ERROR: Landing page does not contain v${DEPLOY_VERSION}"
+                exit 1
+              fi
+            fi
+
+            echo "Deployment complete!"

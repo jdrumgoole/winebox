@@ -78,7 +78,6 @@ class UserResponse(BaseModel):
     is_active: bool
     is_admin: bool
     is_verified: bool
-    has_api_key: bool
     created_at: datetime
     last_login: datetime | None
 
@@ -94,7 +93,6 @@ class UserResponse(BaseModel):
             is_active=user.is_active,
             is_admin=user.is_admin,
             is_verified=user.is_verified,
-            has_api_key=user.anthropic_api_key is not None,
             created_at=user.created_at,
             last_login=user.last_login,
         )
@@ -105,18 +103,6 @@ class PasswordChangeRequest(BaseModel):
 
     current_password: str
     new_password: str
-
-
-class ProfileUpdateRequest(BaseModel):
-    """Profile update request model."""
-
-    full_name: str | None = None
-
-
-class ApiKeyUpdateRequest(BaseModel):
-    """API key update request model."""
-
-    api_key: str
 
 
 class Token(BaseModel):
@@ -154,49 +140,6 @@ async def change_password(
     await current_user.save()
 
     return {"message": "Password updated successfully"}
-
-
-@router.put("/profile", response_model=UserResponse)
-async def update_profile(
-    request: ProfileUpdateRequest,
-    current_user: RequireAuth,
-) -> UserResponse:
-    """Update the current user's profile."""
-    if request.full_name is not None:
-        current_user.full_name = request.full_name
-
-    current_user.updated_at = datetime.utcnow()
-    await current_user.save()
-
-    return UserResponse.from_user(current_user)
-
-
-@router.put("/api-key")
-async def update_api_key(
-    request: ApiKeyUpdateRequest,
-    current_user: RequireAuth,
-) -> dict:
-    """Update the current user's Anthropic API key.
-
-    Note: The API key is stored encrypted and cannot be retrieved after setting.
-    """
-    current_user.set_encrypted_api_key(request.api_key)
-    current_user.updated_at = datetime.utcnow()
-    await current_user.save()
-
-    return {"message": "API key updated successfully"}
-
-
-@router.delete("/api-key")
-async def delete_api_key(
-    current_user: RequireAuth,
-) -> dict:
-    """Delete the current user's Anthropic API key."""
-    current_user.anthropic_api_key = None
-    current_user.updated_at = datetime.utcnow()
-    await current_user.save()
-
-    return {"message": "API key deleted successfully"}
 
 
 @router.post("/logout")

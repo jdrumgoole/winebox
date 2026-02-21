@@ -1,24 +1,198 @@
 """X-Wines dataset API router for wine autocomplete and reference data.
 
 Provides endpoints for:
-- Wine search/autocomplete for check-in form
+- Wine search/autocomplete for check-in form (Atlas Search with regex fallback)
 - Wine details lookup
 - Dataset statistics for footer attribution
 """
 
+import logging
 import re
 
 from fastapi import APIRouter, HTTPException, Query
 
+from winebox.database import get_database
 from winebox.models import XWinesMetadata, XWinesWine
 from winebox.schemas.xwines import (
+    FacetBucket,
+    SearchFacets,
     XWinesSearchResponse,
     XWinesStats,
     XWinesWineDetail,
     XWinesWineSearchResult,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+async def _atlas_search(
+    q: str,
+    limit: int,
+    wine_type: str | None,
+    country: str | None,
+) -> tuple[list[dict], int, SearchFacets | None]:
+    """Attempt Atlas Search with facets.
+
+    Returns (results, total, facets) or raises on failure.
+    """
+    db = get_database()
+    collection = db["xwines_wines"]
+
+    # Build compound must/filter clauses
+    must = [
+        {
+            "text": {
+                "query": q,
+                "path": ["name", "winery_name"],
+                "fuzzy": {"maxEdits": 1, "prefixLength": 2},
+            }
+        }
+    ]
+
+    filter_clauses: list[dict] = []
+    if wine_type:
+        filter_clauses.append({"text": {"query": wine_type, "path": "wine_type"}})
+    if country:
+        filter_clauses.append({"text": {"query": country, "path": "country_code"}})
+
+    compound: dict = {"must": must}
+    if filter_clauses:
+        compound["filter"] = filter_clauses
+
+    search_stage = {
+        "$search": {
+            "index": "xwines_search",
+            "compound": compound,
+        }
+    }
+
+    # Run search pipeline for results
+    pipeline: list[dict] = [
+        search_stage,
+        {"$sort": {"rating_count": -1, "avg_rating": -1}},
+        {"$limit": limit},
+    ]
+    results = await collection.aggregate(pipeline).to_list(length=limit)
+
+    # Run count pipeline
+    count_pipeline: list[dict] = [
+        search_stage,
+        {"$count": "total"},
+    ]
+    count_result = await collection.aggregate(count_pipeline).to_list(length=1)
+    total = count_result[0]["total"] if count_result else 0
+
+    # Run facet pipeline via $searchMeta
+    facet_pipeline: list[dict] = [
+        {
+            "$searchMeta": {
+                "index": "xwines_search",
+                "facet": {
+                    "operator": {
+                        "text": {
+                            "query": q,
+                            "path": ["name", "winery_name"],
+                            "fuzzy": {"maxEdits": 1, "prefixLength": 2},
+                        }
+                    },
+                    "facets": {
+                        "wine_type": {
+                            "type": "string",
+                            "path": "wine_type",
+                            "numBuckets": 20,
+                        },
+                        "country": {
+                            "type": "string",
+                            "path": "country",
+                            "numBuckets": 50,
+                        },
+                    },
+                },
+            }
+        }
+    ]
+    facet_result = await collection.aggregate(facet_pipeline).to_list(length=1)
+
+    facets = None
+    if facet_result:
+        meta = facet_result[0].get("facet", {})
+        facets = SearchFacets(
+            wine_type=[
+                FacetBucket(value=b["_id"], count=b["count"])
+                for b in meta.get("wine_type", {}).get("buckets", [])
+            ],
+            country=[
+                FacetBucket(value=b["_id"], count=b["count"])
+                for b in meta.get("country", {}).get("buckets", [])
+            ],
+        )
+
+    return results, total, facets
+
+
+async def _regex_search(
+    q: str,
+    limit: int,
+    wine_type: str | None,
+    country: str | None,
+) -> tuple[list[XWinesWine], int]:
+    """Fallback regex-based search for local MongoDB (no Atlas Search)."""
+    search_pattern = re.compile(re.escape(q), re.IGNORECASE)
+    conditions: dict = {
+        "$or": [
+            {"name": {"$regex": search_pattern}},
+            {"winery_name": {"$regex": search_pattern}},
+        ]
+    }
+
+    if wine_type:
+        conditions["wine_type"] = {
+            "$regex": re.compile(f"^{re.escape(wine_type)}$", re.IGNORECASE)
+        }
+    if country:
+        conditions["country_code"] = country.upper()
+
+    wines = (
+        await XWinesWine.find(conditions)
+        .sort([("rating_count", -1), ("avg_rating", -1), ("name", 1)])
+        .limit(limit)
+        .to_list()
+    )
+    total = await XWinesWine.find(conditions).count()
+
+    return wines, total
+
+
+def _wine_doc_to_result(doc: dict) -> XWinesWineSearchResult:
+    """Convert a raw MongoDB document to a search result."""
+    return XWinesWineSearchResult(
+        id=doc.get("xwines_id", 0),
+        name=doc.get("name", ""),
+        winery=doc.get("winery_name"),
+        wine_type=doc.get("wine_type", ""),
+        country=doc.get("country"),
+        region=doc.get("region_name"),
+        abv=doc.get("abv"),
+        avg_rating=doc.get("avg_rating"),
+        rating_count=doc.get("rating_count", 0),
+    )
+
+
+def _wine_model_to_result(wine: XWinesWine) -> XWinesWineSearchResult:
+    """Convert a Beanie model to a search result."""
+    return XWinesWineSearchResult(
+        id=wine.xwines_id,
+        name=wine.name,
+        winery=wine.winery_name,
+        wine_type=wine.wine_type,
+        country=wine.country,
+        region=wine.region_name,
+        abv=wine.abv,
+        avg_rating=wine.avg_rating,
+        rating_count=wine.rating_count,
+    )
 
 
 @router.get("/search", response_model=XWinesSearchResponse)
@@ -30,49 +204,21 @@ async def search_wines(
 ) -> XWinesSearchResponse:
     """Search X-Wines dataset for autocomplete.
 
-    Returns wines matching the query by name or winery name.
-    Results are sorted by rating count (popularity) then average rating.
+    Uses Atlas Search when available (fuzzy matching, relevance scoring, facets).
+    Falls back to regex search on local MongoDB instances.
     """
-    # Build search query - search in name and winery_name
-    search_pattern = re.compile(re.escape(q), re.IGNORECASE)
-    conditions = {
-        "$or": [
-            {"name": {"$regex": search_pattern}},
-            {"winery_name": {"$regex": search_pattern}},
-        ]
-    }
+    # Try Atlas Search first
+    try:
+        docs, total, facets = await _atlas_search(q, limit, wine_type, country)
+        results = [_wine_doc_to_result(doc) for doc in docs]
+        return XWinesSearchResponse(results=results, total=total, facets=facets)
+    except Exception as e:
+        logger.debug("Atlas Search unavailable, falling back to regex: %s", e)
 
-    # Apply optional filters
-    if wine_type:
-        conditions["wine_type"] = {"$regex": re.compile(f"^{re.escape(wine_type)}$", re.IGNORECASE)}
-    if country:
-        conditions["country_code"] = country.upper()
-
-    # Get wines sorted by popularity
-    wines = await XWinesWine.find(conditions).sort(
-        [("rating_count", -1), ("avg_rating", -1), ("name", 1)]
-    ).limit(limit).to_list()
-
-    # Count total matches
-    total = await XWinesWine.find(conditions).count()
-
-    # Convert to response format
-    results = [
-        XWinesWineSearchResult(
-            id=wine.xwines_id,
-            name=wine.name,
-            winery=wine.winery_name,
-            wine_type=wine.wine_type,
-            country=wine.country,
-            region=wine.region_name,
-            abv=wine.abv,
-            avg_rating=wine.avg_rating,
-            rating_count=wine.rating_count,
-        )
-        for wine in wines
-    ]
-
-    return XWinesSearchResponse(results=results, total=total)
+    # Fallback to regex search
+    wines, total = await _regex_search(q, limit, wine_type, country)
+    results = [_wine_model_to_result(wine) for wine in wines]
+    return XWinesSearchResponse(results=results, total=total, facets=None)
 
 
 @router.get("/wines/{wine_id}", response_model=XWinesWineDetail)
@@ -131,7 +277,7 @@ async def list_wine_types() -> list[str]:
     # Use MongoDB aggregation for efficient distinct values
     # Falls back to Python aggregation if aggregation is not supported (e.g., mongomock)
     try:
-        pipeline = [
+        pipeline: list[dict] = [
             {"$match": {"wine_type": {"$ne": None}}},
             {"$group": {"_id": "$wine_type"}},
             {"$sort": {"_id": 1}},
@@ -153,7 +299,7 @@ async def list_countries() -> list[dict]:
     # Use MongoDB aggregation for efficient grouping
     # Falls back to Python aggregation if aggregation is not supported (e.g., mongomock)
     try:
-        pipeline = [
+        pipeline: list[dict] = [
             {"$match": {"country_code": {"$ne": None}, "country": {"$ne": None}}},
             {
                 "$group": {

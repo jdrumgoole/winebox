@@ -157,8 +157,6 @@ class TestCurrentUser:
         assert "email" in data
         assert "is_active" in data
         assert "is_verified" in data
-        assert "has_api_key" in data
-
     @pytest.mark.asyncio
     async def test_get_me_unauthenticated(self, unauthenticated_client: AsyncClient):
         """Test getting current user info when not authenticated."""
@@ -202,48 +200,3 @@ class TestPasswordChange:
         assert response.status_code == 400
 
 
-class TestProfileUpdate:
-    """Tests for profile update flow."""
-
-    @pytest.mark.asyncio
-    async def test_update_profile(self, client: AsyncClient, auth_headers):
-        """Test updating user profile."""
-        response = await client.put(
-            "/api/auth/profile",
-            headers=auth_headers,
-            json={"full_name": "Updated Name"},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["full_name"] == "Updated Name"
-
-
-class TestApiKey:
-    """Tests for API key management."""
-
-    @pytest.mark.asyncio
-    async def test_update_api_key(self, client: AsyncClient, auth_headers):
-        """Test updating API key."""
-        response = await client.put(
-            "/api/auth/api-key",
-            headers=auth_headers,
-            json={"api_key": "sk-ant-test-key"},
-        )
-
-        assert response.status_code == 200
-
-    @pytest.mark.asyncio
-    async def test_delete_api_key(self, client: AsyncClient, auth_headers):
-        """Test deleting API key."""
-        # First set an API key
-        await client.put(
-            "/api/auth/api-key",
-            headers=auth_headers,
-            json={"api_key": "sk-ant-test-key"},
-        )
-
-        # Then delete it
-        response = await client.delete("/api/auth/api-key", headers=auth_headers)
-
-        assert response.status_code == 200

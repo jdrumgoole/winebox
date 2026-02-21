@@ -14,7 +14,6 @@ class UserRead(schemas.BaseUser[PydanticObjectId]):
     """
 
     full_name: str | None = None
-    has_api_key: bool = False
     created_at: datetime
     last_login: datetime | None = None
 
@@ -35,5 +34,3 @@ class UserUpdate(schemas.BaseUserUpdate):
 
     All fields are optional for partial updates.
     """
-
-    full_name: str | None = None

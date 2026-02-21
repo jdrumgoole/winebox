@@ -1297,36 +1297,6 @@ h3 {
     line-height: 1.5;
 }
 
-.api-key-status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    background: var(--background-color);
-    border-radius: var(--radius);
-    margin-bottom: 1rem;
-}
-
-.api-key-status .status-indicator {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--text-muted);
-}
-
-.api-key-status.configured .status-indicator {
-    background: var(--success-color);
-}
-
-.api-key-status.not-configured .status-indicator {
-    background: var(--warning-color);
-}
-
-.api-key-status .status-text {
-    font-size: 0.9rem;
-    color: var(--text-color);
-}
-
 /* Hide main content when not logged in */
 body.logged-out main {
     display: none;

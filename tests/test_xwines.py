@@ -263,6 +263,32 @@ async def test_xwines_countries_endpoint(client: AsyncClient, init_test_db) -> N
 
 
 @pytest.mark.asyncio
+async def test_xwines_search_response_has_facets_field(
+    client: AsyncClient, init_test_db
+) -> None:
+    """Test that search response includes the facets key (null when Atlas Search unavailable)."""
+    wine = XWinesWine(
+        xwines_id=1,
+        name="Facet Test Wine",
+        wine_type="Red",
+        country="France",
+        country_code="FR",
+        avg_rating=4.0,
+        rating_count=100,
+    )
+    await wine.insert()
+
+    response = await client.get("/api/xwines/search?q=Facet")
+    assert response.status_code == 200
+    data = response.json()
+    assert "facets" in data
+    # In test environment (no Atlas Search), facets should be null
+    assert data["facets"] is None
+    assert data["total"] == 1
+    assert len(data["results"]) == 1
+
+
+@pytest.mark.asyncio
 async def test_xwines_search_ordering(client: AsyncClient, init_test_db) -> None:
     """Test search results are ordered by popularity then rating."""
     wines = [

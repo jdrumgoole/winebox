@@ -1,20 +1,14 @@
 """Claude Vision service for wine label analysis."""
 
 import base64
-import hashlib
 import json
 import logging
 import os
-import time
 from typing import Any
 
 from winebox.config import settings
 
 logger = logging.getLogger(__name__)
-
-# Client cache with TTL (5 minutes)
-_client_cache: dict[str, tuple[Any, float]] = {}
-_CACHE_TTL = 300  # 5 minutes
 
 WINE_ANALYSIS_PROMPT = """Analyze this wine label image and extract the following information.
 Return ONLY a valid JSON object with these fields (use null for any field you cannot determine):
@@ -69,51 +63,21 @@ class ClaudeVisionService:
         """Get the system-wide API key from settings or environment."""
         return settings.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
 
-    def _get_client(self, user_api_key: str | None = None):
-        """Get an Anthropic client, using user key if provided, else system key.
+    def _get_client(self):
+        """Get an Anthropic client using the system API key.
 
-        Clients are cached with a TTL to avoid recreating them on every request.
+        The client is cached to avoid recreating it on every request.
         """
         try:
             import anthropic
 
-            # Use user's API key if provided, otherwise use system key
-            api_key = user_api_key or self._get_system_api_key()
+            api_key = self._get_system_api_key()
             if not api_key:
                 raise ValueError("No Anthropic API key configured")
 
-            # If using system key, cache the client
-            if not user_api_key:
-                if self._default_client is None:
-                    self._default_client = anthropic.Anthropic(api_key=api_key)
-                return self._default_client
-
-            # Cache user-specific clients with TTL
-            # Hash the API key to use as cache key (don't store raw key in memory)
-            cache_key = hashlib.sha256(api_key.encode()).hexdigest()[:16]
-            now = time.time()
-
-            # Check cache
-            if cache_key in _client_cache:
-                client, cached_at = _client_cache[cache_key]
-                if now - cached_at < _CACHE_TTL:
-                    return client
-                # Expired, remove from cache
-                del _client_cache[cache_key]
-
-            # Create new client and cache it
-            client = anthropic.Anthropic(api_key=api_key)
-            _client_cache[cache_key] = (client, now)
-
-            # Clean up expired entries periodically (simple approach)
-            if len(_client_cache) > 100:
-                expired_keys = [
-                    k for k, (_, t) in _client_cache.items() if now - t >= _CACHE_TTL
-                ]
-                for k in expired_keys:
-                    del _client_cache[k]
-
-            return client
+            if self._default_client is None:
+                self._default_client = anthropic.Anthropic(api_key=api_key)
+            return self._default_client
         except ImportError:
             logger.error("anthropic package is not installed")
             raise
@@ -123,14 +87,10 @@ class ClaudeVisionService:
         """Lazy-load the default Anthropic client (for backward compatibility)."""
         return self._get_client()
 
-    def is_available(self, user_api_key: str | None = None) -> bool:
-        """Check if Claude Vision is available.
-
-        Args:
-            user_api_key: Optional user-specific API key to check.
-        """
+    def is_available(self) -> bool:
+        """Check if Claude Vision is available."""
         try:
-            api_key = user_api_key or self._get_system_api_key()
+            api_key = self._get_system_api_key()
             return bool(api_key) and settings.use_claude_vision
         except Exception:
             return False
@@ -139,14 +99,12 @@ class ClaudeVisionService:
         self,
         image_data: bytes,
         media_type: str = "image/jpeg",
-        user_api_key: str | None = None,
     ) -> dict[str, Any]:
         """Analyze a wine label image using Claude Vision.
 
         Args:
             image_data: Raw image data as bytes.
             media_type: MIME type of the image (image/jpeg, image/png, etc.)
-            user_api_key: Optional user-specific API key.
 
         Returns:
             Dictionary with parsed wine information.
@@ -155,8 +113,8 @@ class ClaudeVisionService:
             # Encode image to base64
             image_base64 = base64.standard_b64encode(image_data).decode("utf-8")
 
-            # Get client (uses user key if provided, else system key)
-            client = self._get_client(user_api_key)
+            # Get client
+            client = self._get_client()
 
             # Call Claude API with vision
             message = client.messages.create(
@@ -240,7 +198,6 @@ class ClaudeVisionService:
         back_image_data: bytes | None = None,
         front_media_type: str = "image/jpeg",
         back_media_type: str = "image/jpeg",
-        user_api_key: str | None = None,
     ) -> dict[str, Any]:
         """Analyze front and back wine label images.
 
@@ -249,14 +206,13 @@ class ClaudeVisionService:
             back_image_data: Optional back label image data.
             front_media_type: MIME type of front image.
             back_media_type: MIME type of back image.
-            user_api_key: Optional user-specific API key.
 
         Returns:
             Combined analysis results.
         """
         try:
-            # Get client (uses user key if provided, else system key)
-            client = self._get_client(user_api_key)
+            # Get client
+            client = self._get_client()
 
             # Build message content with images
             content = [

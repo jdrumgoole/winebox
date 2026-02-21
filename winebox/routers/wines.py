@@ -97,7 +97,6 @@ async def scan_label(
 
     Uses Claude Vision for intelligent label analysis when available,
     falls back to Tesseract OCR otherwise.
-    Uses user's API key if configured, otherwise falls back to system key.
     """
     # Validate and read image data with size limits concurrently
     async def validate_front() -> bytes:
@@ -110,11 +109,8 @@ async def scan_label(
 
     front_data, back_data = await asyncio.gather(validate_front(), validate_back())
 
-    # Get user's API key (if they have one configured) - decrypted
-    user_api_key = current_user.get_decrypted_api_key()
-
     # Try Claude Vision first
-    if vision_service.is_available(user_api_key):
+    if vision_service.is_available():
         logger.info("Using Claude Vision for label analysis")
         try:
             front_media_type = get_media_type(front_label.filename)
@@ -125,7 +121,6 @@ async def scan_label(
                 back_image_data=back_data,
                 front_media_type=front_media_type,
                 back_media_type=back_media_type,
-                user_api_key=user_api_key,
             )
 
             return {
@@ -208,7 +203,6 @@ async def checkin_wine(
     Upload front (required) and back (optional) label images.
     If front_label_text is provided (from a prior /scan call), scanning is skipped.
     Otherwise, uses Claude Vision for intelligent label analysis when available.
-    Uses user's API key if configured, otherwise falls back to system key.
     You can override any auto-detected values.
     """
     # Save images
@@ -220,9 +214,6 @@ async def checkin_wine(
     # Use pre-scanned text if provided (avoids duplicate API calls)
     front_text = front_label_text or ""
     back_text = back_label_text
-
-    # Get user's API key (if they have one configured) - decrypted
-    user_api_key = current_user.get_decrypted_api_key()
 
     # Only scan if no pre-scanned text was provided and no name given
     if not front_label_text and not name:
@@ -244,7 +235,7 @@ async def checkin_wine(
         # Try Claude Vision first
         parsed_data = {}
 
-        if vision_service.is_available(user_api_key):
+        if vision_service.is_available():
             logger.info("Using Claude Vision for checkin analysis")
             try:
                 front_media_type = get_media_type(front_label.filename)
@@ -255,7 +246,6 @@ async def checkin_wine(
                     back_image_data=back_data,
                     front_media_type=front_media_type,
                     back_media_type=back_media_type,
-                    user_api_key=user_api_key,
                 )
                 parsed_data = result
                 front_text = result.get("raw_text", "")

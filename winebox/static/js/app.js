@@ -322,9 +322,7 @@ function showMainApp() {
     document.body.classList.remove('logged-out');
     document.getElementById('page-login').classList.remove('active');
     document.getElementById('user-info').style.display = 'flex';
-    // Display full name if available, otherwise email
-    const displayName = currentUser.full_name || currentUser.email;
-    document.getElementById('username-display').textContent = displayName;
+    document.getElementById('username-display').textContent = currentUser.email;
     loadDashboard();
 }
 
@@ -762,10 +760,7 @@ function initForms() {
     document.getElementById('history-filter').addEventListener('change', loadHistory);
 
     // Settings forms
-    document.getElementById('profile-form').addEventListener('submit', handleProfileUpdate);
     document.getElementById('password-form').addEventListener('submit', handlePasswordChange);
-    document.getElementById('api-key-form').addEventListener('submit', handleApiKeyUpdate);
-    document.getElementById('delete-api-key-btn').addEventListener('click', handleApiKeyDelete);
 }
 
 function previewImage(input, previewId) {
@@ -1601,68 +1596,8 @@ function debounce(func, wait) {
 
 // Settings
 function loadSettings() {
-    // Populate profile form with current user data
-    document.getElementById('settings-email').value = currentUser.email;
-    document.getElementById('settings-fullname').value = currentUser.full_name || '';
-
-    // Update API key status
-    updateApiKeyStatus(currentUser.has_api_key);
-
     // Clear password form
     document.getElementById('password-form').reset();
-
-    // Clear API key form
-    document.getElementById('api-key').value = '';
-}
-
-function updateApiKeyStatus(hasApiKey) {
-    const statusDiv = document.getElementById('api-key-status');
-    const statusText = statusDiv.querySelector('.status-text');
-    const deleteBtn = document.getElementById('delete-api-key-btn');
-
-    statusDiv.classList.remove('configured', 'not-configured');
-
-    if (hasApiKey) {
-        statusDiv.classList.add('configured');
-        statusText.textContent = 'API key is configured';
-        deleteBtn.style.display = 'inline-block';
-    } else {
-        statusDiv.classList.add('not-configured');
-        statusText.textContent = 'No API key configured';
-        deleteBtn.style.display = 'none';
-    }
-}
-
-async function handleProfileUpdate(e) {
-    e.preventDefault();
-
-    const fullName = document.getElementById('settings-fullname').value.trim();
-
-    try {
-        const response = await fetchWithAuth(`${API_BASE}/auth/profile`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ full_name: fullName || null })
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to update profile');
-        }
-
-        const updatedUser = await response.json();
-        currentUser = updatedUser;
-
-        // Update display name in header
-        const displayName = currentUser.full_name || currentUser.email;
-        document.getElementById('username-display').textContent = displayName;
-
-        showToast('Profile updated successfully', 'success');
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
 }
 
 async function handlePasswordChange(e) {
@@ -1701,67 +1636,6 @@ async function handlePasswordChange(e) {
 
         document.getElementById('password-form').reset();
         showToast('Password changed successfully', 'success');
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-async function handleApiKeyUpdate(e) {
-    e.preventDefault();
-
-    const apiKey = document.getElementById('api-key').value.trim();
-
-    if (!apiKey) {
-        showToast('Please enter an API key', 'error');
-        return;
-    }
-
-    if (!apiKey.startsWith('sk-ant-')) {
-        showToast('Invalid API key format. Anthropic API keys start with sk-ant-', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetchWithAuth(`${API_BASE}/auth/api-key`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ api_key: apiKey })
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to update API key');
-        }
-
-        currentUser.has_api_key = true;
-        updateApiKeyStatus(true);
-        document.getElementById('api-key').value = '';
-        showToast('API key saved successfully', 'success');
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-async function handleApiKeyDelete() {
-    if (!confirm('Are you sure you want to delete your API key? Wine label scanning will use the default system key if available.')) {
-        return;
-    }
-
-    try {
-        const response = await fetchWithAuth(`${API_BASE}/auth/api-key`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to delete API key');
-        }
-
-        currentUser.has_api_key = false;
-        updateApiKeyStatus(false);
-        showToast('API key deleted successfully', 'success');
     } catch (error) {
         showToast(error.message, 'error');
     }
@@ -1831,8 +1705,45 @@ async function handleXWinesSearch(e) {
         if (!response.ok) throw new Error('Search failed');
         const data = await response.json();
         renderXWinesGrid('xwines-results', data.results, data.total);
+
+        // Update filter dropdowns with facet counts if available
+        if (data.facets) {
+            updateFilterCounts(data.facets);
+        }
     } catch (error) {
         showToast('X-Wines search failed', 'error');
+    }
+}
+
+function updateFilterCounts(facets) {
+    // Update wine type dropdown with facet counts
+    if (facets.wine_type && facets.wine_type.length > 0) {
+        const typeSelect = document.getElementById('xwines-type');
+        const countMap = {};
+        facets.wine_type.forEach(b => { countMap[b.value] = b.count; });
+
+        Array.from(typeSelect.options).forEach(opt => {
+            if (!opt.value) return; // skip "All Types" placeholder
+            const count = countMap[opt.value];
+            // Strip any existing count suffix before adding new one
+            const baseLabel = opt.textContent.replace(/\s*\(\d[\d,]*\)$/, '');
+            opt.textContent = count !== undefined ? `${baseLabel} (${count.toLocaleString()})` : baseLabel;
+        });
+    }
+
+    // Update country dropdown with facet counts
+    if (facets.country && facets.country.length > 0) {
+        const countrySelect = document.getElementById('xwines-country');
+        const countMap = {};
+        facets.country.forEach(b => { countMap[b.value] = b.count; });
+
+        Array.from(countrySelect.options).forEach(opt => {
+            if (!opt.value) return; // skip "All Countries" placeholder
+            // Country options show "Name (count)" — update the count portion
+            const baseLabel = opt.textContent.replace(/\s*\(\d[\d,]*\)$/, '');
+            const count = countMap[baseLabel];
+            opt.textContent = count !== undefined ? `${baseLabel} (${count.toLocaleString()})` : baseLabel;
+        });
     }
 }
 

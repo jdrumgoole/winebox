@@ -47,6 +47,20 @@ class XWinesWineDetail(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class FacetBucket(BaseModel):
+    """A single facet value with its count."""
+
+    value: str = Field(..., description="Facet value")
+    count: int = Field(..., description="Number of matching documents")
+
+
+class SearchFacets(BaseModel):
+    """Facet counts returned alongside search results."""
+
+    wine_type: list[FacetBucket] = Field(default_factory=list)
+    country: list[FacetBucket] = Field(default_factory=list)
+
+
 class XWinesSearchResponse(BaseModel):
     """Response for wine search/autocomplete."""
 
@@ -54,6 +68,9 @@ class XWinesSearchResponse(BaseModel):
         default_factory=list, description="Matching wines"
     )
     total: int = Field(0, description="Total number of matches (may be more than returned)")
+    facets: SearchFacets | None = Field(
+        None, description="Facet counts (when Atlas Search is available)"
+    )
 
 
 class XWinesStats(BaseModel):
