@@ -134,7 +134,7 @@ def deploy(
         print("Version: latest")
     print("=" * 50)
 
-    total_steps = 5 if setup_dns_flag else 4
+    total_steps = 6 if setup_dns_flag else 5
     step = 0
 
     # Step: Setup DNS (optional)
@@ -152,12 +152,16 @@ def deploy(
     print(f"\n[{step}/{total_steps}] Installing winebox from PyPI...")
     if not dry_run:
         if version:
-            pip_spec = f"winebox=={version}"
+            # Retry installation for CDN propagation lag
+            install_cmd = (
+                f"for attempt in $(seq 1 10); do "
+                f"sudo -u winebox /opt/winebox/.venv/bin/pip install 'winebox=={version}' --no-cache-dir && break; "
+                f'echo "Attempt $attempt/10: waiting for PyPI CDN..."; sleep 10; '
+                f"done"
+            )
         else:
-            pip_spec = "winebox --upgrade"
-        run_ssh(host, user, [
-            f"sudo -u winebox /opt/winebox/.venv/bin/pip install {pip_spec}",
-        ])
+            install_cmd = "sudo -u winebox /opt/winebox/.venv/bin/pip install winebox --upgrade --no-cache-dir"
+        run_ssh(host, user, [install_cmd])
 
     # Step: Sync secrets
     step += 1
@@ -169,20 +173,40 @@ def deploy(
     else:
         print("  No local .env loaded, skipping")
 
-    # Step: Restart service
+    # Step: Update static files symlink and reload nginx
     step += 1
-    print(f"\n[{step}/{total_steps}] Restarting service...")
-    if not dry_run:
-        run_ssh(host, user, ["systemctl restart winebox"])
-
-    # Step: Check status
-    step += 1
-    print(f"\n[{step}/{total_steps}] Checking service status...")
+    print(f"\n[{step}/{total_steps}] Updating static files and restarting service...")
     if not dry_run:
         run_ssh(host, user, [
-            "sleep 2",
-            "systemctl is-active winebox",
-        ], check=False)
+            "rm -f /opt/winebox/static",
+            "ln -sf /opt/winebox/.venv/lib/python3.*/site-packages/winebox/static /opt/winebox/static",
+            "systemctl restart winebox",
+            "nginx -t && systemctl reload nginx",
+        ])
+
+    # Step: Health check with version verification
+    step += 1
+    print(f"\n[{step}/{total_steps}] Running health check...")
+    if not dry_run:
+        run_ssh(host, user, ["sleep 3"], check=False)
+
+        # Check service is active
+        run_ssh(host, user, ["systemctl is-active winebox"], check=False)
+
+        # Health check with version verification
+        if version:
+            health_cmd = (
+                'HEALTH=$(curl -sf http://localhost:8000/health); '
+                'echo "$HEALTH"; '
+                f"echo \"$HEALTH\" | grep -q '\"version\":\"{version}\"' && "
+                f'echo "Version {version} verified" || '
+                f'echo "WARNING: Version mismatch on health endpoint"'
+            )
+            run_ssh(host, user, [health_cmd], check=False)
+        else:
+            run_ssh(host, user, [
+                "curl -sf http://localhost:8000/health || echo 'Health check failed'",
+            ], check=False)
 
         # Show recent logs
         print("\nRecent logs:")

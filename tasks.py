@@ -1,6 +1,9 @@
 """Invoke tasks for WineBox application management."""
 
+import re
 import sys
+import time
+import urllib.request
 from pathlib import Path
 
 from invoke import task
@@ -350,6 +353,97 @@ def docs_serve(ctx: Context, port: int = 8080) -> None:
     ctx.run(f"uv run python -m http.server {port} --directory docs/_build/html", pty=True)
 
 
+# =============================================================================
+# Version & Release Helpers
+# =============================================================================
+
+def _get_current_version() -> str:
+    """Read the current version from pyproject.toml."""
+    content = Path("pyproject.toml").read_text()
+    match = re.search(r'^version = "(.+)"', content, re.MULTILINE)
+    if not match:
+        print("Error: Could not find version in pyproject.toml")
+        sys.exit(1)
+    return match.group(1)
+
+
+def _bump_version(current: str, major: bool = False, minor: bool = False) -> str:
+    """Bump a semver version string.
+
+    Args:
+        current: Current version string (e.g. "0.5.8")
+        major: Bump major version
+        minor: Bump minor version
+
+    Returns:
+        New version string
+    """
+    parts = current.split(".")
+    maj, min_, patch = int(parts[0]), int(parts[1]), int(parts[2])
+    if major:
+        return f"{maj + 1}.0.0"
+    elif minor:
+        return f"{maj}.{min_ + 1}.0"
+    else:
+        return f"{maj}.{min_}.{patch + 1}"
+
+
+def _update_version_files(new_version: str) -> None:
+    """Update version in pyproject.toml and __init__.py.
+
+    Args:
+        new_version: New version string to set
+    """
+    # pyproject.toml
+    pyproject = Path("pyproject.toml")
+    content = pyproject.read_text()
+    content = re.sub(
+        r'^version = ".*"',
+        f'version = "{new_version}"',
+        content,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    pyproject.write_text(content)
+
+    # __init__.py
+    init = Path("winebox/__init__.py")
+    content = init.read_text()
+    content = re.sub(
+        r'^__version__ = ".*"',
+        f'__version__ = "{new_version}"',
+        content,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    init.write_text(content)
+
+
+def _wait_for_pypi(version: str, max_attempts: int = 30, interval: int = 10) -> bool:
+    """Poll PyPI until the version is available.
+
+    Args:
+        version: Version string to check for
+        max_attempts: Maximum number of polling attempts
+        interval: Seconds between attempts
+
+    Returns:
+        True if version became available, False if timed out
+    """
+    url = f"https://pypi.org/pypi/winebox/{version}/json"
+    for attempt in range(1, max_attempts + 1):
+        try:
+            resp = urllib.request.urlopen(url)
+            if resp.status == 200:
+                print(f"  v{version} is available on PyPI!")
+                return True
+        except Exception:
+            pass
+        print(f"  Attempt {attempt}/{max_attempts}: v{version} not yet on PyPI, waiting {interval}s...")
+        time.sleep(interval)
+    return False
+
+
 # Deployment Tasks
 @task(name="deploy-setup")
 def deploy_setup(ctx: Context, host: str = "", domain: str = "booze.winebox.app") -> None:
@@ -375,14 +469,144 @@ def deploy(
     host: str = "",
     droplet_name: str = "",
     version: str = "",
+    minor: bool = False,
+    major: bool = False,
+    no_secrets: bool = False,
+    setup_dns: bool = False,
+    skip_tests: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Release and deploy WineBox: tests, version bump, PyPI publish, server deploy.
+
+    Orchestrates the full release pipeline:
+    1. Run tests (abort on failure)
+    2. Bump version (patch by default, or --minor/--major)
+    3. Commit, tag, and push to GitHub
+    4. Create GitHub release (triggers PyPI publish via Actions)
+    5. Wait for new version on PyPI
+    6. Deploy to production server
+
+    Args:
+        ctx: Invoke context
+        host: Droplet IP (optional, auto-discovered if not set)
+        droplet_name: Droplet name for IP lookup (default: winebox-droplet)
+        version: Explicit version to release (overrides auto-bump)
+        minor: Bump minor version instead of patch
+        major: Bump major version instead of patch
+        no_secrets: Skip syncing secrets to production
+        setup_dns: Configure DNS A records (first-time setup)
+        skip_tests: Skip running the test suite
+        dry_run: Preview what would happen without making changes
+    """
+    print("=" * 60)
+    print("WineBox Release & Deploy Pipeline")
+    print("=" * 60)
+
+    # Step 1: Run tests
+    if not skip_tests:
+        print("\n[1/7] Running test suite...")
+        if dry_run:
+            print("  DRY RUN - Would run: uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py -v")
+        else:
+            ctx.run(
+                "WINEBOX_USE_CLAUDE_VISION=false uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py -v",
+                pty=True,
+            )
+            print("  Tests passed!")
+    else:
+        print("\n[1/7] Skipping tests (--skip-tests)")
+
+    # Step 2: Determine new version
+    print("\n[2/7] Determining version...")
+    current_version = _get_current_version()
+    if version:
+        new_version = version
+        print(f"  Using explicit version: {current_version} -> {new_version}")
+    else:
+        new_version = _bump_version(current_version, major=major, minor=minor)
+        bump_type = "major" if major else ("minor" if minor else "patch")
+        print(f"  Auto-bump ({bump_type}): {current_version} -> {new_version}")
+
+    # Step 3: Bump version in files
+    print("\n[3/7] Updating version files...")
+    if dry_run:
+        print(f"  DRY RUN - Would update pyproject.toml and winebox/__init__.py to {new_version}")
+    else:
+        _update_version_files(new_version)
+        print(f"  Updated pyproject.toml and winebox/__init__.py to {new_version}")
+
+    # Step 4: Commit, tag, push
+    print("\n[4/7] Committing, tagging, and pushing...")
+    if dry_run:
+        print(f"  DRY RUN - Would commit, tag v{new_version}, and push")
+    else:
+        ctx.run(
+            f"git add pyproject.toml winebox/__init__.py && "
+            f'git commit -m "chore: Bump version to {new_version}"',
+            pty=True,
+        )
+        ctx.run(f'git tag -a v{new_version} -m "Release v{new_version}"', pty=True)
+        ctx.run("git push && git push --tags", pty=True)
+        print(f"  Pushed tag v{new_version}")
+
+    # Step 5: Create GitHub release
+    print("\n[5/7] Creating GitHub release...")
+    if dry_run:
+        print(f"  DRY RUN - Would create GitHub release v{new_version}")
+    else:
+        ctx.run(
+            f'gh release create v{new_version} --title "v{new_version}" --generate-notes',
+            pty=True,
+        )
+        print(f"  GitHub release v{new_version} created")
+
+    # Step 6: Wait for PyPI
+    print("\n[6/7] Waiting for PyPI availability...")
+    if dry_run:
+        print(f"  DRY RUN - Would poll PyPI for winebox=={new_version}")
+    else:
+        if not _wait_for_pypi(new_version):
+            print(f"  ERROR: Timed out waiting for v{new_version} on PyPI")
+            print("  The GitHub release was created. PyPI publish may still be in progress.")
+            print("  You can deploy manually later with: invoke deploy-only --version {new_version}")
+            sys.exit(1)
+
+    # Step 7: Deploy to server
+    print("\n[7/7] Deploying to production server...")
+    deploy_cmd = f"uv run python -m deploy.app --version {new_version}"
+    if host:
+        deploy_cmd += f" --host {host}"
+    if droplet_name:
+        deploy_cmd += f" --droplet-name {droplet_name}"
+    if no_secrets:
+        deploy_cmd += " --no-secrets"
+    if setup_dns:
+        deploy_cmd += " --setup-dns"
+    if dry_run:
+        deploy_cmd += " --dry-run"
+    ctx.run(deploy_cmd, pty=True)
+
+    print("\n" + "=" * 60)
+    if dry_run:
+        print("DRY RUN complete - no changes were made")
+    else:
+        print(f"Release v{new_version} deployed successfully!")
+        print(f"  PyPI: https://pypi.org/project/winebox/{new_version}/")
+        print(f"  App:  https://booze.winebox.app")
+    print("=" * 60)
+
+
+@task(name="deploy-only")
+def deploy_only(
+    ctx: Context,
+    host: str = "",
+    droplet_name: str = "",
+    version: str = "",
     no_secrets: bool = False,
     setup_dns: bool = False,
     dry_run: bool = False,
 ) -> None:
-    """Deploy WineBox to the Digital Ocean droplet.
-
-    Installs/upgrades winebox from PyPI, syncs secrets, and restarts the service.
-    Droplet IP is auto-discovered from the API using WINEBOX_DO_TOKEN.
+    """Deploy to server only (no release). Use for re-deploying an existing version.
 
     Args:
         ctx: Invoke context
