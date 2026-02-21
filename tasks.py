@@ -389,7 +389,7 @@ def _bump_version(current: str, major: bool = False, minor: bool = False) -> str
 
 
 def _update_version_files(new_version: str) -> None:
-    """Update version in pyproject.toml and __init__.py.
+    """Update version in pyproject.toml, __init__.py, and static files.
 
     Args:
         new_version: New version string to set
@@ -417,6 +417,19 @@ def _update_version_files(new_version: str) -> None:
         flags=re.MULTILINE,
     )
     init.write_text(content)
+
+    # Static files — cache-busting params and version display
+    index_html = Path("winebox/static/index.html")
+    if index_html.exists():
+        content = index_html.read_text()
+        content = re.sub(r'\?v=[0-9.]+', f'?v={new_version}', content)
+        index_html.write_text(content)
+
+    landing_html = Path("winebox/static/landing.html")
+    if landing_html.exists():
+        content = landing_html.read_text()
+        content = re.sub(r'>v[0-9.]+</span>', f'>v{new_version}</span>', content)
+        landing_html.write_text(content)
 
 
 def _wait_for_pypi(version: str, max_attempts: int = 30, interval: int = 10) -> bool:
@@ -541,7 +554,7 @@ def deploy(
         print(f"  DRY RUN - Would commit, tag v{new_version}, and push")
     else:
         ctx.run(
-            f"git add pyproject.toml winebox/__init__.py && "
+            f"git add pyproject.toml winebox/__init__.py winebox/static/index.html winebox/static/landing.html && "
             f'git commit -m "chore: Bump version to {new_version}"',
             pty=True,
         )
