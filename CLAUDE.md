@@ -25,7 +25,8 @@
 
 ## Deployment
 - Never install from git directly on the server. Always build the package first and install from PyPI.
-- To deploy new code: make a release (bump version, tag, publish to PyPI), then run `invoke deploy`
+- New releases are auto-deployed to the Droplet by a GitHub Action. No need to run `invoke deploy` manually after a release.
+- To deploy manually (if needed): `invoke deploy`
 - After every deployment, flush all web caches to ensure users see the latest build
 - Browser caches can serve stale static files (HTML, JS, CSS) even after server updates
 - When taking screenshots of deployed apps, use cache-busting query parameters (e.g., `?v=0.5.0`) or clear browser cache first
