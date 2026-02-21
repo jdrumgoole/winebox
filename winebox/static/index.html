@@ -383,6 +383,18 @@
                     <option value="out-of-stock">Out of Stock</option>
                 </select>
                 <input type="text" id="cellar-search" placeholder="Quick search...">
+                <div class="export-dropdown" id="cellar-export-dropdown">
+                    <button class="btn btn-secondary export-dropdown-btn" id="cellar-export-btn">
+                        Export
+                        <span class="dropdown-arrow">&#9662;</span>
+                    </button>
+                    <div class="export-dropdown-menu">
+                        <a href="#" data-format="csv" data-type="wines">CSV</a>
+                        <a href="#" data-format="xlsx" data-type="wines">Excel</a>
+                        <a href="#" data-format="yaml" data-type="wines">YAML</a>
+                        <a href="#" data-format="json" data-type="wines">JSON</a>
+                    </div>
+                </div>
             </div>
             <div id="cellar-list" class="wine-grid"></div>
         </section>
@@ -404,6 +416,18 @@
                     <option value="CHECK_IN">Check Ins Only</option>
                     <option value="CHECK_OUT">Check Outs Only</option>
                 </select>
+                <div class="export-dropdown" id="history-export-dropdown">
+                    <button class="btn btn-secondary export-dropdown-btn" id="history-export-btn">
+                        Export
+                        <span class="dropdown-arrow">&#9662;</span>
+                    </button>
+                    <div class="export-dropdown-menu">
+                        <a href="#" data-format="csv" data-type="transactions">CSV</a>
+                        <a href="#" data-format="xlsx" data-type="transactions">Excel</a>
+                        <a href="#" data-format="yaml" data-type="transactions">YAML</a>
+                        <a href="#" data-format="json" data-type="transactions">JSON</a>
+                    </div>
+                </div>
             </div>
             <div id="history-list" class="transaction-list"></div>
         </section>

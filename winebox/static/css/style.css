@@ -1953,3 +1953,92 @@ body.logged-out #user-info {
 .xwines-detail-fields .wine-detail-field .value a:hover {
     text-decoration: underline;
 }
+
+/* Export Dropdown */
+.export-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.export-dropdown-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+}
+
+.export-dropdown-btn .dropdown-arrow {
+    font-size: 0.7rem;
+    transition: transform 0.2s;
+}
+
+.export-dropdown.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.export-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    min-width: 120px;
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-hover);
+    z-index: 100;
+    display: none;
+    margin-top: 4px;
+}
+
+.export-dropdown.active .export-dropdown-menu {
+    display: block;
+}
+
+.export-dropdown-menu a {
+    display: block;
+    padding: 0.75rem 1rem;
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: background-color 0.15s;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.export-dropdown-menu a:last-child {
+    border-bottom: none;
+}
+
+.export-dropdown-menu a:hover {
+    background-color: var(--background-color);
+    color: var(--primary-color);
+}
+
+.export-dropdown-menu a:first-child {
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.export-dropdown-menu a:last-child {
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+
+/* Mobile adjustments for export dropdown */
+@media (max-width: 768px) {
+    .export-dropdown {
+        flex-shrink: 0;
+    }
+
+    .export-dropdown-btn {
+        padding: 0.65rem 0.9rem;
+        font-size: 0.9rem;
+    }
+
+    .export-dropdown-menu {
+        min-width: 100px;
+    }
+
+    .export-dropdown-menu a {
+        padding: 0.65rem 0.85rem;
+        font-size: 0.9rem;
+    }
+}

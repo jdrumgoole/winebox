@@ -262,7 +262,7 @@ async def health_check() -> JSONResponse:
 
 
 # Import and include routers
-from winebox.routers import auth, cellar, reference, search, transactions, wines, xwines
+from winebox.routers import auth, cellar, export, reference, search, transactions, wines, xwines
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(wines.router, prefix="/api/wines", tags=["Wines"])
@@ -271,6 +271,7 @@ app.include_router(transactions.router, prefix="/api/transactions", tags=["Trans
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(reference.router, prefix="/api/reference", tags=["Reference Data"])
 app.include_router(xwines.router, prefix="/api/xwines", tags=["X-Wines Dataset"])
+app.include_router(export.router, prefix="/api/export", tags=["Export"])
 
 # Serve static files - mounted after routes to avoid conflicts
 static_path = Path(__file__).parent / "static"

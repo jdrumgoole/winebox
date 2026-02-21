@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initModals();
     initAuth();
     initAutocomplete();
+    initExportDropdowns();
     checkAuth();
     loadAppInfo();
 });
@@ -1639,6 +1640,121 @@ async function handlePasswordChange(e) {
     } catch (error) {
         showToast(error.message, 'error');
     }
+}
+
+// Export Dropdowns
+function initExportDropdowns() {
+    // Initialize cellar export dropdown
+    initExportDropdown('cellar-export-dropdown', 'cellar-export-btn');
+
+    // Initialize history export dropdown
+    initExportDropdown('history-export-dropdown', 'history-export-btn');
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.export-dropdown')) {
+            document.querySelectorAll('.export-dropdown.active').forEach(dropdown => {
+                dropdown.classList.remove('active');
+            });
+        }
+    });
+}
+
+function initExportDropdown(dropdownId, buttonId) {
+    const dropdown = document.getElementById(dropdownId);
+    const button = document.getElementById(buttonId);
+
+    if (!dropdown || !button) return;
+
+    // Toggle dropdown on button click
+    button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close other dropdowns
+        document.querySelectorAll('.export-dropdown.active').forEach(other => {
+            if (other !== dropdown) other.classList.remove('active');
+        });
+        dropdown.classList.toggle('active');
+    });
+
+    // Handle format selection
+    dropdown.querySelectorAll('.export-dropdown-menu a').forEach(link => {
+        link.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const format = link.dataset.format;
+            const type = link.dataset.type;
+
+            dropdown.classList.remove('active');
+            await handleExport(type, format);
+        });
+    });
+}
+
+async function handleExport(type, format) {
+    // Build export URL with current filters
+    let url = `${API_BASE}/export/${type}?format=${format}`;
+
+    // Add relevant filters based on export type
+    if (type === 'wines') {
+        const cellarFilter = document.getElementById('cellar-filter')?.value;
+        if (cellarFilter === 'in-stock') {
+            url += '&in_stock=true';
+        } else if (cellarFilter === 'out-of-stock') {
+            url += '&in_stock=false';
+        }
+    } else if (type === 'transactions') {
+        const historyFilter = document.getElementById('history-filter')?.value;
+        if (historyFilter && historyFilter !== 'all') {
+            url += `&transaction_type=${historyFilter}`;
+        }
+    }
+
+    try {
+        showToast('Preparing export...', 'info');
+
+        const response = await fetchWithAuth(url);
+
+        if (!response.ok) {
+            throw new Error('Export failed');
+        }
+
+        // Get filename from Content-Disposition header
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `winebox_${type}.${format}`;
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename=([^;]+)/);
+            if (match) {
+                filename = match[1].trim();
+            }
+        }
+
+        // Handle different formats
+        if (format === 'json') {
+            // JSON is returned as response body
+            const data = await response.json();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            downloadBlob(blob, filename);
+        } else {
+            // Binary formats (CSV, XLSX, YAML)
+            const blob = await response.blob();
+            downloadBlob(blob, filename);
+        }
+
+        showToast(`Exported ${type} as ${format.toUpperCase()}`, 'success');
+    } catch (error) {
+        console.error('Export error:', error);
+        showToast(`Export failed: ${error.message}`, 'error');
+    }
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 }
 
 // X-Wines Search
