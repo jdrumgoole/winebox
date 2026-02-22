@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#8B1A4A">
+    <title>WineBox Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/static/logos/favicon.png">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* Admin-specific styles */
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(139, 26, 74, 0.2);
+        }
+
+        .admin-header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            color: #8B1A4A;
+            margin: 0;
+        }
+
+        .admin-nav {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .admin-nav a {
+            color: #666;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .admin-nav a:hover {
+            background-color: rgba(139, 26, 74, 0.1);
+            color: #8B1A4A;
+        }
+
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #fff 0%, #f8f4f5 100%);
+            border: 1px solid rgba(139, 26, 74, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-box .stat-value {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #8B1A4A;
+            line-height: 1;
+        }
+
+        .stat-box .stat-label {
+            font-size: 0.875rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        .users-section h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .users-table th,
+        .users-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .users-table th {
+            background: linear-gradient(135deg, #8B1A4A 0%, #722040 100%);
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .users-table tr:hover {
+            background-color: #f8f4f5;
+        }
+
+        .users-table td {
+            font-size: 0.9rem;
+            color: #333;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-primary {
+            background-color: #f8e1ea;
+            color: #8B1A4A;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #8B1A4A;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .timestamp {
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        .cellar-size {
+            font-weight: 600;
+            color: #8B1A4A;
+        }
+
+        @media (max-width: 768px) {
+            .admin-container {
+                padding: 1rem;
+            }
+
+            .admin-header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .stats-overview {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .users-table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <img src="/static/logos/logo-compact-dark.svg" alt="WineBox" class="header-logo" height="32">
+        </div>
+    </header>
+
+    <main class="admin-container">
+        <div class="admin-header">
+            <h1>Admin Panel</h1>
+            <nav class="admin-nav">
+                <a href="/static/index.html">Back to App</a>
+            </nav>
+        </div>
+
+        <!-- Stats Overview -->
+        <section class="stats-overview" id="stats-overview">
+            <div class="stat-box">
+                <div class="stat-value" id="stat-total-users">-</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="stat-active-users">-</div>
+                <div class="stat-label">Active Users</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="stat-verified-users">-</div>
+                <div class="stat-label">Verified Users</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="stat-total-wines">-</div>
+                <div class="stat-label">Total Wines</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="stat-total-bottles">-</div>
+                <div class="stat-label">Total Bottles</div>
+            </div>
+        </section>
+
+        <!-- Users List -->
+        <section class="users-section">
+            <h2>Users</h2>
+            <div id="users-container">
+                <div class="loading">Loading users...</div>
+            </div>
+        </section>
+    </main>
+
+    <footer id="app-footer">
+        <div class="footer-content">
+            <span>WineBox Admin Panel</span>
+        </div>
+    </footer>
+
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>

@@ -18,6 +18,7 @@ class TransactionType(str, enum.Enum):
 class Transaction(Document):
     """Transaction document model for tracking wine movements."""
 
+    owner_id: Indexed(PydanticObjectId)  # Denormalized for efficient user queries
     wine_id: Indexed(PydanticObjectId)
     transaction_type: TransactionType
     quantity: int = Field(..., ge=1)
@@ -28,9 +29,11 @@ class Transaction(Document):
     class Settings:
         name = "transactions"
         indexes = [
+            "owner_id",
             "wine_id",
             "transaction_type",
             "transaction_date",
+            [("owner_id", 1), ("transaction_date", -1)],  # Compound index for user transaction queries
         ]
 
     def __repr__(self) -> str:

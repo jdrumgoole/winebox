@@ -18,14 +18,15 @@ router = APIRouter()
 
 @router.get("", response_model=list[TransactionResponse])
 async def list_transactions(
-    _: RequireAuth,
+    current_user: RequireAuth,
     skip: int = 0,
     limit: int = 100,
     transaction_type: TransactionType | None = None,
     wine_id: str | None = None,
 ) -> list[TransactionResponse]:
     """List all transactions with optional filtering."""
-    conditions = {}
+    # Always filter by owner
+    conditions = {"owner_id": current_user.id}
 
     if transaction_type:
         conditions["transaction_type"] = transaction_type
@@ -69,11 +70,14 @@ async def list_transactions(
 @router.get("/{transaction_id}", response_model=TransactionResponse)
 async def get_transaction(
     transaction_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
 ) -> TransactionResponse:
     """Get a single transaction by ID."""
     try:
-        transaction = await Transaction.get(PydanticObjectId(transaction_id))
+        transaction = await Transaction.find_one(
+            Transaction.id == PydanticObjectId(transaction_id),
+            Transaction.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid transaction ID format: %s - %s", transaction_id, e)
         transaction = None

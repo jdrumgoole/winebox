@@ -3,10 +3,16 @@
 import pytest
 from datetime import datetime, timezone
 
+from beanie import PydanticObjectId
+
 from winebox.models.user import User
 from winebox.models.wine import Wine
 from winebox.models.transaction import Transaction, TransactionType
 from winebox.services.auth import get_password_hash
+
+
+# Test owner ID for wines/transactions that need one
+TEST_OWNER_ID = PydanticObjectId("000000000000000000000001")
 
 
 class TestUserAdmin:
@@ -207,6 +213,7 @@ class TestPurgeData:
 
         # Create some wines and transactions
         wine = Wine(
+            owner_id=TEST_OWNER_ID,
             name="Test Wine",
             front_label_image_path="test.jpg",
             created_at=datetime.now(timezone.utc),
@@ -215,6 +222,7 @@ class TestPurgeData:
         await wine.insert()
 
         transaction = Transaction(
+            owner_id=TEST_OWNER_ID,
             wine_id=wine.id,
             transaction_type=TransactionType.CHECK_IN,
             quantity=3,
@@ -244,6 +252,7 @@ class TestPurgeData:
         await user.insert()
 
         wine = Wine(
+            owner_id=user.id,
             name="Count Test Wine",
             front_label_image_path="test.jpg",
             created_at=datetime.now(timezone.utc),
@@ -252,6 +261,7 @@ class TestPurgeData:
         await wine.insert()
 
         transaction = Transaction(
+            owner_id=user.id,
             wine_id=wine.id,
             transaction_type=TransactionType.CHECK_IN,
             quantity=1,
@@ -318,6 +328,7 @@ class TestPurgeData:
         # Create wines and transactions
         for i in range(3):
             wine = Wine(
+                owner_id=user.id,
                 name=f"Wine {i}",
                 front_label_image_path=f"test{i}.jpg",
                 created_at=datetime.now(timezone.utc),
@@ -326,6 +337,7 @@ class TestPurgeData:
             await wine.insert()
 
             transaction = Transaction(
+                owner_id=user.id,
                 wine_id=wine.id,
                 transaction_type=TransactionType.CHECK_IN,
                 quantity=1,
@@ -367,6 +379,7 @@ class TestPurgeData:
         await user.insert()
 
         wine = Wine(
+            owner_id=user.id,
             name="To Delete Wine",
             front_label_image_path="test.jpg",
             created_at=datetime.now(timezone.utc),
@@ -375,6 +388,7 @@ class TestPurgeData:
         await wine.insert()
 
         transaction = Transaction(
+            owner_id=user.id,
             wine_id=wine.id,
             transaction_type=TransactionType.CHECK_IN,
             quantity=1,

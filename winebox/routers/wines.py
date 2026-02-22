@@ -294,6 +294,7 @@ async def checkin_wine(
 
     # Create wine document with embedded inventory
     wine = Wine(
+        owner_id=current_user.id,
         name=wine_name,
         winery=winery,
         vintage=vintage,
@@ -314,6 +315,7 @@ async def checkin_wine(
 
     # Create transaction
     transaction = Transaction(
+        owner_id=current_user.id,
         wine_id=wine.id,
         transaction_type=TransactionType.CHECK_IN,
         quantity=quantity,
@@ -348,9 +350,12 @@ async def checkout_wine(
     Remove bottles from inventory. If quantity reaches 0, the wine
     remains in history but shows as out of stock.
     """
-    # Get wine
+    # Get wine - must belong to current user
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
@@ -369,6 +374,7 @@ async def checkout_wine(
 
     # Create transaction
     transaction = Transaction(
+        owner_id=current_user.id,
         wine_id=wine.id,
         transaction_type=TransactionType.CHECK_OUT,
         quantity=quantity,
@@ -398,18 +404,25 @@ async def checkout_wine(
 
 @router.get("", response_model=list[WineWithInventory])
 async def list_wines(
-    _: RequireAuth,
+    current_user: RequireAuth,
     skip: int = 0,
     limit: int = 100,
     in_stock: bool | None = None,
 ) -> list[WineWithInventory]:
     """List all wines with optional filtering."""
-    query = Wine.find()
-
+    # Filter by owner
     if in_stock is True:
-        query = Wine.find(Wine.inventory.quantity > 0)
+        query = Wine.find(
+            Wine.owner_id == current_user.id,
+            Wine.inventory.quantity > 0,
+        )
     elif in_stock is False:
-        query = Wine.find(Wine.inventory.quantity == 0)
+        query = Wine.find(
+            Wine.owner_id == current_user.id,
+            Wine.inventory.quantity == 0,
+        )
+    else:
+        query = Wine.find(Wine.owner_id == current_user.id)
 
     wines = await query.skip(skip).limit(limit).sort(-Wine.created_at).to_list()
 
@@ -419,11 +432,14 @@ async def list_wines(
 @router.get("/{wine_id}", response_model=WineResponse)
 async def get_wine(
     wine_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
 ) -> WineResponse:
     """Get wine details with full transaction history."""
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
@@ -434,7 +450,7 @@ async def get_wine(
             detail=f"Wine with ID {wine_id} not found",
         )
 
-    # Get transactions for this wine
+    # Get transactions for this wine (owner already verified via wine ownership)
     transactions = await Transaction.find(
         Transaction.wine_id == wine.id
     ).sort(-Transaction.transaction_date).to_list()
@@ -449,12 +465,15 @@ async def get_wine(
 @router.put("/{wine_id}", response_model=WineWithInventory)
 async def update_wine(
     wine_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
     wine_update: WineUpdate,
 ) -> WineWithInventory:
     """Update wine metadata."""
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
@@ -479,11 +498,14 @@ async def update_wine(
 @router.delete("/{wine_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_wine(
     wine_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
 ) -> None:
     """Delete wine and all associated history."""
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
@@ -514,12 +536,15 @@ async def delete_wine(
 @router.get("/{wine_id}/grapes", response_model=WineGrapeBlend)
 async def get_wine_grapes(
     wine_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
 ) -> WineGrapeBlend:
     """Get the grape blend for a wine."""
-    # Verify wine exists
+    # Verify wine exists and belongs to current user
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
@@ -563,13 +588,16 @@ async def get_wine_grapes(
 @router.post("/{wine_id}/grapes", response_model=WineGrapeBlend)
 async def set_wine_grapes(
     wine_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
     blend: WineGrapeBlendUpdate,
 ) -> WineGrapeBlend:
     """Set the grape blend for a wine (replaces all existing grapes)."""
-    # Verify wine exists
+    # Verify wine exists and belongs to current user
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
@@ -611,7 +639,7 @@ async def set_wine_grapes(
     await wine.save()
 
     # Return updated blend
-    return await get_wine_grapes(wine_id, _)
+    return await get_wine_grapes(wine_id, current_user)
 
 
 # =============================================================================
@@ -622,12 +650,15 @@ async def set_wine_grapes(
 @router.get("/{wine_id}/scores", response_model=WineScoresResponse)
 async def get_wine_scores(
     wine_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
 ) -> WineScoresResponse:
     """Get all scores for a wine."""
-    # Verify wine exists
+    # Verify wine exists and belongs to current user
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
@@ -670,13 +701,16 @@ async def get_wine_scores(
 @router.post("/{wine_id}/scores", response_model=WineScoreResponse, status_code=status.HTTP_201_CREATED)
 async def add_wine_score(
     wine_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
     score_data: WineScoreCreate,
 ) -> WineScoreResponse:
     """Add a score/rating for a wine."""
-    # Verify wine exists
+    # Verify wine exists and belongs to current user
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
@@ -730,13 +764,16 @@ async def add_wine_score(
 async def update_wine_score(
     wine_id: str,
     score_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
     score_update: WineScoreUpdate,
 ) -> WineScoreResponse:
     """Update a score for a wine."""
-    # Get wine
+    # Get wine - must belong to current user
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None
@@ -798,11 +835,14 @@ async def update_wine_score(
 async def delete_wine_score(
     wine_id: str,
     score_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
 ) -> None:
     """Delete a score from a wine."""
     try:
-        wine = await Wine.get(PydanticObjectId(wine_id))
+        wine = await Wine.find_one(
+            Wine.id == PydanticObjectId(wine_id),
+            Wine.owner_id == current_user.id,
+        )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
         wine = None

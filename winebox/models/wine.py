@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from beanie import Document, Indexed
+from beanie import Document, Indexed, PydanticObjectId
 from pydantic import BaseModel, Field
 
 
@@ -50,6 +50,9 @@ class ScoreEntry(BaseModel):
 class Wine(Document):
     """Wine document model representing a wine in the cellar."""
 
+    # Owner reference for data isolation
+    owner_id: Indexed(PydanticObjectId)
+
     # Basic wine information
     name: Indexed(str)
     winery: Optional[Indexed(str)] = None
@@ -88,11 +91,13 @@ class Wine(Document):
     class Settings:
         name = "wines"
         indexes = [
+            "owner_id",
             "name",
             "winery",
             "vintage",
             "country",
             "wine_type_id",
+            [("owner_id", 1), ("inventory.quantity", 1)],  # Compound index for cellar queries
             [
                 ("name", "text"),
                 ("winery", "text"),

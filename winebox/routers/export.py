@@ -30,7 +30,7 @@ def _generate_filename(export_type: str, export_format: ExportFormat) -> str:
 
 @router.get("/wines")
 async def export_wines(
-    _: RequireAuth,
+    current_user: RequireAuth,
     format: ExportFormat = Query(default=ExportFormat.JSON, description="Export format"),
     in_stock: bool | None = Query(default=None, description="Filter: only wines with quantity > 0"),
     country: str | None = Query(default=None, description="Filter by country"),
@@ -41,8 +41,8 @@ async def export_wines(
 
     Returns wine data in the specified format (CSV, XLSX, YAML, or JSON).
     """
-    # Build query conditions
-    conditions: dict[str, Any] = {}
+    # Build query conditions - always filter by owner
+    conditions: dict[str, Any] = {"owner_id": current_user.id}
 
     if in_stock is not None:
         if in_stock:
@@ -53,7 +53,7 @@ async def export_wines(
     if country:
         conditions["country"] = country
 
-    # Fetch wines
+    # Fetch wines (filtered by owner)
     wines = await Wine.find(conditions).sort(Wine.name).to_list()
 
     # Track applied filters
@@ -121,7 +121,7 @@ async def export_wines(
 
 @router.get("/transactions")
 async def export_transactions(
-    _: RequireAuth,
+    current_user: RequireAuth,
     format: ExportFormat = Query(default=ExportFormat.JSON, description="Export format"),
     transaction_type: TransactionType | None = Query(default=None, description="Filter by transaction type"),
     wine_id: str | None = Query(default=None, description="Filter by specific wine"),
@@ -133,8 +133,8 @@ async def export_transactions(
 
     Returns transaction data in the specified format (CSV, XLSX, YAML, or JSON).
     """
-    # Build query conditions
-    conditions: dict[str, Any] = {}
+    # Build query conditions - always filter by owner
+    conditions: dict[str, Any] = {"owner_id": current_user.id}
 
     if transaction_type:
         conditions["transaction_type"] = transaction_type

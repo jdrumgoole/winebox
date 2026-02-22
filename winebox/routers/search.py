@@ -16,7 +16,7 @@ router = APIRouter()
 
 @router.get("", response_model=list[WineWithInventory])
 async def search_wines(
-    _: RequireAuth,
+    current_user: RequireAuth,
     q: Annotated[str | None, Query(description="Full-text search query")] = None,
     vintage: Annotated[int | None, Query(description="Wine vintage year")] = None,
     grape: Annotated[str | None, Query(description="Grape variety")] = None,
@@ -36,8 +36,8 @@ async def search_wines(
     Use `q` for full-text search across name, winery, region, and label text.
     Other parameters filter on specific fields.
     """
-    # Build filter conditions
-    conditions = {}
+    # Build filter conditions - always filter by owner
+    conditions = {"owner_id": current_user.id}
 
     # Use MongoDB text search for full-text queries when available
     # Falls back to regex for compatibility (e.g., mongomock in tests)
@@ -91,8 +91,8 @@ async def search_wines(
     wine_ids_from_transactions = None
 
     if checked_in_after or checked_in_before:
-        # Find wines with check-in transactions in date range
-        checkin_filter = {"transaction_type": TransactionType.CHECK_IN}
+        # Find wines with check-in transactions in date range (filtered by owner)
+        checkin_filter = {"owner_id": current_user.id, "transaction_type": TransactionType.CHECK_IN}
         if checked_in_after:
             checkin_filter["transaction_date"] = {"$gte": checked_in_after}
         if checked_in_before:
@@ -110,8 +110,8 @@ async def search_wines(
             wine_ids_from_transactions &= checkin_wine_ids
 
     if checked_out_after or checked_out_before:
-        # Find wines with check-out transactions in date range
-        checkout_filter = {"transaction_type": TransactionType.CHECK_OUT}
+        # Find wines with check-out transactions in date range (filtered by owner)
+        checkout_filter = {"owner_id": current_user.id, "transaction_type": TransactionType.CHECK_OUT}
         if checked_out_after:
             checkout_filter["transaction_date"] = {"$gte": checked_out_after}
         if checked_out_before:
