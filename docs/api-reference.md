@@ -53,7 +53,7 @@ Check if the server is running.
 ```json
 {
   "status": "healthy",
-  "version": "0.3.0",
+  "version": "0.5.12",
   "app_name": "WineBox"
 }
 ```
@@ -78,7 +78,10 @@ Check in wine bottles to the cellar.
 | winery | string | No | Winery name |
 | vintage | integer | No | Vintage year (1900-2100) |
 | grape_variety | string | No | Grape variety |
-| region | string | No | Wine region |
+| region | string | No | Wine region (e.g., Burgundy, Napa Valley) |
+| sub_region | string | No | Sub-region (e.g., Côte de Nuits, Médoc) |
+| appellation | string | No | Appellation (e.g., Nuits-St-Georges, Pomerol) |
+| classification | string | No | Classification (e.g., Grand Cru, DOCG, Reserve) |
 | country | string | No | Country of origin |
 | alcohol_percentage | float | No | Alcohol percentage (0-100) |
 | quantity | integer | Yes | Number of bottles (min: 1) |
@@ -92,8 +95,11 @@ Check in wine bottles to the cellar.
   "winery": "Winery Name",
   "vintage": 2019,
   "grape_variety": "Cabernet Sauvignon",
-  "region": "Napa Valley",
-  "country": "United States",
+  "region": "Burgundy",
+  "sub_region": "Côte de Nuits",
+  "appellation": "Nuits-St-Georges",
+  "country": "France",
+  "classification": "Premier Cru",
   "alcohol_percentage": 14.5,
   "front_label_text": "OCR extracted text...",
   "back_label_text": null,
@@ -201,11 +207,14 @@ Update wine metadata.
 {
   "name": "Updated Name",
   "vintage": 2020,
-  "grape_variety": "Merlot"
+  "grape_variety": "Merlot",
+  "sub_region": "Côte de Nuits",
+  "appellation": "Gevrey-Chambertin",
+  "classification": "Grand Cru"
 }
 ```
 
-Only include fields you want to update.
+Only include fields you want to update. All fields are optional.
 
 **Response**: `200 OK`
 
@@ -318,7 +327,7 @@ Search wines by various criteria.
 
 | Name | Type | Description |
 |------|------|-------------|
-| q | string | Full-text search |
+| q | string | Full-text search (name, winery, region, sub-region, appellation, label text) |
 | vintage | integer | Vintage year |
 | grape | string | Grape variety (partial match) |
 | winery | string | Winery name (partial match) |

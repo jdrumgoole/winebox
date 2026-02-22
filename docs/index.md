@@ -9,7 +9,7 @@ WineBox helps you keep track of your wine collection with ease:
 - **Scan wine labels** - Take a photo of a wine label and WineBox automatically extracts the details using AI
 - **Smart autocomplete** - Start typing a wine name and get suggestions from over 100,000 wines with community ratings
 - **Track your inventory** - Check bottles in and out, and always know what's in your cellar
-- **Search and filter** - Find any wine by name, vintage, grape, region, or country
+- **Search and filter** - Find any wine by name, vintage, grape, region, appellation, or country
 - **View history** - See a complete log of every bottle added or removed
 
 ![WineBox Dashboard](images/dashboard.png)
@@ -131,7 +131,7 @@ The **Cellar** page shows all your wines:
 Click on any wine to see its full details:
 
 - Label image
-- Wine information (region, country, alcohol %)
+- Wine information (region, sub-region, appellation, country, classification, alcohol %)
 - Current stock count
 - Transaction history
 - Check Out and Delete buttons
@@ -157,7 +157,7 @@ The **Search** page provides advanced filtering:
 *Advanced search with multiple filters*
 
 Available filters:
-- Text search (name, winery, region)
+- Text search (name, winery, region, sub-region, appellation)
 - Vintage year
 - Grape variety
 - Country

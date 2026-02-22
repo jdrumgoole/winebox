@@ -258,6 +258,28 @@ Actions:
 3. Imports wines into MongoDB
 4. Cleans up temporary files
 
+## Database Migrations
+
+### Text Index Migration (v0.5.12)
+
+Version 0.5.12 added `sub_region` and `appellation` to the MongoDB text search index.
+MongoDB does not allow creating a new text index when one already exists with different
+fields, so the old index must be dropped before deploying v0.5.12 or later.
+
+A migration script is provided:
+
+```bash
+# Run locally
+uv run python scripts/migrations/drop_old_text_index.py [MONGODB_URL]
+
+# Run on production
+scp scripts/migrations/drop_old_text_index.py root@<droplet-ip>:/tmp/
+ssh root@<droplet-ip> "sudo -u winebox /opt/winebox/.venv/bin/python /tmp/drop_old_text_index.py \$WINEBOX_MONGODB_URL"
+```
+
+If `MONGODB_URL` is not provided, the script falls back to the `WINEBOX_MONGODB_URL`
+environment variable, then defaults to `mongodb://localhost:27017`.
+
 ## Database
 
 ### MongoDB Atlas

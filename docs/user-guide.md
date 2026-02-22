@@ -42,8 +42,10 @@ The AI scanner looks for:
 - Winery/producer
 - Grape variety
 - Region and country
+- Sub-region (e.g., Côte de Nuits, Médoc)
+- Appellation (e.g., Nuits-St-Georges, Pomerol)
 - Alcohol percentage
-- Classification (Grand Cru, DOCG, etc.)
+- Classification (Grand Cru, DOCG, Reserve, etc.)
 
 ### Using Wine Autocomplete
 
@@ -77,6 +79,7 @@ Each card shows:
 - Label image
 - Wine name and vintage
 - Region and country
+- Appellation and classification tags (when available)
 - Current bottle count
 - **Check Out** button
 
@@ -87,7 +90,7 @@ Click anywhere on the card to see full details.
 Clicking a wine opens the detail modal showing:
 
 - **Label image** - the photo you uploaded
-- **Full wine info** - name, vintage, region, country, alcohol %
+- **Full wine info** - name, vintage, region, sub-region, appellation, country, classification, alcohol %
 - **Stock status** - how many bottles you have
 - **Raw label text** - expand to see what the scanner detected
 - **Transaction history** - every check-in and check-out
@@ -114,7 +117,7 @@ The **Search** page offers advanced filtering beyond the cellar's quick search.
 
 | Filter | Description |
 |--------|-------------|
-| Text Search | Searches name, winery, region, and label text |
+| Text Search | Searches name, winery, region, sub-region, appellation, and label text |
 | Vintage | Filter by year |
 | Grape Variety | e.g., "Cabernet", "Merlot" |
 | Winery | Filter by producer |
@@ -243,7 +246,8 @@ winebox/
 │   ├── winebox.service   # systemd service
 │   └── nginx-winebox.conf # nginx config
 ├── scripts/              # Utility scripts
-│   └── seed_reference_data.py  # Reference data seeding
+│   ├── seed_reference_data.py  # Reference data seeding
+│   └── migrations/       # Database migration scripts
 ├── tests/                # Test suite
 ├── docs/                 # Sphinx documentation
 ├── data/                 # Images and local data
@@ -458,6 +462,10 @@ curl -X POST http://localhost:8000/api/wines/checkin \
   -F "back_label=@wine_back.jpg" \
   -F "name=Chateau Margaux" \
   -F "vintage=2016" \
+  -F "region=Bordeaux" \
+  -F "sub_region=Médoc" \
+  -F "appellation=Margaux" \
+  -F "classification=Premier Grand Cru Classé" \
   -F "quantity=6"
 ```
 

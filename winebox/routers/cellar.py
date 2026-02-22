@@ -33,7 +33,8 @@ async def get_cellar_summary(
         {"$match": {"inventory.quantity": {"$gt": 0}}},
         {"$group": {"_id": None, "total": {"$sum": "$inventory.quantity"}}},
     ]
-    total_bottles_result = await Wine.aggregate(total_bottles_pipeline).to_list()
+    cursor = Wine.get_pymongo_collection().aggregate(total_bottles_pipeline)
+    total_bottles_result = await cursor.to_list(length=None)
     total_bottles = total_bottles_result[0]["total"] if total_bottles_result else 0
 
     # Unique wines in stock
@@ -48,7 +49,8 @@ async def get_cellar_summary(
         {"$group": {"_id": "$vintage", "count": {"$sum": "$inventory.quantity"}}},
         {"$sort": {"_id": -1}},
     ]
-    by_vintage_result = await Wine.aggregate(by_vintage_pipeline).to_list()
+    cursor = Wine.get_pymongo_collection().aggregate(by_vintage_pipeline)
+    by_vintage_result = await cursor.to_list(length=None)
     by_vintage = {str(row["_id"]): row["count"] for row in by_vintage_result}
 
     # Wines by country (in stock)
@@ -57,7 +59,8 @@ async def get_cellar_summary(
         {"$group": {"_id": "$country", "count": {"$sum": "$inventory.quantity"}}},
         {"$sort": {"count": -1}},
     ]
-    by_country_result = await Wine.aggregate(by_country_pipeline).to_list()
+    cursor = Wine.get_pymongo_collection().aggregate(by_country_pipeline)
+    by_country_result = await cursor.to_list(length=None)
     by_country = {row["_id"]: row["count"] for row in by_country_result}
 
     # Wines by grape variety (in stock)
@@ -66,7 +69,8 @@ async def get_cellar_summary(
         {"$group": {"_id": "$grape_variety", "count": {"$sum": "$inventory.quantity"}}},
         {"$sort": {"count": -1}},
     ]
-    by_grape_result = await Wine.aggregate(by_grape_pipeline).to_list()
+    cursor = Wine.get_pymongo_collection().aggregate(by_grape_pipeline)
+    by_grape_result = await cursor.to_list(length=None)
     by_grape = {row["_id"]: row["count"] for row in by_grape_result}
 
     return {
