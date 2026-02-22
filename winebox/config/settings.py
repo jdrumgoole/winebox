@@ -211,6 +211,23 @@ class Settings:
     def aws_secret_access_key(self) -> str | None:
         return self._secrets.aws_secret_access_key
 
+    # Analytics
+    @property
+    def posthog_enabled(self) -> bool:
+        return self._config.analytics.posthog_enabled
+
+    @property
+    def posthog_host(self) -> str:
+        return self._config.analytics.posthog_host
+
+    @property
+    def posthog_debug(self) -> bool:
+        return self._config.analytics.posthog_debug
+
+    @property
+    def posthog_api_key(self) -> str | None:
+        return self._secrets.posthog_api_key
+
 
 # Global settings instance - lazily initialized
 _settings: Settings | None = None

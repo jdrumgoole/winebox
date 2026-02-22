@@ -18,6 +18,7 @@ from winebox.auth import (
 )
 from winebox.config import settings
 from winebox.models.user import User
+from winebox.services.analytics import posthog_service
 from winebox.services.auth import (
     RequireAuth,
     verify_password,
@@ -181,10 +182,23 @@ async def logout(
             user_id=str(current_user.id),
             reason="logout",
         )
+
+        # Track logout event
+        posthog_service.capture(
+            distinct_id=str(current_user.id),
+            event="user_logout",
+        )
+
         if success:
             return {"message": "Successfully logged out"}
         else:
             return {"message": "Logged out (token could not be revoked)"}
+
+    # Track logout event even if no token
+    posthog_service.capture(
+        distinct_id=str(current_user.id),
+        event="user_logout",
+    )
 
     return {"message": "Successfully logged out"}
 
@@ -229,6 +243,13 @@ async def login_token(
     access_token = create_access_token(
         data={"sub": user.email},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    # Track login event
+    posthog_service.capture(
+        distinct_id=str(user.id),
+        event="user_login",
+        properties={"method": "password"},
     )
 
     return Token(access_token=access_token)

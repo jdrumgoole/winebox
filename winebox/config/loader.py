@@ -185,6 +185,10 @@ def apply_env_overrides(config_dict: dict[str, Any], prefix: str = "WINEBOX") ->
         f"{prefix}_EMAIL_FROM_ADDRESS": ("email", "from_address"),
         f"{prefix}_EMAIL_AWS_REGION": ("email", "aws_region"),
         f"{prefix}_FRONTEND_URL": ("email", "frontend_url"),
+        # Analytics
+        f"{prefix}_POSTHOG_ENABLED": ("analytics", "posthog_enabled"),
+        f"{prefix}_POSTHOG_HOST": ("analytics", "posthog_host"),
+        f"{prefix}_POSTHOG_DEBUG": ("analytics", "posthog_debug"),
     }
 
     for env_var, path in env_mappings.items():
@@ -206,6 +210,8 @@ def apply_env_overrides(config_dict: dict[str, Any], prefix: str = "WINEBOX") ->
                 "registration_enabled",
                 "email_verification_required",
                 "use_claude_vision",
+                "posthog_enabled",
+                "posthog_debug",
             ):
                 config_dict[section][key] = value.lower() in ("true", "1", "yes")
             else:
@@ -233,6 +239,7 @@ def load_secrets(secrets_file: Path | None = None) -> SecretsConfig:
             "WINEBOX_ANTHROPIC_API_KEY": "anthropic_api_key",
             "AWS_ACCESS_KEY_ID": "aws_access_key_id",
             "AWS_SECRET_ACCESS_KEY": "aws_secret_access_key",
+            "WINEBOX_POSTHOG_API_KEY": "posthog_api_key",
         }
 
         for file_key, config_key in key_mapping.items():
@@ -246,6 +253,7 @@ def load_secrets(secrets_file: Path | None = None) -> SecretsConfig:
         "ANTHROPIC_API_KEY": "anthropic_api_key",  # Also check common name
         "AWS_ACCESS_KEY_ID": "aws_access_key_id",
         "AWS_SECRET_ACCESS_KEY": "aws_secret_access_key",
+        "WINEBOX_POSTHOG_API_KEY": "posthog_api_key",
     }
 
     for env_var, config_key in env_mapping.items():

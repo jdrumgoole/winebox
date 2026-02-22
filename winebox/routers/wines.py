@@ -32,6 +32,7 @@ from winebox.schemas.reference import (
     WineScoreUpdate,
 )
 from winebox.schemas.wine import WineResponse, WineUpdate, WineWithInventory
+from winebox.services.analytics import posthog_service
 from winebox.services.auth import RequireAuth
 from winebox.services.image_storage import ImageStorageService
 from winebox.services.ocr import OCRService
@@ -320,13 +321,25 @@ async def checkin_wine(
     )
     await transaction.insert()
 
+    # Track check-in event
+    posthog_service.capture(
+        distinct_id=str(current_user.id),
+        event="wine_checkin",
+        properties={
+            "quantity": quantity,
+            "scan_method": "claude_vision" if vision_service.is_available() else "tesseract",
+            "country": country,
+            "wine_id": str(wine.id),
+        },
+    )
+
     return WineWithInventory.model_validate(wine)
 
 
 @router.post("/{wine_id}/checkout", response_model=WineWithInventory)
 async def checkout_wine(
     wine_id: str,
-    _: RequireAuth,
+    current_user: RequireAuth,
     quantity: Annotated[int, Form(ge=1, le=10000, description="Number of bottles to remove")] = 1,
     notes: Annotated[str | None, Form(max_length=MAX_NOTES_LENGTH, description="Check-out notes")] = None,
 ) -> WineWithInventory:
@@ -368,6 +381,17 @@ async def checkout_wine(
     wine.inventory.updated_at = datetime.now(timezone.utc)
     wine.updated_at = datetime.now(timezone.utc)
     await wine.save()
+
+    # Track check-out event
+    posthog_service.capture(
+        distinct_id=str(current_user.id),
+        event="wine_checkout",
+        properties={
+            "quantity": quantity,
+            "remaining_quantity": wine.inventory.quantity,
+            "wine_id": str(wine.id),
+        },
+    )
 
     return WineWithInventory.model_validate(wine)
 

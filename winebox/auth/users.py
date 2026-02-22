@@ -15,6 +15,7 @@ from winebox.auth.db import get_user_db
 from winebox.auth.schemas import UserCreate
 from winebox.config import settings
 from winebox.models.user import User
+from winebox.services.analytics import posthog_service
 from winebox.services.email import get_email_service
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,17 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
         Sends verification email if email verification is required.
         """
         logger.info("User registered (id=%s, email=%s)", user.id, user.email)
+
+        # Track registration event
+        posthog_service.capture(
+            distinct_id=str(user.id),
+            event="user_registered",
+            properties={"email_verification_required": settings.email_verification_required},
+        )
+        posthog_service.identify(
+            distinct_id=str(user.id),
+            properties={"email": user.email},
+        )
 
         if settings.email_verification_required and not user.is_verified:
             await self.request_verify(user, request)
@@ -117,6 +129,13 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
     ) -> None:
         """Called after successful login."""
         logger.info("User logged in (id=%s)", user.id)
+
+        # Track login event
+        posthog_service.capture(
+            distinct_id=str(user.id),
+            event="user_login",
+            properties={"method": "fastapi_users"},
+        )
 
 
 async def get_user_manager(

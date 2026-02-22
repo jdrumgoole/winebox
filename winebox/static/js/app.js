@@ -5,6 +5,40 @@
 
 const API_BASE = '/api';
 
+// Analytics wrapper
+const analytics = {
+    isEnabled: function() {
+        return window.posthog && window.POSTHOG_CONFIG && window.POSTHOG_CONFIG.enabled;
+    },
+    capture: function(event, props) {
+        if (this.isEnabled()) {
+            try {
+                posthog.capture(event, props);
+            } catch (e) {
+                console.debug('Analytics capture error:', e);
+            }
+        }
+    },
+    identify: function(userId, props) {
+        if (this.isEnabled()) {
+            try {
+                posthog.identify(userId, props);
+            } catch (e) {
+                console.debug('Analytics identify error:', e);
+            }
+        }
+    },
+    reset: function() {
+        if (this.isEnabled()) {
+            try {
+                posthog.reset();
+            } catch (e) {
+                console.debug('Analytics reset error:', e);
+            }
+        }
+    }
+};
+
 // State
 let currentPage = 'dashboard';
 let authToken = localStorage.getItem('winebox_token');
@@ -325,6 +359,10 @@ function showMainApp() {
     document.getElementById('page-login').classList.remove('active');
     document.getElementById('user-info').style.display = 'flex';
     document.getElementById('username-display').textContent = currentUser.email;
+
+    // Identify user for analytics
+    analytics.identify(currentUser.id, { email: currentUser.email });
+
     loadDashboard();
 }
 
@@ -367,6 +405,9 @@ async function handleLogin(e) {
         authToken = data.access_token;
         localStorage.setItem('winebox_token', authToken);
 
+        // Track successful login
+        analytics.capture('frontend_login_success');
+
         form.reset();
         checkAuth();
     } catch (error) {
@@ -376,6 +417,10 @@ async function handleLogin(e) {
 }
 
 function handleLogout() {
+    // Track logout before clearing state
+    analytics.capture('frontend_logout');
+    analytics.reset();
+
     localStorage.removeItem('winebox_token');
     authToken = null;
     currentUser = null;
@@ -667,6 +712,9 @@ function navigateTo(page) {
     });
 
     currentPage = page;
+
+    // Track page view
+    analytics.capture('page_view', { page: page });
 
     // Load page data
     switch (page) {
@@ -1077,6 +1125,13 @@ async function submitCheckin() {
 
         const wine = await response.json();
         showToast(`Successfully checked in: ${wine.name}`, 'success');
+
+        // Track check-in event
+        analytics.capture('frontend_wine_checkin', {
+            wine_name: wine.name,
+            quantity: document.getElementById('confirm-quantity').value || '1',
+            country: document.getElementById('confirm-country').value || null
+        });
 
         // Close modal and reset form
         modal.classList.remove('active');

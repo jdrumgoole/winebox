@@ -77,6 +77,14 @@ class EmailConfig(BaseModel):
     aws_region: str = "eu-west-1"
 
 
+class AnalyticsConfig(BaseModel):
+    """Analytics configuration."""
+
+    posthog_enabled: bool = False
+    posthog_host: str = "https://eu.posthog.com"
+    posthog_debug: bool = False
+
+
 class WineboxConfig(BaseModel):
     """Main WineBox configuration loaded from config.toml."""
 
@@ -87,6 +95,7 @@ class WineboxConfig(BaseModel):
     ocr: OCRConfig = Field(default_factory=OCRConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
     email: EmailConfig = Field(default_factory=EmailConfig)
+    analytics: AnalyticsConfig = Field(default_factory=AnalyticsConfig)
 
 
 class SecretsConfig(BaseModel):
@@ -99,3 +108,4 @@ class SecretsConfig(BaseModel):
     anthropic_api_key: str | None = None
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
+    posthog_api_key: str | None = None

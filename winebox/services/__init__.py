@@ -1,7 +1,14 @@
 """Services for WineBox application."""
 
+from winebox.services.analytics import PostHogService, posthog_service
 from winebox.services.image_storage import ImageStorageService
 from winebox.services.ocr import OCRService
 from winebox.services.wine_parser import WineParserService
 
-__all__ = ["ImageStorageService", "OCRService", "WineParserService"]
+__all__ = [
+    "ImageStorageService",
+    "OCRService",
+    "PostHogService",
+    "WineParserService",
+    "posthog_service",
+]

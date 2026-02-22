@@ -21,6 +21,7 @@ from starlette.responses import Response
 from winebox import __version__
 from winebox.config import settings
 from winebox.database import close_db, init_db
+from winebox.services.analytics import posthog_service
 
 logger = logging.getLogger(__name__)
 
@@ -55,13 +56,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Note: 'unsafe-inline' is kept for style-src only (for basic inline styles
         # like style="display: none;"). Script-src does not need unsafe-inline as
         # all JavaScript is loaded from external files.
+        # PostHog domains are allowed for analytics when enabled.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self'; "
+            "script-src 'self' https://eu.posthog.com https://eu-assets.i.posthog.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "img-src 'self' data: blob:; "
+            "img-src 'self' data: blob: https://eu.posthog.com; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "connect-src 'self'; "
+            "connect-src 'self' https://eu.posthog.com https://eu.i.posthog.com; "
             "frame-ancestors 'none'; "
             "form-action 'self'; "
             "base-uri 'self'; "
@@ -210,6 +212,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             pass
         logger.info("Stopped security cleanup background task")
 
+    # Shutdown PostHog analytics (flush pending events)
+    posthog_service.shutdown()
+
     await close_db()
 
 
@@ -257,6 +262,23 @@ async def health_check() -> JSONResponse:
             "status": "healthy",
             "version": __version__,
             "app_name": settings.app_name,
+        }
+    )
+
+
+# PostHog analytics configuration endpoint
+@app.get("/api/config/analytics", tags=["Configuration"])
+async def get_analytics_config() -> JSONResponse:
+    """Get analytics configuration for frontend.
+
+    Returns PostHog settings (enabled, host, API key) for client-side analytics.
+    Only returns the public API key which is safe to expose.
+    """
+    return JSONResponse(
+        content={
+            "enabled": settings.posthog_enabled,
+            "host": settings.posthog_host,
+            "api_key": settings.posthog_api_key or "",
         }
     )
 

@@ -392,6 +392,8 @@ SYNCABLE_SECRETS = [
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_REGION",
+    "WINEBOX_POSTHOG_ENABLED",
+    "WINEBOX_POSTHOG_API_KEY",
 ]
 
 # Secrets that should NEVER be synced (production-specific)
