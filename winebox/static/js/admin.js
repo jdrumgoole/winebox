@@ -4,7 +4,7 @@
 
 // Get auth token from localStorage
 function getAuthToken() {
-    return localStorage.getItem('token');
+    return localStorage.getItem('winebox_token');
 }
 
 // Check if user is authenticated
