@@ -17,10 +17,13 @@ router = APIRouter()
 
 
 @router.get("")
-async def admin_panel(
-    admin: RequireAdmin,
-) -> FileResponse:
-    """Serve the admin panel HTML page."""
+async def admin_panel() -> FileResponse:
+    """Serve the admin panel HTML page.
+
+    Note: The page itself doesn't require authentication - the JavaScript
+    will check auth and redirect if needed. The API endpoints still require
+    admin privileges.
+    """
     static_path = Path(__file__).parent.parent / "static" / "admin.html"
     return FileResponse(static_path, media_type="text/html")
 
