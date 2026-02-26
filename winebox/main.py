@@ -10,7 +10,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -246,11 +246,12 @@ if settings.cors_origins:
 app.add_middleware(SecurityHeadersMiddleware)
 
 
-# Root redirect to web interface - defined first to ensure it's matched
+# Root serves web interface directly - no redirect to keep URL clean
 @app.get("/", tags=["Root"])
-async def root() -> RedirectResponse:
-    """Root endpoint - redirects to web interface."""
-    return RedirectResponse(url="/static/index.html")
+async def root() -> FileResponse:
+    """Root endpoint - serves the main web interface."""
+    static_path = Path(__file__).parent / "static" / "index.html"
+    return FileResponse(static_path, media_type="text/html")
 
 
 # Health check endpoint
