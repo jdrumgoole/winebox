@@ -17,11 +17,12 @@ async def test_health_check(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_root_redirects_to_web_interface(client: AsyncClient) -> None:
-    """Test that root URL redirects to the web interface."""
-    response = await client.get("/", follow_redirects=False)
-    assert response.status_code == 307  # Temporary redirect
-    assert response.headers["location"] == "/static/index.html"
+async def test_root_serves_web_interface(client: AsyncClient) -> None:
+    """Test that root URL serves the web interface directly."""
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "WineBox" in response.text
 
 
 @pytest.mark.asyncio
