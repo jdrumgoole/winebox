@@ -804,3 +804,28 @@ def prod_enable_user(ctx: Context, email: str) -> None:
         email: Email of user to enable
     """
     ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} enable {email}"), pty=True)
+
+
+@task(name="generate-test-data")
+def generate_test_data(
+    ctx: Context,
+    rows: int = 5000,
+    output: str = "tests/data/xwines-test-data.csv",
+    seed: int = 42,
+) -> None:
+    """Generate a test CSV from the production X-Wines dataset.
+
+    Connects to the production MongoDB, samples real wines from the X-Wines
+    collection (100K+ wines), and expands their vintages into rows matching
+    the Berry Bros & Rudd (bc-test-data.csv) column format.
+
+    Args:
+        ctx: Invoke context
+        rows: Number of data rows to generate (default: 5000)
+        output: Output CSV path (default: tests/data/xwines-test-data.csv)
+        seed: Random seed for reproducibility (default: 42)
+    """
+    ctx.run(
+        f"uv run python scripts/generate_test_csv.py -n {rows} -o {output} --seed {seed}",
+        pty=True,
+    )
