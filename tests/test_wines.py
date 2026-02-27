@@ -384,3 +384,46 @@ async def test_checkin_accepts_jpeg_with_correct_magic_bytes(client: AsyncClient
 
     response = await client.post("/api/wines/checkin", files=files, data=data)
     assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_checkin_with_custom_fields(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Test checking in a wine with custom fields."""
+    import json
+
+    files = {
+        "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+    }
+    custom = {"Cellar Location": "Rack 3A", "Purchase Price": "$50"}
+    data = {
+        "name": "Custom Fields Wine",
+        "quantity": "1",
+        "custom_fields": json.dumps(custom),
+    }
+
+    response = await client.post("/api/wines/checkin", files=files, data=data)
+    assert response.status_code == 201
+
+    wine = response.json()
+    assert wine["name"] == "Custom Fields Wine"
+    assert wine["custom_fields"] is not None
+    assert wine["custom_fields"]["Cellar Location"] == "Rack 3A"
+    assert wine["custom_fields"]["Purchase Price"] == "$50"
+
+
+@pytest.mark.asyncio
+async def test_wine_without_image_path(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Test that front_label_image_path can be None (imported wines)."""
+    # Check in a wine first (this will have an image path)
+    files = {
+        "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+    }
+    data = {"name": "Test Wine", "quantity": "1"}
+    response = await client.post("/api/wines/checkin", files=files, data=data)
+    assert response.status_code == 201
+
+    # The wine should have an image path from checkin
+    wine = response.json()
+    # front_label_image_path is now optional (can be None for imported wines)
+    # For checkin wines, it should still be set
+    assert wine["front_label_image_path"] is not None

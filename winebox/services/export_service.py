@@ -58,6 +58,7 @@ def _wine_to_row(wine: WineFlatExport) -> list[Any]:
         wine.grape_blend_summary or "",
         wine.scores_summary or "",
         wine.average_score or "",
+        wine.custom_fields or "",
         _format_datetime(wine.created_at),
         _format_datetime(wine.updated_at),
     ]
@@ -96,6 +97,7 @@ WINE_HEADERS = [
     "grape_blend_summary",
     "scores_summary",
     "average_score",
+    "custom_fields",
     "created_at",
     "updated_at",
 ]

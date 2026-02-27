@@ -67,7 +67,7 @@ class Wine(Document):
     # Label text and images
     front_label_text: str = ""
     back_label_text: Optional[str] = None
-    front_label_image_path: str
+    front_label_image_path: Optional[str] = None
     back_label_image_path: Optional[str] = None
 
     # Taxonomy fields
@@ -83,6 +83,10 @@ class Wine(Document):
     inventory: InventoryInfo = Field(default_factory=InventoryInfo)
     grape_blends: list[GrapeBlendEntry] = Field(default_factory=list)
     scores: list[ScoreEntry] = Field(default_factory=list)
+
+    # Custom fields from spreadsheet import or manual entry
+    custom_fields: Optional[dict[str, str]] = None
+    custom_fields_text: Optional[str] = None  # Denormalized for text search
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -106,6 +110,7 @@ class Wine(Document):
                 ("appellation", "text"),
                 ("country", "text"),
                 ("front_label_text", "text"),
+                ("custom_fields_text", "text"),
             ],
         ]
 

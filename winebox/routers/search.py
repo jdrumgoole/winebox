@@ -63,6 +63,7 @@ async def search_wines(
                 {"grape_variety": {"$regex": search_pattern}},
                 {"front_label_text": {"$regex": search_pattern}},
                 {"back_label_text": {"$regex": search_pattern}},
+                {"custom_fields_text": {"$regex": search_pattern}},
             ]
 
     # Exact/partial matches on specific fields

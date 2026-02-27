@@ -1,5 +1,6 @@
 """Pydantic schemas for data export functionality."""
 
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -34,6 +35,7 @@ class WineFlatExport(BaseModel):
     grape_blend_summary: str | None = None
     scores_summary: str | None = None
     average_score: float | None = None
+    custom_fields: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -73,6 +75,11 @@ class WineFlatExport(BaseModel):
             if normalized_scores:
                 average_score = sum(normalized_scores) / len(normalized_scores)
 
+        # Build custom fields JSON string
+        custom_fields_str = None
+        if hasattr(wine, "custom_fields") and wine.custom_fields:
+            custom_fields_str = json.dumps(wine.custom_fields)
+
         return WineFlatExport(
             id=str(wine.id),
             name=wine.name,
@@ -89,6 +96,7 @@ class WineFlatExport(BaseModel):
             grape_blend_summary=grape_blend_summary,
             scores_summary=scores_summary,
             average_score=average_score,
+            custom_fields=custom_fields_str,
             created_at=wine.created_at,
             updated_at=wine.updated_at,
         )

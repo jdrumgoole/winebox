@@ -2043,6 +2043,119 @@ body.logged-out #user-info {
     }
 }
 
+/* Import Page */
+.import-upload-area {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.import-upload-area:hover,
+.import-upload-area.drag-over {
+    border-color: var(--primary-color);
+    background-color: rgba(139, 26, 74, 0.04);
+}
+
+.import-upload-icon {
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.import-upload-area p {
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.import-step {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.import-mapping-table,
+.import-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.import-mapping-table th,
+.import-mapping-table td,
+.import-preview-table th,
+.import-preview-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.import-mapping-table th,
+.import-preview-table th {
+    background: var(--background-color);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.import-sample-cell {
+    color: var(--text-muted);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.import-mapping-select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+}
+
+.import-custom-name {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+}
+
+.import-preview-table {
+    margin-top: 0.5rem;
+}
+
+.import-preview-table td {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* Custom Field Rows */
+.custom-field-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    align-items: center;
+}
+
+.custom-field-row .custom-field-name,
+.custom-field-row .custom-field-value {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+}
+
+.custom-field-row .custom-field-remove {
+    padding: 0.4rem 0.6rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
 /* X-Wines Toolbar */
 .xwines-toolbar {
     display: flex;

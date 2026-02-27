@@ -30,6 +30,7 @@ class WineBase(BaseModel):
     drink_window_start: int | None = Field(None, ge=1900, le=2200, description="Start year of drink window")
     drink_window_end: int | None = Field(None, ge=1900, le=2200, description="End year of drink window")
     producer_type: str | None = Field(None, description="Producer type: estate, negociant, cooperative")
+    custom_fields: dict[str, str] | None = Field(None, description="User-defined custom fields")
 
 
 class WineCreate(WineBase):
@@ -59,6 +60,7 @@ class WineUpdate(BaseModel):
     drink_window_start: int | None = Field(None, ge=1900, le=2200)
     drink_window_end: int | None = Field(None, ge=1900, le=2200)
     producer_type: str | None = Field(None)
+    custom_fields: dict[str, str] | None = Field(None, description="User-defined custom fields")
 
 
 class InventoryInfo(BaseModel):
@@ -76,8 +78,9 @@ class WineWithInventory(WineBase):
     id: str
     front_label_text: str
     back_label_text: str | None
-    front_label_image_path: str
+    front_label_image_path: str | None = None
     back_label_image_path: str | None
+    custom_fields: dict[str, str] | None = None
     created_at: datetime
     updated_at: datetime
     inventory: InventoryInfo | None = None

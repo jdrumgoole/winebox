@@ -54,6 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initAutocomplete();
     initExportDropdowns();
     initXWinesPage();
+    initImportPage();
+    initCustomFields();
     checkAuth();
     loadAppInfo();
 });
@@ -208,8 +210,13 @@ function selectAutocompleteItem(wine) {
     // Fill in the form fields with the selected wine data
     document.getElementById('wine-name').value = wine.name || '';
     document.getElementById('winery').value = wine.winery || '';
-    document.getElementById('grape-variety').value = wine.region || '';  // Use region as a hint for now
     document.getElementById('country').value = wine.country || '';
+
+    // Fill region from search result
+    const regionInput = document.getElementById('region');
+    if (wine.region && regionInput && !regionInput.value) {
+        regionInput.value = wine.region;
+    }
 
     // Fill alcohol percentage if available
     const alcoholInput = document.getElementById('alcohol');
@@ -217,8 +224,13 @@ function selectAutocompleteItem(wine) {
         alcoholInput.value = wine.abv;
     }
 
+    // Fetch full X-Wines detail to fill remaining fields
+    if (wine.id) {
+        fetchXWinesDetailForForm(wine.id);
+    }
+
     // Add visual indicator that fields were auto-filled
-    const autoFilledFields = ['wine-name', 'winery', 'country', 'alcohol'];
+    const autoFilledFields = ['wine-name', 'winery', 'country', 'region', 'alcohol'];
     autoFilledFields.forEach(fieldId => {
         const input = document.getElementById(fieldId);
         if (input && input.value) {
@@ -229,6 +241,45 @@ function selectAutocompleteItem(wine) {
 
     hideAutocomplete();
     showToast(`Selected: ${wine.name}`, 'success');
+}
+
+async function fetchXWinesDetailForForm(xwinesId) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/xwines/wines/${xwinesId}`);
+        if (!response.ok) return;
+        const detail = await response.json();
+
+        // Fill empty fields from X-Wines detail
+        const grapeInput = document.getElementById('grape-variety');
+        if (grapeInput && !grapeInput.value && detail.grapes) {
+            grapeInput.value = parsePythonList(detail.grapes);
+            grapeInput.classList.add('auto-filled');
+            setTimeout(() => grapeInput.classList.remove('auto-filled'), 2000);
+        }
+
+        const regionInput = document.getElementById('region');
+        if (regionInput && !regionInput.value && detail.region_name) {
+            regionInput.value = detail.region_name;
+            regionInput.classList.add('auto-filled');
+            setTimeout(() => regionInput.classList.remove('auto-filled'), 2000);
+        }
+
+        const wineTypeSelect = document.getElementById('wine-type');
+        if (wineTypeSelect && !wineTypeSelect.value && detail.wine_type) {
+            const typeValue = detail.wine_type.toLowerCase();
+            // Check if option exists in the select
+            const option = Array.from(wineTypeSelect.options).find(
+                opt => opt.value === typeValue
+            );
+            if (option) {
+                wineTypeSelect.value = typeValue;
+                wineTypeSelect.classList.add('auto-filled');
+                setTimeout(() => wineTypeSelect.classList.remove('auto-filled'), 2000);
+            }
+        }
+    } catch (error) {
+        console.debug('X-Wines detail fetch for form failed:', error);
+    }
 }
 
 function showAutocomplete() {
@@ -730,6 +781,9 @@ function navigateTo(page) {
         case 'search':
             // Search results loaded on form submit
             break;
+        case 'import':
+            // Import page is ready as-is
+            break;
         case 'xwines':
             loadXWinesFilters();
             break;
@@ -895,6 +949,22 @@ function populateFormFromScan(result) {
         }
     }
 
+    // Set Wine Type dropdown from enriched scan data
+    if (parsed.wine_type) {
+        const wineTypeSelect = document.getElementById('wine-type');
+        if (wineTypeSelect) {
+            const typeValue = parsed.wine_type.toLowerCase();
+            const option = Array.from(wineTypeSelect.options).find(
+                opt => opt.value === typeValue
+            );
+            if (option) {
+                wineTypeSelect.value = typeValue;
+                wineTypeSelect.classList.add('auto-filled');
+                setTimeout(() => wineTypeSelect.classList.remove('auto-filled'), 2000);
+            }
+        }
+    }
+
     // Populate raw label text section
     populateRawLabelText(result.ocr, result.method);
 }
@@ -991,10 +1061,12 @@ function handleCheckin(e) {
         country: document.getElementById('country').value,
         classification: document.getElementById('classification').value,
         alcohol: document.getElementById('alcohol').value,
+        wineTypeId: document.getElementById('wine-type').value,
         quantity: document.getElementById('quantity').value || '1',
         notes: document.getElementById('notes').value,
         frontLabelText: lastScanResult?.ocr?.front_label_text || '',
-        backLabelText: lastScanResult?.ocr?.back_label_text || ''
+        backLabelText: lastScanResult?.ocr?.back_label_text || '',
+        customFields: collectCustomFields('custom-fields-container')
     };
 
     // Show the confirmation modal with editable fields
@@ -1030,6 +1102,21 @@ function showCheckinConfirmation() {
     document.getElementById('confirm-alcohol').value = data.alcohol || '';
     document.getElementById('confirm-quantity').value = data.quantity || '1';
     document.getElementById('confirm-notes').value = data.notes || '';
+
+    // Set Wine Type in confirmation modal
+    const confirmWineType = document.getElementById('confirm-wine-type');
+    if (confirmWineType && data.wineTypeId) {
+        confirmWineType.value = data.wineTypeId;
+    }
+
+    // Set custom fields in confirmation modal
+    const confirmCfContainer = document.getElementById('confirm-custom-fields-container');
+    confirmCfContainer.innerHTML = '';
+    if (data.customFields && Object.keys(data.customFields).length > 0) {
+        for (const [key, value] of Object.entries(data.customFields)) {
+            addCustomFieldRow(confirmCfContainer, key, value);
+        }
+    }
 
     // Set OCR text (hidden by default)
     const ocrSection = document.getElementById('confirm-ocr-section');
@@ -1101,6 +1188,8 @@ async function submitCheckin() {
     formData.append('classification', document.getElementById('confirm-classification').value);
     const alcohol = document.getElementById('confirm-alcohol').value;
     if (alcohol) formData.append('alcohol_percentage', alcohol);
+    const wineTypeId = document.getElementById('confirm-wine-type').value;
+    if (wineTypeId) formData.append('wine_type_id', wineTypeId);
     formData.append('quantity', document.getElementById('confirm-quantity').value || '1');
     formData.append('notes', document.getElementById('confirm-notes').value);
 
@@ -1110,6 +1199,12 @@ async function submitCheckin() {
     }
     if (data.backLabelText) {
         formData.append('back_label_text', data.backLabelText);
+    }
+
+    // Include custom fields
+    const customFields = collectCustomFields('confirm-custom-fields-container');
+    if (customFields && Object.keys(customFields).length > 0) {
+        formData.append('custom_fields', JSON.stringify(customFields));
     }
 
     try {
@@ -1480,6 +1575,18 @@ async function showWineDetail(wineId) {
                     <div class="wine-detail-field">
                         <div class="label">Alcohol</div>
                         <div class="value">${wine.alcohol_percentage}%</div>
+                    </div>
+                ` : ''}
+
+                ${wine.custom_fields && Object.keys(wine.custom_fields).length > 0 ? `
+                    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border-color);">
+                        <div class="label" style="margin-bottom:0.5rem;">CUSTOM FIELDS</div>
+                        ${Object.entries(wine.custom_fields).map(([k, v]) => `
+                            <div class="wine-detail-field">
+                                <div class="label">${escapeHtml(k)}</div>
+                                <div class="value">${escapeHtml(v)}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
 
@@ -2284,4 +2391,305 @@ async function showXWinesDetail(wineId) {
     } catch (error) {
         showToast('Failed to load wine details', 'error');
     }
+}
+
+// =============================================================================
+// CUSTOM FIELDS
+// =============================================================================
+
+function initCustomFields() {
+    const addBtn = document.getElementById('add-custom-field-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => {
+            addCustomFieldRow(document.getElementById('custom-fields-container'));
+        });
+    }
+
+    const confirmAddBtn = document.getElementById('confirm-add-custom-field-btn');
+    if (confirmAddBtn) {
+        confirmAddBtn.addEventListener('click', () => {
+            addCustomFieldRow(document.getElementById('confirm-custom-fields-container'));
+        });
+    }
+}
+
+function addCustomFieldRow(container, name, value) {
+    const row = document.createElement('div');
+    row.className = 'custom-field-row';
+    row.innerHTML = `
+        <input type="text" class="custom-field-name" placeholder="Field name" value="${escapeHtml(name || '')}">
+        <input type="text" class="custom-field-value" placeholder="Value" value="${escapeHtml(value || '')}">
+        <button type="button" class="btn btn-small btn-danger custom-field-remove">&times;</button>
+    `;
+    row.querySelector('.custom-field-remove').addEventListener('click', () => row.remove());
+    container.appendChild(row);
+}
+
+function collectCustomFields(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return null;
+    const fields = {};
+    container.querySelectorAll('.custom-field-row').forEach(row => {
+        const name = row.querySelector('.custom-field-name').value.trim();
+        const value = row.querySelector('.custom-field-value').value.trim();
+        if (name && value) {
+            fields[name] = value;
+        }
+    });
+    return Object.keys(fields).length > 0 ? fields : null;
+}
+
+// =============================================================================
+// IMPORT PAGE
+// =============================================================================
+
+let currentImportBatchId = null;
+let currentImportData = null;
+
+function initImportPage() {
+    const fileInput = document.getElementById('import-file-input');
+    const dropZone = document.getElementById('import-drop-zone');
+
+    if (!fileInput || !dropZone) return;
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleImportFileSelect(e.target.files[0]);
+        }
+    });
+
+    // Drag and drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleImportFileSelect(e.dataTransfer.files[0]);
+        }
+    });
+
+    // Buttons
+    document.getElementById('import-confirm-mapping-btn').addEventListener('click', handleConfirmMapping);
+    document.getElementById('import-back-to-upload-btn').addEventListener('click', resetImportPage);
+    document.getElementById('import-new-btn').addEventListener('click', resetImportPage);
+}
+
+async function handleImportFileSelect(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['csv', 'xlsx'].includes(ext)) {
+        showToast('Please select a CSV or XLSX file', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        showToast('Uploading and parsing...', 'info');
+        const response = await fetchWithAuth(`${API_BASE}/import/upload`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
+        }
+
+        const data = await response.json();
+        currentImportBatchId = data.batch_id;
+        currentImportData = data;
+
+        renderMappingStep(data);
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+function renderMappingStep(data) {
+    // Show step 2
+    document.getElementById('import-step-upload').style.display = 'none';
+    document.getElementById('import-step-map').style.display = 'block';
+    document.getElementById('import-step-results').style.display = 'none';
+
+    document.getElementById('import-file-info').textContent =
+        `${data.filename} - ${data.row_count} rows`;
+
+    // Wine fields for dropdown
+    const wineFields = [
+        { value: 'skip', label: 'Skip' },
+        { value: 'name', label: 'Wine Name' },
+        { value: 'winery', label: 'Winery' },
+        { value: 'vintage', label: 'Vintage' },
+        { value: 'grape_variety', label: 'Grape Variety' },
+        { value: 'region', label: 'Region' },
+        { value: 'sub_region', label: 'Sub-Region' },
+        { value: 'appellation', label: 'Appellation' },
+        { value: 'country', label: 'Country' },
+        { value: 'alcohol_percentage', label: 'Alcohol %' },
+        { value: 'wine_type_id', label: 'Wine Type' },
+        { value: 'classification', label: 'Classification' },
+        { value: 'price_tier', label: 'Price Tier' },
+        { value: 'quantity', label: 'Quantity' },
+        { value: 'notes', label: 'Notes' },
+    ];
+
+    // Build mapping table
+    const sampleRow = data.preview_rows[0] || {};
+    let tableHtml = '<table class="import-mapping-table"><thead><tr><th>Column</th><th>Sample</th><th>Map To</th></tr></thead><tbody>';
+
+    for (const header of data.headers) {
+        const suggested = data.suggested_mapping[header] || 'skip';
+        const sample = sampleRow[header] || '';
+
+        tableHtml += `<tr>
+            <td><strong>${escapeHtml(header)}</strong></td>
+            <td class="import-sample-cell">${escapeHtml(String(sample).substring(0, 60))}</td>
+            <td>
+                <select class="import-mapping-select" data-header="${escapeHtml(header)}">
+                    ${wineFields.map(f =>
+                        `<option value="${f.value}" ${suggested === f.value ? 'selected' : ''}>${f.label}</option>`
+                    ).join('')}
+                    <option value="custom" ${suggested === 'skip' ? '' : ''}>Custom Field...</option>
+                </select>
+                <input type="text" class="import-custom-name" placeholder="Field name" style="display:none;margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}">
+            </td>
+        </tr>`;
+    }
+    tableHtml += '</tbody></table>';
+    document.getElementById('import-mapping-table-container').innerHTML = tableHtml;
+
+    // Toggle custom field name input
+    document.querySelectorAll('.import-mapping-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+            const header = e.target.dataset.header;
+            const customInput = document.querySelector(`.import-custom-name[data-header="${header}"]`);
+            customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+        });
+    });
+
+    // Build preview table
+    if (data.preview_rows.length > 0) {
+        let previewHtml = '<table class="import-preview-table"><thead><tr>';
+        for (const h of data.headers) {
+            previewHtml += `<th>${escapeHtml(h)}</th>`;
+        }
+        previewHtml += '</tr></thead><tbody>';
+        for (const row of data.preview_rows) {
+            previewHtml += '<tr>';
+            for (const h of data.headers) {
+                previewHtml += `<td>${escapeHtml(String(row[h] || '').substring(0, 40))}</td>`;
+            }
+            previewHtml += '</tr>';
+        }
+        previewHtml += '</tbody></table>';
+        document.getElementById('import-preview-container').innerHTML = previewHtml;
+    }
+}
+
+async function handleConfirmMapping() {
+    if (!currentImportBatchId) return;
+
+    // Collect mapping from dropdowns
+    const mapping = {};
+    document.querySelectorAll('.import-mapping-select').forEach(select => {
+        const header = select.dataset.header;
+        let value = select.value;
+        if (value === 'custom') {
+            const customInput = document.querySelector(`.import-custom-name[data-header="${header}"]`);
+            const customName = customInput.value.trim();
+            value = customName ? `custom:${customName}` : 'skip';
+        }
+        mapping[header] = value;
+    });
+
+    // Validate at least one name mapping
+    if (!Object.values(mapping).includes('name')) {
+        showToast('At least one column must be mapped to "Wine Name"', 'error');
+        return;
+    }
+
+    try {
+        // Set mapping
+        const mapResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/mapping`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mapping: mapping })
+        });
+
+        if (!mapResponse.ok) {
+            const error = await mapResponse.json();
+            throw new Error(error.detail || 'Failed to set mapping');
+        }
+
+        showToast('Processing import...', 'info');
+
+        // Process
+        const processResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1 })
+        });
+
+        if (!processResponse.ok) {
+            const error = await processResponse.json();
+            throw new Error(error.detail || 'Processing failed');
+        }
+
+        const result = await processResponse.json();
+        showImportResults(result);
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+function showImportResults(result) {
+    document.getElementById('import-step-upload').style.display = 'none';
+    document.getElementById('import-step-map').style.display = 'none';
+    document.getElementById('import-step-results').style.display = 'block';
+
+    let html = `
+        <div class="stats-grid" style="margin-bottom:1.5rem;">
+            <div class="stat-card">
+                <div class="stat-value">${result.wines_created}</div>
+                <div class="stat-label">Wines Created</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${result.rows_skipped}</div>
+                <div class="stat-label">Rows Skipped</div>
+            </div>
+        </div>
+    `;
+
+    if (result.errors && result.errors.length > 0) {
+        html += '<div style="margin-top:1rem;"><strong>Errors:</strong><ul>';
+        for (const err of result.errors.slice(0, 20)) {
+            html += `<li style="color:var(--error-color);font-size:0.9rem;">${escapeHtml(err)}</li>`;
+        }
+        if (result.errors.length > 20) {
+            html += `<li>... and ${result.errors.length - 20} more</li>`;
+        }
+        html += '</ul></div>';
+    }
+
+    document.getElementById('import-results-content').innerHTML = html;
+
+    if (result.wines_created > 0) {
+        showToast(`Successfully imported ${result.wines_created} wines!`, 'success');
+    }
+}
+
+function resetImportPage() {
+    document.getElementById('import-step-upload').style.display = 'block';
+    document.getElementById('import-step-map').style.display = 'none';
+    document.getElementById('import-step-results').style.display = 'none';
+    document.getElementById('import-file-input').value = '';
+    currentImportBatchId = null;
+    currentImportData = null;
 }

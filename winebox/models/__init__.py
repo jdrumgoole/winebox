@@ -10,6 +10,7 @@ from winebox.models.classification import Classification
 from winebox.models.xwines import XWinesWine, XWinesMetadata
 from winebox.models.token_blacklist import RevokedToken
 from winebox.models.login_attempt import LoginAttempt
+from winebox.models.import_batch import ImportBatch, ImportStatus
 
 __all__ = [
     # Main documents
@@ -31,4 +32,7 @@ __all__ = [
     # X-Wines reference data
     "XWinesWine",
     "XWinesMetadata",
+    # Import
+    "ImportBatch",
+    "ImportStatus",
 ]

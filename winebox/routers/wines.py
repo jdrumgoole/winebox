@@ -1,6 +1,7 @@
 """Wine management endpoints."""
 
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -38,6 +39,7 @@ from winebox.services.image_storage import ImageStorageService
 from winebox.services.ocr import OCRService
 from winebox.services.vision import ClaudeVisionService
 from winebox.services.wine_parser import WineParserService
+from winebox.services.xwines_enrichment import enrich_parsed_with_xwines
 
 logger = logging.getLogger(__name__)
 
@@ -126,18 +128,35 @@ async def scan_label(
                 back_media_type=back_media_type,
             )
 
+            # Build parsed dict and enrich with X-Wines data
+            parsed = {
+                "name": result.get("name"),
+                "winery": result.get("winery"),
+                "vintage": result.get("vintage"),
+                "grape_variety": result.get("grape_variety"),
+                "region": result.get("region"),
+                "sub_region": result.get("sub_region"),
+                "appellation": result.get("appellation"),
+                "country": result.get("country"),
+                "classification": result.get("classification"),
+                "alcohol_percentage": result.get("alcohol_percentage"),
+            }
+            parsed = await enrich_parsed_with_xwines(parsed)
+
             return {
                 "parsed": {
-                    "name": result.get("name"),
-                    "winery": result.get("winery"),
-                    "vintage": result.get("vintage"),
-                    "grape_variety": result.get("grape_variety"),
-                    "region": result.get("region"),
-                    "sub_region": result.get("sub_region"),
-                    "appellation": result.get("appellation"),
-                    "country": result.get("country"),
-                    "classification": result.get("classification"),
-                    "alcohol_percentage": result.get("alcohol_percentage"),
+                    "name": parsed.get("name"),
+                    "winery": parsed.get("winery"),
+                    "vintage": parsed.get("vintage"),
+                    "grape_variety": parsed.get("grape_variety"),
+                    "region": parsed.get("region"),
+                    "sub_region": parsed.get("sub_region"),
+                    "appellation": parsed.get("appellation"),
+                    "country": parsed.get("country"),
+                    "classification": parsed.get("classification"),
+                    "alcohol_percentage": parsed.get("alcohol_percentage"),
+                    "wine_type": parsed.get("wine_type"),
+                    "xwines_id": parsed.get("xwines_id"),
                 },
                 "ocr": {
                     "front_label_text": result.get("raw_text", ""),
@@ -161,6 +180,7 @@ async def scan_label(
     if back_text:
         combined_text = f"{front_text}\n{back_text}"
     parsed_data = wine_parser.parse(combined_text)
+    parsed_data = await enrich_parsed_with_xwines(parsed_data)
 
     return {
         "parsed": {
@@ -174,6 +194,8 @@ async def scan_label(
             "country": parsed_data.get("country"),
             "classification": parsed_data.get("classification"),
             "alcohol_percentage": parsed_data.get("alcohol_percentage"),
+            "wine_type": parsed_data.get("wine_type"),
+            "xwines_id": parsed_data.get("xwines_id"),
         },
         "ocr": {
             "front_label_text": front_text,
@@ -206,9 +228,11 @@ async def checkin_wine(
     country: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
     classification: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
     alcohol_percentage: Annotated[float | None, Form(ge=0, le=100)] = None,
+    wine_type_id: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
     notes: Annotated[str | None, Form(max_length=MAX_NOTES_LENGTH, description="Check-in notes")] = None,
     front_label_text: Annotated[str | None, Form(max_length=MAX_OCR_TEXT_LENGTH, description="Pre-scanned front label text")] = None,
     back_label_text: Annotated[str | None, Form(max_length=MAX_OCR_TEXT_LENGTH, description="Pre-scanned back label text")] = None,
+    custom_fields: Annotated[str | None, Form(max_length=5000, description="Custom fields as JSON dict")] = None,
 ) -> WineWithInventory:
     """Check in wine bottles to the cellar.
 
@@ -292,6 +316,25 @@ async def checkin_wine(
     # Use provided values
     wine_name = name or "Unknown Wine"
 
+    # Parse custom fields JSON
+    parsed_custom_fields = None
+    custom_fields_text = None
+    if custom_fields:
+        try:
+            parsed_custom_fields = json.loads(custom_fields)
+            if not isinstance(parsed_custom_fields, dict):
+                raise ValueError("custom_fields must be a JSON object")
+            # Ensure all values are strings
+            parsed_custom_fields = {str(k): str(v) for k, v in parsed_custom_fields.items()}
+            custom_fields_text = " ".join(
+                f"{k} {v}" for k, v in parsed_custom_fields.items()
+            ) if parsed_custom_fields else None
+        except (json.JSONDecodeError, ValueError) as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid custom_fields JSON: {e}",
+            )
+
     # Create wine document with embedded inventory
     wine = Wine(
         owner_id=current_user.id,
@@ -305,10 +348,13 @@ async def checkin_wine(
         country=country,
         classification=classification,
         alcohol_percentage=alcohol_percentage,
+        wine_type_id=wine_type_id,
         front_label_text=front_text,
         back_label_text=back_text,
         front_label_image_path=front_image_path,
         back_label_image_path=back_image_path,
+        custom_fields=parsed_custom_fields,
+        custom_fields_text=custom_fields_text,
         inventory=InventoryInfo(quantity=quantity, updated_at=datetime.now(timezone.utc)),
     )
     await wine.insert()
@@ -489,6 +535,13 @@ async def update_wine(
     for field, value in update_data.items():
         setattr(wine, field, value)
 
+    # Recompute custom_fields_text if custom_fields was updated
+    if "custom_fields" in update_data:
+        cf = update_data["custom_fields"]
+        wine.custom_fields_text = (
+            " ".join(f"{k} {v}" for k, v in cf.items()) if cf else None
+        )
+
     wine.updated_at = datetime.now(timezone.utc)
     await wine.save()
 
@@ -517,7 +570,8 @@ async def delete_wine(
         )
 
     # Delete associated images
-    await image_storage.delete_image(wine.front_label_image_path)
+    if wine.front_label_image_path:
+        await image_storage.delete_image(wine.front_label_image_path)
     if wine.back_label_image_path:
         await image_storage.delete_image(wine.back_label_image_path)
 

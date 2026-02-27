@@ -25,6 +25,7 @@
                 <a href="#" data-page="cellar" class="nav-link">Cellar</a>
                 <a href="#" data-page="history" class="nav-link">History</a>
                 <a href="#" data-page="search" class="nav-link">Search</a>
+                <a href="#" data-page="import" class="nav-link">Import</a>
                 <a href="#" data-page="xwines" class="nav-link">X-Wines</a>
             </nav>
             <div id="user-info" class="user-info" style="display: none;">
@@ -352,6 +353,12 @@
                     </div>
 
                     <div class="form-group full-width">
+                        <label>Custom Fields</label>
+                        <div id="custom-fields-container"></div>
+                        <button type="button" class="btn btn-secondary btn-small" id="add-custom-field-btn" style="margin-top:0.5rem;">+ Add Custom Field</button>
+                    </div>
+
+                    <div class="form-group full-width">
                         <label for="notes">Notes</label>
                         <textarea id="notes" name="notes" rows="3" placeholder="Purchase notes, occasion, etc."></textarea>
                     </div>
@@ -508,6 +515,64 @@
                 </div>
             </form>
             <div id="search-results" class="wine-grid"></div>
+        </section>
+
+        <!-- Import Page -->
+        <section id="page-import" class="page">
+            <h2>Import Wine Collection</h2>
+            <p class="page-subtitle">Upload a CSV or Excel spreadsheet to import your wine collection</p>
+
+            <!-- Step 1: Upload -->
+            <div id="import-step-upload" class="import-step">
+                <div class="form-section">
+                    <h3>Step 1: Upload Spreadsheet</h3>
+                    <div class="import-upload-area" id="import-drop-zone">
+                        <div class="import-upload-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                        </div>
+                        <p>Drag and drop your file here, or</p>
+                        <label for="import-file-input" class="btn btn-primary" style="cursor:pointer;">Browse Files</label>
+                        <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none;">
+                        <p class="form-hint">Supported formats: CSV, Excel (.xlsx). Max 5,000 rows.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Map Columns -->
+            <div id="import-step-map" class="import-step" style="display:none;">
+                <div class="form-section">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                        <h3>Step 2: Map Columns</h3>
+                        <span id="import-file-info" class="form-hint"></span>
+                    </div>
+                    <p class="form-note">Match your spreadsheet columns to wine fields. Unmapped columns can be saved as custom fields.</p>
+                    <div id="import-mapping-table-container"></div>
+                </div>
+                <div class="form-section">
+                    <h3>Preview</h3>
+                    <div id="import-preview-container" style="overflow-x:auto;"></div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" id="import-confirm-mapping-btn">Confirm Mapping &amp; Import</button>
+                    <button type="button" class="btn btn-secondary" id="import-back-to-upload-btn">Back</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Processing / Results -->
+            <div id="import-step-results" class="import-step" style="display:none;">
+                <div class="form-section">
+                    <h3>Import Results</h3>
+                    <div id="import-results-content"></div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" id="import-new-btn">Import Another File</button>
+                    <button type="button" class="btn btn-secondary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                </div>
+            </div>
         </section>
 
         <!-- X-Wines Search Page -->
@@ -758,6 +823,11 @@
                                     <option value="cooperative">Cooperative</option>
                                 </select>
                             </div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Custom Fields</label>
+                            <div id="confirm-custom-fields-container"></div>
+                            <button type="button" class="btn btn-secondary btn-small" id="confirm-add-custom-field-btn" style="margin-top:0.5rem;">+ Add Custom Field</button>
                         </div>
                         <div class="form-group full-width">
                             <label for="confirm-notes">Notes</label>
