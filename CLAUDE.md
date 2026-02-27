@@ -27,6 +27,7 @@
 - Secrets are synced to production via `deploy/common.py:sync_secrets()`
 - Required secrets: `WINEBOX_SECRET_KEY`, `WINEBOX_MONGODB_URL`, `WINEBOX_ANTHROPIC_API_KEY`, `WINEBOX_POSTHOG_API_KEY`, AWS credentials
 - Never log secrets or include them in error messages
+- **NEVER hardcode credentials, connection strings, passwords, API keys, or tokens in source code** — not in scripts, tests, config files, or anywhere that gets committed to git. Always read them from environment variables or `secrets.env`. This includes one-off scripts, data generation scripts, and migration scripts. If a script needs a credential, require it via an environment variable and fail with a clear error if it is not set.
 
 ### Input Validation
 - Always validate and limit user input length (especially search queries)

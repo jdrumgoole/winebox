@@ -11,16 +11,16 @@ import argparse
 import ast
 import asyncio
 import csv
+import os
 import random
 import sys
 from pathlib import Path
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# Production MongoDB (read-only access to xwines_wines)
-PROD_MONGODB_URL = (
-    "mongodb+srv://jdrumgoole:2VfsYHCbJ9TqFiivnUvb@shared.2t22cum.mongodb.net"
-)
+# Production MongoDB URL - must be set via environment variable
+# Example: export XWINES_MONGODB_URL="mongodb+srv://user:pass@host"
+PROD_MONGODB_URL = os.environ.get("XWINES_MONGODB_URL", "")
 DB_NAME = "winebox"
 COLLECTION = "xwines_wines"
 
@@ -248,7 +248,12 @@ async def main() -> None:
     rng = random.Random(args.seed)
     output_path = Path(args.output)
 
-    print(f"Connecting to production X-Wines database...")
+    if not PROD_MONGODB_URL:
+        print("Error: XWINES_MONGODB_URL environment variable is not set.", file=sys.stderr)
+        print("Set it to the MongoDB connection string for the X-Wines database.", file=sys.stderr)
+        sys.exit(1)
+
+    print("Connecting to production X-Wines database...")
     wines = await fetch_wines(limit=2000)
     print(f"Fetched {len(wines)} wines from X-Wines")
 
