@@ -100,6 +100,18 @@ async def authenticate_user(
         )
 
     user = await get_user_by_email(email)
+
+    # Always verify password to prevent timing-based user enumeration
+    # If user doesn't exist, verify against a dummy hash (same time cost)
+    if user:
+        password_valid = verify_password(password, user.hashed_password)
+    else:
+        # Dummy hash to ensure constant-time comparison even for non-existent users
+        # This is a valid Argon2 hash that will never match any input
+        dummy_hash = "$argon2id$v=19$m=65536,t=3,p=4$Md2wFrOYTTHUZQ+9BMQ30Q$0++2tWFRb3NhF1aF3Xkos3RtheYbLA7S0gH4qC9jf50"
+        verify_password(password, dummy_hash)
+        password_valid = False
+
     if not user:
         # Record failed attempt - user not found
         await LoginAttempt.record_attempt(email, failed=True, ip_address=ip_address)
@@ -110,7 +122,7 @@ async def authenticate_user(
         )
         return None
 
-    if not verify_password(password, user.hashed_password):
+    if not password_valid:
         # Record failed attempt - wrong password
         await LoginAttempt.record_attempt(email, failed=True, ip_address=ip_address)
         security_logger.warning(

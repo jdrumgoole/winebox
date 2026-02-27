@@ -2,7 +2,7 @@
 
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import yaml
@@ -35,7 +35,7 @@ def _generate_filename(export_type: str, export_format: ExportFormat) -> str:
     Returns:
         Filename string
     """
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     extension = export_format.value
     return f"winebox_{export_type}_{timestamp}.{extension}"
 
@@ -204,7 +204,7 @@ def export_wines_to_yaml(
     export_data = {
         "wines": wines,
         "export_info": {
-            "exported_at": datetime.utcnow().isoformat() + "Z",
+            "exported_at": datetime.now(timezone.utc).isoformat() + "Z",
             "total_count": len(wines),
             "format": "yaml",
             "filters_applied": filters_applied,
@@ -322,7 +322,7 @@ def export_transactions_to_yaml(
     export_data = {
         "transactions": transactions,
         "export_info": {
-            "exported_at": datetime.utcnow().isoformat() + "Z",
+            "exported_at": datetime.now(timezone.utc).isoformat() + "Z",
             "total_count": len(transactions),
             "format": "yaml",
             "filters_applied": filters_applied,
@@ -487,7 +487,7 @@ def export_xwines_to_yaml(
     export_data = {
         "xwines": xwines,
         "export_info": {
-            "exported_at": datetime.utcnow().isoformat() + "Z",
+            "exported_at": datetime.now(timezone.utc).isoformat() + "Z",
             "total_count": len(xwines),
             "format": "yaml",
             "filters_applied": filters_applied,
@@ -528,6 +528,6 @@ def generate_xwines_filename(export_format: ExportFormat) -> str:
     Returns:
         Filename string
     """
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     extension = export_format.value
     return f"xwines_search_{timestamp}.{extension}"

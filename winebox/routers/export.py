@@ -1,6 +1,6 @@
 """Export endpoints for downloading wine cellar data."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -23,7 +23,7 @@ router = APIRouter()
 
 def _generate_filename(export_type: str, export_format: ExportFormat) -> str:
     """Generate a standardized filename for exports."""
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     extension = export_format.value
     return f"winebox_{export_type}_{timestamp}.{extension}"
 

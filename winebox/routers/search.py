@@ -14,15 +14,19 @@ from winebox.services.auth import RequireAuth
 router = APIRouter()
 
 
+# Maximum length for search query parameters to prevent DoS
+MAX_QUERY_LENGTH = 200
+
+
 @router.get("", response_model=list[WineWithInventory])
 async def search_wines(
     current_user: RequireAuth,
-    q: Annotated[str | None, Query(description="Full-text search query")] = None,
+    q: Annotated[str | None, Query(description="Full-text search query", max_length=MAX_QUERY_LENGTH)] = None,
     vintage: Annotated[int | None, Query(description="Wine vintage year")] = None,
-    grape: Annotated[str | None, Query(description="Grape variety")] = None,
-    winery: Annotated[str | None, Query(description="Winery name")] = None,
-    region: Annotated[str | None, Query(description="Wine region")] = None,
-    country: Annotated[str | None, Query(description="Country")] = None,
+    grape: Annotated[str | None, Query(description="Grape variety", max_length=MAX_QUERY_LENGTH)] = None,
+    winery: Annotated[str | None, Query(description="Winery name", max_length=MAX_QUERY_LENGTH)] = None,
+    region: Annotated[str | None, Query(description="Wine region", max_length=MAX_QUERY_LENGTH)] = None,
+    country: Annotated[str | None, Query(description="Country", max_length=MAX_QUERY_LENGTH)] = None,
     checked_in_after: Annotated[datetime | None, Query(description="Checked in after date")] = None,
     checked_in_before: Annotated[datetime | None, Query(description="Checked in before date")] = None,
     checked_out_after: Annotated[datetime | None, Query(description="Checked out after date")] = None,

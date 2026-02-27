@@ -1,7 +1,7 @@
 """Transaction document model for tracking wine check-ins and check-outs."""
 
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from beanie import Document, Indexed, PydanticObjectId
@@ -23,8 +23,8 @@ class Transaction(Document):
     transaction_type: TransactionType
     quantity: int = Field(..., ge=1)
     notes: Optional[str] = None
-    transaction_date: Indexed(datetime) = Field(default_factory=datetime.utcnow)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    transaction_date: Indexed(datetime) = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
         name = "transactions"

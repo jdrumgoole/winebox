@@ -1,6 +1,6 @@
 """Wine document model for MongoDB with embedded subdocuments."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from beanie import Document, Indexed, PydanticObjectId
@@ -11,7 +11,7 @@ class InventoryInfo(BaseModel):
     """Embedded subdocument for inventory information."""
 
     quantity: int = Field(default=0, ge=0)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class GrapeBlendEntry(BaseModel):
@@ -33,7 +33,7 @@ class ScoreEntry(BaseModel):
     review_date: Optional[datetime] = None
     reviewer: Optional[str] = None
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def normalized_score(self) -> float:
@@ -89,8 +89,8 @@ class Wine(Document):
     custom_fields_text: Optional[str] = None  # Denormalized for text search
 
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
         name = "wines"

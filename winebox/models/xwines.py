@@ -4,7 +4,7 @@ These models represent read-only reference data from the X-Wines dataset.
 Source: https://github.com/rogerioxavier/X-Wines
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from beanie import Document, Indexed
@@ -65,7 +65,7 @@ class XWinesMetadata(Document):
 
     key: Indexed(str, unique=True)
     value: str
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
         name = "xwines_metadata"

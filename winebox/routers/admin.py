@@ -1,35 +1,50 @@
 """Admin panel endpoints for user management and statistics."""
 
 import logging
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timezone
+from typing import Annotated, Any
 
-from fastapi import APIRouter
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from pathlib import Path
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from winebox.models import User, Wine
-from winebox.services.auth import RequireAdmin
+from winebox.services.auth import RequireAdmin, get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
-@router.get("")
-async def admin_panel() -> FileResponse:
+@router.get("", response_model=None)
+async def admin_panel(
+    current_user: Annotated[User | None, Depends(get_current_user)],
+) -> FileResponse | RedirectResponse:
     """Serve the admin panel HTML page.
 
-    Note: The page itself doesn't require authentication - the JavaScript
-    will check auth and redirect if needed. The API endpoints still require
-    admin privileges.
+    Requires admin authentication. Non-authenticated users are redirected
+    to the login page. Non-admin users see an access denied message.
     """
+    # Not logged in - redirect to login
+    if not current_user:
+        return RedirectResponse(url="/?error=login_required", status_code=302)
+
+    # Logged in but not admin - redirect with error
+    if not current_user.is_superuser:
+        return RedirectResponse(url="/?error=admin_required", status_code=302)
+
+    # Admin user - serve the admin panel
     static_path = Path(__file__).parent.parent / "static" / "admin.html"
     return FileResponse(static_path, media_type="text/html")
 
 
 @router.get("/api/users")
+@limiter.limit("30/minute")
 async def list_users(
+    request: Request,
     admin: RequireAdmin,
 ) -> dict[str, Any]:
     """List all users with their cellar statistics.
@@ -75,12 +90,14 @@ async def list_users(
     return {
         "users": user_list,
         "total_users": len(users),
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
 @router.get("/api/stats")
+@limiter.limit("30/minute")
 async def get_admin_stats(
+    request: Request,
     admin: RequireAdmin,
 ) -> dict[str, Any]:
     """Get overall system statistics for the admin panel.
@@ -122,5 +139,5 @@ async def get_admin_stats(
             "in_stock": wines_in_stock,
             "total_bottles": total_bottles,
         },
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }

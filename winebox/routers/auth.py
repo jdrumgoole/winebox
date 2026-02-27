@@ -129,8 +129,14 @@ async def change_password(
     password_request: PasswordChangeRequest,
     current_user: RequireAuth,
 ) -> dict:
-    """Change the current user's password."""
+    """Change the current user's password.
+
+    After changing the password, the current session token is revoked
+    and the user must log in again with the new password.
+    """
     import logging
+    from winebox.services.auth import revoke_token
+
     security_logger = logging.getLogger("winebox.security")
 
     # Verify current password
@@ -150,13 +156,23 @@ async def change_password(
     current_user.updated_at = datetime.now(timezone.utc)
     await current_user.save()
 
+    # Revoke current token to force re-login with new password
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        await revoke_token(
+            token=token,
+            user_id=str(current_user.id),
+            reason="password_change",
+        )
+
     security_logger.info(
         "Password changed successfully: user_id=%s, ip=%s",
         str(current_user.id),
         get_remote_address(request),
     )
 
-    return {"message": "Password updated successfully"}
+    return {"message": "Password updated successfully. Please log in again."}
 
 
 @router.post("/logout")

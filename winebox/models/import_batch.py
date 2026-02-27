@@ -1,6 +1,6 @@
 """ImportBatch document model for tracking spreadsheet imports."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
@@ -24,7 +24,7 @@ class ImportBatch(Document):
     owner_id: Indexed(PydanticObjectId)
     filename: str
     file_type: str  # "csv" or "xlsx"
-    imported_at: datetime = Field(default_factory=datetime.utcnow)
+    imported_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: ImportStatus = ImportStatus.UPLOADED
 
     # Column mapping: header name -> wine field / "custom:FieldName" / "skip"

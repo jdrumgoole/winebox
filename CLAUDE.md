@@ -14,6 +14,45 @@
 - Each new feature or component should have corresponding tests written before implementation
 - Run tests frequently during development to catch regressions early
 
+## Security Guidelines
+
+### Authentication & Authorization
+- All protected endpoints MUST use `RequireAuth` or `RequireAdmin` dependencies
+- Admin pages should require server-side auth, not just client-side JS checks
+- When changing passwords, invalidate all existing tokens for that user
+- Use constant-time comparison for authentication to prevent timing attacks
+
+### Secrets Management
+- ALL API keys and secrets MUST be in `secrets.env`, never in code or config files
+- Secrets are synced to production via `deploy/common.py:sync_secrets()`
+- Required secrets: `WINEBOX_SECRET_KEY`, `WINEBOX_MONGODB_URL`, `WINEBOX_ANTHROPIC_API_KEY`, `WINEBOX_POSTHOG_API_KEY`, AWS credentials
+- Never log secrets or include them in error messages
+
+### Input Validation
+- Always validate and limit user input length (especially search queries)
+- Use Pydantic models for all API inputs
+- Escape user input before regex compilation (`re.escape()`)
+- Set timeouts on database queries to prevent DoS
+
+### Rate Limiting
+- All auth endpoints must have rate limits
+- Admin endpoints should have stricter rate limits
+- Search/expensive operations should be rate limited
+
+### Data Isolation
+- ALL database queries for user data MUST filter by `owner_id`
+- Use the pattern: `Wine.find(Wine.owner_id == current_user.id, ...)`
+- Admin endpoints that access all users' data must verify `RequireAdmin`
+
+### Datetime Handling
+- Always use `datetime.now(timezone.utc)` (timezone-aware)
+- Never use deprecated `datetime.utcnow()` (timezone-naive)
+
+### Static Files & Caching
+- Add cache-busting version parameters to JS/CSS files: `app.js?v=0.5.22`
+- No inline scripts - use external JS files for CSP compliance
+- Admin-related static files should have short cache times
+
 ## Releases & Deployment
 
 Single command handles everything:

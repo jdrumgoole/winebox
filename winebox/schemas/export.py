@@ -1,7 +1,7 @@
 """Pydantic schemas for data export functionality."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -158,7 +158,7 @@ class TransactionFlatExport(BaseModel):
 class ExportMetadata(BaseModel):
     """Metadata included in hierarchical exports (JSON, YAML)."""
 
-    exported_at: datetime = Field(default_factory=datetime.utcnow)
+    exported_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     total_count: int
     format: str
     filters_applied: dict[str, Any] = Field(default_factory=dict)
