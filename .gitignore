@@ -41,6 +41,7 @@ htmlcov/
 
 # Data (local database and images)
 data/
+!tests/data/
 *.db
 
 # Environment variables
