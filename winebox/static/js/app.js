@@ -2695,7 +2695,7 @@ function renderMappingStep(data) {
     let tableHtml = '<table class="import-mapping-table"><thead><tr><th>Column</th><th>Sample</th><th>Map To</th></tr></thead><tbody>';
 
     for (const header of data.headers) {
-        const suggested = data.suggested_mapping[header] || 'skip';
+        const suggested = data.suggested_mapping[header] || `custom:${header}`;
         const sample = sampleRow[header] || '';
 
         // Detect custom field suggestions (e.g. "custom:Cellar Location")

@@ -87,20 +87,20 @@ Valid wine fields:
 {fields_section}
 
 Special values:
-  - "skip": Ignore this column entirely
-  - "custom:<name>": Store as a custom field with the given name
+  - "custom:<name>": Store as a custom field with the given name (use for any column that doesn't match a wine field)
 
 Spreadsheet columns (with sample values):
 {headers_section}
 
 Instructions:
-- Map each column header to the most appropriate wine field, "skip", or "custom:<name>".
+- Map each column header to the most appropriate wine field or "custom:<name>".
 - PRIORITY: The following are the core wine fields — try hardest to match these:
   name (REQUIRED), winery, vintage, grape_variety, country, region.
   Rows without "name" mapped will be skipped entirely.
 - Consider typos, abbreviations, and non-English headers (French, Italian, Spanish, German, etc.).
 - Use sample values to disambiguate ambiguous headers (e.g. "Type" with values "Red", "White" -> "wine_type_id").
-- If a column clearly doesn't match any wine field, use "custom:<original header name>".
+- If a column doesn't match any wine field, use "custom:<original header name>" to preserve it as a custom field.
+- Do NOT use "skip". Map every column to either a wine field or a custom field.
 - Return ONLY a JSON object mapping each header to its target field. No extra text.
 
 Example output:
@@ -173,9 +173,13 @@ async def suggest_column_mapping_ai(
             return None
 
         # Validate each mapping; fall back to static per-header for invalid ones
+        # Never auto-skip — convert any "skip" to a custom field so the user decides
         validated: dict[str, str] = {}
         for header in headers:
             ai_value = result.get(header)
+            if ai_value == "skip":
+                validated[header] = f"custom:{header}"
+                continue
             if ai_value and isinstance(ai_value, str) and _is_valid_mapping_value(ai_value):
                 validated[header] = ai_value
             else:
