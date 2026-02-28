@@ -515,6 +515,26 @@ def deploy(
     print("WineBox Release & Deploy Pipeline")
     print("=" * 60)
 
+    # Pre-flight: Abort if there are uncommitted changes (excluding uv.lock)
+    # This prevents deploying a version that doesn't include all code changes.
+    dirty = ctx.run(
+        "git diff --name-only HEAD -- . ':!uv.lock'",
+        hide=True, warn=True,
+    ).stdout.strip()
+    untracked = ctx.run(
+        "git ls-files --others --exclude-standard -- . ':!uv.lock' ':!.claude/'",
+        hide=True, warn=True,
+    ).stdout.strip()
+    if dirty or untracked:
+        print("\nERROR: Working tree has uncommitted changes:")
+        for f in (dirty + "\n" + untracked).strip().splitlines():
+            if f:
+                print(f"  {f}")
+        print("\nCommit or stash your changes before deploying.")
+        print("The deploy pipeline only commits version bump files, so any")
+        print("other changes would be missing from the PyPI package.")
+        raise SystemExit(1)
+
     # Step 1: Run tests
     if not skip_tests:
         print("\n[1/7] Running test suite...")
