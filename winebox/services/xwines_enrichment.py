@@ -128,9 +128,10 @@ async def enrich_parsed_with_xwines(parsed: dict) -> dict:
 async def _find_best_xwines_match(name: str) -> XWinesWine | None:
     """Find the best matching X-Wines wine by name.
 
-    Uses Atlas Search when available with phrase matching for better relevance,
-    falls back to three-tier regex search for local dev. Returns the top-1
-    result, prioritizing exact phrase matches over fuzzy matches.
+    Uses Atlas Search when available, requiring ALL search terms to match
+    (AND logic) to eliminate false positives. Falls back to three-tier regex
+    search for local dev. Returns the top-1 result, prioritizing exact phrase
+    matches over fuzzy matches.
 
     Args:
         name: Wine name to search for.
@@ -138,20 +139,34 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
     Returns:
         Best matching XWinesWine, or None if no match found.
     """
-    # Try Atlas Search first with phrase matching for better relevance
+    terms = name.split()
+
+    # Try Atlas Search first with AND logic for all terms
     try:
         db = get_database()
         collection = db["xwines_wines"]
 
-        # Use compound query with should clauses for relevance ranking
-        # Phrase matches get higher scores than fuzzy token matches
+        # Build must clauses - require ALL terms to appear (AND logic)
+        must_clauses: list[dict] = [
+            {
+                "text": {
+                    "query": term,
+                    "path": ["name", "winery_name"],
+                    "fuzzy": {"maxEdits": 1, "prefixLength": 2},
+                }
+            }
+            for term in terms
+        ]
+
+        # Use compound query with must for AND logic, should for score boosting
         pipeline: list[dict] = [
             {
                 "$search": {
                     "index": "xwines_search",
                     "compound": {
+                        "must": must_clauses,
                         "should": [
-                            # Highest priority: exact phrase match in name
+                            # Boost exact phrase matches in name
                             {
                                 "phrase": {
                                     "query": name,
@@ -159,7 +174,7 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
                                     "score": {"boost": {"value": 10}},
                                 }
                             },
-                            # Medium priority: phrase match in winery_name
+                            # Boost phrase matches in winery_name
                             {
                                 "phrase": {
                                     "query": name,
@@ -167,17 +182,7 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
                                     "score": {"boost": {"value": 5}},
                                 }
                             },
-                            # Fallback: fuzzy token match
-                            {
-                                "text": {
-                                    "query": name,
-                                    "path": ["name", "winery_name"],
-                                    "fuzzy": {"maxEdits": 1, "prefixLength": 2},
-                                    "score": {"boost": {"value": 1}},
-                                }
-                            },
                         ],
-                        "minimumShouldMatch": 1,
                     },
                 }
             },
@@ -193,10 +198,10 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
     except Exception as e:
         logger.debug("Atlas Search unavailable for enrichment, falling back to regex: %s", e)
 
-    # Fallback: three-tier regex search for better relevance
+    # Fallback: three-tier regex search with AND logic
     escaped_name = re.escape(name)
 
-    # Tier 1: Query at START of name (highest priority)
+    # Tier 1: Full phrase at START of name (highest priority)
     start_pattern = re.compile(f"^{escaped_name}", re.IGNORECASE)
     match = await XWinesWine.find({"name": {"$regex": start_pattern}}).sort(
         [("rating_count", -1)]
@@ -204,7 +209,7 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
     if match:
         return match
 
-    # Tier 2: Query with word boundaries (full phrase match)
+    # Tier 2: Full phrase with word boundaries anywhere
     word_boundary_pattern = re.compile(rf"\b{escaped_name}\b", re.IGNORECASE)
     match = await XWinesWine.find(
         {
@@ -217,15 +222,26 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
     if match:
         return match
 
-    # Tier 3: Substring match (original behavior as fallback)
-    substring_pattern = re.compile(escaped_name, re.IGNORECASE)
-    match = await XWinesWine.find(
-        {
-            "$or": [
-                {"name": {"$regex": substring_pattern}},
-                {"winery_name": {"$regex": substring_pattern}},
-            ]
-        }
-    ).sort([("rating_count", -1)]).first_or_none()
+    # Tier 3: All terms present as substrings (AND logic)
+    term_conditions = []
+    for term in terms:
+        term_pattern = re.compile(re.escape(term), re.IGNORECASE)
+        term_conditions.append(
+            {
+                "$or": [
+                    {"name": {"$regex": term_pattern}},
+                    {"winery_name": {"$regex": term_pattern}},
+                ]
+            }
+        )
+
+    if len(term_conditions) > 1:
+        all_terms_condition: dict = {"$and": term_conditions}
+    else:
+        all_terms_condition = term_conditions[0]
+
+    match = await XWinesWine.find(all_terms_condition).sort(
+        [("rating_count", -1)]
+    ).first_or_none()
 
     return match

@@ -40,17 +40,34 @@ async def _atlas_search(
 ) -> tuple[list[dict], int, SearchFacets | None]:
     """Attempt Atlas Search with facets.
 
-    Uses compound query with phrase matching and score boosting to prioritize
-    exact phrase matches over tokenized/fuzzy matches. This reduces false
-    positives (e.g., "Chateau Madelaine" won't match all "Chateau" wines).
+    Uses compound query requiring ALL search terms to match (AND logic),
+    with phrase matching for score boosting. This eliminates false positives
+    where only some terms match (e.g., "Chateau Magdelaine" won't match
+    wines with just "Chateau").
 
     Returns (results, total, facets) or raises on failure.
     """
     db = get_database()
     collection = db["xwines_wines"]
 
-    # Build compound query with should clauses for relevance ranking
-    # Phrase matches get higher scores than fuzzy token matches
+    # Split query into terms - each term MUST appear (AND logic)
+    terms = q.split()
+
+    # Build must clauses - require ALL terms to appear in name or winery_name
+    # This prevents false positives where only some terms match
+    must_clauses: list[dict] = []
+    for term in terms:
+        must_clauses.append(
+            {
+                "text": {
+                    "query": term,
+                    "path": ["name", "winery_name"],
+                    "fuzzy": {"maxEdits": 1, "prefixLength": 2},
+                }
+            }
+        )
+
+    # Build should clauses for score boosting - phrase matches rank higher
     should_clauses: list[dict] = [
         # Highest priority: exact phrase match in name
         {
@@ -68,15 +85,6 @@ async def _atlas_search(
                 "score": {"boost": {"value": 5}},
             }
         },
-        # Fallback: fuzzy token match (original behavior for partial matches)
-        {
-            "text": {
-                "query": q,
-                "path": ["name", "winery_name"],
-                "fuzzy": {"maxEdits": 1, "prefixLength": 2},
-                "score": {"boost": {"value": 1}},
-            }
-        },
     ]
 
     filter_clauses: list[dict] = []
@@ -85,7 +93,7 @@ async def _atlas_search(
     if country:
         filter_clauses.append({"text": {"query": country, "path": "country_code"}})
 
-    compound: dict = {"should": should_clauses, "minimumShouldMatch": 1}
+    compound: dict = {"must": must_clauses, "should": should_clauses}
     if filter_clauses:
         compound["filter"] = filter_clauses
 
@@ -116,7 +124,17 @@ async def _atlas_search(
     total = count_result[0]["total"] if count_result else 0
 
     # Run facet pipeline via $searchMeta
-    # Use compound with should clauses to match the search query behavior
+    # Use compound with must clauses to match the search query behavior (AND logic)
+    facet_must_clauses: list[dict] = [
+        {
+            "text": {
+                "query": term,
+                "path": ["name", "winery_name"],
+                "fuzzy": {"maxEdits": 1, "prefixLength": 2},
+            }
+        }
+        for term in terms
+    ]
     facet_pipeline: list[dict] = [
         {
             "$searchMeta": {
@@ -124,18 +142,7 @@ async def _atlas_search(
                 "facet": {
                     "operator": {
                         "compound": {
-                            "should": [
-                                {"phrase": {"query": q, "path": "name"}},
-                                {"phrase": {"query": q, "path": "winery_name"}},
-                                {
-                                    "text": {
-                                        "query": q,
-                                        "path": ["name", "winery_name"],
-                                        "fuzzy": {"maxEdits": 1, "prefixLength": 2},
-                                    }
-                                },
-                            ],
-                            "minimumShouldMatch": 1,
+                            "must": facet_must_clauses,
                         }
                     },
                     "facets": {
@@ -182,14 +189,16 @@ async def _regex_search(
 ) -> tuple[list[XWinesWine], int]:
     """Fallback regex-based search for local MongoDB (no Atlas Search).
 
+    Requires ALL search terms to appear (AND logic) to eliminate false positives.
     Uses three-tier matching to prioritize exact phrase matches:
-    1. First: Query at START of name (highest priority)
-    2. Second: Query with word boundaries (full phrase match)
-    3. Third: Substring match (fallback for partial matches)
+    1. First: Full phrase at START of name (highest priority)
+    2. Second: Full phrase with word boundaries anywhere
+    3. Third: All terms present as substrings (fallback)
 
     Results are combined and deduplicated, preserving priority order.
     """
     escaped_q = re.escape(q)
+    terms = q.split()
 
     # Build filter conditions for wine_type and country
     filter_conditions: dict = {}
@@ -200,13 +209,31 @@ async def _regex_search(
     if country:
         filter_conditions["country_code"] = country.upper()
 
+    # Helper to build AND condition requiring all terms to appear
+    def build_all_terms_condition() -> dict:
+        """Build $and condition requiring ALL terms in name OR winery_name."""
+        term_conditions = []
+        for term in terms:
+            term_pattern = re.compile(re.escape(term), re.IGNORECASE)
+            term_conditions.append(
+                {
+                    "$or": [
+                        {"name": {"$regex": term_pattern}},
+                        {"winery_name": {"$regex": term_pattern}},
+                    ]
+                }
+            )
+        return {"$and": term_conditions} if len(term_conditions) > 1 else term_conditions[0]
+
     # Three-tier search patterns with decreasing priority
-    # Tier 1: Query at START of name (e.g., "Chateau Madelaine" matches "Chateau Madelaine 2019")
+    # All tiers require ALL terms to match (AND logic)
+
+    # Tier 1: Full phrase at START of name
     start_pattern = re.compile(f"^{escaped_q}", re.IGNORECASE)
     tier1_conditions: dict = {"name": {"$regex": start_pattern}}
     tier1_conditions.update(filter_conditions)
 
-    # Tier 2: Query with word boundaries (full phrase match anywhere in name/winery)
+    # Tier 2: Full phrase with word boundaries anywhere in name/winery
     word_boundary_pattern = re.compile(rf"\b{escaped_q}\b", re.IGNORECASE)
     tier2_conditions: dict = {
         "$or": [
@@ -216,14 +243,9 @@ async def _regex_search(
     }
     tier2_conditions.update(filter_conditions)
 
-    # Tier 3: Substring match (original behavior as fallback)
-    substring_pattern = re.compile(escaped_q, re.IGNORECASE)
-    tier3_conditions: dict = {
-        "$or": [
-            {"name": {"$regex": substring_pattern}},
-            {"winery_name": {"$regex": substring_pattern}},
-        ]
-    }
+    # Tier 3: All terms present as substrings (AND logic)
+    tier3_base = build_all_terms_condition()
+    tier3_conditions: dict = {**tier3_base}
     tier3_conditions.update(filter_conditions)
 
     # Fetch results from each tier, sorted by popularity
