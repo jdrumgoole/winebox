@@ -1460,6 +1460,14 @@ function setCellarViewMode(mode) {
     document.getElementById('cellar-view-cards').classList.toggle('active', mode === 'cards');
     document.getElementById('cellar-view-table').classList.toggle('active', mode === 'table');
 
+    // Toggle wine-grid class: cards need the grid layout, table needs full width
+    const cellarList = document.getElementById('cellar-list');
+    if (mode === 'table') {
+        cellarList.classList.remove('wine-grid');
+    } else {
+        cellarList.classList.add('wine-grid');
+    }
+
     if (cellarLastWines.length > 0) {
         renderCellarView();
     }
@@ -2232,6 +2240,14 @@ function setXWinesViewMode(mode) {
     // Update button states
     document.getElementById('xwines-view-cards').classList.toggle('active', mode === 'cards');
     document.getElementById('xwines-view-table').classList.toggle('active', mode === 'table');
+
+    // Toggle wine-grid class: cards need the grid layout, table needs full width
+    const resultsContainer = document.getElementById('xwines-results');
+    if (mode === 'table') {
+        resultsContainer.classList.remove('wine-grid');
+    } else {
+        resultsContainer.classList.add('wine-grid');
+    }
 
     // Re-render with current results
     if (xwinesLastResults.length > 0) {
