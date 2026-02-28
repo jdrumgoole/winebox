@@ -40,20 +40,43 @@ async def _atlas_search(
 ) -> tuple[list[dict], int, SearchFacets | None]:
     """Attempt Atlas Search with facets.
 
+    Uses compound query with phrase matching and score boosting to prioritize
+    exact phrase matches over tokenized/fuzzy matches. This reduces false
+    positives (e.g., "Chateau Madelaine" won't match all "Chateau" wines).
+
     Returns (results, total, facets) or raises on failure.
     """
     db = get_database()
     collection = db["xwines_wines"]
 
-    # Build compound must/filter clauses
-    must = [
+    # Build compound query with should clauses for relevance ranking
+    # Phrase matches get higher scores than fuzzy token matches
+    should_clauses: list[dict] = [
+        # Highest priority: exact phrase match in name
+        {
+            "phrase": {
+                "query": q,
+                "path": "name",
+                "score": {"boost": {"value": 10}},
+            }
+        },
+        # Medium priority: phrase match in winery_name
+        {
+            "phrase": {
+                "query": q,
+                "path": "winery_name",
+                "score": {"boost": {"value": 5}},
+            }
+        },
+        # Fallback: fuzzy token match (original behavior for partial matches)
         {
             "text": {
                 "query": q,
                 "path": ["name", "winery_name"],
                 "fuzzy": {"maxEdits": 1, "prefixLength": 2},
+                "score": {"boost": {"value": 1}},
             }
-        }
+        },
     ]
 
     filter_clauses: list[dict] = []
@@ -62,7 +85,7 @@ async def _atlas_search(
     if country:
         filter_clauses.append({"text": {"query": country, "path": "country_code"}})
 
-    compound: dict = {"must": must}
+    compound: dict = {"should": should_clauses, "minimumShouldMatch": 1}
     if filter_clauses:
         compound["filter"] = filter_clauses
 
@@ -74,9 +97,11 @@ async def _atlas_search(
     }
 
     # Run search pipeline for results (with skip for pagination)
+    # Sort by search score first (phrase matches rank higher), then by popularity
     pipeline: list[dict] = [
         search_stage,
-        {"$sort": {"rating_count": -1, "avg_rating": -1}},
+        {"$addFields": {"searchScore": {"$meta": "searchScore"}}},
+        {"$sort": {"searchScore": -1, "rating_count": -1, "avg_rating": -1}},
         {"$skip": skip},
         {"$limit": limit},
     ]
@@ -91,16 +116,26 @@ async def _atlas_search(
     total = count_result[0]["total"] if count_result else 0
 
     # Run facet pipeline via $searchMeta
+    # Use compound with should clauses to match the search query behavior
     facet_pipeline: list[dict] = [
         {
             "$searchMeta": {
                 "index": "xwines_search",
                 "facet": {
                     "operator": {
-                        "text": {
-                            "query": q,
-                            "path": ["name", "winery_name"],
-                            "fuzzy": {"maxEdits": 1, "prefixLength": 2},
+                        "compound": {
+                            "should": [
+                                {"phrase": {"query": q, "path": "name"}},
+                                {"phrase": {"query": q, "path": "winery_name"}},
+                                {
+                                    "text": {
+                                        "query": q,
+                                        "path": ["name", "winery_name"],
+                                        "fuzzy": {"maxEdits": 1, "prefixLength": 2},
+                                    }
+                                },
+                            ],
+                            "minimumShouldMatch": 1,
                         }
                     },
                     "facets": {
@@ -145,30 +180,72 @@ async def _regex_search(
     country: str | None,
     skip: int = 0,
 ) -> tuple[list[XWinesWine], int]:
-    """Fallback regex-based search for local MongoDB (no Atlas Search)."""
-    search_pattern = re.compile(re.escape(q), re.IGNORECASE)
-    conditions: dict = {
-        "$or": [
-            {"name": {"$regex": search_pattern}},
-            {"winery_name": {"$regex": search_pattern}},
-        ]
-    }
+    """Fallback regex-based search for local MongoDB (no Atlas Search).
 
+    Uses three-tier matching to prioritize exact phrase matches:
+    1. First: Query at START of name (highest priority)
+    2. Second: Query with word boundaries (full phrase match)
+    3. Third: Substring match (fallback for partial matches)
+
+    Results are combined and deduplicated, preserving priority order.
+    """
+    escaped_q = re.escape(q)
+
+    # Build filter conditions for wine_type and country
+    filter_conditions: dict = {}
     if wine_type:
-        conditions["wine_type"] = {
+        filter_conditions["wine_type"] = {
             "$regex": re.compile(f"^{re.escape(wine_type)}$", re.IGNORECASE)
         }
     if country:
-        conditions["country_code"] = country.upper()
+        filter_conditions["country_code"] = country.upper()
 
-    wines = (
-        await XWinesWine.find(conditions)
-        .sort([("rating_count", -1), ("avg_rating", -1), ("name", 1)])
-        .skip(skip)
-        .limit(limit)
-        .to_list()
-    )
-    total = await XWinesWine.find(conditions).count()
+    # Three-tier search patterns with decreasing priority
+    # Tier 1: Query at START of name (e.g., "Chateau Madelaine" matches "Chateau Madelaine 2019")
+    start_pattern = re.compile(f"^{escaped_q}", re.IGNORECASE)
+    tier1_conditions: dict = {"name": {"$regex": start_pattern}}
+    tier1_conditions.update(filter_conditions)
+
+    # Tier 2: Query with word boundaries (full phrase match anywhere in name/winery)
+    word_boundary_pattern = re.compile(rf"\b{escaped_q}\b", re.IGNORECASE)
+    tier2_conditions: dict = {
+        "$or": [
+            {"name": {"$regex": word_boundary_pattern}},
+            {"winery_name": {"$regex": word_boundary_pattern}},
+        ]
+    }
+    tier2_conditions.update(filter_conditions)
+
+    # Tier 3: Substring match (original behavior as fallback)
+    substring_pattern = re.compile(escaped_q, re.IGNORECASE)
+    tier3_conditions: dict = {
+        "$or": [
+            {"name": {"$regex": substring_pattern}},
+            {"winery_name": {"$regex": substring_pattern}},
+        ]
+    }
+    tier3_conditions.update(filter_conditions)
+
+    # Fetch results from each tier, sorted by popularity
+    sort_order = [("rating_count", -1), ("avg_rating", -1), ("name", 1)]
+
+    tier1_wines = await XWinesWine.find(tier1_conditions).sort(sort_order).to_list()
+    tier2_wines = await XWinesWine.find(tier2_conditions).sort(sort_order).to_list()
+    tier3_wines = await XWinesWine.find(tier3_conditions).sort(sort_order).to_list()
+
+    # Combine and deduplicate results while preserving tier priority
+    seen_ids: set[int] = set()
+    combined: list[XWinesWine] = []
+
+    for wine_list in [tier1_wines, tier2_wines, tier3_wines]:
+        for wine in wine_list:
+            if wine.xwines_id not in seen_ids:
+                seen_ids.add(wine.xwines_id)
+                combined.append(wine)
+
+    # Apply pagination
+    total = len(combined)
+    wines = combined[skip : skip + limit]
 
     return wines, total
 

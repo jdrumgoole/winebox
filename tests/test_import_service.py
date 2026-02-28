@@ -2,6 +2,8 @@
 
 import csv
 import io
+import json
+from unittest.mock import MagicMock, patch
 
 import pytest
 from openpyxl import Workbook
@@ -10,11 +12,14 @@ from winebox.services.import_service import (
     _coerce_float,
     _coerce_vintage,
     _compute_custom_fields_text,
+    _is_valid_mapping_value,
+    _static_fallback,
     is_non_wine_row,
     parse_csv,
     parse_xlsx,
     row_to_wine_data,
     suggest_column_mapping,
+    suggest_column_mapping_ai,
 )
 
 
@@ -148,11 +153,11 @@ def test_suggest_mapping_case_insensitive() -> None:
     assert mapping["VINTAGE"] == "vintage"
 
 
-def test_suggest_mapping_unknown_skip() -> None:
-    """Test that unknown headers default to 'skip'."""
+def test_suggest_mapping_unknown_custom() -> None:
+    """Test that unknown headers default to custom fields using the column name."""
     mapping = suggest_column_mapping(["Cellar Location", "Purchase Date", "name"])
-    assert mapping["Cellar Location"] == "skip"
-    assert mapping["Purchase Date"] == "skip"
+    assert mapping["Cellar Location"] == "custom:Cellar Location"
+    assert mapping["Purchase Date"] == "custom:Purchase Date"
     assert mapping["name"] == "name"
 
 
@@ -315,3 +320,165 @@ def test_compute_custom_fields_text() -> None:
 def test_compute_custom_fields_text_none() -> None:
     assert _compute_custom_fields_text(None) is None
     assert _compute_custom_fields_text({}) is None
+
+
+# =============================================================================
+# AI Column Mapping Tests
+# =============================================================================
+
+
+def _mock_claude_response(content: str) -> MagicMock:
+    """Build a mock Anthropic messages.create() response."""
+    message = MagicMock()
+    message.content = [MagicMock(text=content)]
+    return message
+
+
+@pytest.mark.asyncio
+async def test_suggest_mapping_ai_basic() -> None:
+    """Test correct mapping returned from mocked Claude response."""
+    headers = ["Nom du vin", "Producteur", "Millésime"]
+    preview_rows = [
+        {"Nom du vin": "Margaux", "Producteur": "Chateau Margaux", "Millésime": "2015"},
+    ]
+    ai_response = json.dumps({
+        "Nom du vin": "name",
+        "Producteur": "winery",
+        "Millésime": "vintage",
+    })
+
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = _mock_claude_response(ai_response)
+
+    with patch("winebox.services.import_service.settings") as mock_settings, \
+         patch("anthropic.Anthropic", return_value=mock_client):
+        mock_settings.anthropic_api_key = "test-key"
+        result = await suggest_column_mapping_ai(headers, preview_rows)
+
+    assert result is not None
+    assert result["Nom du vin"] == "name"
+    assert result["Producteur"] == "winery"
+    assert result["Millésime"] == "vintage"
+
+
+@pytest.mark.asyncio
+async def test_suggest_mapping_ai_no_api_key() -> None:
+    """Test returns None when no API key is set."""
+    headers = ["Name", "Vintage"]
+    preview_rows = [{"Name": "Test Wine", "Vintage": "2020"}]
+
+    with patch("winebox.services.import_service.settings") as mock_settings, \
+         patch.dict("os.environ", {}, clear=True):
+        mock_settings.anthropic_api_key = None
+        result = await suggest_column_mapping_ai(headers, preview_rows)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_suggest_mapping_ai_api_error() -> None:
+    """Test returns None on API exception (graceful fallback)."""
+    headers = ["Name", "Vintage"]
+    preview_rows = [{"Name": "Test Wine", "Vintage": "2020"}]
+
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = Exception("API rate limit exceeded")
+
+    with patch("winebox.services.import_service.settings") as mock_settings, \
+         patch("anthropic.Anthropic", return_value=mock_client):
+        mock_settings.anthropic_api_key = "test-key"
+        result = await suggest_column_mapping_ai(headers, preview_rows)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_suggest_mapping_ai_malformed_json() -> None:
+    """Test returns None when response isn't valid JSON."""
+    headers = ["Name", "Vintage"]
+    preview_rows = [{"Name": "Test Wine", "Vintage": "2020"}]
+
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = _mock_claude_response(
+        "I'm sorry, I can't parse that spreadsheet."
+    )
+
+    with patch("winebox.services.import_service.settings") as mock_settings, \
+         patch("anthropic.Anthropic", return_value=mock_client):
+        mock_settings.anthropic_api_key = "test-key"
+        result = await suggest_column_mapping_ai(headers, preview_rows)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_suggest_mapping_ai_invalid_field_dropped() -> None:
+    """Test that invalid field values fall back to static per-header."""
+    headers = ["Wine Name", "Bogus Column"]
+    preview_rows = [{"Wine Name": "Margaux", "Bogus Column": "xyz"}]
+    ai_response = json.dumps({
+        "Wine Name": "name",
+        "Bogus Column": "nonexistent_field",  # Invalid field
+    })
+
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = _mock_claude_response(ai_response)
+
+    with patch("winebox.services.import_service.settings") as mock_settings, \
+         patch("anthropic.Anthropic", return_value=mock_client):
+        mock_settings.anthropic_api_key = "test-key"
+        result = await suggest_column_mapping_ai(headers, preview_rows)
+
+    assert result is not None
+    assert result["Wine Name"] == "name"  # Valid AI mapping kept
+    # Invalid field falls back to static; "Bogus Column" is not in HEADER_ALIASES
+    assert result["Bogus Column"] == "custom:Bogus Column"
+
+
+@pytest.mark.asyncio
+async def test_suggest_mapping_ai_markdown_code_block() -> None:
+    """Test handling of JSON wrapped in markdown code blocks."""
+    headers = ["Vintge", "Région"]
+    preview_rows = [{"Vintge": "2018", "Région": "Bordeaux"}]
+    ai_json = json.dumps({"Vintge": "vintage", "Région": "region"})
+    wrapped = f"```json\n{ai_json}\n```"
+
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = _mock_claude_response(wrapped)
+
+    with patch("winebox.services.import_service.settings") as mock_settings, \
+         patch("anthropic.Anthropic", return_value=mock_client):
+        mock_settings.anthropic_api_key = "test-key"
+        result = await suggest_column_mapping_ai(headers, preview_rows)
+
+    assert result is not None
+    assert result["Vintge"] == "vintage"
+    assert result["Région"] == "region"
+
+
+# =============================================================================
+# Static Fallback & Validation Helper Tests
+# =============================================================================
+
+
+def test_static_fallback_known_alias() -> None:
+    """Test _static_fallback returns correct field for known alias."""
+    assert _static_fallback("Wine Name") == "name"
+    assert _static_fallback("Producer") == "winery"
+    assert _static_fallback("VINTAGE") == "vintage"
+
+
+def test_static_fallback_unknown() -> None:
+    """Test _static_fallback returns custom field for unknown header."""
+    assert _static_fallback("My Custom Column") == "custom:My Custom Column"
+
+
+def test_is_valid_mapping_value() -> None:
+    """Test _is_valid_mapping_value for various inputs."""
+    assert _is_valid_mapping_value("name") is True
+    assert _is_valid_mapping_value("vintage") is True
+    assert _is_valid_mapping_value("skip") is True
+    assert _is_valid_mapping_value("custom:Rating") is True
+    assert _is_valid_mapping_value("custom:") is False  # Empty custom name
+    assert _is_valid_mapping_value("nonexistent_field") is False
+    assert _is_valid_mapping_value("") is False

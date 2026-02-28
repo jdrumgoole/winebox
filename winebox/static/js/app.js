@@ -44,6 +44,8 @@ let currentPage = 'dashboard';
 let authToken = localStorage.getItem('winebox_token');
 let currentUser = null;
 let lastScanResult = null;  // Store last scan result to avoid rescanning on checkin
+let cellarViewMode = 'cards';
+let cellarLastWines = [];
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -860,6 +862,10 @@ function initForms() {
     document.getElementById('cellar-filter').addEventListener('change', loadCellar);
     document.getElementById('cellar-search').addEventListener('input', debounce(loadCellar, 300));
 
+    // Cellar view toggle
+    document.getElementById('cellar-view-cards')?.addEventListener('click', () => setCellarViewMode('cards'));
+    document.getElementById('cellar-view-table')?.addEventListener('click', () => setCellarViewMode('table'));
+
     // History filter
     document.getElementById('history-filter').addEventListener('change', loadHistory);
 
@@ -1433,10 +1439,93 @@ async function loadCellar() {
             );
         }
 
-        renderWineGrid('cellar-list', wines);
+        cellarLastWines = wines;
+        renderCellarView();
     } catch (error) {
         console.error('Failed to load cellar:', error);
     }
+}
+
+function renderCellarView() {
+    if (cellarViewMode === 'table') {
+        renderCellarTable('cellar-list', cellarLastWines);
+    } else {
+        renderWineGrid('cellar-list', cellarLastWines);
+    }
+}
+
+function setCellarViewMode(mode) {
+    cellarViewMode = mode;
+
+    document.getElementById('cellar-view-cards').classList.toggle('active', mode === 'cards');
+    document.getElementById('cellar-view-table').classList.toggle('active', mode === 'table');
+
+    if (cellarLastWines.length > 0) {
+        renderCellarView();
+    }
+}
+
+function renderCellarTable(containerId, wines) {
+    const container = document.getElementById(containerId);
+    if (!wines || wines.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
+        return;
+    }
+
+    const tableRows = wines.map(wine => {
+        const quantity = wine.inventory ? wine.inventory.quantity : 0;
+        const inStock = quantity > 0;
+
+        return `
+            <tr class="wine-table-row" data-wine-id="${wine.id}">
+                <td class="wine-table-name">${escapeHtml(wine.name)}</td>
+                <td>${wine.winery ? escapeHtml(wine.winery) : '-'}</td>
+                <td>${wine.vintage || '-'}</td>
+                <td>${wine.grape_variety ? escapeHtml(wine.grape_variety) : '-'}</td>
+                <td class="wine-table-hide-mobile">${wine.region ? escapeHtml(wine.region) : '-'}</td>
+                <td class="wine-table-hide-mobile">${wine.country ? escapeHtml(wine.country) : '-'}</td>
+                <td><span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">${inStock ? quantity : 'Out'}</span></td>
+                <td>${inStock ? `<button class="btn btn-small btn-primary checkout-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Check Out</button>` : ''}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="wine-table-wrapper">
+            <table class="wine-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Winery</th>
+                        <th>Vintage</th>
+                        <th>Grape</th>
+                        <th class="wine-table-hide-mobile">Region</th>
+                        <th class="wine-table-hide-mobile">Country</th>
+                        <th>Qty</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    container.querySelectorAll('.wine-table-row').forEach(row => {
+        row.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('checkout-btn')) {
+                showWineDetail(row.dataset.wineId);
+            }
+        });
+    });
+
+    container.querySelectorAll('.checkout-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openCheckoutModal(btn.dataset.wineId, btn.dataset.quantity);
+        });
+    });
 }
 
 function renderWineGrid(containerId, wines) {
@@ -2548,17 +2637,22 @@ function renderMappingStep(data) {
         const suggested = data.suggested_mapping[header] || 'skip';
         const sample = sampleRow[header] || '';
 
+        // Detect custom field suggestions (e.g. "custom:Cellar Location")
+        const isCustom = suggested.startsWith('custom:');
+        const customName = isCustom ? suggested.substring(7) : '';
+        const selectValue = isCustom ? 'custom' : suggested;
+
         tableHtml += `<tr>
             <td><strong>${escapeHtml(header)}</strong></td>
             <td class="import-sample-cell">${escapeHtml(String(sample).substring(0, 60))}</td>
             <td>
                 <select class="import-mapping-select" data-header="${escapeHtml(header)}">
                     ${wineFields.map(f =>
-                        `<option value="${f.value}" ${suggested === f.value ? 'selected' : ''}>${f.label}</option>`
+                        `<option value="${f.value}" ${selectValue === f.value ? 'selected' : ''}>${f.label}</option>`
                     ).join('')}
-                    <option value="custom" ${suggested === 'skip' ? '' : ''}>Custom Field...</option>
+                    <option value="custom" ${isCustom ? 'selected' : ''}>Custom Field...</option>
                 </select>
-                <input type="text" class="import-custom-name" placeholder="Field name" style="display:none;margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}">
+                <input type="text" class="import-custom-name" placeholder="Field name" style="display:${isCustom ? 'block' : 'none'};margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}" value="${isCustom ? escapeHtml(customName) : ''}">
             </td>
         </tr>`;
     }

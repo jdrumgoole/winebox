@@ -2260,6 +2260,59 @@ body.logged-out #user-info {
     font-weight: 500;
 }
 
+/* Cellar Wine Table */
+.wine-table-wrapper {
+    overflow-x: auto;
+    background: var(--card-background);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+}
+
+.wine-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.wine-table th,
+.wine-table td {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.wine-table th {
+    background: var(--background-color);
+    font-weight: 600;
+    color: var(--text-color);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+}
+
+.wine-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.wine-table tbody tr:hover {
+    background-color: var(--background-color);
+}
+
+.wine-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.wine-table-name {
+    font-weight: 500;
+    color: var(--primary-color);
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Pagination Controls */
 .pagination-controls {
     display: flex;
@@ -2309,6 +2362,23 @@ body.logged-out #user-info {
 
     .xwines-table-name {
         max-width: 150px;
+    }
+
+    .wine-table {
+        font-size: 0.85rem;
+    }
+
+    .wine-table th,
+    .wine-table td {
+        padding: 0.65rem 0.5rem;
+    }
+
+    .wine-table-name {
+        max-width: 150px;
+    }
+
+    .wine-table-hide-mobile {
+        display: none;
     }
 
     .pagination-controls {

@@ -23,6 +23,7 @@ from winebox.services.import_service import (
     parse_xlsx,
     process_import_batch,
     suggest_column_mapping,
+    suggest_column_mapping_ai,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,8 +93,16 @@ async def upload_spreadsheet(
             detail="Spreadsheet has no data rows",
         )
 
-    # Suggest column mapping
-    suggested_mapping = suggest_column_mapping(headers)
+    # Suggest column mapping — try AI first, fall back to static aliases
+    ai_mapping = await suggest_column_mapping_ai(headers, rows[:5])
+    if ai_mapping is not None:
+        suggested_mapping = ai_mapping
+        mapping_source = "ai"
+        logger.info("Using AI-suggested column mapping for %s", file.filename)
+    else:
+        suggested_mapping = suggest_column_mapping(headers)
+        mapping_source = "static"
+        logger.info("Using static alias column mapping for %s", file.filename)
 
     # Create batch document
     batch = ImportBatch(
@@ -115,6 +124,7 @@ async def upload_spreadsheet(
         headers=headers,
         preview_rows=batch.preview_rows,
         suggested_mapping=suggested_mapping,
+        mapping_source=mapping_source,
     )
 
 

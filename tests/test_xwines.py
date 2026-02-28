@@ -515,3 +515,151 @@ async def test_xwines_export_with_filters(client: AsyncClient, init_test_db) -> 
     assert len(data["xwines"]) == 1
     assert data["xwines"][0]["wine_type"] == "Red"
     assert data["export_info"]["filters_applied"]["wine_type"] == "Red"
+
+
+@pytest.mark.asyncio
+async def test_xwines_search_prioritizes_exact_match(client: AsyncClient, init_test_db) -> None:
+    """Test that exact phrase matches are prioritized over partial/token matches.
+
+    When searching for "Chateau Madelaine", the exact match should appear first
+    even if other "Chateau" wines have higher popularity (rating_count).
+    """
+    wines = [
+        # High popularity but only partial match (just "Chateau")
+        XWinesWine(
+            xwines_id=1,
+            name="Chateau Margaux",
+            wine_type="Red",
+            winery_name="Chateau Margaux",
+            country="France",
+            country_code="FR",
+            avg_rating=4.8,
+            rating_count=10000,  # Very popular
+        ),
+        # Lower popularity but exact phrase match
+        XWinesWine(
+            xwines_id=2,
+            name="Chateau Madelaine",
+            wine_type="Red",
+            winery_name="Chateau Madelaine",
+            country="France",
+            country_code="FR",
+            avg_rating=4.2,
+            rating_count=100,  # Less popular
+        ),
+        # Another partial match with high popularity
+        XWinesWine(
+            xwines_id=3,
+            name="Chateau Lafite Rothschild",
+            wine_type="Red",
+            winery_name="Chateau Lafite Rothschild",
+            country="France",
+            country_code="FR",
+            avg_rating=4.9,
+            rating_count=8000,  # Very popular
+        ),
+    ]
+    for wine in wines:
+        await wine.insert()
+
+    # Search for "Chateau Madelaine" - exact match should be first
+    response = await client.get("/api/xwines/search?q=Chateau%20Madelaine")
+    assert response.status_code == 200
+    data = response.json()
+
+    # The exact match "Chateau Madelaine" should be first, not the more popular wines
+    assert len(data["results"]) >= 1
+    assert data["results"][0]["name"] == "Chateau Madelaine"
+
+
+@pytest.mark.asyncio
+async def test_xwines_search_phrase_vs_token(client: AsyncClient, init_test_db) -> None:
+    """Test that full phrase matches rank higher than token matches.
+
+    When searching for "Silver Oak", a wine with "Silver Oak" as a phrase
+    should rank higher than a wine with just "Silver" or just "Oak".
+    """
+    wines = [
+        # Contains "Oak" but not "Silver Oak" phrase
+        XWinesWine(
+            xwines_id=1,
+            name="Golden Oak Reserve",
+            wine_type="Red",
+            winery_name="Oak Valley Winery",
+            country="United States",
+            country_code="US",
+            avg_rating=4.5,
+            rating_count=5000,  # Popular
+        ),
+        # Exact phrase "Silver Oak"
+        XWinesWine(
+            xwines_id=2,
+            name="Silver Oak Cabernet",
+            wine_type="Red",
+            winery_name="Silver Oak Cellars",
+            country="United States",
+            country_code="US",
+            avg_rating=4.3,
+            rating_count=200,  # Less popular
+        ),
+        # Contains "Silver" but not "Silver Oak" phrase
+        XWinesWine(
+            xwines_id=3,
+            name="Silver Creek Merlot",
+            wine_type="Red",
+            winery_name="Silver Creek Winery",
+            country="United States",
+            country_code="US",
+            avg_rating=4.4,
+            rating_count=3000,  # Popular
+        ),
+    ]
+    for wine in wines:
+        await wine.insert()
+
+    # Search for "Silver Oak" - phrase match should be first
+    response = await client.get("/api/xwines/search?q=Silver%20Oak")
+    assert response.status_code == 200
+    data = response.json()
+
+    # The phrase match "Silver Oak Cabernet" should be first
+    assert len(data["results"]) >= 1
+    assert data["results"][0]["name"] == "Silver Oak Cabernet"
+
+
+@pytest.mark.asyncio
+async def test_xwines_search_start_of_name_priority(client: AsyncClient, init_test_db) -> None:
+    """Test that matches at the start of name rank higher than matches elsewhere."""
+    wines = [
+        # "Merlot" at the end of name
+        XWinesWine(
+            xwines_id=1,
+            name="Premium Reserve Merlot",
+            wine_type="Red",
+            country="France",
+            country_code="FR",
+            avg_rating=4.5,
+            rating_count=5000,  # Popular
+        ),
+        # "Merlot" at the start of name
+        XWinesWine(
+            xwines_id=2,
+            name="Merlot Classic Reserve",
+            wine_type="Red",
+            country="France",
+            country_code="FR",
+            avg_rating=4.0,
+            rating_count=100,  # Less popular
+        ),
+    ]
+    for wine in wines:
+        await wine.insert()
+
+    # Search for "Merlot" - start-of-name match should be first
+    response = await client.get("/api/xwines/search?q=Merlot")
+    assert response.status_code == 200
+    data = response.json()
+
+    # The start-of-name match "Merlot Classic Reserve" should be first
+    assert len(data["results"]) >= 1
+    assert data["results"][0]["name"] == "Merlot Classic Reserve"

@@ -15,6 +15,7 @@ class ImportUploadResponse(BaseModel):
     headers: list[str]
     preview_rows: list[dict[str, Any]]
     suggested_mapping: dict[str, str]
+    mapping_source: str = "static"
 
 
 class ColumnMappingRequest(BaseModel):

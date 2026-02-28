@@ -72,8 +72,8 @@ AUTO_MAPPED = {
     "Colour": "wine_type_id",
 }
 
-# Columns expected to default to "skip"
-EXPECTED_SKIP = [
+# Columns expected to default to custom fields (not auto-mapped)
+EXPECTED_CUSTOM = [
     "Parent ID",
     "Product Code(s)",
     "Maturity",
@@ -312,10 +312,13 @@ class TestXWinesImport:
             select = page.locator(f'.import-mapping-select[data-header="{header}"]')
             expect(select).to_have_value(expected_value)
 
-        # Check a sample of unmapped columns default to "skip"
-        for header in EXPECTED_SKIP[:5]:
+        # Check a sample of unmapped columns default to "custom" with pre-filled name
+        for header in EXPECTED_CUSTOM[:5]:
             select = page.locator(f'.import-mapping-select[data-header="{header}"]')
-            expect(select).to_have_value("skip")
+            expect(select).to_have_value("custom")
+            custom_input = page.locator(f'.import-custom-name[data-header="{header}"]')
+            expect(custom_input).to_be_visible()
+            expect(custom_input).to_have_value(header)
 
     def test_full_import_and_cellar_validation(
         self,

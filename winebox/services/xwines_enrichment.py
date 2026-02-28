@@ -128,8 +128,9 @@ async def enrich_parsed_with_xwines(parsed: dict) -> dict:
 async def _find_best_xwines_match(name: str) -> XWinesWine | None:
     """Find the best matching X-Wines wine by name.
 
-    Uses Atlas Search when available (fuzzy matching), falls back to
-    regex search for local dev. Returns the top-1 result by rating_count.
+    Uses Atlas Search when available with phrase matching for better relevance,
+    falls back to three-tier regex search for local dev. Returns the top-1
+    result, prioritizing exact phrase matches over fuzzy matches.
 
     Args:
         name: Wine name to search for.
@@ -137,46 +138,94 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
     Returns:
         Best matching XWinesWine, or None if no match found.
     """
-    # Try Atlas Search first
+    # Try Atlas Search first with phrase matching for better relevance
     try:
         db = get_database()
         collection = db["xwines_wines"]
 
+        # Use compound query with should clauses for relevance ranking
+        # Phrase matches get higher scores than fuzzy token matches
         pipeline: list[dict] = [
             {
                 "$search": {
                     "index": "xwines_search",
                     "compound": {
-                        "must": [
+                        "should": [
+                            # Highest priority: exact phrase match in name
+                            {
+                                "phrase": {
+                                    "query": name,
+                                    "path": "name",
+                                    "score": {"boost": {"value": 10}},
+                                }
+                            },
+                            # Medium priority: phrase match in winery_name
+                            {
+                                "phrase": {
+                                    "query": name,
+                                    "path": "winery_name",
+                                    "score": {"boost": {"value": 5}},
+                                }
+                            },
+                            # Fallback: fuzzy token match
                             {
                                 "text": {
                                     "query": name,
                                     "path": ["name", "winery_name"],
                                     "fuzzy": {"maxEdits": 1, "prefixLength": 2},
+                                    "score": {"boost": {"value": 1}},
                                 }
-                            }
-                        ]
+                            },
+                        ],
+                        "minimumShouldMatch": 1,
                     },
                 }
             },
-            {"$sort": {"rating_count": -1}},
+            {"$addFields": {"searchScore": {"$meta": "searchScore"}}},
+            {"$sort": {"searchScore": -1, "rating_count": -1}},
             {"$limit": 1},
         ]
         docs = await collection.aggregate(pipeline).to_list(length=1)
         if docs:
             # Convert raw doc to XWinesWine model
             doc = docs[0]
-            return XWinesWine(**{k: v for k, v in doc.items() if k != "_id"})
+            return XWinesWine(**{k: v for k, v in doc.items() if k not in ("_id", "searchScore")})
     except Exception as e:
         logger.debug("Atlas Search unavailable for enrichment, falling back to regex: %s", e)
 
-    # Fallback: regex search
-    search_pattern = re.compile(re.escape(name), re.IGNORECASE)
+    # Fallback: three-tier regex search for better relevance
+    escaped_name = re.escape(name)
+
+    # Tier 1: Query at START of name (highest priority)
+    start_pattern = re.compile(f"^{escaped_name}", re.IGNORECASE)
+    match = await XWinesWine.find({"name": {"$regex": start_pattern}}).sort(
+        [("rating_count", -1)]
+    ).first_or_none()
+    if match:
+        return match
+
+    # Tier 2: Query with word boundaries (full phrase match)
+    word_boundary_pattern = re.compile(rf"\b{escaped_name}\b", re.IGNORECASE)
     match = await XWinesWine.find(
-        {"$or": [
-            {"name": {"$regex": search_pattern}},
-            {"winery_name": {"$regex": search_pattern}},
-        ]}
-    ).sort([("rating_count", -1)]).limit(1).first_or_none()
+        {
+            "$or": [
+                {"name": {"$regex": word_boundary_pattern}},
+                {"winery_name": {"$regex": word_boundary_pattern}},
+            ]
+        }
+    ).sort([("rating_count", -1)]).first_or_none()
+    if match:
+        return match
+
+    # Tier 3: Substring match (original behavior as fallback)
+    substring_pattern = re.compile(escaped_name, re.IGNORECASE)
+    match = await XWinesWine.find(
+        {
+            "$or": [
+                {"name": {"$regex": substring_pattern}},
+                {"winery_name": {"$regex": substring_pattern}},
+            ]
+        }
+    ).sort([("rating_count", -1)]).first_or_none()
 
     return match
