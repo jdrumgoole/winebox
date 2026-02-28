@@ -350,7 +350,7 @@ async def test_suggest_mapping_ai_basic() -> None:
     mock_client = MagicMock()
     mock_client.messages.create.return_value = _mock_claude_response(ai_response)
 
-    with patch("winebox.services.import_service.settings") as mock_settings, \
+    with patch("winebox.services.import_service.mapping.settings") as mock_settings, \
          patch("anthropic.Anthropic", return_value=mock_client):
         mock_settings.anthropic_api_key = "test-key"
         result = await suggest_column_mapping_ai(headers, preview_rows)
@@ -367,7 +367,7 @@ async def test_suggest_mapping_ai_no_api_key() -> None:
     headers = ["Name", "Vintage"]
     preview_rows = [{"Name": "Test Wine", "Vintage": "2020"}]
 
-    with patch("winebox.services.import_service.settings") as mock_settings, \
+    with patch("winebox.services.import_service.mapping.settings") as mock_settings, \
          patch.dict("os.environ", {}, clear=True):
         mock_settings.anthropic_api_key = None
         result = await suggest_column_mapping_ai(headers, preview_rows)
@@ -384,7 +384,7 @@ async def test_suggest_mapping_ai_api_error() -> None:
     mock_client = MagicMock()
     mock_client.messages.create.side_effect = Exception("API rate limit exceeded")
 
-    with patch("winebox.services.import_service.settings") as mock_settings, \
+    with patch("winebox.services.import_service.mapping.settings") as mock_settings, \
          patch("anthropic.Anthropic", return_value=mock_client):
         mock_settings.anthropic_api_key = "test-key"
         result = await suggest_column_mapping_ai(headers, preview_rows)
@@ -403,7 +403,7 @@ async def test_suggest_mapping_ai_malformed_json() -> None:
         "I'm sorry, I can't parse that spreadsheet."
     )
 
-    with patch("winebox.services.import_service.settings") as mock_settings, \
+    with patch("winebox.services.import_service.mapping.settings") as mock_settings, \
          patch("anthropic.Anthropic", return_value=mock_client):
         mock_settings.anthropic_api_key = "test-key"
         result = await suggest_column_mapping_ai(headers, preview_rows)
@@ -424,7 +424,7 @@ async def test_suggest_mapping_ai_invalid_field_dropped() -> None:
     mock_client = MagicMock()
     mock_client.messages.create.return_value = _mock_claude_response(ai_response)
 
-    with patch("winebox.services.import_service.settings") as mock_settings, \
+    with patch("winebox.services.import_service.mapping.settings") as mock_settings, \
          patch("anthropic.Anthropic", return_value=mock_client):
         mock_settings.anthropic_api_key = "test-key"
         result = await suggest_column_mapping_ai(headers, preview_rows)
@@ -446,7 +446,7 @@ async def test_suggest_mapping_ai_markdown_code_block() -> None:
     mock_client = MagicMock()
     mock_client.messages.create.return_value = _mock_claude_response(wrapped)
 
-    with patch("winebox.services.import_service.settings") as mock_settings, \
+    with patch("winebox.services.import_service.mapping.settings") as mock_settings, \
          patch("anthropic.Anthropic", return_value=mock_client):
         mock_settings.anthropic_api_key = "test-key"
         result = await suggest_column_mapping_ai(headers, preview_rows)

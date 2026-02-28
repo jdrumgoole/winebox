@@ -209,9 +209,9 @@ async def test_scan_returns_xwines_fields(client: AsyncClient, init_test_db, sam
     await xwine.insert()
 
     # Mock OCR to return a name that matches our X-Wines entry
-    with patch("winebox.routers.wines.vision_service") as mock_vision, \
-         patch("winebox.routers.wines.ocr_service") as mock_ocr, \
-         patch("winebox.routers.wines.wine_parser") as mock_parser:
+    with patch("winebox.routers.wines.scan.vision_service") as mock_vision, \
+         patch("winebox.routers.wines.scan.ocr_service") as mock_ocr, \
+         patch("winebox.routers.wines.scan.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
         mock_ocr.extract_text_from_bytes = AsyncMock(return_value="Test Scan Wine")
         mock_parser.parse.return_value = {"name": "Test Scan Wine"}
@@ -240,9 +240,9 @@ async def test_scan_returns_xwines_fields(client: AsyncClient, init_test_db, sam
 async def test_checkin_accepts_wine_type_id(client: AsyncClient, init_test_db, sample_image_bytes: bytes) -> None:
     """wine_type_id form field is saved on the Wine document."""
     # Mock vision to not be available, and OCR to return minimal data
-    with patch("winebox.routers.wines.vision_service") as mock_vision, \
-         patch("winebox.routers.wines.ocr_service") as mock_ocr, \
-         patch("winebox.routers.wines.wine_parser") as mock_parser:
+    with patch("winebox.routers.wines.checkin.vision_service") as mock_vision, \
+         patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
+         patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
         mock_ocr.extract_text.return_value = "Test Wine"
         mock_parser.parse.return_value = {"name": "Test Wine"}
