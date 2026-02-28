@@ -2706,11 +2706,14 @@ function renderMappingStep(data) {
         const isSkipped = selectValue === 'skip';
 
         tableHtml += `<tr class="import-mapping-row ${isSkipped ? 'skipped' : ''}" data-header="${escapeHtml(header)}">
-            <td><strong>${escapeHtml(header)}</strong></td>
+            <td>
+                <span class="import-column-name"><strong>${escapeHtml(header)}</strong></span>
+                <span class="import-not-mapped" style="display:${isSkipped ? 'block' : 'none'}">Not mapped</span>
+            </td>
             <td class="import-sample-cell">${escapeHtml(String(sample).substring(0, 60))}</td>
             <td>
                 <div class="import-mapping-controls">
-                    <select class="import-mapping-select" data-header="${escapeHtml(header)}" ${isSkipped ? 'disabled' : ''}>
+                    <select class="import-mapping-select" data-header="${escapeHtml(header)}">
                         <optgroup label="Core Fields">
                             ${canonicalFields.map(f =>
                                 `<option value="${f.value}" ${selectValue === f.value ? 'selected' : ''}>${f.label}</option>`
@@ -2746,15 +2749,18 @@ function renderMappingStep(data) {
         btn.addEventListener('click', (e) => {
             const header = e.target.dataset.header;
             const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
-            const select = row.querySelector('.import-mapping-select');
             const customInput = row.querySelector('.import-custom-name');
+            const notMapped = row.querySelector('.import-not-mapped');
             const isActive = btn.classList.toggle('active');
             row.classList.toggle('skipped', isActive);
-            select.disabled = isActive;
+            notMapped.style.display = isActive ? 'block' : 'none';
             if (isActive) {
                 customInput.style.display = 'none';
-            } else if (select.value === 'custom') {
-                customInput.style.display = 'block';
+            } else {
+                const select = row.querySelector('.import-mapping-select');
+                if (select.value === 'custom') {
+                    customInput.style.display = 'block';
+                }
             }
         });
     });

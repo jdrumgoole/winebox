@@ -2197,17 +2197,16 @@ body.logged-out #user-info {
     border-color: var(--text-muted);
 }
 
-.import-mapping-row.skipped td {
-    opacity: 0.45;
+.import-mapping-row.skipped .import-column-name {
+    text-decoration: line-through;
+    color: var(--text-muted);
 }
 
-.import-mapping-row.skipped .import-skip-btn {
-    opacity: 1;
-}
-
-.import-mapping-select:disabled {
-    background: var(--background-color);
-    cursor: not-allowed;
+.import-not-mapped {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.15rem;
 }
 
 .import-custom-name {
