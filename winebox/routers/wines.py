@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from winebox.config import settings
 from winebox.models import (
     GrapeVariety,
+    ImportBatch,
     Transaction,
     TransactionType,
     Wine,
@@ -546,6 +547,55 @@ async def update_wine(
     await wine.save()
 
     return WineWithInventory.model_validate(wine)
+
+
+@router.delete("/all")
+async def delete_all_wines(
+    current_user: RequireAuth,
+) -> dict:
+    """Delete all wines, transactions, images, and import batches for the current user."""
+    # Find all wines belonging to the current user
+    wines = await Wine.find(Wine.owner_id == current_user.id).to_list()
+
+    # Delete label images for all wines
+    deleted_images = 0
+    for wine in wines:
+        if wine.front_label_image_path:
+            await image_storage.delete_image(wine.front_label_image_path)
+            deleted_images += 1
+        if wine.back_label_image_path:
+            await image_storage.delete_image(wine.back_label_image_path)
+            deleted_images += 1
+
+    # Delete all transactions for this user
+    delete_transactions_result = await Transaction.find(
+        Transaction.owner_id == current_user.id
+    ).delete()
+    deleted_transactions = delete_transactions_result.deleted_count if delete_transactions_result else 0
+
+    # Delete all import batches for this user
+    delete_batches_result = await ImportBatch.find(
+        ImportBatch.owner_id == current_user.id
+    ).delete()
+    deleted_import_batches = delete_batches_result.deleted_count if delete_batches_result else 0
+
+    # Delete all wines for this user
+    delete_wines_result = await Wine.find(
+        Wine.owner_id == current_user.id
+    ).delete()
+    deleted_wines = delete_wines_result.deleted_count if delete_wines_result else 0
+
+    logger.info(
+        "User %s deleted entire collection: %d wines, %d transactions, %d images, %d import batches",
+        current_user.id, deleted_wines, deleted_transactions, deleted_images, deleted_import_batches,
+    )
+
+    return {
+        "deleted_wines": deleted_wines,
+        "deleted_transactions": deleted_transactions,
+        "deleted_images": deleted_images,
+        "deleted_import_batches": deleted_import_batches,
+    }
 
 
 @router.delete("/{wine_id}", status_code=status.HTTP_204_NO_CONTENT)

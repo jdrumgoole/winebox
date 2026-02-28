@@ -1297,6 +1297,43 @@ h3 {
     line-height: 1.5;
 }
 
+/* Danger Zone */
+.danger-zone {
+    background: var(--card-background);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    box-shadow: var(--shadow);
+    border: 2px solid var(--error-color);
+}
+
+.danger-zone h3 {
+    color: var(--error-color);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--error-color);
+}
+
+.danger-zone .btn-danger {
+    background: var(--error-color);
+    color: #fff;
+    border: none;
+}
+
+.danger-zone .btn-danger:hover {
+    opacity: 0.9;
+}
+
+#confirm-delete-collection-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#delete-confirm-input:focus {
+    border-color: var(--error-color);
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+}
+
 /* Hide main content when not logged in */
 body.logged-out main {
     display: none;

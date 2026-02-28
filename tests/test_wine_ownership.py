@@ -496,3 +496,39 @@ async def test_both_users_can_manage_their_own_wines_independently(
     response = await client2.get(f"/api/wines/{user2_wine_id}")
     assert response.json()["name"] == "User2 Wine Updated"
     assert response.json()["inventory"]["quantity"] == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_all_wines_only_deletes_own_wines(
+    two_users_clients, sample_image_bytes
+) -> None:
+    """Test that deleting all wines only affects the current user's collection."""
+    client1, client2 = two_users_clients
+
+    # User 1 checks in a wine
+    files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
+    data = {"name": "User1 Wine", "quantity": "2"}
+    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    assert response.status_code == 201
+
+    # User 2 checks in a wine
+    files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
+    data = {"name": "User2 Wine", "quantity": "3"}
+    response = await client2.post("/api/wines/checkin", files=files, data=data)
+    assert response.status_code == 201
+
+    # User 1 deletes all their wines
+    response = await client1.delete("/api/wines/all")
+    assert response.status_code == 200
+    assert response.json()["deleted_wines"] == 1
+
+    # User 1 has no wines
+    response = await client1.get("/api/wines")
+    assert response.json() == []
+
+    # User 2's wine survives
+    response = await client2.get("/api/wines")
+    wines = response.json()
+    assert len(wines) == 1
+    assert wines[0]["name"] == "User2 Wine"
+    assert wines[0]["inventory"]["quantity"] == 3

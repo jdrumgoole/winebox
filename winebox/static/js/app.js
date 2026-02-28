@@ -871,6 +871,19 @@ function initForms() {
 
     // Settings forms
     document.getElementById('password-form').addEventListener('submit', handlePasswordChange);
+
+    // Delete collection
+    document.getElementById('delete-collection-btn').addEventListener('click', () => {
+        document.getElementById('delete-confirm-input').value = '';
+        document.getElementById('confirm-delete-collection-btn').disabled = true;
+        openModal('delete-collection-modal');
+    });
+
+    document.getElementById('delete-confirm-input').addEventListener('input', (e) => {
+        document.getElementById('confirm-delete-collection-btn').disabled = e.target.value !== 'DELETE';
+    });
+
+    document.getElementById('confirm-delete-collection-btn').addEventListener('click', handleDeleteCollection);
 }
 
 function previewImage(input, previewId) {
@@ -1933,6 +1946,36 @@ async function handlePasswordChange(e) {
         document.getElementById('password-form').reset();
         showToast('Password changed successfully', 'success');
     } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function handleDeleteCollection() {
+    const input = document.getElementById('delete-confirm-input');
+    if (input.value !== 'DELETE') return;
+
+    const btn = document.getElementById('confirm-delete-collection-btn');
+    btn.disabled = true;
+    btn.textContent = 'Deleting...';
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/wines/all`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete collection');
+        }
+
+        const result = await response.json();
+        closeModals();
+        showToast(`Deleted ${result.deleted_wines} wines, ${result.deleted_transactions} transactions`, 'success');
+        loadCellar();
+        loadDashboard();
+    } catch (error) {
+        btn.disabled = false;
+        btn.textContent = 'Delete Everything';
         showToast(error.message, 'error');
     }
 }

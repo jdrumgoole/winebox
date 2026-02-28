@@ -427,3 +427,53 @@ async def test_wine_without_image_path(client: AsyncClient, sample_image_bytes: 
     # front_label_image_path is now optional (can be None for imported wines)
     # For checkin wines, it should still be set
     assert wine["front_label_image_path"] is not None
+
+
+# Delete all wines tests
+
+
+@pytest.mark.asyncio
+async def test_delete_all_wines(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Test deleting all wines in the collection."""
+    # Check in 3 wines
+    for i in range(3):
+        files = {
+            "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+        }
+        data = {"name": f"Wine {i}", "quantity": "1"}
+        response = await client.post("/api/wines/checkin", files=files, data=data)
+        assert response.status_code == 201
+
+    # Verify 3 wines exist
+    response = await client.get("/api/wines")
+    assert len(response.json()) == 3
+
+    # Delete all
+    response = await client.delete("/api/wines/all")
+    assert response.status_code == 200
+    result = response.json()
+    assert result["deleted_wines"] == 3
+    assert result["deleted_transactions"] == 3
+
+    # Verify 0 wines remain
+    response = await client.get("/api/wines")
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_delete_all_wines_empty_collection(client: AsyncClient) -> None:
+    """Test deleting all wines when collection is already empty."""
+    response = await client.delete("/api/wines/all")
+    assert response.status_code == 200
+    result = response.json()
+    assert result["deleted_wines"] == 0
+    assert result["deleted_transactions"] == 0
+    assert result["deleted_images"] == 0
+    assert result["deleted_import_batches"] == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_all_wines_requires_auth(unauthenticated_client: AsyncClient) -> None:
+    """Test that deleting all wines requires authentication."""
+    response = await unauthenticated_client.delete("/api/wines/all")
+    assert response.status_code == 401

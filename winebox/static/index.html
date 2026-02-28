@@ -710,6 +710,15 @@
                     </div>
                 </form>
             </div>
+
+            <!-- Danger Zone -->
+            <div class="danger-zone">
+                <h3>Danger Zone</h3>
+                <p class="settings-description">
+                    Permanently delete your entire wine collection, including all wines, transactions, label images, and import history. This action cannot be undone.
+                </p>
+                <button type="button" class="btn btn-danger" id="delete-collection-btn">Delete Entire Collection</button>
+            </div>
         </section>
     </main>
 
@@ -861,6 +870,23 @@
                     <button type="button" class="btn btn-primary" id="checkin-confirm-btn">Confirm</button>
                     <button type="button" class="btn btn-secondary" id="checkin-cancel-btn">Cancel</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Collection Confirmation Modal -->
+    <div id="delete-collection-modal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="modal-close">&times;</span>
+            <h3 style="color: var(--error-color);">Delete Entire Collection</h3>
+            <p>This will permanently delete <strong>all your wines</strong>, transactions, label images, and import history. This action <strong>cannot be undone</strong>.</p>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label for="delete-confirm-input">Type <strong>DELETE</strong> to confirm:</label>
+                <input type="text" id="delete-confirm-input" placeholder="Type DELETE" autocomplete="off">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-danger" id="confirm-delete-collection-btn" disabled>Delete Everything</button>
+                <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
             </div>
         </div>
     </div>
