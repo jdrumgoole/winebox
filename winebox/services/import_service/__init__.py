@@ -1,6 +1,7 @@
 """Import service package for parsing spreadsheets and creating wine records."""
 
 from .constants import (
+    CANONICAL_WINE_FIELDS,
     HEADER_ALIASES,
     MAX_ROWS,
     NON_WINE_KEYWORDS,
@@ -26,6 +27,7 @@ from .processor import process_import_batch
 
 __all__ = [
     # Constants
+    "CANONICAL_WINE_FIELDS",
     "HEADER_ALIASES",
     "MAX_ROWS",
     "NON_WINE_KEYWORDS",

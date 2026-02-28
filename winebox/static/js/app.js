@@ -2669,17 +2669,19 @@ function renderMappingStep(data) {
     document.getElementById('import-file-info').textContent =
         `${data.filename} - ${data.row_count} rows`;
 
-    // Wine fields for dropdown
-    const wineFields = [
-        { value: 'skip', label: 'Skip' },
-        { value: 'name', label: 'Wine Name' },
+    // Wine fields for dropdown — split into core (canonical) and additional
+    const canonicalFields = [
+        { value: 'name', label: 'Wine Name (required)' },
         { value: 'winery', label: 'Winery' },
         { value: 'vintage', label: 'Vintage' },
         { value: 'grape_variety', label: 'Grape Variety' },
+        { value: 'country', label: 'Country' },
         { value: 'region', label: 'Region' },
+    ];
+
+    const optionalFields = [
         { value: 'sub_region', label: 'Sub-Region' },
         { value: 'appellation', label: 'Appellation' },
-        { value: 'country', label: 'Country' },
         { value: 'alcohol_percentage', label: 'Alcohol %' },
         { value: 'wine_type_id', label: 'Wine Type' },
         { value: 'classification', label: 'Classification' },
@@ -2701,16 +2703,28 @@ function renderMappingStep(data) {
         const customName = isCustom ? suggested.substring(7) : '';
         const selectValue = isCustom ? 'custom' : suggested;
 
-        tableHtml += `<tr>
+        const isSkipped = selectValue === 'skip';
+
+        tableHtml += `<tr class="import-mapping-row ${isSkipped ? 'skipped' : ''}" data-header="${escapeHtml(header)}">
             <td><strong>${escapeHtml(header)}</strong></td>
             <td class="import-sample-cell">${escapeHtml(String(sample).substring(0, 60))}</td>
             <td>
-                <select class="import-mapping-select" data-header="${escapeHtml(header)}">
-                    ${wineFields.map(f =>
-                        `<option value="${f.value}" ${selectValue === f.value ? 'selected' : ''}>${f.label}</option>`
-                    ).join('')}
-                    <option value="custom" ${isCustom ? 'selected' : ''}>Custom Field...</option>
-                </select>
+                <div class="import-mapping-controls">
+                    <select class="import-mapping-select" data-header="${escapeHtml(header)}" ${isSkipped ? 'disabled' : ''}>
+                        <optgroup label="Core Fields">
+                            ${canonicalFields.map(f =>
+                                `<option value="${f.value}" ${selectValue === f.value ? 'selected' : ''}>${f.label}</option>`
+                            ).join('')}
+                        </optgroup>
+                        <optgroup label="Additional Fields">
+                            ${optionalFields.map(f =>
+                                `<option value="${f.value}" ${selectValue === f.value ? 'selected' : ''}>${f.label}</option>`
+                            ).join('')}
+                        </optgroup>
+                        <option value="custom" ${isCustom ? 'selected' : ''}>Custom Field...</option>
+                    </select>
+                    <button type="button" class="btn btn-small import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Skip</button>
+                </div>
                 <input type="text" class="import-custom-name" placeholder="Field name" style="display:${isCustom ? 'block' : 'none'};margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}" value="${isCustom ? escapeHtml(customName) : ''}">
             </td>
         </tr>`;
@@ -2724,6 +2738,24 @@ function renderMappingStep(data) {
             const header = e.target.dataset.header;
             const customInput = document.querySelector(`.import-custom-name[data-header="${header}"]`);
             customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+        });
+    });
+
+    // Skip button toggle
+    document.querySelectorAll('.import-skip-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const header = e.target.dataset.header;
+            const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
+            const select = row.querySelector('.import-mapping-select');
+            const customInput = row.querySelector('.import-custom-name');
+            const isActive = btn.classList.toggle('active');
+            row.classList.toggle('skipped', isActive);
+            select.disabled = isActive;
+            if (isActive) {
+                customInput.style.display = 'none';
+            } else if (select.value === 'custom') {
+                customInput.style.display = 'block';
+            }
         });
     });
 
@@ -2751,11 +2783,17 @@ async function handleConfirmMapping() {
 
     // Collect mapping from dropdowns
     const mapping = {};
-    document.querySelectorAll('.import-mapping-select').forEach(select => {
-        const header = select.dataset.header;
+    document.querySelectorAll('.import-mapping-row').forEach(row => {
+        const header = row.dataset.header;
+        const skipBtn = row.querySelector('.import-skip-btn');
+        if (skipBtn.classList.contains('active')) {
+            mapping[header] = 'skip';
+            return;
+        }
+        const select = row.querySelector('.import-mapping-select');
         let value = select.value;
         if (value === 'custom') {
-            const customInput = document.querySelector(`.import-custom-name[data-header="${header}"]`);
+            const customInput = row.querySelector('.import-custom-name');
             const customName = customInput.value.trim();
             value = customName ? `custom:${customName}` : 'skip';
         }

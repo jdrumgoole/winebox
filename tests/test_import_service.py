@@ -9,6 +9,8 @@ import pytest
 from openpyxl import Workbook
 
 from winebox.services.import_service import (
+    CANONICAL_WINE_FIELDS,
+    VALID_WINE_FIELDS,
     _coerce_float,
     _coerce_vintage,
     _compute_custom_fields_text,
@@ -482,3 +484,18 @@ def test_is_valid_mapping_value() -> None:
     assert _is_valid_mapping_value("custom:") is False  # Empty custom name
     assert _is_valid_mapping_value("nonexistent_field") is False
     assert _is_valid_mapping_value("") is False
+
+
+# =============================================================================
+# Canonical Fields Tests
+# =============================================================================
+
+
+def test_canonical_fields_subset_of_valid() -> None:
+    """Test that every canonical field is a valid wine field."""
+    assert set(CANONICAL_WINE_FIELDS).issubset(VALID_WINE_FIELDS)
+
+
+def test_canonical_fields_name_is_first() -> None:
+    """Test that 'name' is the first canonical field (it's required)."""
+    assert CANONICAL_WINE_FIELDS[0] == "name"

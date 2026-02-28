@@ -83,6 +83,7 @@ To re-deploy an existing version without making a new release:
 GitHub Actions only publishes to PyPI (no auto-deploy to production).
 
 - Never install from git directly on the server. Always build the package first and install from PyPI.
+- **Never reuse a version number that has been published to PyPI.** Always increment the version for every new build. PyPI is immutable — once a version is uploaded, its contents cannot be changed. If you need to fix something in a released version, bump the version and publish again.
 - After every deployment, flush all web caches to ensure users see the latest build
 - Browser caches can serve stale static files (HTML, JS, CSS) even after server updates
 - When taking screenshots of deployed apps, use cache-busting query parameters (e.g., `?v=0.5.0`) or clear browser cache first

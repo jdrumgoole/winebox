@@ -7,7 +7,12 @@ from typing import Any
 
 from winebox.config import settings
 
-from .constants import HEADER_ALIASES, VALID_WINE_FIELDS, WINE_FIELD_DESCRIPTIONS
+from .constants import (
+    CANONICAL_WINE_FIELDS,
+    HEADER_ALIASES,
+    VALID_WINE_FIELDS,
+    WINE_FIELD_DESCRIPTIONS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +95,9 @@ Spreadsheet columns (with sample values):
 
 Instructions:
 - Map each column header to the most appropriate wine field, "skip", or "custom:<name>".
+- PRIORITY: The following are the core wine fields — try hardest to match these:
+  name (REQUIRED), winery, vintage, grape_variety, country, region.
+  Rows without "name" mapped will be skipped entirely.
 - Consider typos, abbreviations, and non-English headers (French, Italian, Spanish, German, etc.).
 - Use sample values to disambiguate ambiguous headers (e.g. "Type" with values "Red", "White" -> "wine_type_id").
 - If a column clearly doesn't match any wine field, use "custom:<original header name>".

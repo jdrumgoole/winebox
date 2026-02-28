@@ -93,9 +93,12 @@ VALID_WINE_FIELDS = {
     "classification", "price_tier", "quantity", "notes",
 }
 
+# Core identifying fields for a wine record (name is required; others strongly recommended)
+CANONICAL_WINE_FIELDS = ["name", "winery", "vintage", "grape_variety", "country", "region"]
+
 # Human-readable descriptions for each wine field (used in AI mapping prompt)
 WINE_FIELD_DESCRIPTIONS: dict[str, str] = {
-    "name": "The wine name or label title",
+    "name": "The wine name or label title (REQUIRED — rows without this are skipped)",
     "winery": "The winery, producer, domaine, château, or estate",
     "vintage": "The vintage year (integer)",
     "grape_variety": "The grape variety or varietal (e.g. Cabernet Sauvignon, Merlot)",

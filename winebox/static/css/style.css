@@ -2154,6 +2154,62 @@ body.logged-out #user-info {
     font-size: 0.9rem;
 }
 
+.import-mapping-select optgroup {
+    font-weight: 700;
+    color: var(--primary-color);
+    font-style: normal;
+}
+
+.import-mapping-select optgroup option {
+    font-weight: 400;
+    color: var(--text-color);
+}
+
+.import-mapping-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.import-mapping-controls .import-mapping-select {
+    flex: 1;
+}
+
+.import-skip-btn {
+    white-space: nowrap;
+    background: var(--card-background);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.import-skip-btn:hover {
+    border-color: var(--text-muted);
+    color: var(--text-color);
+}
+
+.import-skip-btn.active {
+    background: var(--text-muted);
+    color: white;
+    border-color: var(--text-muted);
+}
+
+.import-mapping-row.skipped td {
+    opacity: 0.45;
+}
+
+.import-mapping-row.skipped .import-skip-btn {
+    opacity: 1;
+}
+
+.import-mapping-select:disabled {
+    background: var(--background-color);
+    cursor: not-allowed;
+}
+
 .import-custom-name {
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--border-color);
