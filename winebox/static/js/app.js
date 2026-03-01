@@ -1702,71 +1702,70 @@ async function showWineDetail(wineId) {
                     ${wine.vintage ? ` - ${wine.vintage}` : ''}
                 </div>
 
-                <div class="wine-detail-field">
-                    <div class="label">In Stock</div>
-                    <div class="value">${quantity} bottle${quantity !== 1 ? 's' : ''}</div>
+                <div class="wine-detail-fields">
+                    <div class="wine-detail-field">
+                        <div class="label">In Stock</div>
+                        <div class="value">${quantity} bottle${quantity !== 1 ? 's' : ''}</div>
+                    </div>
+
+                    ${wine.grape_variety ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Grape Variety</div>
+                            <div class="value">${wine.grape_variety}</div>
+                        </div>
+                    ` : ''}
+
+                    ${wine.region ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Region</div>
+                            <div class="value">${wine.region}</div>
+                        </div>
+                    ` : ''}
+
+                    ${wine.sub_region ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Sub-Region</div>
+                            <div class="value">${wine.sub_region}</div>
+                        </div>
+                    ` : ''}
+
+                    ${wine.appellation ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Appellation</div>
+                            <div class="value">${wine.appellation}</div>
+                        </div>
+                    ` : ''}
+
+                    ${wine.country ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Country</div>
+                            <div class="value">${wine.country}</div>
+                        </div>
+                    ` : ''}
+
+                    ${wine.classification ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Classification</div>
+                            <div class="value">${wine.classification}</div>
+                        </div>
+                    ` : ''}
+
+                    ${wine.alcohol_percentage ? `
+                        <div class="wine-detail-field">
+                            <div class="label">Alcohol</div>
+                            <div class="value">${wine.alcohol_percentage}%</div>
+                        </div>
+                    ` : ''}
                 </div>
 
-                ${wine.grape_variety ? `
-                    <div class="wine-detail-field">
-                        <div class="label">Grape Variety</div>
-                        <div class="value">${wine.grape_variety}</div>
-                    </div>
-                ` : ''}
-
-                ${wine.region ? `
-                    <div class="wine-detail-field">
-                        <div class="label">Region</div>
-                        <div class="value">${wine.region}</div>
-                    </div>
-                ` : ''}
-
-                ${wine.sub_region ? `
-                    <div class="wine-detail-field">
-                        <div class="label">Sub-Region</div>
-                        <div class="value">${wine.sub_region}</div>
-                    </div>
-                ` : ''}
-
-                ${wine.appellation ? `
-                    <div class="wine-detail-field">
-                        <div class="label">Appellation</div>
-                        <div class="value">${wine.appellation}</div>
-                    </div>
-                ` : ''}
-
-                ${wine.country ? `
-                    <div class="wine-detail-field">
-                        <div class="label">Country</div>
-                        <div class="value">${wine.country}</div>
-                    </div>
-                ` : ''}
-
-                ${wine.classification ? `
-                    <div class="wine-detail-field">
-                        <div class="label">Classification</div>
-                        <div class="value">${wine.classification}</div>
-                    </div>
-                ` : ''}
-
-                ${wine.alcohol_percentage ? `
-                    <div class="wine-detail-field">
-                        <div class="label">Alcohol</div>
-                        <div class="value">${wine.alcohol_percentage}%</div>
-                    </div>
-                ` : ''}
-
                 ${wine.custom_fields && Object.keys(wine.custom_fields).length > 0 ? `
-                    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border-color);">
-                        <div class="label" style="margin-bottom:0.5rem;">CUSTOM FIELDS</div>
-                        <div class="wine-detail-custom-fields">
-                            ${Object.entries(wine.custom_fields).map(([k, v]) => `
-                                <div class="wine-detail-field">
-                                    <div class="label">${escapeHtml(k)}</div>
-                                    <div class="value">${escapeHtml(v)}</div>
-                                </div>
-                            `).join('')}
-                        </div>
+                    <div class="wine-detail-custom-fields">
+                        ${Object.entries(wine.custom_fields).map(([k, v]) => `
+                            <div class="wine-detail-field">
+                                <div class="label">${escapeHtml(k)}</div>
+                                <div class="value">${escapeHtml(v)}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
 

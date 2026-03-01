@@ -90,15 +90,16 @@ def test_card_view_extra_tags_hidden_by_default(app_js_source: str) -> None:
 
 
 def test_detail_modal_compact_layout_css(style_css_source: str) -> None:
-    """CSS must define .wine-detail-field with display: flex for compact layout."""
+    """CSS must define .wine-detail-fields grid wrapper and .wine-detail-field with background."""
     assert ".wine-detail-field" in style_css_source
-    # Verify flex layout is applied
+    assert ".wine-detail-fields" in style_css_source
+    # Verify grid layout on the wrapper
     import re
     match = re.search(
-        r"\.wine-detail-field\s*\{[^}]*display:\s*flex",
+        r"\.wine-detail-fields\s*\{[^}]*display:\s*grid",
         style_css_source,
     )
-    assert match is not None, ".wine-detail-field should have display: flex"
+    assert match is not None, ".wine-detail-fields should have display: grid"
 
 
 def test_detail_modal_custom_fields_grid_css(style_css_source: str) -> None:

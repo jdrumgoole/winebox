@@ -753,19 +753,24 @@ h3 {
     margin-bottom: 1.5rem;
 }
 
-.wine-detail-field {
-    display: flex;
-    align-items: baseline;
+.wine-detail-fields {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.wine-detail-field {
+    background: var(--background-color);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
 }
 
 .wine-detail-field .label {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    white-space: nowrap;
 }
 
 .wine-detail-field .value {
@@ -776,8 +781,8 @@ h3 {
 /* Custom fields grid in detail modal */
 .wine-detail-custom-fields {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 0.25rem 1rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
 }
 
 /* Card expand button for extra tags */
