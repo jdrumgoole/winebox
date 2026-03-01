@@ -73,7 +73,37 @@ def test_table_expand_chevron_exists(app_js_source: str) -> None:
     assert "wine-table-expand" in app_js_source
 
 
+# --- Static JS source tests (card expand/collapse) ---
+
+
+def test_card_view_has_expand_button(app_js_source: str) -> None:
+    """Card view must have a wine-card-expand-btn element for toggling extra tags."""
+    assert "wine-card-expand-btn" in app_js_source
+
+
+def test_card_view_extra_tags_hidden_by_default(app_js_source: str) -> None:
+    """Card view must wrap extra tags in a wine-card-extra div."""
+    assert "wine-card-extra" in app_js_source
+
+
 # --- Static CSS source tests ---
+
+
+def test_detail_modal_compact_layout_css(style_css_source: str) -> None:
+    """CSS must define .wine-detail-field with display: flex for compact layout."""
+    assert ".wine-detail-field" in style_css_source
+    # Verify flex layout is applied
+    import re
+    match = re.search(
+        r"\.wine-detail-field\s*\{[^}]*display:\s*flex",
+        style_css_source,
+    )
+    assert match is not None, ".wine-detail-field should have display: flex"
+
+
+def test_detail_modal_custom_fields_grid_css(style_css_source: str) -> None:
+    """CSS must define .wine-detail-custom-fields for grid layout."""
+    assert ".wine-detail-custom-fields" in style_css_source
 
 
 def test_custom_tag_css_exists(style_css_source: str) -> None:

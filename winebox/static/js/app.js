@@ -1621,16 +1621,21 @@ function renderWineGrid(containerId, wines) {
                     <div class="wine-card-details">
                         ${wine.grape_variety ? `<span class="wine-tag">${wine.grape_variety}</span>` : ''}
                         ${wine.region ? `<span class="wine-tag">${wine.region}</span>` : ''}
-                        ${wine.sub_region ? `<span class="wine-tag">${escapeHtml(wine.sub_region)}</span>` : ''}
                         ${wine.appellation ? `<span class="wine-tag">${wine.appellation}</span>` : ''}
                         ${wine.classification ? `<span class="wine-tag wine-tag-classification">${wine.classification}</span>` : ''}
                         ${wine.country ? `<span class="wine-tag">${wine.country}</span>` : ''}
-                        ${wine.alcohol_percentage ? `<span class="wine-tag">${escapeHtml(String(wine.alcohol_percentage))}%</span>` : ''}
-                        ${wine.notes ? `<span class="wine-tag wine-tag-custom" title="${escapeHtml(wine.notes)}">${escapeHtml(wine.notes.length > 50 ? wine.notes.substring(0, 50) + '...' : wine.notes)}</span>` : ''}
-                        ${wine.custom_fields ? Object.entries(wine.custom_fields).map(([k, v]) =>
-                            v ? `<span class="wine-tag wine-tag-custom">${escapeHtml(k)}: ${escapeHtml(v)}</span>` : ''
-                        ).join('') : ''}
                     </div>
+                    ${(wine.sub_region || wine.alcohol_percentage || wine.notes || (wine.custom_fields && Object.keys(wine.custom_fields).length > 0)) ? `
+                        <div class="wine-card-extra" style="display: none;">
+                            ${wine.sub_region ? `<span class="wine-tag">${escapeHtml(wine.sub_region)}</span>` : ''}
+                            ${wine.alcohol_percentage ? `<span class="wine-tag">${escapeHtml(String(wine.alcohol_percentage))}%</span>` : ''}
+                            ${wine.notes ? `<span class="wine-tag wine-tag-custom" title="${escapeHtml(wine.notes)}">${escapeHtml(wine.notes.length > 50 ? wine.notes.substring(0, 50) + '...' : wine.notes)}</span>` : ''}
+                            ${wine.custom_fields ? Object.entries(wine.custom_fields).map(([k, v]) =>
+                                v ? `<span class="wine-tag wine-tag-custom">${escapeHtml(k)}: ${escapeHtml(v)}</span>` : ''
+                            ).join('') : ''}
+                        </div>
+                        <span class="wine-card-expand-btn">More...</span>
+                    ` : ''}
                     <div class="wine-card-footer">
                         <span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">
                             ${inStock ? `${quantity} bottle${quantity > 1 ? 's' : ''}` : 'Out of stock'}
@@ -1645,7 +1650,7 @@ function renderWineGrid(containerId, wines) {
     // Add click handlers
     container.querySelectorAll('.wine-card').forEach(card => {
         card.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('checkout-btn')) {
+            if (!e.target.classList.contains('checkout-btn') && !e.target.classList.contains('wine-card-expand-btn')) {
                 showWineDetail(card.dataset.wineId);
             }
         });
@@ -1655,6 +1660,19 @@ function renderWineGrid(containerId, wines) {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             openCheckoutModal(btn.dataset.wineId, btn.dataset.quantity);
+        });
+    });
+
+    // Add expand/collapse handlers for extra tags
+    container.querySelectorAll('.wine-card-expand-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const extra = btn.previousElementSibling;
+            if (extra && extra.classList.contains('wine-card-extra')) {
+                const isHidden = extra.style.display === 'none';
+                extra.style.display = isHidden ? 'flex' : 'none';
+                btn.textContent = isHidden ? 'Less' : 'More...';
+            }
         });
     });
 }
@@ -1741,12 +1759,14 @@ async function showWineDetail(wineId) {
                 ${wine.custom_fields && Object.keys(wine.custom_fields).length > 0 ? `
                     <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border-color);">
                         <div class="label" style="margin-bottom:0.5rem;">CUSTOM FIELDS</div>
-                        ${Object.entries(wine.custom_fields).map(([k, v]) => `
-                            <div class="wine-detail-field">
-                                <div class="label">${escapeHtml(k)}</div>
-                                <div class="value">${escapeHtml(v)}</div>
-                            </div>
-                        `).join('')}
+                        <div class="wine-detail-custom-fields">
+                            ${Object.entries(wine.custom_fields).map(([k, v]) => `
+                                <div class="wine-detail-field">
+                                    <div class="label">${escapeHtml(k)}</div>
+                                    <div class="value">${escapeHtml(v)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 ` : ''}
 
