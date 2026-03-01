@@ -1497,9 +1497,40 @@ function renderCellarTable(containerId, wines) {
         const quantity = wine.inventory ? wine.inventory.quantity : 0;
         const inStock = quantity > 0;
 
+        const additionalFields = [];
+        if (wine.sub_region) additionalFields.push(['Sub-Region', escapeHtml(wine.sub_region)]);
+        if (wine.appellation) additionalFields.push(['Appellation', escapeHtml(wine.appellation)]);
+        if (wine.classification) additionalFields.push(['Classification', escapeHtml(wine.classification)]);
+        if (wine.alcohol_percentage) additionalFields.push(['Alcohol', escapeHtml(String(wine.alcohol_percentage)) + '%']);
+        if (wine.wine_type_id) additionalFields.push(['Wine Type', escapeHtml(wine.wine_type_id)]);
+        if (wine.price_tier) additionalFields.push(['Price Tier', escapeHtml(wine.price_tier)]);
+        if (wine.notes) additionalFields.push(['Notes', escapeHtml(wine.notes)]);
+        if (wine.custom_fields) {
+            Object.entries(wine.custom_fields).forEach(([k, v]) => {
+                if (v) additionalFields.push([escapeHtml(k), escapeHtml(v)]);
+            });
+        }
+
+        const hasDetails = additionalFields.length > 0;
+
+        const detailRow = hasDetails ? `
+            <tr class="wine-table-detail-row" data-detail-for="${wine.id}">
+                <td colspan="8">
+                    <div class="wine-table-detail-content">
+                        ${additionalFields.map(([label, value]) => `
+                            <div class="wine-table-detail-field">
+                                <div class="label">${label}</div>
+                                <div class="value">${value}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </td>
+            </tr>
+        ` : '';
+
         return `
             <tr class="wine-table-row" data-wine-id="${wine.id}">
-                <td class="wine-table-name">${escapeHtml(wine.name)}</td>
+                <td class="wine-table-name">${hasDetails ? `<span class="wine-table-expand" data-wine-id="${wine.id}">&#9654;</span> ` : ''}${escapeHtml(wine.name)}</td>
                 <td>${wine.winery ? escapeHtml(wine.winery) : '-'}</td>
                 <td>${wine.vintage || '-'}</td>
                 <td>${wine.grape_variety ? escapeHtml(wine.grape_variety) : '-'}</td>
@@ -1508,6 +1539,7 @@ function renderCellarTable(containerId, wines) {
                 <td><span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">${inStock ? quantity : 'Out'}</span></td>
                 <td>${inStock ? `<button class="btn btn-small btn-primary checkout-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Check Out</button>` : ''}</td>
             </tr>
+            ${detailRow}
         `;
     }).join('');
 
@@ -1533,9 +1565,21 @@ function renderCellarTable(containerId, wines) {
         </div>
     `;
 
+    container.querySelectorAll('.wine-table-expand').forEach(chevron => {
+        chevron.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const wineId = chevron.dataset.wineId;
+            const detailRow = container.querySelector(`.wine-table-detail-row[data-detail-for="${wineId}"]`);
+            if (detailRow) {
+                detailRow.classList.toggle('expanded');
+                chevron.classList.toggle('expanded');
+            }
+        });
+    });
+
     container.querySelectorAll('.wine-table-row').forEach(row => {
         row.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('checkout-btn')) {
+            if (!e.target.classList.contains('checkout-btn') && !e.target.classList.contains('wine-table-expand')) {
                 showWineDetail(row.dataset.wineId);
             }
         });
@@ -1577,9 +1621,15 @@ function renderWineGrid(containerId, wines) {
                     <div class="wine-card-details">
                         ${wine.grape_variety ? `<span class="wine-tag">${wine.grape_variety}</span>` : ''}
                         ${wine.region ? `<span class="wine-tag">${wine.region}</span>` : ''}
+                        ${wine.sub_region ? `<span class="wine-tag">${escapeHtml(wine.sub_region)}</span>` : ''}
                         ${wine.appellation ? `<span class="wine-tag">${wine.appellation}</span>` : ''}
                         ${wine.classification ? `<span class="wine-tag wine-tag-classification">${wine.classification}</span>` : ''}
                         ${wine.country ? `<span class="wine-tag">${wine.country}</span>` : ''}
+                        ${wine.alcohol_percentage ? `<span class="wine-tag">${escapeHtml(String(wine.alcohol_percentage))}%</span>` : ''}
+                        ${wine.notes ? `<span class="wine-tag wine-tag-custom" title="${escapeHtml(wine.notes)}">${escapeHtml(wine.notes.length > 50 ? wine.notes.substring(0, 50) + '...' : wine.notes)}</span>` : ''}
+                        ${wine.custom_fields ? Object.entries(wine.custom_fields).map(([k, v]) =>
+                            v ? `<span class="wine-tag wine-tag-custom">${escapeHtml(k)}: ${escapeHtml(v)}</span>` : ''
+                        ).join('') : ''}
                     </div>
                     <div class="wine-card-footer">
                         <span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">
