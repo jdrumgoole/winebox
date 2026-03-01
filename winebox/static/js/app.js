@@ -1832,27 +1832,25 @@ function openCheckoutModal(wineId, availableQuantity) {
     openModal('checkout-modal');
 }
 
-async function deleteWine(wineId) {
-    if (!confirm('Are you sure you want to delete this wine and all its history?')) {
-        return;
-    }
-
-    try {
-        const response = await fetchWithAuth(`${API_BASE}/wines/${wineId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) {
-            throw new Error('Delete failed');
-        }
-
-        showToast('Wine deleted', 'success');
+function deleteWine(wineId) {
+    openModal('delete-wine-modal');
+    const confirmBtn = document.getElementById('confirm-delete-wine-btn');
+    const handler = async () => {
+        confirmBtn.removeEventListener('click', handler);
         closeModals();
-        loadCellar();
-        loadDashboard();
-    } catch (error) {
-        showToast('Failed to delete wine', 'error');
-    }
+        try {
+            const response = await fetchWithAuth(`${API_BASE}/wines/${wineId}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) throw new Error('Delete failed');
+            showToast('Wine deleted', 'success');
+            loadCellar();
+            loadDashboard();
+        } catch (error) {
+            showToast('Failed to delete wine', 'error');
+        }
+    };
+    confirmBtn.addEventListener('click', handler);
 }
 
 // History
