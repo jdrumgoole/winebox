@@ -88,5 +88,10 @@ markers = [
     "e2e: marks tests as end-to-end tests (run separately with '-m e2e')",
 ]
 
+[tool.hatch.build]
+artifacts = [
+    "winebox/static/logos/*.png",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["winebox"]
