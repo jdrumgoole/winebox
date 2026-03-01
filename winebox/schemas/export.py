@@ -36,6 +36,7 @@ class WineFlatExport(BaseModel):
     scores_summary: str | None = None
     average_score: float | None = None
     custom_fields: str | None = None
+    custom_fields_dict: dict[str, str] | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -80,6 +81,11 @@ class WineFlatExport(BaseModel):
         if hasattr(wine, "custom_fields") and wine.custom_fields:
             custom_fields_str = json.dumps(wine.custom_fields)
 
+        # Keep dict form for CSV/XLSX expansion
+        custom_fields_raw = None
+        if hasattr(wine, "custom_fields") and wine.custom_fields:
+            custom_fields_raw = wine.custom_fields
+
         return WineFlatExport(
             id=str(wine.id),
             name=wine.name,
@@ -97,6 +103,7 @@ class WineFlatExport(BaseModel):
             scores_summary=scores_summary,
             average_score=average_score,
             custom_fields=custom_fields_str,
+            custom_fields_dict=custom_fields_raw,
             created_at=wine.created_at,
             updated_at=wine.updated_at,
         )

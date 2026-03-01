@@ -20,8 +20,8 @@ from .constants import (
 )
 
 
-def _wine_to_row(wine: WineFlatExport) -> list[Any]:
-    """Convert a wine export schema to a row for CSV/Excel."""
+def _wine_to_base_row(wine: WineFlatExport) -> list[Any]:
+    """Convert a wine export schema to a base row (without custom fields)."""
     return [
         wine.id,
         wine.name,
@@ -38,10 +38,40 @@ def _wine_to_row(wine: WineFlatExport) -> list[Any]:
         wine.grape_blend_summary or "",
         wine.scores_summary or "",
         wine.average_score or "",
-        wine.custom_fields or "",
         format_datetime(wine.created_at),
         format_datetime(wine.updated_at),
     ]
+
+
+def _collect_custom_field_keys(wines: list[WineFlatExport]) -> list[str]:
+    """Collect all unique custom field keys across wines, sorted alphabetically."""
+    keys: set[str] = set()
+    for wine in wines:
+        if wine.custom_fields_dict:
+            keys.update(wine.custom_fields_dict.keys())
+    return sorted(keys)
+
+
+def _build_headers_and_rows(
+    wines: list[WineFlatExport],
+) -> tuple[list[str], list[list[Any]]]:
+    """Build headers and rows with custom fields expanded into individual columns.
+
+    Returns:
+        Tuple of (headers, rows) where custom field keys are appended after base headers.
+    """
+    custom_keys = _collect_custom_field_keys(wines)
+    headers = list(WINE_HEADERS) + custom_keys
+
+    rows: list[list[Any]] = []
+    for wine in wines:
+        base_row = _wine_to_base_row(wine)
+        custom_values = [
+            (wine.custom_fields_dict or {}).get(key, "") for key in custom_keys
+        ]
+        rows.append(base_row + custom_values)
+
+    return headers, rows
 
 
 def export_wines_to_csv(wines: list[WineFlatExport]) -> bytes:
@@ -53,15 +83,17 @@ def export_wines_to_csv(wines: list[WineFlatExport]) -> bytes:
     Returns:
         CSV content as bytes
     """
+    headers, rows = _build_headers_and_rows(wines)
+
     output = io.StringIO()
     writer = csv.writer(output)
 
     # Write header
-    writer.writerow(WINE_HEADERS)
+    writer.writerow(headers)
 
     # Write data rows
-    for wine in wines:
-        writer.writerow(_wine_to_row(wine))
+    for row in rows:
+        writer.writerow(row)
 
     return output.getvalue().encode("utf-8")
 
@@ -75,28 +107,30 @@ def export_wines_to_xlsx(wines: list[WineFlatExport]) -> bytes:
     Returns:
         XLSX content as bytes
     """
+    headers, rows = _build_headers_and_rows(wines)
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Wines"
 
     # Write header
-    for col_idx, header in enumerate(WINE_HEADERS, 1):
+    for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_idx, value=header)
         cell.font = HEADER_FONT
         cell.fill = HEADER_FILL
         cell.alignment = HEADER_ALIGNMENT
 
     # Write data rows
-    for row_idx, wine in enumerate(wines, 2):
-        for col_idx, value in enumerate(_wine_to_row(wine), 1):
+    for row_idx, row in enumerate(rows, 2):
+        for col_idx, value in enumerate(row, 1):
             ws.cell(row=row_idx, column=col_idx, value=value)
 
     # Auto-adjust column widths
-    for col_idx, header in enumerate(WINE_HEADERS, 1):
+    for col_idx, header in enumerate(headers, 1):
         col_letter = get_column_letter(col_idx)
         # Start with header length, then check data
         max_length = len(header)
-        for row_idx in range(2, len(wines) + 2):
+        for row_idx in range(2, len(rows) + 2):
             cell_value = ws.cell(row=row_idx, column=col_idx).value
             if cell_value:
                 max_length = max(max_length, len(str(cell_value)))

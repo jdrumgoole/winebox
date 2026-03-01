@@ -24,7 +24,6 @@ WINE_HEADERS = [
     "grape_blend_summary",
     "scores_summary",
     "average_score",
-    "custom_fields",
     "created_at",
     "updated_at",
 ]
