@@ -515,8 +515,9 @@ def deploy(
     print("WineBox Release & Deploy Pipeline")
     print("=" * 60)
 
-    # Pre-flight: Abort if there are uncommitted changes (excluding uv.lock)
-    # This prevents deploying a version that doesn't include all code changes.
+    # Pre-flight: Auto-commit any uncommitted changes so they are included
+    # in the PyPI package. Excludes uv.lock (committed with version bump)
+    # and .claude/ (not tracked).
     dirty = ctx.run(
         "git diff --name-only HEAD -- . ':!uv.lock'",
         hide=True, warn=True,
@@ -526,14 +527,21 @@ def deploy(
         hide=True, warn=True,
     ).stdout.strip()
     if dirty or untracked:
-        print("\nERROR: Working tree has uncommitted changes:")
-        for f in (dirty + "\n" + untracked).strip().splitlines():
-            if f:
-                print(f"  {f}")
-        print("\nCommit or stash your changes before deploying.")
-        print("The deploy pipeline only commits version bump files, so any")
-        print("other changes would be missing from the PyPI package.")
-        raise SystemExit(1)
+        changed_files = [f for f in (dirty + "\n" + untracked).strip().splitlines() if f]
+        print("\n  Uncommitted changes detected:")
+        for f in changed_files:
+            print(f"    {f}")
+        if dry_run:
+            print("  DRY RUN - Would commit these files before deploying")
+        else:
+            # Stage all changed/untracked files (excluding .claude/)
+            for f in changed_files:
+                ctx.run(f"git add {f}", hide=True)
+            ctx.run(
+                'git commit -m "chore: Pre-deploy commit of pending changes"',
+                pty=True,
+            )
+            print("  Committed pending changes.")
 
     # Step 1: Run tests
     if not skip_tests:
