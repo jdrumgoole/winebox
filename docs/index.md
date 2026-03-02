@@ -10,6 +10,8 @@ WineBox helps you keep track of your wine collection with ease:
 - **Smart autocomplete** - Start typing a wine name and get suggestions from over 100,000 wines with community ratings
 - **Track your inventory** - Check bottles in and out, and always know what's in your cellar
 - **Search and filter** - Find any wine by name, vintage, grape, region, appellation, or country
+- **Import from spreadsheets** - Upload CSV or XLSX files to bulk-add wines with custom field mapping
+- **Export your collection** - Download your cellar as CSV, XLSX, JSON, or YAML with custom fields preserved
 - **View history** - See a complete log of every bottle added or removed
 
 ![WineBox Dashboard](images/dashboard.png)

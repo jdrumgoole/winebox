@@ -357,6 +357,129 @@ Serve stored label images.
 
 ---
 
+## Export Endpoints
+
+### GET /api/export/wines
+
+Export wine collection in various formats.
+
+**Query Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| format | string | No | Export format: `csv`, `xlsx`, `json`, `yaml` (default: `json`) |
+| in_stock | boolean | No | Only export in-stock wines |
+| country | string | No | Filter by country |
+| include_blends | boolean | No | Include grape blend summaries (default: true) |
+| include_scores | boolean | No | Include score summaries (default: true) |
+
+**CSV/XLSX columns**: `id`, `name`, `winery`, `vintage`, `grape_variety`, `region`, `country`, `alcohol_percentage`, `wine_type_id`, `price_tier`, `quantity`, `inventory_updated_at`, `grape_blend_summary`, `scores_summary`, `average_score`, `created_at`, `updated_at`, plus any custom field columns.
+
+Custom fields are expanded into individual columns (sorted alphabetically) rather than a single JSON blob. For example, if wines have custom fields "Purchase Price" and "Cellar Location", those appear as separate columns in the export.
+
+**Response**: File download (CSV/XLSX/YAML) or JSON body.
+
+---
+
+### GET /api/export/transactions
+
+Export transaction history in various formats.
+
+**Query Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| format | string | No | Export format: `csv`, `xlsx`, `json`, `yaml` (default: `json`) |
+| transaction_type | string | No | Filter: `CHECK_IN` or `CHECK_OUT` |
+| wine_id | string | No | Filter by wine UUID |
+| include_wine_details | boolean | No | Include wine name/vintage/winery (default: true) |
+
+**Response**: File download or JSON body.
+
+---
+
+## Import Endpoints
+
+### POST /api/import/upload
+
+Upload a CSV or XLSX spreadsheet for import.
+
+**Content-Type**: `multipart/form-data`
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| file | file | Yes | CSV or XLSX file (max 10 MB) |
+
+**Response**: `200 OK`
+```json
+{
+  "batch_id": "abc123",
+  "filename": "wines.csv",
+  "row_count": 100,
+  "headers": ["Name", "Country", "Vintage", "Price"],
+  "preview_rows": [...],
+  "suggested_mapping": {
+    "Name": "name",
+    "Country": "country",
+    "Vintage": "vintage",
+    "Price": "skip"
+  },
+  "mapping_source": "ai"
+}
+```
+
+---
+
+### POST /api/import/{batch_id}/mapping
+
+Set or update column mapping for an import batch.
+
+**Request Body**:
+```json
+{
+  "mapping": {
+    "Name": "name",
+    "Country": "country",
+    "Vintage": "vintage",
+    "Purchase Price": "custom:Purchase Price",
+    "Notes Column": "skip"
+  }
+}
+```
+
+Valid mapping targets: `name`, `winery`, `vintage`, `grape_variety`, `region`, `sub_region`, `appellation`, `country`, `alcohol_percentage`, `wine_type_id`, `classification`, `price_tier`, `quantity`, `notes`, `custom:<field_name>`, or `skip`.
+
+**Response**: `200 OK` (updated batch info)
+
+---
+
+### POST /api/import/{batch_id}/process
+
+Process an import batch to create wine records.
+
+**Request Body** (optional):
+```json
+{
+  "skip_non_wine": true,
+  "default_quantity": 1
+}
+```
+
+**Response**: `200 OK`
+```json
+{
+  "batch_id": "abc123",
+  "wines_created": 95,
+  "rows_skipped": 5,
+  "errors": [],
+  "status": "completed"
+}
+```
+
+---
+
 ## X-Wines Dataset Endpoints
 
 The X-Wines endpoints provide access to a reference database of 100K+ wines with community ratings from the [X-Wines dataset](https://github.com/rogerioxavier/X-Wines).

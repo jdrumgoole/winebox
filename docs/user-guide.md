@@ -156,6 +156,67 @@ Use the dropdown to show:
 - Check-ins only
 - Check-outs only
 
+## Importing from Spreadsheets
+
+The **Import** page lets you bulk-add wines from CSV or XLSX files.
+
+### Import Workflow
+
+1. **Click Import** in the navigation menu
+2. **Upload your spreadsheet** (CSV or XLSX, max 10 MB)
+3. **Review the column mapping** - WineBox suggests which spreadsheet columns map to wine fields
+4. **Adjust the mapping** as needed:
+   - Map columns to standard wine fields (name, country, vintage, etc.)
+   - Map extra columns to **custom fields** (e.g., "Purchase Price", "Cellar Location")
+   - Set columns to "skip" if they're not needed
+5. **Process the import** - wines are created in your cellar
+
+### Custom Fields
+
+Columns that don't map to standard wine fields can be stored as custom fields. These are preserved on each wine and displayed in the detail modal as a 2-column grid of label/value cards.
+
+Custom field names use the `custom:FieldName` mapping syntax (e.g., `custom:Purchase Price`).
+
+## Exporting Your Collection
+
+Export your wine collection from the **Cellar** or **History** pages using the **Export** dropdown.
+
+### Supported Formats
+
+| Format | Description |
+|--------|-------------|
+| CSV | Comma-separated values, opens in any spreadsheet app |
+| XLSX | Excel format with styled headers and auto-sized columns |
+| JSON | Structured data with export metadata |
+| YAML | Human-readable structured data |
+
+### Custom Fields in Exports
+
+When exporting to CSV or XLSX, custom fields are expanded into individual columns rather than being serialized as a single JSON blob. This means:
+
+- Each custom field gets its own column header (e.g., "Purchase Price", "Cellar Location")
+- Custom field columns are sorted alphabetically and appended after the standard columns
+- If different wines have different custom fields, all unique field names appear as columns, with empty values where a wine doesn't have that field
+- This preserves the original spreadsheet layout when you import and then re-export
+
+### Export via API
+
+You can also export programmatically:
+
+```bash
+# Export as CSV
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:8000/api/export/wines?format=csv" -o wines.csv
+
+# Export as XLSX
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:8000/api/export/wines?format=xlsx" -o wines.xlsx
+
+# Export with filters
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:8000/api/export/wines?format=csv&country=France&in_stock=true"
+```
+
 ## Tips for Best Results
 
 ### Taking Great Label Photos
