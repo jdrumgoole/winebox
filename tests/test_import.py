@@ -2,6 +2,7 @@
 
 import csv
 import io
+import json
 
 import pytest
 from httpx import AsyncClient
@@ -287,3 +288,84 @@ async def test_import_requires_auth(unauthenticated_client: AsyncClient) -> None
     files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
     response = await unauthenticated_client.post("/api/import/upload", files=files)
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_process_stream_returns_progress(client: AsyncClient) -> None:
+    """Test that the streaming endpoint sends SSE progress events."""
+    csv_data = _make_csv(
+        ["Wine Name", "Country"],
+        [
+            ["Chateau Margaux", "France"],
+            ["Barolo Riserva", "Italy"],
+            ["Rioja Gran Reserva", "Spain"],
+        ],
+    )
+
+    # Upload
+    files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp = await client.post("/api/import/upload", files=files)
+    assert upload_resp.status_code == 200
+    batch_id = upload_resp.json()["batch_id"]
+
+    # Set mapping
+    await client.post(
+        f"/api/import/{batch_id}/mapping",
+        json={"mapping": {"Wine Name": "name", "Country": "country"}},
+    )
+
+    # Process via streaming endpoint
+    stream_resp = await client.post(
+        f"/api/import/{batch_id}/process-stream",
+        json={"skip_non_wine": True, "default_quantity": 1},
+    )
+    assert stream_resp.status_code == 200
+    assert "text/event-stream" in stream_resp.headers["content-type"]
+
+    # Parse SSE events from response body
+    events = []
+    for line in stream_resp.text.strip().split("\n\n"):
+        line = line.strip()
+        if line.startswith("data: "):
+            events.append(json.loads(line[6:]))
+
+    # Should have progress events for each row plus a final done event
+    assert len(events) >= 3
+
+    # Check intermediate progress events have expected fields
+    for event in events:
+        assert "processed" in event
+        assert "total" in event
+        assert "wines_created" in event
+        assert "rows_skipped" in event
+
+    # Progress should be monotonically increasing
+    for i in range(1, len(events)):
+        assert events[i]["processed"] >= events[i - 1]["processed"]
+
+    # Final event should be done
+    final = events[-1]
+    assert final.get("done") is True
+    assert final["wines_created"] == 3
+    assert final["total"] == 3
+    assert final["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_process_stream_already_processed(client: AsyncClient) -> None:
+    """Test that streaming a completed batch returns an error."""
+    csv_data = _make_csv(["Name"], [["Wine A"]])
+    files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp = await client.post("/api/import/upload", files=files)
+    batch_id = upload_resp.json()["batch_id"]
+
+    # Map and process normally first
+    await client.post(
+        f"/api/import/{batch_id}/mapping",
+        json={"mapping": {"Name": "name"}},
+    )
+    await client.post(f"/api/import/{batch_id}/process", json={})
+
+    # Try streaming again — should fail
+    stream_resp = await client.post(f"/api/import/{batch_id}/process-stream", json={})
+    assert stream_resp.status_code == 400

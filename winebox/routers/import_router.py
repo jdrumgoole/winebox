@@ -1,5 +1,6 @@
 """Import endpoints for spreadsheet wine collection import."""
 
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -7,6 +8,7 @@ from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from pydantic import ValidationError
+from starlette.responses import StreamingResponse
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.schemas.import_schemas import (
@@ -22,6 +24,7 @@ from winebox.services.import_service import (
     parse_csv,
     parse_xlsx,
     process_import_batch,
+    process_import_batch_streaming,
     suggest_column_mapping,
     suggest_column_mapping_ai,
 )
@@ -212,6 +215,48 @@ async def process_batch(
         rows_skipped=batch.rows_skipped,
         errors=batch.errors,
         status=batch.status.value,
+    )
+
+
+@router.post("/{batch_id}/process-stream")
+async def process_batch_stream(
+    batch_id: str,
+    current_user: RequireAuth,
+    request: ImportProcessRequest | None = None,
+) -> StreamingResponse:
+    """Process an import batch with SSE progress streaming."""
+    batch = await _get_user_batch(batch_id, current_user.id)
+
+    if batch.status not in (ImportStatus.MAPPED, ImportStatus.UPLOADED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Batch is in '{batch.status.value}' state, cannot process",
+        )
+
+    if not batch.column_mapping:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Column mapping must be set before processing",
+        )
+
+    opts = request or ImportProcessRequest()
+
+    async def event_generator():
+        async for progress in process_import_batch_streaming(
+            batch=batch,
+            owner_id=current_user.id,
+            skip_non_wine=opts.skip_non_wine,
+            default_quantity=opts.default_quantity,
+        ):
+            yield f"data: {json.dumps(progress)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

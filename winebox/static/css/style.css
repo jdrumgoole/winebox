@@ -2177,6 +2177,48 @@ body.logged-out #user-info {
     animation: fadeIn 0.3s ease;
 }
 
+/* Import progress bar */
+.import-progress-container {
+    padding: 1rem 0;
+}
+
+.import-progress-bar-track {
+    width: 100%;
+    height: 12px;
+    background: var(--background-color);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.import-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+    border-radius: 6px;
+    transition: width 0.15s ease-out;
+}
+
+.import-progress-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.75rem;
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.import-progress-stats #import-progress-percent {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.import-progress-details {
+    display: flex;
+    gap: 2rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }

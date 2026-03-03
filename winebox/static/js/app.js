@@ -2940,10 +2940,21 @@ async function handleConfirmMapping() {
             throw new Error(error.detail || 'Failed to set mapping');
         }
 
-        showToast('Processing import...', 'info');
+        // Show progress bar
+        document.getElementById('import-step-upload').style.display = 'none';
+        document.getElementById('import-step-map').style.display = 'none';
+        document.getElementById('import-step-progress').style.display = 'block';
+        document.getElementById('import-step-results').style.display = 'none';
 
-        // Process
-        const processResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/process`, {
+        // Reset progress UI
+        document.getElementById('import-progress-fill').style.width = '0%';
+        document.getElementById('import-progress-text').textContent = '0 / 0 rows';
+        document.getElementById('import-progress-percent').textContent = '0%';
+        document.getElementById('import-progress-created').textContent = '0 wines created';
+        document.getElementById('import-progress-skipped').textContent = '0 rows skipped';
+
+        // Stream processing with progress
+        const processResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/process-stream`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ skip_non_wine: true, default_quantity: 1 })
@@ -2954,16 +2965,63 @@ async function handleConfirmMapping() {
             throw new Error(error.detail || 'Processing failed');
         }
 
-        const result = await processResponse.json();
+        const result = await readImportStream(processResponse);
         showImportResults(result);
     } catch (error) {
         showToast(error.message, 'error');
     }
 }
 
+async function readImportStream(response) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let lastEvent = null;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE events (separated by double newlines)
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop(); // keep incomplete last chunk
+
+        for (const part of parts) {
+            const trimmed = part.trim();
+            if (!trimmed.startsWith('data: ')) continue;
+
+            try {
+                const data = JSON.parse(trimmed.slice(6));
+                lastEvent = data;
+
+                // Update progress bar
+                const pct = data.total > 0 ? Math.round((data.processed / data.total) * 100) : 0;
+                document.getElementById('import-progress-fill').style.width = pct + '%';
+                document.getElementById('import-progress-text').textContent = `${data.processed} / ${data.total} rows`;
+                document.getElementById('import-progress-percent').textContent = pct + '%';
+                document.getElementById('import-progress-created').textContent = `${data.wines_created} wines created`;
+                document.getElementById('import-progress-skipped').textContent = `${data.rows_skipped} rows skipped`;
+            } catch (e) {
+                // Skip malformed events
+            }
+        }
+    }
+
+    // Return the final event as the result
+    if (lastEvent && lastEvent.done) {
+        return lastEvent;
+    }
+
+    // Fallback: construct result from last progress event
+    return lastEvent || { wines_created: 0, rows_skipped: 0, errors: [], status: 'completed' };
+}
+
 function showImportResults(result) {
     document.getElementById('import-step-upload').style.display = 'none';
     document.getElementById('import-step-map').style.display = 'none';
+    document.getElementById('import-step-progress').style.display = 'none';
     document.getElementById('import-step-results').style.display = 'block';
 
     let html = `
@@ -3000,6 +3058,7 @@ function showImportResults(result) {
 function resetImportPage() {
     document.getElementById('import-step-upload').style.display = 'block';
     document.getElementById('import-step-map').style.display = 'none';
+    document.getElementById('import-step-progress').style.display = 'none';
     document.getElementById('import-step-results').style.display = 'none';
     document.getElementById('import-file-input').value = '';
     currentImportBatchId = null;

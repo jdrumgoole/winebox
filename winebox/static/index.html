@@ -567,7 +567,27 @@
                 </div>
             </div>
 
-            <!-- Step 3: Processing / Results -->
+            <!-- Step 3: Processing Progress -->
+            <div id="import-step-progress" class="import-step" style="display:none;">
+                <div class="form-section">
+                    <h3>Importing Wines...</h3>
+                    <div class="import-progress-container">
+                        <div class="import-progress-bar-track">
+                            <div class="import-progress-bar-fill" id="import-progress-fill" style="width:0%"></div>
+                        </div>
+                        <div class="import-progress-stats">
+                            <span id="import-progress-text">0 / 0 rows</span>
+                            <span id="import-progress-percent">0%</span>
+                        </div>
+                        <div class="import-progress-details" id="import-progress-details">
+                            <span id="import-progress-created">0 wines created</span>
+                            <span id="import-progress-skipped">0 rows skipped</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Results -->
             <div id="import-step-results" class="import-step" style="display:none;">
                 <div class="form-section">
                     <h3>Import Results</h3>

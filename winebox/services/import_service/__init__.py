@@ -23,7 +23,7 @@ from .mapping import (
     suggest_column_mapping_ai,
 )
 from .parsers import parse_csv, parse_xlsx
-from .processor import process_import_batch
+from .processor import process_import_batch, process_import_batch_streaming
 
 __all__ = [
     # Constants
@@ -50,4 +50,5 @@ __all__ = [
     "_compute_custom_fields_text",
     # Processor
     "process_import_batch",
+    "process_import_batch_streaming",
 ]
