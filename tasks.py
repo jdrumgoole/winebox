@@ -139,6 +139,23 @@ def test_unit(ctx: Context, verbose: bool = False, coverage: bool = False) -> No
     ctx.run(cmd, pty=True)
 
 
+@task(name="test-quick")
+def test_quick(ctx: Context, verbose: bool = False) -> None:
+    """Run a small subset of fast unit tests (no DB, no server). Good for rapid feedback.
+
+    Args:
+        ctx: Invoke context
+        verbose: Enable verbose output
+    """
+    cmd = (
+        "uv run python -m pytest tests/test_ocr.py tests/test_config.py "
+        "-m 'not e2e'"
+    )
+    if verbose:
+        cmd += " -v"
+    ctx.run(cmd, pty=True)
+
+
 @task(name="test-e2e")
 def test_e2e(ctx: Context, verbose: bool = False, workers: int = 4, no_purge: bool = False) -> None:
     """Run E2E tests only (requires running server).

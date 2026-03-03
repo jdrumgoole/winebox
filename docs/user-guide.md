@@ -397,6 +397,9 @@ uv run python -m invoke test
 # Run only unit tests (fast, no server required)
 uv run python -m invoke test-unit
 
+# Run a small subset of fast unit tests for rapid feedback (~2s, no DB)
+uv run python -m invoke test-quick
+
 # Run core Playwright E2E smoke tests (requires running server)
 uv run python -m invoke start-background
 uv run python -m invoke test-e2e-fast

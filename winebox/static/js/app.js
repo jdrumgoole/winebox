@@ -1537,14 +1537,15 @@ function renderCellarTable(containerId, wines) {
     const tableRows = wines.map(wine => {
         const quantity = wine.inventory ? wine.inventory.quantity : 0;
         const inStock = quantity > 0;
+        const ef = wine.enriched_fields || [];
 
         const additionalFields = [];
-        if (wine.sub_region) additionalFields.push(['Sub-Region', escapeHtml(wine.sub_region)]);
-        if (wine.appellation) additionalFields.push(['Appellation', escapeHtml(wine.appellation)]);
-        if (wine.classification) additionalFields.push(['Classification', escapeHtml(wine.classification)]);
-        if (wine.alcohol_percentage) additionalFields.push(['Alcohol', escapeHtml(String(wine.alcohol_percentage)) + '%']);
-        if (wine.wine_type_id) additionalFields.push(['Wine Type', escapeHtml(wine.wine_type_id)]);
-        if (wine.price_tier) additionalFields.push(['Price Tier', escapeHtml(wine.price_tier)]);
+        if (wine.sub_region) additionalFields.push(['Sub-Region', escapeHtml(wine.sub_region) + (ef.includes('sub_region') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
+        if (wine.appellation) additionalFields.push(['Appellation', escapeHtml(wine.appellation) + (ef.includes('appellation') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
+        if (wine.classification) additionalFields.push(['Classification', escapeHtml(wine.classification) + (ef.includes('classification') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
+        if (wine.alcohol_percentage) additionalFields.push(['Alcohol', escapeHtml(String(wine.alcohol_percentage)) + '%' + (ef.includes('alcohol_percentage') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
+        if (wine.wine_type_id) additionalFields.push(['Wine Type', escapeHtml(wine.wine_type_id) + (ef.includes('wine_type_id') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
+        if (wine.price_tier) additionalFields.push(['Price Tier', escapeHtml(wine.price_tier) + (ef.includes('price_tier') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
         if (wine.notes) additionalFields.push(['Notes', escapeHtml(wine.notes)]);
         if (wine.custom_fields) {
             Object.entries(wine.custom_fields).forEach(([k, v]) => {
@@ -1572,11 +1573,11 @@ function renderCellarTable(containerId, wines) {
         return `
             <tr class="wine-table-row" data-wine-id="${wine.id}">
                 <td class="wine-table-name">${hasDetails ? `<span class="wine-table-expand" data-wine-id="${wine.id}">&#9654;</span> ` : ''}${escapeHtml(wine.name)}</td>
-                <td>${wine.winery ? escapeHtml(wine.winery) : '-'}</td>
+                <td>${wine.winery ? escapeHtml(wine.winery) + (ef.includes('winery') ? ' <span class="xwines-badge">X-Wines</span>' : '') : '-'}</td>
                 <td>${wine.vintage || '-'}</td>
-                <td>${wine.grape_variety ? escapeHtml(wine.grape_variety) : '-'}</td>
-                <td class="wine-table-hide-mobile">${wine.region ? escapeHtml(wine.region) : '-'}</td>
-                <td class="wine-table-hide-mobile">${wine.country ? escapeHtml(wine.country) : '-'}</td>
+                <td>${wine.grape_variety ? escapeHtml(wine.grape_variety) + (ef.includes('grape_variety') ? ' <span class="xwines-badge">X-Wines</span>' : '') : '-'}</td>
+                <td class="wine-table-hide-mobile">${wine.region ? escapeHtml(wine.region) + (ef.includes('region') ? ' <span class="xwines-badge">X-Wines</span>' : '') : '-'}</td>
+                <td class="wine-table-hide-mobile">${wine.country ? escapeHtml(wine.country) + (ef.includes('country') ? ' <span class="xwines-badge">X-Wines</span>' : '') : '-'}</td>
                 <td><span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">${inStock ? quantity : 'Out'}</span></td>
                 <td>${inStock ? `<button class="btn btn-small btn-primary checkout-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Check Out</button>` : ''}</td>
             </tr>
@@ -1644,6 +1645,7 @@ function renderWineGrid(containerId, wines) {
     container.innerHTML = wines.map(wine => {
         const quantity = wine.inventory ? wine.inventory.quantity : 0;
         const inStock = quantity > 0;
+        const ef = wine.enriched_fields || [];
 
         return `
             <div class="wine-card" data-wine-id="${wine.id}">
@@ -1656,20 +1658,20 @@ function renderWineGrid(containerId, wines) {
                 <div class="wine-card-content">
                     <div class="wine-card-title">${wine.name}</div>
                     <div class="wine-card-subtitle">
-                        ${wine.winery ? wine.winery : ''}
+                        ${wine.winery ? wine.winery + (ef.includes('winery') ? ' <span class="xwines-badge">X-Wines</span>' : '') : ''}
                         ${wine.vintage ? ` - ${wine.vintage}` : ''}
                     </div>
                     <div class="wine-card-details">
-                        ${wine.grape_variety ? `<span class="wine-tag">${wine.grape_variety}</span>` : ''}
-                        ${wine.region ? `<span class="wine-tag">${wine.region}</span>` : ''}
-                        ${wine.appellation ? `<span class="wine-tag">${wine.appellation}</span>` : ''}
-                        ${wine.classification ? `<span class="wine-tag wine-tag-classification">${wine.classification}</span>` : ''}
-                        ${wine.country ? `<span class="wine-tag">${wine.country}</span>` : ''}
+                        ${wine.grape_variety ? `<span class="wine-tag">${wine.grape_variety}${ef.includes('grape_variety') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
+                        ${wine.region ? `<span class="wine-tag">${wine.region}${ef.includes('region') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
+                        ${wine.appellation ? `<span class="wine-tag">${wine.appellation}${ef.includes('appellation') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
+                        ${wine.classification ? `<span class="wine-tag wine-tag-classification">${wine.classification}${ef.includes('classification') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
+                        ${wine.country ? `<span class="wine-tag">${wine.country}${ef.includes('country') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
                     </div>
                     ${(wine.sub_region || wine.alcohol_percentage || wine.notes || (wine.custom_fields && Object.keys(wine.custom_fields).length > 0)) ? `
                         <div class="wine-card-extra" style="display: none;">
-                            ${wine.sub_region ? `<span class="wine-tag">${escapeHtml(wine.sub_region)}</span>` : ''}
-                            ${wine.alcohol_percentage ? `<span class="wine-tag">${escapeHtml(String(wine.alcohol_percentage))}%</span>` : ''}
+                            ${wine.sub_region ? `<span class="wine-tag">${escapeHtml(wine.sub_region)}${ef.includes('sub_region') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
+                            ${wine.alcohol_percentage ? `<span class="wine-tag">${escapeHtml(String(wine.alcohol_percentage))}%${ef.includes('alcohol_percentage') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
                             ${wine.notes ? `<span class="wine-tag wine-tag-custom" title="${escapeHtml(wine.notes)}">${escapeHtml(wine.notes.length > 50 ? wine.notes.substring(0, 50) + '...' : wine.notes)}</span>` : ''}
                             ${wine.custom_fields ? Object.entries(wine.custom_fields).map(([k, v]) =>
                                 v ? `<span class="wine-tag wine-tag-custom">${escapeHtml(k)}: ${escapeHtml(v)}</span>` : ''

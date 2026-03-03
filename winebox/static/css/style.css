@@ -1713,11 +1713,12 @@ body.logged-out #user-info {
 /* X-Wines Enrichment Badge */
 .xwines-badge {
     display: inline-block;
-    font-size: 0.65rem;
-    padding: 1px 5px;
+    font-size: 0.7rem;
+    padding: 2px 6px;
     margin-left: 6px;
     background-color: #e8f5e9;
     color: #2e7d32;
+    border: 1px solid #a5d6a7;
     border-radius: 3px;
     font-weight: 600;
     vertical-align: middle;
