@@ -15,7 +15,7 @@ from .converters import is_non_wine_row, row_to_wine_data
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CHUNK_SIZE = 100
+DEFAULT_CHUNK_SIZE = 50
 
 
 async def _process_chunks(
@@ -47,6 +47,14 @@ async def _process_chunks(
     wines_created = 0
     rows_skipped = 0
     errors: list[str] = []
+
+    # Yield immediately so the client sees progress start without delay
+    yield {
+        "processed": 0,
+        "total": total,
+        "wines_created": 0,
+        "rows_skipped": 0,
+    }
 
     for chunk_start in range(0, total, chunk_size):
         chunk_end = min(chunk_start + chunk_size, total)
@@ -97,6 +105,15 @@ async def _process_chunks(
                     wd["xwines_id"] = xwines_id
             except Exception as e:
                 logger.warning("Batch enrichment failed for chunk %d-%d: %s", chunk_start + 1, chunk_end, e)
+
+            # Mid-chunk progress: enrichment done, inserting next
+            yield {
+                "processed": chunk_start,  # Not yet at chunk_end (insert pending)
+                "total": total,
+                "wines_created": wines_created,
+                "rows_skipped": rows_skipped,
+                "phase": "inserting",
+            }
 
         # Phase 3: Batch insert Wine documents
         if wine_datas:
