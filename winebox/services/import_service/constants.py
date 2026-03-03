@@ -1,7 +1,7 @@
 """Constants for wine import service."""
 
 # Maximum rows per import batch (safety limit for MongoDB 16MB doc size)
-MAX_ROWS = 5000
+MAX_ROWS = 10000
 
 # Header alias table: lowercase alias -> wine field name
 HEADER_ALIASES: dict[str, str] = {

@@ -44,6 +44,21 @@ class ImportResultResponse(BaseModel):
     status: str
 
 
+class ParsedUploadRequest(BaseModel):
+    """Request for uploading client-parsed CSV data (headers + preview only)."""
+
+    filename: str = Field(..., max_length=255)
+    headers: list[str] = Field(..., min_length=1, max_length=200)
+    preview_rows: list[dict[str, Any]] = Field(..., max_length=5)
+    row_count: int = Field(..., ge=1, le=10000)
+
+
+class RowChunkRequest(BaseModel):
+    """Request to append a chunk of parsed rows to an import batch."""
+
+    rows: list[dict[str, Any]] = Field(..., min_length=1, max_length=500)
+
+
 class ImportBatchSummary(BaseModel):
     """Summary of an import batch for listing."""
 

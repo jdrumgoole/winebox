@@ -369,3 +369,251 @@ async def test_process_stream_already_processed(client: AsyncClient) -> None:
     # Try streaming again — should fail
     stream_resp = await client.post(f"/api/import/{batch_id}/process-stream", json={})
     assert stream_resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Tests for client-parsed CSV upload endpoints (upload-parsed + rows)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_upload_parsed_creates_batch(client: AsyncClient) -> None:
+    """Test that upload-parsed creates a batch with headers and preview."""
+    response = await client.post(
+        "/api/import/upload-parsed",
+        json={
+            "filename": "wines.csv",
+            "headers": ["Wine Name", "Winery", "Vintage"],
+            "preview_rows": [
+                {"Wine Name": "Margaux", "Winery": "Ch. Margaux", "Vintage": "2015"},
+                {"Wine Name": "Barolo", "Winery": "Conterno", "Vintage": "2018"},
+            ],
+            "row_count": 100,
+        },
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["batch_id"]
+    assert data["filename"] == "wines.csv"
+    assert data["row_count"] == 100
+    assert data["headers"] == ["Wine Name", "Winery", "Vintage"]
+    assert len(data["preview_rows"]) == 2
+    assert data["suggested_mapping"]["Wine Name"] == "name"
+    assert data["suggested_mapping"]["Winery"] == "winery"
+    assert data["suggested_mapping"]["Vintage"] == "vintage"
+
+
+@pytest.mark.asyncio
+async def test_upload_parsed_rejects_too_many_rows(client: AsyncClient) -> None:
+    """Test that row_count > 10000 is rejected."""
+    response = await client.post(
+        "/api/import/upload-parsed",
+        json={
+            "filename": "huge.csv",
+            "headers": ["Name"],
+            "preview_rows": [{"Name": "Wine A"}],
+            "row_count": 10001,
+        },
+    )
+    assert response.status_code == 422  # Pydantic validation error
+
+
+@pytest.mark.asyncio
+async def test_append_rows_to_batch(client: AsyncClient) -> None:
+    """Test appending row chunks to a batch."""
+    # Create batch via upload-parsed
+    upload_resp = await client.post(
+        "/api/import/upload-parsed",
+        json={
+            "filename": "wines.csv",
+            "headers": ["Name", "Country"],
+            "preview_rows": [{"Name": "Wine A", "Country": "France"}],
+            "row_count": 3,
+        },
+    )
+    batch_id = upload_resp.json()["batch_id"]
+
+    # Append first chunk with clear=true
+    resp1 = await client.post(
+        f"/api/import/{batch_id}/rows?clear=true",
+        json={"rows": [{"Name": "Wine A", "Country": "France"}]},
+    )
+    assert resp1.status_code == 200
+    assert resp1.json()["rows_added"] == 1
+
+    # Append second chunk (no clear)
+    resp2 = await client.post(
+        f"/api/import/{batch_id}/rows",
+        json={
+            "rows": [
+                {"Name": "Wine B", "Country": "Italy"},
+                {"Name": "Wine C", "Country": "Spain"},
+            ]
+        },
+    )
+    assert resp2.status_code == 200
+    assert resp2.json()["rows_added"] == 2
+
+
+@pytest.mark.asyncio
+async def test_append_rows_clear_first_chunk(client: AsyncClient) -> None:
+    """Test that ?clear=true replaces existing rows instead of appending."""
+    upload_resp = await client.post(
+        "/api/import/upload-parsed",
+        json={
+            "filename": "wines.csv",
+            "headers": ["Name"],
+            "preview_rows": [{"Name": "Wine A"}],
+            "row_count": 2,
+        },
+    )
+    batch_id = upload_resp.json()["batch_id"]
+
+    # Add some rows
+    await client.post(
+        f"/api/import/{batch_id}/rows",
+        json={"rows": [{"Name": "Old Wine 1"}, {"Name": "Old Wine 2"}]},
+    )
+
+    # Clear and replace with new rows
+    await client.post(
+        f"/api/import/{batch_id}/rows?clear=true",
+        json={"rows": [{"Name": "New Wine"}]},
+    )
+
+    # Map and process to verify only the new row is used
+    await client.post(
+        f"/api/import/{batch_id}/mapping",
+        json={"mapping": {"Name": "name"}},
+    )
+    process_resp = await client.post(
+        f"/api/import/{batch_id}/process",
+        json={"skip_non_wine": False, "default_quantity": 1},
+    )
+    result = process_resp.json()
+    assert result["wines_created"] == 1
+
+    # Verify only the new wine exists
+    wines_resp = await client.get("/api/wines")
+    names = {w["name"] for w in wines_resp.json()}
+    assert "New Wine" in names
+    assert "Old Wine 1" not in names
+    assert "Old Wine 2" not in names
+
+
+@pytest.mark.asyncio
+async def test_append_rows_wrong_status(client: AsyncClient) -> None:
+    """Test that rows cannot be appended to a completed batch."""
+    # Create and fully process a batch via the original upload path
+    csv_data = _make_csv(["Name"], [["Wine A"]])
+    files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp = await client.post("/api/import/upload", files=files)
+    batch_id = upload_resp.json()["batch_id"]
+
+    await client.post(
+        f"/api/import/{batch_id}/mapping",
+        json={"mapping": {"Name": "name"}},
+    )
+    await client.post(f"/api/import/{batch_id}/process", json={})
+
+    # Try to append rows to completed batch
+    resp = await client.post(
+        f"/api/import/{batch_id}/rows",
+        json={"rows": [{"Name": "Wine B"}]},
+    )
+    assert resp.status_code == 400
+    assert "Cannot add rows" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_full_workflow_parsed_upload(client: AsyncClient) -> None:
+    """Test end-to-end: upload-parsed -> rows -> mapping -> process."""
+    # 1. Upload parsed metadata
+    upload_resp = await client.post(
+        "/api/import/upload-parsed",
+        json={
+            "filename": "wines.csv",
+            "headers": ["Wine Name", "Country", "Qty"],
+            "preview_rows": [
+                {"Wine Name": "Margaux", "Country": "France", "Qty": "3"},
+            ],
+            "row_count": 2,
+        },
+    )
+    assert upload_resp.status_code == 200
+    batch_id = upload_resp.json()["batch_id"]
+
+    # 2. Upload rows in chunks
+    resp = await client.post(
+        f"/api/import/{batch_id}/rows?clear=true",
+        json={
+            "rows": [
+                {"Wine Name": "Margaux", "Country": "France", "Qty": "3"},
+                {"Wine Name": "Barolo", "Country": "Italy", "Qty": "2"},
+            ]
+        },
+    )
+    assert resp.status_code == 200
+
+    # 3. Set mapping
+    map_resp = await client.post(
+        f"/api/import/{batch_id}/mapping",
+        json={
+            "mapping": {
+                "Wine Name": "name",
+                "Country": "country",
+                "Qty": "quantity",
+            }
+        },
+    )
+    assert map_resp.status_code == 200
+
+    # 4. Process
+    process_resp = await client.post(
+        f"/api/import/{batch_id}/process",
+        json={"skip_non_wine": True, "default_quantity": 1},
+    )
+    assert process_resp.status_code == 200
+    result = process_resp.json()
+    assert result["wines_created"] == 2
+    assert result["status"] == "completed"
+
+    # 5. Verify wines in cellar
+    wines_resp = await client.get("/api/wines")
+    wines = wines_resp.json()
+    names = {w["name"] for w in wines}
+    assert "Margaux" in names
+    assert "Barolo" in names
+
+    # Verify quantities
+    for w in wines:
+        if w["name"] == "Margaux":
+            assert w["inventory"]["quantity"] == 3
+        elif w["name"] == "Barolo":
+            assert w["inventory"]["quantity"] == 2
+
+
+@pytest.mark.asyncio
+async def test_upload_parsed_requires_auth(unauthenticated_client: AsyncClient) -> None:
+    """Test that upload-parsed requires authentication."""
+    response = await unauthenticated_client.post(
+        "/api/import/upload-parsed",
+        json={
+            "filename": "wines.csv",
+            "headers": ["Name"],
+            "preview_rows": [{"Name": "Wine A"}],
+            "row_count": 1,
+        },
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_append_rows_requires_auth(unauthenticated_client: AsyncClient) -> None:
+    """Test that appending rows requires authentication."""
+    response = await unauthenticated_client.post(
+        "/api/import/fake-id/rows",
+        json={"rows": [{"Name": "Wine A"}]},
+    )
+    assert response.status_code == 401

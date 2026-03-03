@@ -2709,6 +2709,8 @@ function collectCustomFields(containerId) {
 
 let currentImportBatchId = null;
 let currentImportData = null;
+let pendingCsvRows = null;
+let isUploadingRows = false;
 
 function initImportPage() {
     const fileInput = document.getElementById('import-file-input');
@@ -2742,6 +2744,13 @@ function initImportPage() {
     document.getElementById('import-confirm-mapping-btn').addEventListener('click', handleConfirmMapping);
     document.getElementById('import-back-to-upload-btn').addEventListener('click', resetImportPage);
     document.getElementById('import-new-btn').addEventListener('click', resetImportPage);
+
+    // Warn before navigating away during row upload
+    window.addEventListener('beforeunload', (e) => {
+        if (isUploadingRows) {
+            e.preventDefault();
+        }
+    });
 }
 
 async function handleImportFileSelect(file) {
@@ -2751,6 +2760,70 @@ async function handleImportFileSelect(file) {
         return;
     }
 
+    if (ext === 'csv') {
+        await handleCsvImport(file);
+    } else {
+        await handleXlsxImport(file);
+    }
+}
+
+/**
+ * Parse CSV client-side with PapaParse streaming, then upload metadata to server.
+ */
+async function handleCsvImport(file) {
+    try {
+        showToast('Parsing CSV...', 'info');
+        const parsed = await parseCsvFile(file);
+
+        if (parsed.errors.length > 0) {
+            showToast(`CSV parse error: ${parsed.errors[0].message}`, 'error');
+            return;
+        }
+
+        if (parsed.rows.length === 0) {
+            showToast('CSV file has no data rows', 'error');
+            return;
+        }
+
+        if (parsed.rows.length > 10000) {
+            showToast('CSV exceeds maximum of 10,000 rows', 'error');
+            return;
+        }
+
+        // Store rows for later upload after mapping
+        pendingCsvRows = parsed.rows;
+
+        // Send headers + preview to server for mapping suggestion
+        const response = await fetchWithAuth(`${API_BASE}/import/upload-parsed`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                filename: file.name,
+                headers: parsed.headers,
+                preview_rows: parsed.rows.slice(0, 5),
+                row_count: parsed.rows.length,
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
+        }
+
+        const data = await response.json();
+        currentImportBatchId = data.batch_id;
+        currentImportData = data;
+
+        renderMappingStep(data);
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+/**
+ * Upload XLSX file to server for server-side parsing (existing flow).
+ */
+async function handleXlsxImport(file) {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -2773,6 +2846,84 @@ async function handleImportFileSelect(file) {
         renderMappingStep(data);
     } catch (error) {
         showToast(error.message, 'error');
+    }
+}
+
+/**
+ * Parse a CSV file using PapaParse streaming mode.
+ * Reads the file from disk in ~64 KB chunks (never loads entire file into memory).
+ * Returns {headers, rows, errors}.
+ */
+function parseCsvFile(file) {
+    return new Promise((resolve) => {
+        const rows = [];
+        let headers = null;
+        const errors = [];
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            chunkSize: 64 * 1024,
+            chunk: function(results) {
+                if (!headers && results.meta.fields) {
+                    headers = results.meta.fields;
+                }
+                for (const row of results.data) {
+                    // Filter empty rows (all values blank)
+                    const hasData = Object.values(row).some(v => v !== null && v !== undefined && String(v).trim() !== '');
+                    if (hasData) {
+                        rows.push(row);
+                    }
+                }
+                if (results.errors.length > 0) {
+                    errors.push(...results.errors);
+                }
+            },
+            complete: function() {
+                resolve({ headers: headers || [], rows, errors });
+            },
+            error: function(err) {
+                resolve({ headers: headers || [], rows, errors: [err] });
+            }
+        });
+    });
+}
+
+/**
+ * Upload parsed rows to server in 500-row chunks.
+ * First chunk uses ?clear=true for safe retry semantics.
+ */
+async function uploadRowChunks(batchId, rows) {
+    const CHUNK_SIZE = 500;
+    const total = rows.length;
+    isUploadingRows = true;
+
+    try {
+        for (let i = 0; i < total; i += CHUNK_SIZE) {
+            const chunk = rows.slice(i, i + CHUNK_SIZE);
+            const isFirstChunk = (i === 0);
+            const url = `${API_BASE}/import/${batchId}/rows${isFirstChunk ? '?clear=true' : ''}`;
+
+            const response = await fetchWithAuth(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rows: chunk })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to upload rows');
+            }
+
+            // Update progress bar during upload phase
+            const uploaded = Math.min(i + CHUNK_SIZE, total);
+            const pct = Math.round((uploaded / total) * 100);
+            document.getElementById('import-progress-fill').style.width = pct + '%';
+            document.getElementById('import-progress-text').textContent = `Uploading rows: ${uploaded} / ${total}`;
+            document.getElementById('import-progress-percent').textContent = pct + '%';
+        }
+    } finally {
+        isUploadingRows = false;
     }
 }
 
@@ -2954,6 +3105,17 @@ async function handleConfirmMapping() {
         document.getElementById('import-progress-created').textContent = '0 wines created';
         document.getElementById('import-progress-skipped').textContent = '0 rows skipped';
 
+        // If client-parsed CSV, upload rows in chunks first
+        if (pendingCsvRows) {
+            await uploadRowChunks(currentImportBatchId, pendingCsvRows);
+            pendingCsvRows = null;
+        }
+
+        // Reset progress for processing phase
+        document.getElementById('import-progress-fill').style.width = '0%';
+        document.getElementById('import-progress-text').textContent = '0 / 0 rows';
+        document.getElementById('import-progress-percent').textContent = '0%';
+
         // Stream processing with progress
         const processResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/process-stream`, {
             method: 'POST',
@@ -3064,4 +3226,6 @@ function resetImportPage() {
     document.getElementById('import-file-input').value = '';
     currentImportBatchId = null;
     currentImportData = null;
+    pendingCsvRows = null;
+    isUploadingRows = false;
 }

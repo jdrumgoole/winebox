@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from pydantic import ValidationError
 from starlette.responses import StreamingResponse
 
@@ -17,6 +17,8 @@ from winebox.schemas.import_schemas import (
     ImportProcessRequest,
     ImportResultResponse,
     ImportUploadResponse,
+    ParsedUploadRequest,
+    RowChunkRequest,
 )
 from winebox.services.auth import RequireAuth
 from winebox.services.import_service import (
@@ -129,6 +131,88 @@ async def upload_spreadsheet(
         suggested_mapping=suggested_mapping,
         mapping_source=mapping_source,
     )
+
+
+@router.post("/upload-parsed", response_model=ImportUploadResponse)
+async def upload_parsed(
+    current_user: RequireAuth,
+    request: ParsedUploadRequest,
+) -> ImportUploadResponse:
+    """Upload client-parsed CSV data (headers + preview + row count).
+
+    The client parses the CSV using PapaParse and sends only metadata here.
+    Actual rows are uploaded via POST /{batch_id}/rows in chunks.
+    """
+    # Suggest column mapping — try AI first, fall back to static aliases
+    ai_mapping = await suggest_column_mapping_ai(request.headers, request.preview_rows[:5])
+    if ai_mapping is not None:
+        suggested_mapping = ai_mapping
+        mapping_source = "ai"
+        logger.info("Using AI-suggested column mapping for %s", request.filename)
+    else:
+        suggested_mapping = suggest_column_mapping(request.headers)
+        mapping_source = "static"
+        logger.info("Using static alias column mapping for %s", request.filename)
+
+    # Create batch document with empty rows (rows arrive via /rows endpoint)
+    batch = ImportBatch(
+        owner_id=current_user.id,
+        filename=request.filename,
+        file_type="csv",
+        headers=request.headers,
+        rows=[],
+        row_count=request.row_count,
+        preview_rows=request.preview_rows[:5],
+        status=ImportStatus.UPLOADED,
+    )
+    await batch.insert()
+
+    return ImportUploadResponse(
+        batch_id=str(batch.id),
+        filename=batch.filename,
+        row_count=batch.row_count,
+        headers=request.headers,
+        preview_rows=batch.preview_rows,
+        suggested_mapping=suggested_mapping,
+        mapping_source=mapping_source,
+    )
+
+
+@router.post("/{batch_id}/rows")
+async def append_rows(
+    batch_id: str,
+    current_user: RequireAuth,
+    request: RowChunkRequest,
+    clear: bool = Query(False, description="Replace existing rows instead of appending"),
+) -> dict:
+    """Append a chunk of parsed rows to an import batch.
+
+    Used by the client-side CSV parser to upload rows in 500-row chunks.
+    Pass ?clear=true on the first chunk to replace any existing rows (safe retry).
+    """
+    batch = await _get_user_batch(batch_id, current_user.id)
+
+    if batch.status not in (ImportStatus.UPLOADED, ImportStatus.MAPPED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot add rows to batch in '{batch.status.value}' state",
+        )
+
+    collection = ImportBatch.get_pymongo_collection()
+    if clear:
+        # Replace rows (first chunk or retry)
+        await collection.update_one(
+            {"_id": batch.id},
+            {"$set": {"rows": request.rows}},
+        )
+    else:
+        # Append rows (subsequent chunks)
+        await collection.update_one(
+            {"_id": batch.id},
+            {"$push": {"rows": {"$each": request.rows}}},
+        )
+
+    return {"status": "ok", "rows_added": len(request.rows)}
 
 
 @router.post("/{batch_id}/mapping", response_model=ImportUploadResponse)
