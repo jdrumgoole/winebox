@@ -6,6 +6,7 @@ from beanie import PydanticObjectId
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.wine import Wine
+from winebox.services.xwines_enrichment import enrich_parsed_with_xwines
 
 from .converters import is_non_wine_row, row_to_wine_data
 
@@ -53,6 +54,29 @@ async def process_import_batch(
             if wine_data is None:
                 rows_skipped += 1
                 continue
+
+            # Enrich with X-Wines data (best-effort, non-fatal)
+            try:
+                enrichment_input = {
+                    "name": wine_data.get("name"),
+                    "winery": wine_data.get("winery"),
+                    "grape_variety": wine_data.get("grape_variety"),
+                    "region": wine_data.get("region"),
+                    "country": wine_data.get("country"),
+                    "alcohol_percentage": wine_data.get("alcohol_percentage"),
+                }
+                enrichment_result = await enrich_parsed_with_xwines(enrichment_input)
+                enriched_fields = enrichment_result.pop("enriched_fields", None)
+                xwines_id = enrichment_result.pop("xwines_id", None)
+
+                for key in ("winery", "grape_variety", "region", "country", "alcohol_percentage"):
+                    if enrichment_result.get(key):
+                        wine_data[key] = enrichment_result[key]
+
+                wine_data["enriched_fields"] = enriched_fields
+                wine_data["xwines_id"] = xwines_id
+            except Exception as e:
+                logger.warning("X-Wines enrichment failed for row %d: %s", i + 1, e)
 
             wine = Wine(**wine_data)
             await wine.insert()
