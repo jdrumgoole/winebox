@@ -125,7 +125,7 @@ class TestCheckinFlow:
 
         # Navigate to checkin
         page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible")
+        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
         # Upload first wine image
         image_path = wine_images[0]
@@ -144,7 +144,7 @@ class TestCheckinFlow:
 
         # Navigate to checkin
         page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible")
+        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
         # Upload image
         image_path = wine_images[0]
@@ -152,6 +152,7 @@ class TestCheckinFlow:
 
         # Wait for scan to complete (either preview shows or we have form data)
         page.wait_for_timeout(3000)  # Give time for OCR/scan
+        page.wait_for_selector("#quantity", state="visible", timeout=15000)
 
         # Fill in quantity
         page.fill("#quantity", "2")
@@ -174,12 +175,13 @@ class TestCheckinFlow:
 
         # Navigate to checkin
         page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible")
+        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
         # Upload image
         image_path = wine_images[0]
         page.set_input_files("#front-label", str(image_path))
         page.wait_for_timeout(3000)
+        page.wait_for_selector("#quantity", state="visible", timeout=15000)
 
         # Fill quantity and click Check In
         page.fill("#quantity", "1")
@@ -205,12 +207,13 @@ class TestCheckinFlow:
 
         # Navigate to checkin
         page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible")
+        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
         # Upload image
         image_path = wine_images[0]
         page.set_input_files("#front-label", str(image_path))
         page.wait_for_timeout(3000)
+        page.wait_for_selector("#quantity", state="visible", timeout=15000)
 
         # Fill in details
         page.fill("#quantity", "3")
@@ -240,7 +243,7 @@ class TestCheckinFlow:
 
         # Navigate to checkin
         page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible")
+        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
         # Upload image
         image_path = wine_images[0]
@@ -289,7 +292,7 @@ class TestWineImageUploads:
 
         # Navigate to checkin
         page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible")
+        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
         # Upload the image
         page.set_input_files("#front-label", str(image_path))

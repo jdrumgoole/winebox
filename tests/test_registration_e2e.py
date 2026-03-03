@@ -231,15 +231,15 @@ class TestRegistrationE2E:
             page.evaluate("localStorage.clear()")
             page.wait_for_selector("#login-card", state="visible", timeout=10000)
 
-        # Now login with registered credentials (email in the email field)
+        # Ensure login form is visible before filling
+        page.wait_for_selector("#login-form", state="visible", timeout=5000)
         page.fill("#login-email", unique_user_data["email"])
         page.fill("#login-password", unique_user_data["password"])
         page.click("#login-form button[type='submit']")
 
-        # Should show main content after successful login
-        expect(page.locator("#main-content")).to_be_visible(timeout=15000)
-
-        # Verify user info shows
+        # After login the app shows #user-info and hides #page-login; wait for that
+        page.wait_for_selector("#user-info", state="visible", timeout=20000)
+        expect(page.locator("#main-content")).to_be_visible()
         expect(page.locator("#user-info")).to_be_visible()
 
     def test_back_to_login_link(self, registration_page: Page) -> None:

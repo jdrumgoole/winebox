@@ -9,6 +9,8 @@ For parallel execution: pytest -n auto tests/test_xwines_e2e.py
 
 import json
 import os
+import sys
+import time
 import uuid
 from typing import Generator
 from urllib.request import Request, urlopen
@@ -19,8 +21,8 @@ from pymongo import MongoClient
 
 from .playwright_utils import BASE_URL, preflight_check
 
-# MongoDB URL for verifying test users
-TEST_MONGODB_URL = os.environ.get("TEST_MONGODB_URL", "mongodb://localhost:27017")
+# MongoDB URL for verifying test users (same as server when not overridden)
+TEST_MONGODB_URL = os.environ.get("TEST_MONGODB_URL", os.environ.get("WINEBOX_MONGODB_URL", "mongodb://localhost:27017"))
 
 
 def get_worker_id(request: pytest.FixtureRequest) -> str:
@@ -44,15 +46,7 @@ def base_url() -> str:
 
 @pytest.fixture(scope="session")
 def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], None, None]:
-    """Create a test user for this worker session via the registration API.
-
-    Registers the user via HTTP, then marks them as verified in MongoDB
-    so they can log in (email verification is required by default).
-
-    Returns (email, password) tuple.
-    """
-    import sys
-
+    """Create a test user for this worker via the registration API and mark verified in MongoDB."""
     worker_id = get_worker_id(request)
     unique = uuid.uuid4().hex[:6]
     email = f"e2e_xwines_{worker_id}_{unique}@test.example.com"
@@ -98,29 +92,40 @@ def test_user(worker_user: tuple[str, str]) -> tuple[str, str]:
     return worker_user
 
 
-@pytest.fixture(scope="session")
-def auth_token(worker_user: tuple[str, str]) -> str:
-    """Get an auth token via the API once per session.
-
-    This avoids hitting the login rate limit (5/minute) by only
-    authenticating once and reusing the token across all tests.
-    """
+def _get_auth_token(email: str, password: str, max_attempts: int = 5, retry_delay: float = 2.0) -> str:
+    """Get auth token with retries to handle 429 rate limit when workers start in parallel."""
     import urllib.parse
 
+    last_error = None
+    for attempt in range(max_attempts):
+        try:
+            form_data = urllib.parse.urlencode({
+                "username": email,
+                "password": password,
+            }).encode()
+            req = Request(
+                f"{BASE_URL}/api/auth/token",
+                data=form_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                method="POST",
+            )
+            with urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+            return data["access_token"]
+        except Exception as e:
+            last_error = e
+            if getattr(e, "code", None) == 429 and attempt < max_attempts - 1:
+                time.sleep(retry_delay)
+                continue
+            raise
+    raise last_error or RuntimeError("Failed to get auth token")
+
+
+@pytest.fixture(scope="session")
+def auth_token(worker_user: tuple[str, str]) -> str:
+    """Get an auth token via the API once per session (with retry for rate limits)."""
     email, password = worker_user
-    form_data = urllib.parse.urlencode({
-        "username": email,
-        "password": password,
-    }).encode()
-    req = Request(
-        f"{BASE_URL}/api/auth/token",
-        data=form_data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST",
-    )
-    with urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read())
-    return data["access_token"]
+    return _get_auth_token(email, password)
 
 
 @pytest.fixture(scope="function")
@@ -198,6 +203,7 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         # Search for a common wine term
         page.fill("#xwines-q", "wine")
@@ -215,6 +221,7 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")
@@ -230,6 +237,7 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         page.fill("#xwines-q", "xyznonexistentwine123")
         page.click("#xwines-search-form button[type='submit']")
@@ -246,6 +254,7 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         # Try to search with a single character
         page.fill("#xwines-q", "a")
@@ -263,6 +272,7 @@ class TestXWinesSearch:
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
         page.wait_for_timeout(2000)  # Wait for filters to load
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         # Select "Red" type filter
         page.select_option("#xwines-type", label="Red")
@@ -286,6 +296,7 @@ class TestXWinesSearch:
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
         page.wait_for_timeout(2000)  # Wait for filters to load
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         # Get the first real country option (not "All Countries")
         first_country = page.evaluate("""
@@ -320,6 +331,7 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         # Set limit to 10
         page.select_option("#xwines-limit", "10")
@@ -337,6 +349,7 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         # Fill in some values
         page.fill("#xwines-q", "test query")
@@ -360,6 +373,7 @@ class TestXWinesDetailModal:
         """Helper: navigate to X-Wines, search, and wait for results."""
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")
@@ -447,6 +461,7 @@ class TestXWinesCardContent:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")
@@ -463,6 +478,7 @@ class TestXWinesCardContent:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
+        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
 
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")

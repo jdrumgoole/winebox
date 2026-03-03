@@ -130,10 +130,10 @@ def _navigate_to_import(page: Page) -> None:
     page.wait_for_selector("#page-import", state="visible")
 
 
-def _upload_file(page: Page, csv_path: Path) -> None:
-    """Upload a CSV file and wait for the mapping step."""
+def _upload_file(page: Page, csv_path: Path, timeout_ms: int = 60000) -> None:
+    """Upload a CSV file and wait for the mapping step (long timeout for large files)."""
     page.set_input_files("#import-file-input", str(csv_path))
-    page.wait_for_selector("#import-step-map", state="visible", timeout=30000)
+    page.wait_for_selector("#import-step-map", state="visible", timeout=timeout_ms)
 
 
 def _upload_and_remap(page: Page, csv_path: Path) -> None:

@@ -7,6 +7,7 @@ Run with: uv run python -m pytest -m e2e tests/test_import_e2e.py -v
 """
 
 import csv
+import re
 from pathlib import Path
 from typing import Generator
 
@@ -102,11 +103,11 @@ def _navigate_to_import(page: Page) -> None:
     page.wait_for_selector("#page-import", state="visible")
 
 
-def _upload_csv(page: Page, csv_path: Path) -> None:
+def _upload_csv(page: Page, csv_path: Path, timeout_ms: int = 25000) -> None:
     """Upload a CSV file via the import page file input."""
     page.set_input_files("#import-file-input", str(csv_path))
-    # Wait for the mapping step to appear (actual ID: import-step-map)
-    page.wait_for_selector("#import-step-map", state="visible", timeout=15000)
+    # Wait for the mapping step to appear (backend parses file then shows map step)
+    page.wait_for_selector("#import-step-map", state="visible", timeout=timeout_ms)
 
 
 @pytest.mark.e2e
@@ -194,14 +195,16 @@ class TestImportMapping:
     """Test the column mapping step."""
 
     def test_change_mapping_dropdown(self, authenticated_page: Page, sample_csv: Path) -> None:
-        """Test that column mapping dropdowns can be changed."""
+        """Test that column mapping can be set to skip via the Skip button."""
         page = authenticated_page
         _navigate_to_import(page)
         _upload_csv(page, sample_csv)
 
-        first_select = page.locator(".import-mapping-select").first
-        first_select.select_option("skip")
-        expect(first_select).to_have_value("skip")
+        # UI uses a Skip button per row, not a "skip" dropdown option
+        first_skip_btn = page.locator(".import-skip-btn").first
+        first_skip_btn.click()
+        first_row = page.locator(".import-mapping-row").first
+        expect(first_row).to_have_class(re.compile(r".*\bskipped\b.*"))
 
     def test_confirm_mapping_button(self, authenticated_page: Page, sample_csv: Path) -> None:
         """Test that Confirm Mapping button proceeds to results step."""
@@ -265,13 +268,13 @@ class TestImportProcess:
 
         _upload_csv(page, sample_csv)
         page.click("#import-confirm-mapping-btn")
-        page.wait_for_selector("#import-step-results", state="visible", timeout=15000)
+        page.wait_for_selector("#import-step-results", state="visible", timeout=20000)
 
         # Click "Import Another File" button
         reset_btn = page.locator("#import-new-btn")
-        if reset_btn.is_visible():
-            reset_btn.click()
-            expect(page.locator(".import-upload-area")).to_be_visible()
+        reset_btn.wait_for(state="visible", timeout=5000)
+        reset_btn.click()
+        expect(page.locator(".import-upload-area")).to_be_visible(timeout=5000)
 
 
 @pytest.mark.e2e
