@@ -330,7 +330,7 @@ async def test_process_stream_returns_progress(client: AsyncClient) -> None:
             events.append(json.loads(line[6:]))
 
     # Should have progress events for each row plus a final done event
-    assert len(events) >= 3
+    assert len(events) >= 2
 
     # Check intermediate progress events have expected fields
     for event in events:

@@ -1,10 +1,12 @@
 """Batch processing for wine imports."""
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
 from beanie import PydanticObjectId
+from pymongo.errors import BulkWriteError
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.wine import Wine
@@ -13,6 +15,143 @@ from winebox.services.xwines_enrichment import enrich_parsed_with_xwines
 from .converters import is_non_wine_row, row_to_wine_data
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_CHUNK_SIZE = 20
+
+
+async def _enrich_wine_data(wine_data: dict[str, Any], row_index: int) -> None:
+    """Enrich a single wine dict with X-Wines data (best-effort, in-place).
+
+    Args:
+        wine_data: Wine dict to enrich (modified in-place).
+        row_index: 1-based row index for logging.
+    """
+    try:
+        enrichment_input = {
+            "name": wine_data.get("name"),
+            "winery": wine_data.get("winery"),
+            "grape_variety": wine_data.get("grape_variety"),
+            "region": wine_data.get("region"),
+            "country": wine_data.get("country"),
+            "alcohol_percentage": wine_data.get("alcohol_percentage"),
+        }
+        enrichment_result = await enrich_parsed_with_xwines(enrichment_input)
+        enriched_fields = enrichment_result.pop("enriched_fields", None)
+        xwines_id = enrichment_result.pop("xwines_id", None)
+
+        for key in ("winery", "grape_variety", "region", "country", "alcohol_percentage"):
+            if enrichment_result.get(key):
+                wine_data[key] = enrichment_result[key]
+
+        wine_data["enriched_fields"] = enriched_fields
+        wine_data["xwines_id"] = xwines_id
+    except Exception as e:
+        logger.warning("X-Wines enrichment failed for row %d: %s", row_index, e)
+
+
+async def _process_chunks(
+    batch: ImportBatch,
+    owner_id: PydanticObjectId,
+    skip_non_wine: bool = True,
+    default_quantity: int = 1,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> AsyncGenerator[dict[str, Any], None]:
+    """Process import rows in chunks, yielding progress after each chunk.
+
+    Within each chunk:
+    1. Convert all rows to wine dicts (fast, sync)
+    2. Enrich all rows concurrently via asyncio.gather (parallel DB lookups)
+    3. Insert all Wine docs in one insert_many call (single DB round-trip)
+    4. Yield progress event
+
+    Yields dicts with keys: processed, total, wines_created, rows_skipped.
+    The final yield includes done=True plus errors list and status.
+
+    Args:
+        batch: The ImportBatch document with rows and mapping.
+        owner_id: Owner's ID for created wines.
+        skip_non_wine: Whether to skip non-wine rows.
+        default_quantity: Default bottle quantity.
+        chunk_size: Number of rows per chunk.
+    """
+    total = len(batch.rows)
+    wines_created = 0
+    rows_skipped = 0
+    errors: list[str] = []
+
+    for chunk_start in range(0, total, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, total)
+        chunk_rows = batch.rows[chunk_start:chunk_end]
+
+        # Phase 1: Convert rows to wine dicts
+        wine_datas: list[tuple[dict[str, Any], int]] = []  # (wine_data, 1-based row_index)
+        for offset, row in enumerate(chunk_rows):
+            row_index = chunk_start + offset  # 0-based
+            try:
+                if skip_non_wine and is_non_wine_row(row, batch.column_mapping):
+                    rows_skipped += 1
+                    continue
+
+                wine_data = row_to_wine_data(row, batch.column_mapping, owner_id, default_quantity)
+                if wine_data is None:
+                    rows_skipped += 1
+                    continue
+
+                wine_datas.append((wine_data, row_index + 1))
+            except Exception as e:
+                error_msg = f"Row {row_index + 1}: {str(e)}"
+                errors.append(error_msg)
+                logger.warning("Import error on row %d: %s", row_index + 1, e)
+
+        # Phase 2: Enrich all rows in this chunk concurrently
+        if wine_datas:
+            await asyncio.gather(
+                *[_enrich_wine_data(wd, ri) for wd, ri in wine_datas]
+            )
+
+        # Phase 3: Batch insert Wine documents
+        if wine_datas:
+            wine_docs = [Wine(**wd) for wd, _ in wine_datas]
+            try:
+                await Wine.insert_many(wine_docs)
+                wines_created += len(wine_docs)
+            except BulkWriteError as e:
+                n_inserted = e.details.get("nInserted", 0)
+                wines_created += n_inserted
+                failed = len(wine_docs) - n_inserted
+                error_msg = f"Batch insert partial failure: {failed} of {len(wine_docs)} failed"
+                errors.append(error_msg)
+                logger.warning(error_msg)
+            except Exception as e:
+                error_msg = f"Batch insert failed for rows {chunk_start + 1}-{chunk_end}: {str(e)}"
+                errors.append(error_msg)
+                logger.warning(error_msg)
+
+        # Yield progress after each chunk
+        yield {
+            "processed": chunk_end,
+            "total": total,
+            "wines_created": wines_created,
+            "rows_skipped": rows_skipped,
+        }
+
+    # Save final batch state
+    batch.wines_created = wines_created
+    batch.rows_skipped = rows_skipped
+    batch.errors = errors
+    batch.status = ImportStatus.COMPLETED
+    await batch.save()
+
+    # Final yield with done=True
+    yield {
+        "done": True,
+        "processed": total,
+        "total": total,
+        "wines_created": wines_created,
+        "rows_skipped": rows_skipped,
+        "errors": errors,
+        "status": "completed",
+    }
 
 
 async def process_import_batch(
@@ -41,59 +180,8 @@ async def process_import_batch(
     batch.status = ImportStatus.PROCESSING
     await batch.save()
 
-    wines_created = 0
-    rows_skipped = 0
-    errors: list[str] = []
-
-    for i, row in enumerate(batch.rows):
-        try:
-            # Skip non-wine rows
-            if skip_non_wine and is_non_wine_row(row, batch.column_mapping):
-                rows_skipped += 1
-                continue
-
-            wine_data = row_to_wine_data(row, batch.column_mapping, owner_id, default_quantity)
-            if wine_data is None:
-                rows_skipped += 1
-                continue
-
-            # Enrich with X-Wines data (best-effort, non-fatal)
-            try:
-                enrichment_input = {
-                    "name": wine_data.get("name"),
-                    "winery": wine_data.get("winery"),
-                    "grape_variety": wine_data.get("grape_variety"),
-                    "region": wine_data.get("region"),
-                    "country": wine_data.get("country"),
-                    "alcohol_percentage": wine_data.get("alcohol_percentage"),
-                }
-                enrichment_result = await enrich_parsed_with_xwines(enrichment_input)
-                enriched_fields = enrichment_result.pop("enriched_fields", None)
-                xwines_id = enrichment_result.pop("xwines_id", None)
-
-                for key in ("winery", "grape_variety", "region", "country", "alcohol_percentage"):
-                    if enrichment_result.get(key):
-                        wine_data[key] = enrichment_result[key]
-
-                wine_data["enriched_fields"] = enriched_fields
-                wine_data["xwines_id"] = xwines_id
-            except Exception as e:
-                logger.warning("X-Wines enrichment failed for row %d: %s", i + 1, e)
-
-            wine = Wine(**wine_data)
-            await wine.insert()
-            wines_created += 1
-
-        except Exception as e:
-            error_msg = f"Row {i + 1}: {str(e)}"
-            errors.append(error_msg)
-            logger.warning("Import error on row %d: %s", i + 1, e)
-
-    batch.wines_created = wines_created
-    batch.rows_skipped = rows_skipped
-    batch.errors = errors
-    batch.status = ImportStatus.COMPLETED
-    await batch.save()
+    async for _progress in _process_chunks(batch, owner_id, skip_non_wine, default_quantity):
+        pass  # Consume all progress; batch is saved inside _process_chunks
 
     return batch
 
@@ -104,7 +192,7 @@ async def process_import_batch_streaming(
     skip_non_wine: bool = True,
     default_quantity: int = 1,
 ) -> AsyncGenerator[dict[str, Any], None]:
-    """Process an import batch, yielding progress after each row.
+    """Process an import batch, yielding progress after each chunk.
 
     Yields dicts with keys: processed, total, wines_created, rows_skipped.
     The final yield includes done=True plus errors list.
@@ -133,85 +221,5 @@ async def process_import_batch_streaming(
     batch.status = ImportStatus.PROCESSING
     await batch.save()
 
-    total = len(batch.rows)
-    wines_created = 0
-    rows_skipped = 0
-    errors: list[str] = []
-
-    for i, row in enumerate(batch.rows):
-        try:
-            if skip_non_wine and is_non_wine_row(row, batch.column_mapping):
-                rows_skipped += 1
-                yield {
-                    "processed": i + 1,
-                    "total": total,
-                    "wines_created": wines_created,
-                    "rows_skipped": rows_skipped,
-                }
-                continue
-
-            wine_data = row_to_wine_data(row, batch.column_mapping, owner_id, default_quantity)
-            if wine_data is None:
-                rows_skipped += 1
-                yield {
-                    "processed": i + 1,
-                    "total": total,
-                    "wines_created": wines_created,
-                    "rows_skipped": rows_skipped,
-                }
-                continue
-
-            # Enrich with X-Wines data (best-effort, non-fatal)
-            try:
-                enrichment_input = {
-                    "name": wine_data.get("name"),
-                    "winery": wine_data.get("winery"),
-                    "grape_variety": wine_data.get("grape_variety"),
-                    "region": wine_data.get("region"),
-                    "country": wine_data.get("country"),
-                    "alcohol_percentage": wine_data.get("alcohol_percentage"),
-                }
-                enrichment_result = await enrich_parsed_with_xwines(enrichment_input)
-                enriched_fields = enrichment_result.pop("enriched_fields", None)
-                xwines_id = enrichment_result.pop("xwines_id", None)
-
-                for key in ("winery", "grape_variety", "region", "country", "alcohol_percentage"):
-                    if enrichment_result.get(key):
-                        wine_data[key] = enrichment_result[key]
-
-                wine_data["enriched_fields"] = enriched_fields
-                wine_data["xwines_id"] = xwines_id
-            except Exception as e:
-                logger.warning("X-Wines enrichment failed for row %d: %s", i + 1, e)
-
-            wine = Wine(**wine_data)
-            await wine.insert()
-            wines_created += 1
-
-        except Exception as e:
-            error_msg = f"Row {i + 1}: {str(e)}"
-            errors.append(error_msg)
-            logger.warning("Import error on row %d: %s", i + 1, e)
-
-        yield {
-            "processed": i + 1,
-            "total": total,
-            "wines_created": wines_created,
-            "rows_skipped": rows_skipped,
-        }
-
-    batch.wines_created = wines_created
-    batch.rows_skipped = rows_skipped
-    batch.errors = errors
-    batch.status = ImportStatus.COMPLETED
-    await batch.save()
-
-    yield {
-        "done": True,
-        "processed": total,
-        "total": total,
-        "wines_created": wines_created,
-        "rows_skipped": rows_skipped,
-        "errors": errors,
-        "status": "completed",
-    }
+    async for progress in _process_chunks(batch, owner_id, skip_non_wine, default_quantity):
+        yield progress
