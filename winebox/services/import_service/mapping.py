@@ -149,10 +149,10 @@ async def suggest_column_mapping_ai(
     try:
         import anthropic
 
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.AsyncAnthropic(api_key=api_key)
         prompt = _build_mapping_prompt(headers, preview_rows)
 
-        message = client.messages.create(
+        message = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],

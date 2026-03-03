@@ -1,6 +1,5 @@
 """Batch processing for wine imports."""
 
-import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -10,43 +9,13 @@ from pymongo.errors import BulkWriteError
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.wine import Wine
-from winebox.services.xwines_enrichment import enrich_parsed_with_xwines
+from winebox.services.xwines_enrichment import enrich_batch_with_xwines
 
 from .converters import is_non_wine_row, row_to_wine_data
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CHUNK_SIZE = 20
-
-
-async def _enrich_wine_data(wine_data: dict[str, Any], row_index: int) -> None:
-    """Enrich a single wine dict with X-Wines data (best-effort, in-place).
-
-    Args:
-        wine_data: Wine dict to enrich (modified in-place).
-        row_index: 1-based row index for logging.
-    """
-    try:
-        enrichment_input = {
-            "name": wine_data.get("name"),
-            "winery": wine_data.get("winery"),
-            "grape_variety": wine_data.get("grape_variety"),
-            "region": wine_data.get("region"),
-            "country": wine_data.get("country"),
-            "alcohol_percentage": wine_data.get("alcohol_percentage"),
-        }
-        enrichment_result = await enrich_parsed_with_xwines(enrichment_input)
-        enriched_fields = enrichment_result.pop("enriched_fields", None)
-        xwines_id = enrichment_result.pop("xwines_id", None)
-
-        for key in ("winery", "grape_variety", "region", "country", "alcohol_percentage"):
-            if enrichment_result.get(key):
-                wine_data[key] = enrichment_result[key]
-
-        wine_data["enriched_fields"] = enriched_fields
-        wine_data["xwines_id"] = xwines_id
-    except Exception as e:
-        logger.warning("X-Wines enrichment failed for row %d: %s", row_index, e)
+DEFAULT_CHUNK_SIZE = 100
 
 
 async def _process_chunks(
@@ -60,7 +29,7 @@ async def _process_chunks(
 
     Within each chunk:
     1. Convert all rows to wine dicts (fast, sync)
-    2. Enrich all rows concurrently via asyncio.gather (parallel DB lookups)
+    2. Enrich all rows via single batch X-Wines lookup (one DB query per chunk)
     3. Insert all Wine docs in one insert_many call (single DB round-trip)
     4. Yield progress event
 
@@ -103,11 +72,31 @@ async def _process_chunks(
                 errors.append(error_msg)
                 logger.warning("Import error on row %d: %s", row_index + 1, e)
 
-        # Phase 2: Enrich all rows in this chunk concurrently
+        # Phase 2: Enrich all rows in this chunk with a single batch query
         if wine_datas:
-            await asyncio.gather(
-                *[_enrich_wine_data(wd, ri) for wd, ri in wine_datas]
-            )
+            enrichment_inputs = []
+            for wd, _ in wine_datas:
+                enrichment_inputs.append({
+                    "name": wd.get("name"),
+                    "winery": wd.get("winery"),
+                    "grape_variety": wd.get("grape_variety"),
+                    "region": wd.get("region"),
+                    "country": wd.get("country"),
+                    "alcohol_percentage": wd.get("alcohol_percentage"),
+                })
+            try:
+                await enrich_batch_with_xwines(enrichment_inputs)
+                # Apply enrichment results back to wine_datas
+                for (wd, _), enriched in zip(wine_datas, enrichment_inputs):
+                    enriched_fields = enriched.pop("enriched_fields", None)
+                    xwines_id = enriched.pop("xwines_id", None)
+                    for key in ("winery", "grape_variety", "region", "country", "alcohol_percentage"):
+                        if enriched.get(key):
+                            wd[key] = enriched[key]
+                    wd["enriched_fields"] = enriched_fields
+                    wd["xwines_id"] = xwines_id
+            except Exception as e:
+                logger.warning("Batch enrichment failed for chunk %d-%d: %s", chunk_start + 1, chunk_end, e)
 
         # Phase 3: Batch insert Wine documents
         if wine_datas:

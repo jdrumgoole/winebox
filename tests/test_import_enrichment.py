@@ -183,7 +183,7 @@ async def test_import_enrichment_failure_nonfatal(init_test_db) -> None:
     await batch.insert()
 
     with patch(
-        "winebox.services.import_service.processor.enrich_parsed_with_xwines",
+        "winebox.services.import_service.processor.enrich_batch_with_xwines",
         new_callable=AsyncMock,
         side_effect=RuntimeError("X-Wines service down"),
     ):
