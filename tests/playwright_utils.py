@@ -23,14 +23,16 @@ from playwright.sync_api import Page
 # Can be overridden with WINEBOX_TEST_URL.
 BASE_URL: str = os.environ.get("WINEBOX_TEST_URL", "http://localhost:8000")
 
-# Project root directory (used for running CLI commands).
+# Project root directory (used for running CLI commands and artifacts).
 PROJECT_DIR: Path = Path(__file__).parent.parent
 
 
 def get_worker_id(request: pytest.FixtureRequest) -> str:
     """Return the pytest-xdist worker ID, or 'main' if not running in parallel."""
     if hasattr(request.config, "workerinput"):
-        return request.config.workerinput.get("workerid", "main")
+        workerinput = request.config.workerinput
+        if isinstance(workerinput, dict):
+            return workerinput.get("workerid", "main")
     return "main"
 
 
@@ -46,16 +48,16 @@ def create_cli_worker_user(
     This function is intended to be called from a session-scoped fixture in an
     E2E test module, for example:
 
-        @pytest.fixture(scope=\"session\")
+        @pytest.fixture(scope="session")
         def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], None, None]:
-            email, password = create_cli_worker_user(request, \"e2e_worker\")
+            email, password = create_cli_worker_user(request, "e2e_worker")
             yield email, password
 
     The helper is resilient to the user already existing and will only emit a
     warning to stderr if creation fails entirely.
     """
     worker_id = get_worker_id(request)
-    email = f\"{email_prefix}_{worker_id}@test.example.com\"
+    email = f"{email_prefix}_{worker_id}@test.example.com"
 
     result: subprocess.CompletedProcess[str] | None = None
     created = False
@@ -63,20 +65,20 @@ def create_cli_worker_user(
     for attempt in range(max_retries):
         try:
             result = subprocess.run(
-                [\"uv\", \"run\", \"winebox-admin\", \"add\", email, \"--password\", password],
+                ["uv", "run", "winebox-admin", "add", email, "--password", password],
                 cwd=PROJECT_DIR,
                 capture_output=True,
                 text=True,
                 timeout=30,
             )
-        except subprocess.SubprocessError as exc:  # timeout or similar
-            print(f\"WARNING: subprocess error creating user {email}: {exc}\", file=sys.stderr)
+        except subprocess.SubprocessError as exc:
+            print(f"WARNING: subprocess error creating user {email}: {exc}", file=sys.stderr)
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
             continue
 
-        combined = (result.stdout or \"\") + (result.stderr or \"\")
-        if result.returncode == 0 or \"already exists\" in combined or \"already in use\" in combined:
+        combined = (result.stdout or "") + (result.stderr or "")
+        if result.returncode == 0 or "already exists" in combined or "already in use" in combined:
             created = True
             break
 
@@ -84,10 +86,10 @@ def create_cli_worker_user(
             time.sleep(retry_delay)
 
     if not created:
-        print(f\"WARNING: Failed to create user {email}\", file=sys.stderr)
+        print(f"WARNING: Failed to create user {email}", file=sys.stderr)
         if result is not None:
-            print(f\"  stdout: {result.stdout}\", file=sys.stderr)
-            print(f\"  stderr: {result.stderr}\", file=sys.stderr)
+            print(f"  stdout: {result.stdout}", file=sys.stderr)
+            print(f"  stderr: {result.stderr}", file=sys.stderr)
 
     # Small delay to reduce chances of race conditions with database writes.
     time.sleep(0.5)
@@ -102,7 +104,7 @@ def preflight_check(timeout_seconds: int = 10) -> None:
     so users immediately see that the server must be running.
     """
     start = time.time()
-    urls = [f\"{BASE_URL}/health\", BASE_URL]
+    urls = [f"{BASE_URL}/health", BASE_URL]
 
     last_error: Exception | None = None
     while time.time() - start < timeout_seconds:
@@ -115,11 +117,57 @@ def preflight_check(timeout_seconds: int = 10) -> None:
                 continue
         time.sleep(0.5)
 
-    msg = f\"E2E preflight failed: server at {BASE_URL!r} is not reachable. \" \\\n          \"Start it with 'uv run python -m invoke start-background' or equivalent.\"\n    if last_error is not None:
-        msg += f\" Last error: {last_error!r}\"\n    pytest.skip(msg)
+    msg = (
+        f"E2E preflight failed: server at {BASE_URL!r} is not reachable. "
+        "Start it with 'uv run python -m invoke start-background' or equivalent."
+    )
+    if last_error is not None:
+        msg += f" Last error: {last_error!r}"
+    pytest.skip(msg)
 
 
 def login_via_ui(page: Page, email: str, password: str, *, timeout_ms: int = 15000) -> None:
-    \"\"\"Log in through the UI and wait for main content to be visible.
-\n    Raises an AssertionError with a helpful message if login fails.\n    \"\"\"\n    page.context.clear_cookies()\n    page.goto(BASE_URL)\n    page.evaluate(\"localStorage.clear()\")\n    page.reload()\n\n    page.wait_for_selector(\"#login-form\", state=\"visible\", timeout=timeout_ms)\n    page.fill(\"#login-email\", email)\n    page.fill(\"#login-password\", password)\n    page.click(\"#login-form button[type='submit']\")\n\n    try:\n        page.wait_for_selector(\"#main-content\", state=\"visible\", timeout=timeout_ms)\n    except Exception:\n        error_elem = page.locator(\"#login-error\")\n        if error_elem.is_visible():\n            error_text = error_elem.text_content() or \"\"\n            raise AssertionError(f\"Login failed for user '{email}': {error_text}\")\n        raise\n+\n+\n+def capture_artifacts(page: Page, name: str) -> None:\n+    \"\"\"Capture best-effort diagnostics (screenshot + HTML) for a failing test.\n+\n+    This is intended to be called from except blocks in tests when a failure is\n+    detected. Errors while capturing artifacts are swallowed so they do not\n+    mask the original test failure.\n+    \"\"\"\n+    artifacts_root = PROJECT_DIR / \"artifacts\" / \"playwright\"\n+    try:\n+        artifacts_root.mkdir(parents=True, exist_ok=True)\n+        safe_name = name.replace(\"/\", \"_\").replace(\" \", \"_\")\n+        screenshot_path = artifacts_root / f\"{safe_name}.png\"\n+        html_path = artifacts_root / f\"{safe_name}.html\"\n+\n+        page.screenshot(path=str(screenshot_path), full_page=True)\n+        html = page.content()\n+        html_path.write_text(html, encoding=\"utf-8\")\n+    except Exception as exc:  # pragma: no cover - best-effort diagnostics\n+        print(f\"WARNING: Failed to capture Playwright artifacts for {name}: {exc}\", file=sys.stderr)\n+\n*** End Patch
-}"/>
+    """Log in through the UI and wait for main content to be visible.
+
+    Raises an AssertionError with a helpful message if login fails.
+    """
+    page.context.clear_cookies()
+    page.goto(BASE_URL)
+    page.evaluate("localStorage.clear()")
+    page.reload()
+
+    page.wait_for_selector("#login-form", state="visible", timeout=timeout_ms)
+    page.fill("#login-email", email)
+    page.fill("#login-password", password)
+    page.click("#login-form button[type='submit']")
+
+    try:
+        page.wait_for_selector("#main-content", state="visible", timeout=timeout_ms)
+    except Exception:
+        error_elem = page.locator("#login-error")
+        if error_elem.is_visible():
+            error_text = error_elem.text_content() or ""
+            raise AssertionError(f"Login failed for user '{email}': {error_text}")
+        raise
+
+
+def capture_artifacts(page: Page, name: str) -> None:
+    """Capture best-effort diagnostics (screenshot + HTML) for a failing test.
+
+    This is intended to be called from except blocks in tests when a failure is
+    detected. Errors while capturing artifacts are swallowed so they do not
+    mask the original test failure.
+    """
+    artifacts_root = PROJECT_DIR / "artifacts" / "playwright"
+    try:
+        artifacts_root.mkdir(parents=True, exist_ok=True)
+        safe_name = name.replace("/", "_").replace(" ", "_")
+        screenshot_path = artifacts_root / f"{safe_name}.png"
+        html_path = artifacts_root / f"{safe_name}.html"
+
+        page.screenshot(path=str(screenshot_path), full_page=True)
+        html = page.content()
+        html_path.write_text(html, encoding="utf-8")
+    except Exception as exc:  # pragma: no cover - best-effort diagnostics
+        print(f"WARNING: Failed to capture Playwright artifacts for {name}: {exc}", file=sys.stderr)
+
