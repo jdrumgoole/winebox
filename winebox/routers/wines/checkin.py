@@ -15,6 +15,7 @@ from winebox.models import InventoryInfo, Transaction, TransactionType, Wine
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.analytics import posthog_service
 from winebox.services.auth import RequireAuth
+from winebox.services.xwines_enrichment import enrich_parsed_with_xwines
 
 from ._common import (
     MAX_FIELD_LENGTH,
@@ -131,6 +132,25 @@ async def checkin_wine(
         classification = classification or parsed_data.get("classification")
         alcohol_percentage = alcohol_percentage or parsed_data.get("alcohol_percentage")
 
+    # Enrich with X-Wines reference data (fills empty fields only)
+    enrichment_input = {
+        "name": name,
+        "winery": winery,
+        "grape_variety": grape_variety,
+        "region": region,
+        "country": country,
+        "alcohol_percentage": alcohol_percentage,
+    }
+    enrichment_input = await enrich_parsed_with_xwines(enrichment_input)
+    enriched_fields = enrichment_input.pop("enriched_fields", None)
+    xwines_id = enrichment_input.pop("xwines_id", None)
+    # Apply enriched values back
+    winery = enrichment_input.get("winery") or winery
+    grape_variety = enrichment_input.get("grape_variety") or grape_variety
+    region = enrichment_input.get("region") or region
+    country = enrichment_input.get("country") or country
+    alcohol_percentage = enrichment_input.get("alcohol_percentage") or alcohol_percentage
+
     # Use provided values
     wine_name = name or "Unknown Wine"
 
@@ -171,6 +191,8 @@ async def checkin_wine(
         back_label_text=back_text,
         front_label_image_path=front_image_path,
         back_label_image_path=back_image_path,
+        enriched_fields=enriched_fields or None,
+        xwines_id=xwines_id,
         custom_fields=parsed_custom_fields,
         custom_fields_text=custom_fields_text,
         inventory=InventoryInfo(quantity=quantity, updated_at=datetime.now(timezone.utc)),

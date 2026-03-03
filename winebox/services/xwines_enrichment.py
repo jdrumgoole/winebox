@@ -101,7 +101,8 @@ async def enrich_parsed_with_xwines(parsed: dict) -> dict:
     if not match:
         return parsed
 
-    # Fill in missing fields from X-Wines match
+    # Fill in missing fields from X-Wines match, tracking which ones we enrich
+    enriched_fields: list[str] = []
     for parsed_key, xwines_attr, transform in _FIELD_MAP:
         if parsed.get(parsed_key):
             # Preserve existing (label-detected) value
@@ -118,9 +119,12 @@ async def enrich_parsed_with_xwines(parsed: dict) -> dict:
 
         if xwines_value:
             parsed[parsed_key] = xwines_value
+            enriched_fields.append(parsed_key)
 
-    # Add xwines_id so the frontend knows a match was found
+    # Add xwines_id and enriched_fields so the frontend knows what was enriched
     parsed["xwines_id"] = match.xwines_id
+    if enriched_fields:
+        parsed["enriched_fields"] = enriched_fields
 
     return parsed
 

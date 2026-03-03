@@ -84,6 +84,10 @@ class Wine(Document):
     grape_blends: list[GrapeBlendEntry] = Field(default_factory=list)
     scores: list[ScoreEntry] = Field(default_factory=list)
 
+    # X-Wines enrichment tracking
+    enriched_fields: Optional[list[str]] = None  # Fields filled by X-Wines enrichment
+    xwines_id: Optional[int] = None  # ID from X-Wines dataset for reference
+
     # Custom fields from spreadsheet import or manual entry
     custom_fields: Optional[dict[str, str]] = None
     custom_fields_text: Optional[str] = None  # Denormalized for text search

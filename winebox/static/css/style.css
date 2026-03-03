@@ -1692,6 +1692,19 @@ body.logged-out #user-info {
     text-decoration: underline;
 }
 
+/* X-Wines Enrichment Badge */
+.xwines-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    margin-left: 6px;
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border-radius: 3px;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
 /* Auto-fill Animation */
 .auto-filled {
     animation: autoFillPulse 0.5s ease;

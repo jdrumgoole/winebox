@@ -1683,6 +1683,10 @@ async function showWineDetail(wineId) {
         const wine = await response.json();
 
         const quantity = wine.inventory ? wine.inventory.quantity : 0;
+        const enrichedFields = wine.enriched_fields || [];
+        const xwinesBadge = (fieldKey) => enrichedFields.includes(fieldKey)
+            ? '<span class="xwines-badge">X-Wines</span>'
+            : '';
 
         document.getElementById('wine-detail').innerHTML = `
             <div class="wine-detail-images">
@@ -1699,6 +1703,7 @@ async function showWineDetail(wineId) {
                 <h3>${wine.name}</h3>
                 <div class="wine-detail-meta">
                     ${wine.winery ? wine.winery : ''}
+                    ${wine.winery ? xwinesBadge('winery') : ''}
                     ${wine.vintage ? ` - ${wine.vintage}` : ''}
                 </div>
 
@@ -1710,14 +1715,14 @@ async function showWineDetail(wineId) {
 
                     ${wine.grape_variety ? `
                         <div class="wine-detail-field">
-                            <div class="label">Grape Variety</div>
+                            <div class="label">Grape Variety${xwinesBadge('grape_variety')}</div>
                             <div class="value">${wine.grape_variety}</div>
                         </div>
                     ` : ''}
 
                     ${wine.region ? `
                         <div class="wine-detail-field">
-                            <div class="label">Region</div>
+                            <div class="label">Region${xwinesBadge('region')}</div>
                             <div class="value">${wine.region}</div>
                         </div>
                     ` : ''}
@@ -1738,7 +1743,7 @@ async function showWineDetail(wineId) {
 
                     ${wine.country ? `
                         <div class="wine-detail-field">
-                            <div class="label">Country</div>
+                            <div class="label">Country${xwinesBadge('country')}</div>
                             <div class="value">${wine.country}</div>
                         </div>
                     ` : ''}
@@ -1752,7 +1757,7 @@ async function showWineDetail(wineId) {
 
                     ${wine.alcohol_percentage ? `
                         <div class="wine-detail-field">
-                            <div class="label">Alcohol</div>
+                            <div class="label">Alcohol${xwinesBadge('alcohol_percentage')}</div>
                             <div class="value">${wine.alcohol_percentage}%</div>
                         </div>
                     ` : ''}
