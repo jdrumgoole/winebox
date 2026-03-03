@@ -10,6 +10,7 @@ For parallel execution, run with: pytest -n auto tests/test_checkin_e2e.py
 Each worker gets its own test user (created once per session for speed).
 """
 
+import re
 from pathlib import Path
 from typing import Generator
 
