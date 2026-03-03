@@ -24,12 +24,15 @@ Environment variables (in .env):
 
 import argparse
 
+from pathlib import Path
+
 from deploy.common import (
     DigitalOceanAPI,
     get_env_config,
     resolve_host,
     run_ssh,
     sync_secrets,
+    upload_file,
 )
 
 
@@ -134,7 +137,7 @@ def deploy(
         print("Version: latest")
     print("=" * 50)
 
-    total_steps = 6 if setup_dns_flag else 5
+    total_steps = 7 if setup_dns_flag else 6
     step = 0
 
     # Step: Setup DNS (optional)
@@ -172,6 +175,21 @@ def deploy(
         print("  DRY RUN - Secrets not synced")
     else:
         print("  No local .env loaded, skipping")
+
+    # Step: Sync nginx config
+    step += 1
+    print(f"\n[{step}/{total_steps}] Syncing nginx config...")
+    if not dry_run:
+        nginx_conf = Path(__file__).parent / "nginx-winebox.conf"
+        if nginx_conf.exists():
+            upload_file(host, user, nginx_conf, "/tmp/nginx-winebox.conf")
+            run_ssh(host, user, [
+                "mv /tmp/nginx-winebox.conf /etc/nginx/sites-available/winebox",
+                "ln -sf /etc/nginx/sites-available/winebox /etc/nginx/sites-enabled/",
+            ])
+            print("  nginx config synced")
+        else:
+            print(f"  Warning: {nginx_conf} not found, skipping")
 
     # Step: Update static files symlink and reload nginx
     step += 1
