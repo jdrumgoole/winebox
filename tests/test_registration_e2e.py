@@ -1,7 +1,7 @@
 """End-to-end tests for user registration flow using Playwright.
 
 These tests require a running WineBox server with email verification disabled:
-    WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false invoke start-background
+    WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false uv run python -m invoke start-background
 
 For parallel execution, run with: pytest -n auto tests/test_registration_e2e.py
 """
@@ -12,8 +12,12 @@ import uuid
 import pytest
 from playwright.sync_api import Page, expect
 
-# Server URL - can be overridden with WINEBOX_TEST_URL env var
-BASE_URL = os.environ.get("WINEBOX_TEST_URL", "http://localhost:8000")
+from .playwright_utils import BASE_URL, preflight_check
+@pytest.fixture(scope="session", autouse=True)
+def _e2e_preflight() -> None:
+    """Fail fast if the E2E server is not reachable."""
+    preflight_check()
+
 
 
 def generate_unique_email() -> str:
@@ -89,15 +93,17 @@ class TestRegistrationE2E:
         # Submit registration
         page.click("#register-form button[type='submit']")
 
-        # Wait for success - should redirect to login or show success message
-        page.wait_for_timeout(2000)
-
-        # Check if we got redirected back to login form or if there's a success indicator
-        login_visible = page.locator("#login-card").is_visible()
-        main_content_visible = page.locator("#main-content").is_visible()
-
-        assert login_visible or main_content_visible, \
-            "Expected to see login form or main content after registration"
+        # Wait for success - should redirect to login or show main content
+        try:
+            page.wait_for_selector(
+                "#login-card, #main-content",
+                state="visible",
+                timeout=10000,
+            )
+        except Exception:
+            raise AssertionError(
+                "Expected to see login form or main content after registration"
+            )
 
     def test_registration_duplicate_email(self, registration_page: Page, unique_user_data: dict) -> None:
         """Verify error message for duplicate email."""

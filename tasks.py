@@ -164,6 +164,52 @@ def test_e2e(ctx: Context, verbose: bool = False, workers: int = 4, no_purge: bo
         purge_wines(ctx, include_images=True, force=True)
 
 
+@task(name="test-e2e-fast")
+def test_e2e_fast(ctx: Context, verbose: bool = False, workers: int = 4) -> None:
+    """Run a fast subset of Playwright E2E tests.
+
+    This is intended for local development and CI smoke runs. It exercises the
+    most important happy-path flows without the very long-running big data
+    imports.
+
+    Expected server preconditions:
+        uv run python -m invoke start-background
+    """
+    cmd = (
+        "WINEBOX_USE_CLAUDE_VISION=false "
+        "uv run python -m pytest -m e2e "
+        "tests/test_registration_e2e.py "
+        "tests/test_checkin_e2e.py "
+        "tests/test_import_e2e.py "
+        "tests/test_xwines_e2e.py "
+        "tests/test_app_navigation_e2e.py "
+        f"-n {workers}"
+    )
+    if verbose:
+        cmd += " -v"
+    ctx.run(cmd, pty=True)
+
+
+@task(name="test-e2e-full")
+def test_e2e_full(ctx: Context, verbose: bool = False, workers: int = 4) -> None:
+    """Run the full Playwright E2E suite, including slow tests.
+
+    This includes large X-Wines CSV import validation and should typically be
+    run on demand (e.g. before a release) rather than on every commit.
+
+    Expected server preconditions:
+        uv run python -m invoke start-background
+    """
+    cmd = (
+        "WINEBOX_USE_CLAUDE_VISION=false "
+        "uv run python -m pytest -m e2e "
+        f"-n {workers}"
+    )
+    if verbose:
+        cmd += " -v"
+    ctx.run(cmd, pty=True)
+
+
 @task(name="init-db")
 def init_db(ctx: Context) -> None:
     """Initialize the database."""

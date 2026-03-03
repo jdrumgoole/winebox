@@ -391,14 +391,19 @@ You should see `wine_count: 100646` for the full dataset.
 ## Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (unit + a core E2E subset)
 uv run python -m invoke test
 
 # Run only unit tests (fast, no server required)
 uv run python -m invoke test-unit
 
-# Run only E2E tests (requires running server)
-uv run python -m invoke test-e2e
+# Run core Playwright E2E smoke tests (requires running server)
+uv run python -m invoke start-background
+uv run python -m invoke test-e2e-fast
+
+# Run full Playwright E2E suite (includes slow big CSV imports)
+uv run python -m invoke start-background
+uv run python -m invoke test-e2e-full
 
 # Run with verbose output
 uv run python -m invoke test --verbose

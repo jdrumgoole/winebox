@@ -1,7 +1,7 @@
 """End-to-end tests for X-Wines search tab using Playwright.
 
 These tests require:
-1. A running WineBox server: invoke start-background
+1. A running WineBox server: uv run python -m invoke start-background
 2. X-Wines test data imported: uv run python deploy/import_xwines_mongo.py --version test --force
 
 For parallel execution: pytest -n auto tests/test_xwines_e2e.py
@@ -11,14 +11,13 @@ import json
 import os
 import uuid
 from typing import Generator
-from urllib.request import urlopen, Request
+from urllib.request import Request, urlopen
 
 import pytest
 from playwright.sync_api import Page, expect
 from pymongo import MongoClient
 
-# Server URL - can be overridden with WINEBOX_TEST_URL env var
-BASE_URL = os.environ.get("WINEBOX_TEST_URL", "http://localhost:8000")
+from .playwright_utils import BASE_URL, preflight_check
 
 # MongoDB URL for verifying test users
 TEST_MONGODB_URL = os.environ.get("TEST_MONGODB_URL", "mongodb://localhost:27017")
@@ -29,6 +28,12 @@ def get_worker_id(request: pytest.FixtureRequest) -> str:
     if hasattr(request.config, "workerinput"):
         return request.config.workerinput["workerid"]
     return "main"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _e2e_preflight() -> None:
+    """Fail fast if the E2E server is not reachable."""
+    preflight_check()
 
 
 @pytest.fixture(scope="session")

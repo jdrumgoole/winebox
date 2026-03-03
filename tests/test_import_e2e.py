@@ -1,33 +1,30 @@
 """End-to-end tests for wine import flow using Playwright.
 
 These tests require a running WineBox server. Start the server with:
-    invoke start-background
+    uv run python -m invoke start-background
 
 Run with: uv run python -m pytest -m e2e tests/test_import_e2e.py -v
 """
 
 import csv
-import os
-import subprocess
-import time
 from pathlib import Path
 from typing import Generator
 
 import pytest
 from playwright.sync_api import Page, expect
 
-# Server URL - can be overridden with WINEBOX_TEST_URL env var
-BASE_URL = os.environ.get("WINEBOX_TEST_URL", "http://localhost:8000")
+from .playwright_utils import (
+    BASE_URL,
+    create_cli_worker_user,
+    login_via_ui,
+    preflight_check,
+)
 
-# Project directory for running CLI commands
-PROJECT_DIR = Path(__file__).parent.parent
 
-
-def get_worker_id(request: pytest.FixtureRequest) -> str:
-    """Get the pytest-xdist worker ID, or 'main' if not running in parallel."""
-    if hasattr(request.config, "workerinput"):
-        return request.config.workerinput["workerid"]
-    return "main"
+@pytest.fixture(scope="session", autouse=True)
+def _e2e_preflight() -> None:
+    """Fail fast if the E2E server is not reachable."""
+    preflight_check()
 
 
 @pytest.fixture(scope="session")
@@ -39,34 +36,11 @@ def base_url() -> str:
 @pytest.fixture(scope="session")
 def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], None, None]:
     """Create a test user for this worker session."""
-    worker_id = get_worker_id(request)
-    email = f"e2e_import_{worker_id}@test.example.com"
-    password = "testpass123"
-
-    max_retries = 3
-    created = False
-    result = None
-    for attempt in range(max_retries):
-        result = subprocess.run(
-            ["uv", "run", "winebox-admin", "add", email, "--password", password],
-            cwd=PROJECT_DIR,
-            capture_output=True,
-            timeout=30,
-            text=True,
-        )
-        if result.returncode == 0 or "already exists" in (result.stdout + result.stderr):
-            created = True
-            break
-        if attempt < max_retries - 1:
-            time.sleep(1.0)
-
-    if not created:
-        import sys
-        print(f"WARNING: Failed to create user {email}", file=sys.stderr)
-        print(f"  stdout: {result.stdout}", file=sys.stderr)
-        print(f"  stderr: {result.stderr}", file=sys.stderr)
-
-    time.sleep(0.5)
+    email, password = create_cli_worker_user(
+        request,
+        email_prefix="e2e_import",
+        password="testpass123",
+    )
     yield email, password
 
 
@@ -80,26 +54,7 @@ def test_user(worker_user: tuple[str, str]) -> tuple[str, str]:
 def authenticated_page(page: Page, test_user: tuple[str, str]) -> Page:
     """Log in and return an authenticated page."""
     email, password = test_user
-
-    page.context.clear_cookies()
-    page.goto(BASE_URL)
-    page.evaluate("localStorage.clear()")
-    page.reload()
-
-    page.wait_for_selector("#login-form", state="visible", timeout=10000)
-    page.fill("#login-email", email)
-    page.fill("#login-password", password)
-    page.click("#login-form button[type='submit']")
-
-    try:
-        page.wait_for_selector("#main-content", state="visible", timeout=15000)
-    except Exception:
-        error_elem = page.locator("#login-error")
-        if error_elem.is_visible():
-            error_text = error_elem.text_content()
-            raise AssertionError(f"Login failed for user '{email}': {error_text}")
-        raise
-
+    login_via_ui(page, email=email, password=password)
     return page
 
 

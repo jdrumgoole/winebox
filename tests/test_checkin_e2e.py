@@ -1,7 +1,7 @@
 """End-to-end tests for wine checkin flow using Playwright.
 
 These tests require a running WineBox server. Start the server with:
-    invoke start-background
+    uv run python -m invoke start-background
 
 Note: These tests use real wine label images and will call the configured
 OCR/Vision API if WINEBOX_ANTHROPIC_API_KEY is set.
@@ -10,36 +10,27 @@ For parallel execution, run with: pytest -n auto tests/test_checkin_e2e.py
 Each worker gets its own test user (created once per session for speed).
 """
 
-import os
-import re
-import subprocess
 from pathlib import Path
 from typing import Generator
 
 import pytest
 from playwright.sync_api import Page, expect
 
+from .playwright_utils import (
+    BASE_URL,
+    create_cli_worker_user,
+    login_via_ui,
+    preflight_check,
+)
+
 # Test data directory containing wine label images
 TEST_DATA_DIR = Path(__file__).parent / "data" / "wine_labels"
 
-# Server URL - can be overridden with WINEBOX_TEST_URL env var
-BASE_URL = os.environ.get("WINEBOX_TEST_URL", "http://localhost:8000")
 
-# Project directory for running CLI commands
-PROJECT_DIR = Path(__file__).parent.parent
-
-
-def get_worker_id(request: pytest.FixtureRequest) -> str:
-    """Get the pytest-xdist worker ID, or 'main' if not running in parallel."""
-    if hasattr(request.config, "workerinput"):
-        return request.config.workerinput["workerid"]
-    return "main"
-
-
-@pytest.fixture(scope="session")
-def base_url() -> str:
-    """Return the base URL for the test server."""
-    return BASE_URL
+@pytest.fixture(scope="session", autouse=True)
+def _e2e_preflight() -> None:
+    """Fail fast if the E2E server is not reachable."""
+    preflight_check()
 
 
 @pytest.fixture(scope="session")
@@ -50,44 +41,11 @@ def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], No
     User is created once per worker and reused across all tests in that worker.
     This is much faster than creating a user per test.
     """
-    import time
-    import sys
-
-    worker_id = get_worker_id(request)
-    email = f"e2e_worker_{worker_id}@test.example.com"
-    password = "testpass123"
-
-    # Create the user via CLI
-    # Retry a few times in case of transient issues
-    max_retries = 3
-    created = False
-    for attempt in range(max_retries):
-        result = subprocess.run(
-            ["uv", "run", "winebox-admin", "add", email, "--password", password],
-            cwd=PROJECT_DIR,
-            capture_output=True,
-            timeout=30,
-            text=True,
-        )
-        # Check if user was created or already exists
-        if result.returncode == 0:
-            created = True
-            break
-        if "already exists" in (result.stdout + result.stderr):
-            created = True
-            break
-        # Wait before retry
-        if attempt < max_retries - 1:
-            time.sleep(1.0)
-
-    if not created:
-        print(f"WARNING: Failed to create user {email}", file=sys.stderr)
-        print(f"  stdout: {result.stdout}", file=sys.stderr)
-        print(f"  stderr: {result.stderr}", file=sys.stderr)
-
-    # Longer delay to ensure database has committed
-    time.sleep(0.5)
-
+    email, password = create_cli_worker_user(
+        request,
+        email_prefix="e2e_worker",
+        password="testpass123",
+    )
     yield email, password
 
     # Note: We don't clean up users here - let invoke purge-wines handle it
@@ -109,37 +67,7 @@ def test_user(worker_user: tuple[str, str]) -> tuple[str, str]:
 def authenticated_page(page: Page, test_user: tuple[str, str]) -> Page:
     """Log in and return an authenticated page with a unique test user."""
     email, password = test_user
-
-    # Clear all browser state to ensure clean login
-    page.context.clear_cookies()
-    # Also clear localStorage which stores the JWT token
-    page.goto(BASE_URL)
-    page.evaluate("localStorage.clear()")
-
-    # Reload to get fresh login page
-    page.reload()
-
-    # Wait for login form
-    page.wait_for_selector("#login-form", state="visible", timeout=10000)
-
-    # Fill in credentials
-    page.fill("#login-email", email)
-    page.fill("#login-password", password)
-
-    # Click login
-    page.click("#login-form button[type='submit']")
-
-    # Wait for either successful login or error message
-    try:
-        page.wait_for_selector("#main-content", state="visible", timeout=15000)
-    except Exception:
-        # Check if there's a login error
-        error_elem = page.locator("#login-error")
-        if error_elem.is_visible():
-            error_text = error_elem.text_content()
-            raise AssertionError(f"Login failed for user '{email}': {error_text}")
-        raise
-
+    login_via_ui(page, email=email, password=password)
     return page
 
 
