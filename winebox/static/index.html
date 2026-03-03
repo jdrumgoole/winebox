@@ -11,21 +11,22 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="/static/logos/favicon.png">
+    <link rel="apple-touch-icon" href="/static/logos/favicon.png">
     <link rel="stylesheet" href="/static/css/style.css?v=0.5.46">
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
 </head>
-<body class="logged-out">
+    <body class="logged-out">
     <header>
         <div class="header-content">
             <img src="/static/logos/logo-compact-dark.svg" alt="WineBox" class="header-logo" height="32">
             <nav id="main-nav">
-                <a href="#" data-page="dashboard" class="nav-link active">Dashboard</a>
+                <a href="#" data-page="dashboard" class="nav-link active" aria-current="page">Dashboard</a>
+                <a href="#" data-page="import" class="nav-link">Import</a>
                 <a href="#" data-page="checkin" class="nav-link">Check In</a>
                 <a href="#" data-page="cellar" class="nav-link">Cellar</a>
                 <a href="#" data-page="history" class="nav-link">History</a>
                 <a href="#" data-page="search" class="nav-link">Search</a>
-                <a href="#" data-page="import" class="nav-link">Import</a>
                 <a href="#" data-page="xwines" class="nav-link">X-Wines</a>
             </nav>
             <div id="user-info" class="user-info" style="display: none;">
@@ -203,8 +204,8 @@
 
     <main id="main-content">
         <!-- Dashboard Page -->
-        <section id="page-dashboard" class="page active">
-            <h2>Dashboard</h2>
+        <section id="page-dashboard" class="page active" aria-labelledby="page-dashboard-title">
+            <h2 id="page-dashboard-title">Dashboard</h2>
             <div class="stats-grid" id="stats-grid">
                 <div class="stat-card">
                     <div class="stat-value" id="stat-total-bottles">-</div>
@@ -240,8 +241,8 @@
         </section>
 
         <!-- Check In Page -->
-        <section id="page-checkin" class="page">
-            <h2>Check In Wine</h2>
+        <section id="page-checkin" class="page" aria-labelledby="page-checkin-title">
+            <h2 id="page-checkin-title">Check In Wine</h2>
             <form id="checkin-form" enctype="multipart/form-data">
                 <div class="form-section">
                     <h3>Label Images</h3>
@@ -391,8 +392,8 @@
         </section>
 
         <!-- Cellar Page -->
-        <section id="page-cellar" class="page">
-            <h2>My Cellar</h2>
+        <section id="page-cellar" class="page" aria-labelledby="page-cellar-title">
+            <h2 id="page-cellar-title">My Cellar</h2>
             <div class="filter-bar">
                 <select id="cellar-filter">
                     <option value="all">All Wines</option>
@@ -429,8 +430,8 @@
         </div>
 
         <!-- History Page -->
-        <section id="page-history" class="page">
-            <h2>Transaction History</h2>
+        <section id="page-history" class="page" aria-labelledby="page-history-title">
+            <h2 id="page-history-title">Transaction History</h2>
             <div class="filter-bar">
                 <select id="history-filter">
                     <option value="all">All Transactions</option>
@@ -454,8 +455,8 @@
         </section>
 
         <!-- Search Page -->
-        <section id="page-search" class="page">
-            <h2>Search Wines</h2>
+        <section id="page-search" class="page" aria-labelledby="page-search-title">
+            <h2 id="page-search-title">Search Wines</h2>
             <form id="search-form">
                 <div class="form-grid">
                     <div class="form-group">
@@ -522,8 +523,8 @@
         </section>
 
         <!-- Import Page -->
-        <section id="page-import" class="page">
-            <h2>Import Wine Collection</h2>
+        <section id="page-import" class="page" aria-labelledby="page-import-title">
+            <h2 id="page-import-title">Import Wine Collection</h2>
             <p class="page-subtitle">Upload a CSV or Excel spreadsheet to import your wine collection</p>
 
             <!-- Step 1: Upload -->

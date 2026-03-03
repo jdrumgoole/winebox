@@ -407,7 +407,9 @@ function showLoginPage() {
     document.getElementById('user-info').style.display = 'none';
 }
 
-function showMainApp() {
+const APP_PAGES = ['dashboard', 'import', 'checkin', 'cellar', 'history', 'search', 'xwines', 'settings'];
+
+async function showMainApp() {
     document.body.classList.remove('logged-out');
     document.getElementById('page-login').classList.remove('active');
     document.getElementById('user-info').style.display = 'flex';
@@ -416,7 +418,26 @@ function showMainApp() {
     // Identify user for analytics
     analytics.identify(currentUser.id, { email: currentUser.email });
 
-    loadDashboard();
+    // Check if URL hash specifies a valid app page
+    const hashPage = window.location.hash.slice(1).split('?')[0];
+    if (hashPage && APP_PAGES.includes(hashPage)) {
+        navigateTo(hashPage);
+        return;
+    }
+
+    // For first-time users (empty cellar), start on the Import page
+    try {
+        const summaryResp = await fetchWithAuth(`${API_BASE}/cellar/summary`);
+        const summary = await summaryResp.json();
+        if (summary.unique_wines === 0) {
+            navigateTo('import');
+            return;
+        }
+    } catch (e) {
+        // Fall through to dashboard on error
+    }
+
+    navigateTo('dashboard');
 }
 
 async function handleLogin(e) {
@@ -520,6 +541,15 @@ function handleHashParams() {
 
 // Handle hash navigation on page load and hash changes
 function handleHashNavigation() {
+    const hashPage = window.location.hash.slice(1).split('?')[0];
+
+    // If it's a valid app page and user is logged in, navigate to it
+    if (hashPage && APP_PAGES.includes(hashPage) && authToken && currentUser) {
+        navigateTo(hashPage);
+        return;
+    }
+
+    // Otherwise handle auth-related hash params (verify, reset-password, login, register)
     handleHashParams();
 }
 
@@ -756,7 +786,13 @@ function initNavigation() {
 function navigateTo(page) {
     // Update nav links
     document.querySelectorAll('.nav-link').forEach(link => {
-        link.classList.toggle('active', link.dataset.page === page);
+        const isActive = link.dataset.page === page;
+        link.classList.toggle('active', isActive);
+        if (isActive) {
+            link.setAttribute('aria-current', 'page');
+        } else {
+            link.removeAttribute('aria-current');
+        }
     });
 
     // Update pages
@@ -765,6 +801,11 @@ function navigateTo(page) {
     });
 
     currentPage = page;
+
+    // Update URL hash to reflect current page
+    if (window.location.hash !== `#${page}`) {
+        history.replaceState(null, '', `#${page}`);
+    }
 
     // Track page view
     analytics.capture('page_view', { page: page });

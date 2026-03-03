@@ -28,14 +28,14 @@ html {
 }
 
 body {
-    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-family: 'Cormorant Garamond', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     background-color: var(--background-color);
     color: var(--text-color);
     line-height: 1.6;
 }
 
 h1, h2, h3, h4 {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
 }
 
 /* Header */
@@ -85,6 +85,11 @@ header {
 
 .header-nav a:hover {
     color: white;
+}
+
+.header-nav a:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
 }
 
 .mobile-menu-toggle {
@@ -164,6 +169,7 @@ header {
 .hero-content {
     max-width: 600px;
     text-align: center;
+    margin: 0 auto 2rem;
 }
 
 .hero h1 {
@@ -202,6 +208,27 @@ header {
 
 .hero-visual {
     display: none;
+}
+
+@media (min-width: 900px) {
+    .hero {
+        padding-top: 9rem;
+        padding-bottom: 6rem;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .hero-content {
+        text-align: left;
+        max-width: 540px;
+        margin: 0;
+    }
+
+    .hero-visual {
+        display: block;
+        margin-left: 3rem;
+    }
 }
 
 /* Card Preview in Hero */
