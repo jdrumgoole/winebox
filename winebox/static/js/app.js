@@ -2088,6 +2088,7 @@ async function handleDeleteCollection() {
         showToast(`Deleted ${result.deleted_wines} wines, ${result.deleted_transactions} transactions`, 'success');
         loadCellar();
         loadDashboard();
+        resetImportPage();
     } catch (error) {
         btn.disabled = false;
         btn.textContent = 'Delete Everything';
