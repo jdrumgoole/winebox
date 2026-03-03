@@ -3080,6 +3080,19 @@ async function handleConfirmMapping() {
     }
 
     try {
+        // Show progress bar immediately so user gets instant feedback
+        document.getElementById('import-step-upload').style.display = 'none';
+        document.getElementById('import-step-map').style.display = 'none';
+        document.getElementById('import-step-progress').style.display = 'block';
+        document.getElementById('import-step-results').style.display = 'none';
+
+        // Reset progress UI
+        document.getElementById('import-progress-fill').style.width = '0%';
+        document.getElementById('import-progress-text').textContent = 'Saving mapping...';
+        document.getElementById('import-progress-percent').textContent = '';
+        document.getElementById('import-progress-created').textContent = '';
+        document.getElementById('import-progress-skipped').textContent = '';
+
         // Set mapping
         const mapResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/mapping`, {
             method: 'POST',
@@ -3091,19 +3104,6 @@ async function handleConfirmMapping() {
             const error = await mapResponse.json();
             throw new Error(error.detail || 'Failed to set mapping');
         }
-
-        // Show progress bar
-        document.getElementById('import-step-upload').style.display = 'none';
-        document.getElementById('import-step-map').style.display = 'none';
-        document.getElementById('import-step-progress').style.display = 'block';
-        document.getElementById('import-step-results').style.display = 'none';
-
-        // Reset progress UI
-        document.getElementById('import-progress-fill').style.width = '0%';
-        document.getElementById('import-progress-text').textContent = '0 / 0 rows';
-        document.getElementById('import-progress-percent').textContent = '0%';
-        document.getElementById('import-progress-created').textContent = '0 wines created';
-        document.getElementById('import-progress-skipped').textContent = '0 rows skipped';
 
         // If client-parsed CSV, upload rows in chunks first
         if (pendingCsvRows) {
@@ -3132,6 +3132,9 @@ async function handleConfirmMapping() {
         showImportResults(result);
     } catch (error) {
         showToast(error.message, 'error');
+        // Restore mapping step if progress was shown prematurely
+        document.getElementById('import-step-progress').style.display = 'none';
+        document.getElementById('import-step-map').style.display = 'block';
     }
 }
 
