@@ -146,6 +146,14 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Refresh all admin data (stats + users)
+async function refreshData() {
+    await Promise.all([
+        loadStats(),
+        loadUsers()
+    ]);
+}
+
 // Initialize admin panel
 async function init() {
     // Check authentication
@@ -153,10 +161,10 @@ async function init() {
     if (!isAuth) return;
 
     // Load data
-    await Promise.all([
-        loadStats(),
-        loadUsers()
-    ]);
+    await refreshData();
+
+    // Auto-refresh every 30 seconds so cellar sizes stay current
+    setInterval(refreshData, 30000);
 }
 
 // Run on page load
