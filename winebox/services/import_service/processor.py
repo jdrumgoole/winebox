@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CHUNK_SIZE = 50
 
+# Sentinel pushed to progress_queue when the writer is done
+_PROGRESS_DONE = object()
+
 
 # ---------------------------------------------------------------------------
 # Chunk dataclass — carries a batch of rows through the pipeline
@@ -185,12 +188,13 @@ async def _enrichment_worker(
 
 async def _writer_worker(
     write_queue: asyncio.Queue[_Chunk | None],
-    progress_queue: asyncio.Queue[dict[str, Any]],
+    progress_queue: asyncio.Queue[dict[str, Any] | object],
     total: int,
     num_enrichment_workers: int,
 ) -> tuple[int, int, list[str]]:
     """Writer: dequeue enriched chunks, insert_many, push progress updates.
 
+    Pushes _PROGRESS_DONE sentinel when all work is complete.
     Returns cumulative (wines_created, rows_skipped, errors).
     """
     wines_created = 0
@@ -231,7 +235,47 @@ async def _writer_worker(
 
         write_queue.task_done()
 
+    # Signal that all progress events have been pushed
+    await progress_queue.put(_PROGRESS_DONE)
+
     return wines_created, rows_skipped, errors
+
+
+# ---------------------------------------------------------------------------
+# Feeder — runs as a background task, feeds chunks and manages shutdown
+# ---------------------------------------------------------------------------
+
+async def _feeder(
+    batch: ImportBatch,
+    owner_id: PydanticObjectId,
+    skip_non_wine: bool,
+    default_quantity: int,
+    chunk_size: int,
+    total: int,
+    enrichment_queue: asyncio.Queue[_Chunk | None],
+    enrichment_tasks: list[asyncio.Task[None]],
+    write_queue: asyncio.Queue[_Chunk | None],
+    num_workers: int,
+) -> None:
+    """Feed chunks into the pipeline and manage orderly shutdown."""
+    # Convert and enqueue all chunks
+    for chunk_start in range(0, total, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, total)
+        chunk = _convert_chunk(
+            batch, owner_id, chunk_start, chunk_end, skip_non_wine, default_quantity,
+        )
+        await enrichment_queue.put(chunk)
+
+    # Poison pills for enrichment workers
+    for _ in range(num_workers):
+        await enrichment_queue.put(None)
+
+    # Wait for enrichment to complete
+    await asyncio.gather(*enrichment_tasks)
+
+    # Poison pills for writer
+    for _ in range(num_workers):
+        await write_queue.put(None)
 
 
 # ---------------------------------------------------------------------------
@@ -249,11 +293,13 @@ async def _process_chunks(
 
     Pipeline:
       1. Split rows into chunk-sized batches, convert to wine dicts (sync)
-      2. Feed chunks to enrichment_queue
+      2. Feed chunks to enrichment_queue (background task)
       3. N enrichment tasks consume chunks, enrich via batch X-Wines query,
          push to write_queue
-      4. 1 writer task consumes enriched chunks, does insert_many
-      5. Progress reported via progress_queue -> this generator yields events
+      4. 1 writer task consumes enriched chunks, does insert_many,
+         pushes progress events to progress_queue
+      5. This generator awaits progress_queue.get() and yields events
+         to the SSE stream in real-time
 
     Yields dicts with keys: processed, total, wines_created, rows_skipped.
     The final yield includes done=True plus errors list and status.
@@ -296,7 +342,7 @@ async def _process_chunks(
     # Queues
     enrichment_queue: asyncio.Queue[_Chunk | None] = asyncio.Queue(maxsize=num_workers * 2)
     write_queue: asyncio.Queue[_Chunk | None] = asyncio.Queue(maxsize=num_workers * 2)
-    progress_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    progress_queue: asyncio.Queue[dict[str, Any] | object] = asyncio.Queue()
 
     # Start enrichment workers
     enrichment_tasks = [
@@ -304,40 +350,31 @@ async def _process_chunks(
         for _ in range(num_workers)
     ]
 
-    # Start writer (runs until all enrichment workers finish)
+    # Start writer (pushes progress events; pushes _PROGRESS_DONE when finished)
     writer_future: asyncio.Future[tuple[int, int, list[str]]] = asyncio.ensure_future(
         _writer_worker(write_queue, progress_queue, total, num_workers)
     )
 
-    # Feed chunks into the enrichment queue
-    for chunk_start in range(0, total, chunk_size):
-        chunk_end = min(chunk_start + chunk_size, total)
-        chunk = _convert_chunk(
-            batch, owner_id, chunk_start, chunk_end, skip_non_wine, default_quantity,
+    # Start feeder as a background task so we can drain progress_queue
+    # concurrently instead of being blocked feeding chunks
+    feeder_task = asyncio.create_task(
+        _feeder(
+            batch, owner_id, skip_non_wine, default_quantity, chunk_size,
+            total, enrichment_queue, enrichment_tasks, write_queue, num_workers,
         )
-        await enrichment_queue.put(chunk)
+    )
 
-        # Drain any available progress events while feeding
-        while not progress_queue.empty():
-            yield progress_queue.get_nowait()
+    # Yield progress events in real-time as the writer produces them.
+    # The writer pushes _PROGRESS_DONE when all chunks are written.
+    while True:
+        event = await progress_queue.get()
+        if event is _PROGRESS_DONE:
+            break
+        yield event
 
-    # Send poison pills to enrichment workers
-    for _ in range(num_workers):
-        await enrichment_queue.put(None)
-
-    # Wait for enrichment workers to finish
-    await asyncio.gather(*enrichment_tasks)
-
-    # Forward poison pills to writer (one per enrichment worker)
-    for _ in range(num_workers):
-        await write_queue.put(None)
-
-    # Wait for writer to finish
+    # Collect final results from writer
     wines_created, rows_skipped, errors = await writer_future
-
-    # Drain remaining progress events
-    while not progress_queue.empty():
-        yield progress_queue.get_nowait()
+    await feeder_task
 
     # Save final batch state
     batch.wines_created = wines_created
