@@ -39,7 +39,7 @@ _PROGRESS_DONE = object()
 class _Chunk:
     """A batch of rows moving through the enrichment/write pipeline."""
 
-    __slots__ = ("wine_datas", "chunk_start", "chunk_end", "rows_skipped", "errors")
+    __slots__ = ("wine_datas", "chunk_start", "chunk_end", "rows_skipped", "skipped_rows", "errors")
 
     def __init__(
         self,
@@ -47,12 +47,14 @@ class _Chunk:
         chunk_start: int,
         chunk_end: int,
         rows_skipped: int,
+        skipped_rows: list[dict[str, Any]],
         errors: list[str],
     ) -> None:
         self.wine_datas = wine_datas
         self.chunk_start = chunk_start
         self.chunk_end = chunk_end
         self.rows_skipped = rows_skipped
+        self.skipped_rows = skipped_rows
         self.errors = errors
 
 
@@ -72,6 +74,7 @@ def _convert_chunk(
     chunk_rows = batch.rows[chunk_start:chunk_end]
     wine_datas: list[tuple[dict[str, Any], int]] = []
     rows_skipped = 0
+    skipped_rows: list[dict[str, Any]] = []
     errors: list[str] = []
 
     for offset, row in enumerate(chunk_rows):
@@ -79,11 +82,21 @@ def _convert_chunk(
         try:
             if skip_non_wine and is_non_wine_row(row, batch.column_mapping):
                 rows_skipped += 1
+                skipped_rows.append({
+                    "row": row_index + 1,
+                    "reason": "Non-wine item detected",
+                    "data": row,
+                })
                 continue
 
             wine_data = row_to_wine_data(row, batch.column_mapping, owner_id, default_quantity)
             if wine_data is None:
                 rows_skipped += 1
+                skipped_rows.append({
+                    "row": row_index + 1,
+                    "reason": "Missing required wine name",
+                    "data": row,
+                })
                 continue
 
             wine_datas.append((wine_data, row_index + 1))
@@ -92,7 +105,7 @@ def _convert_chunk(
             errors.append(error_msg)
             logger.warning("Import error on row %d: %s", row_index + 1, e)
 
-    return _Chunk(wine_datas, chunk_start, chunk_end, rows_skipped, errors)
+    return _Chunk(wine_datas, chunk_start, chunk_end, rows_skipped, skipped_rows, errors)
 
 
 async def _enrich_chunk(chunk: _Chunk) -> _Chunk:
@@ -208,15 +221,16 @@ async def _writer_worker(
     progress_state: dict[str, int],
     total: int,
     num_enrichment_workers: int,
-) -> tuple[int, int, list[str]]:
+) -> tuple[int, int, list[dict[str, Any]], list[str]]:
     """Writer: dequeue enriched chunks, insert_many, push progress updates.
 
     Credits the remaining half of each chunk's rows (enrichment credited the
     first half). Pushes _PROGRESS_DONE sentinel when all work is complete.
-    Returns cumulative (wines_created, rows_skipped, errors).
+    Returns cumulative (wines_created, rows_skipped, skipped_rows, errors).
     """
     wines_created = 0
     rows_skipped = 0
+    skipped_rows: list[dict[str, Any]] = []
     errors: list[str] = []
     poison_pills_seen = 0
 
@@ -231,6 +245,7 @@ async def _writer_worker(
 
         # Accumulate skip/error counts from conversion phase
         rows_skipped += chunk.rows_skipped
+        skipped_rows.extend(chunk.skipped_rows)
         errors.extend(chunk.errors)
 
         # Write
@@ -258,7 +273,7 @@ async def _writer_worker(
     # Signal that all progress events have been pushed
     await progress_queue.put(_PROGRESS_DONE)
 
-    return wines_created, rows_skipped, errors
+    return wines_created, rows_skipped, skipped_rows, errors
 
 
 # ---------------------------------------------------------------------------
@@ -383,7 +398,7 @@ async def _process_chunks(
     ]
 
     # Start writer (pushes progress events; pushes _PROGRESS_DONE when finished)
-    writer_future: asyncio.Future[tuple[int, int, list[str]]] = asyncio.ensure_future(
+    writer_future: asyncio.Future[tuple[int, int, list[dict[str, Any]], list[str]]] = asyncio.ensure_future(
         _writer_worker(write_queue, progress_queue, progress_state, total, num_workers)
     )
 
@@ -405,12 +420,13 @@ async def _process_chunks(
         yield event
 
     # Collect final results from writer
-    wines_created, rows_skipped, errors = await writer_future
+    wines_created, rows_skipped, skipped_rows, errors = await writer_future
     await feeder_task
 
     # Save final batch state
     batch.wines_created = wines_created
     batch.rows_skipped = rows_skipped
+    batch.skipped_rows_detail = skipped_rows
     batch.errors = errors
     batch.status = ImportStatus.COMPLETED
     await batch.save()
@@ -422,6 +438,7 @@ async def _process_chunks(
         "total": total,
         "wines_created": wines_created,
         "rows_skipped": rows_skipped,
+        "skipped_rows": skipped_rows,
         "errors": errors,
         "status": "completed",
     }

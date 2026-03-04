@@ -39,6 +39,7 @@ class ImportBatch(Document):
     # Processing results
     wines_created: int = 0
     rows_skipped: int = 0
+    skipped_rows_detail: list[dict[str, Any]] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
 
     class Settings:

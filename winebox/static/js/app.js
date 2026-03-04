@@ -3197,6 +3197,13 @@ function showImportResults(result) {
     document.getElementById('import-step-progress').style.display = 'none';
     document.getElementById('import-step-results').style.display = 'block';
 
+    // Store skipped rows for modal access
+    window._lastSkippedRows = result.skipped_rows || [];
+
+    const skippedValue = (result.rows_skipped > 0 && window._lastSkippedRows.length > 0)
+        ? `<a href="#" onclick="showSkippedRows(); return false;" style="color:var(--primary-color);text-decoration:underline;">${result.rows_skipped}</a>`
+        : `${result.rows_skipped}`;
+
     let html = `
         <div class="stats-grid" style="margin-bottom:1.5rem;">
             <div class="stat-card">
@@ -3204,7 +3211,7 @@ function showImportResults(result) {
                 <div class="stat-label">Wines Created</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${result.rows_skipped}</div>
+                <div class="stat-value">${skippedValue}</div>
                 <div class="stat-label">Rows Skipped</div>
             </div>
         </div>
@@ -3226,6 +3233,30 @@ function showImportResults(result) {
     if (result.wines_created > 0) {
         showToast(`Successfully imported ${result.wines_created} wines!`, 'success');
     }
+}
+
+function showSkippedRows() {
+    const skippedRows = window._lastSkippedRows || [];
+    if (skippedRows.length === 0) return;
+
+    let html = '<table class="wine-table" style="width:100%;"><thead><tr>';
+    html += '<th>Row #</th><th>Reason</th><th>Data</th>';
+    html += '</tr></thead><tbody>';
+
+    for (const sr of skippedRows) {
+        const dataEntries = Object.entries(sr.data || {})
+            .map(([k, v]) => `<strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v || ''))}`)
+            .join(', ');
+        html += `<tr>
+            <td>${sr.row}</td>
+            <td>${escapeHtml(sr.reason)}</td>
+            <td style="font-size:0.85rem;">${dataEntries}</td>
+        </tr>`;
+    }
+
+    html += '</tbody></table>';
+    document.getElementById('skipped-rows-content').innerHTML = html;
+    openModal('skipped-rows-modal');
 }
 
 function resetImportPage() {
