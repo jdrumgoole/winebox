@@ -782,8 +782,9 @@ async function fetchWithAuth(url, options = {}) {
 function initNavigation() {
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
-            e.preventDefault();
             const page = link.dataset.page;
+            if (!page) return; // Let normal links (e.g. Admin) navigate normally
+            e.preventDefault();
             navigateTo(page);
         });
     });
