@@ -294,7 +294,9 @@ def import_to_mongodb(
     wines_col.create_index("wine_type")
     wines_col.create_index("country_code")
     wines_col.create_index("winery_name")
+    wines_col.create_index("rating_count")
     wines_col.create_index([("name", "text"), ("winery_name", "text")])
+    wines_col.create_index([("name", 1), ("rating_count", -1)])
     print("  Indexes created")
 
     # Save metadata

@@ -47,9 +47,16 @@ class XWinesWine(Document):
             "wine_type",
             "country_code",
             "winery_name",
+            "rating_count",
             [
                 ("name", "text"),
                 ("winery_name", "text"),
+            ],
+            # Compound index: lets Tier 1 anchored regex (^name) use the
+            # index for both the match and the rating_count sort
+            [
+                ("name", 1),
+                ("rating_count", -1),
             ],
         ]
 

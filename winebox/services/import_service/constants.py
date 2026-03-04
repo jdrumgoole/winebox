@@ -114,6 +114,9 @@ WINE_FIELD_DESCRIPTIONS: dict[str, str] = {
     "notes": "Tasting notes, description, or general notes",
 }
 
+# Number of concurrent asyncio enrichment workers for pipelined imports
+ENRICHMENT_WORKERS = 2
+
 # Non-wine keywords for filtering
 NON_WINE_KEYWORDS = {
     "whiskey", "whisky", "bourbon", "scotch", "cognac", "brandy",

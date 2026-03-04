@@ -7,7 +7,10 @@ from beanie import PydanticObjectId
 
 from winebox.models import Wine, XWinesWine
 from winebox.models.import_batch import ImportBatch, ImportStatus
-from winebox.services.import_service.processor import process_import_batch
+from winebox.services.import_service.processor import (
+    process_import_batch,
+    process_import_batch_streaming,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -197,3 +200,77 @@ async def test_import_enrichment_failure_nonfatal(init_test_db) -> None:
     # No enrichment metadata since the service failed
     assert wine.enriched_fields is None
     assert wine.xwines_id is None
+
+
+# ---------------------------------------------------------------------------
+# Test: multi-chunk pipeline processes all rows correctly
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_import_multi_chunk_pipeline(init_test_db) -> None:
+    """Import 120 rows (3 chunks of 50+50+20) — all should be created."""
+    owner_id = PydanticObjectId()
+    rows = [{"Wine Name": f"Pipeline Wine {i}"} for i in range(120)]
+    batch = _make_batch(
+        owner_id=owner_id,
+        rows=rows,
+        mapping={"Wine Name": "name"},
+    )
+    await batch.insert()
+
+    with patch(
+        "winebox.services.import_service.processor.enrich_batch_with_xwines",
+        new_callable=AsyncMock,
+    ):
+        result = await process_import_batch(batch, owner_id)
+
+    assert result.status == ImportStatus.COMPLETED
+    assert result.wines_created == 120
+    assert result.rows_skipped == 0
+    assert result.errors == []
+
+    count = await Wine.find(Wine.owner_id == owner_id).count()
+    assert count == 120
+
+
+# ---------------------------------------------------------------------------
+# Test: streaming progress is monotonically increasing with multi-chunk
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_import_streaming_progress_monotonic(init_test_db) -> None:
+    """Streaming progress should be monotonically increasing even with pipeline."""
+    owner_id = PydanticObjectId()
+    rows = [{"Wine Name": f"Progress Wine {i}"} for i in range(75)]
+    batch = _make_batch(
+        owner_id=owner_id,
+        rows=rows,
+        mapping={"Wine Name": "name"},
+    )
+    await batch.insert()
+
+    batch.status = ImportStatus.MAPPED
+    await batch.save()
+
+    events: list[dict] = []
+    with patch(
+        "winebox.services.import_service.processor.enrich_batch_with_xwines",
+        new_callable=AsyncMock,
+    ):
+        async for progress in process_import_batch_streaming(batch, owner_id):
+            events.append(progress)
+
+    # Should have initial event + chunk events + final done event
+    assert len(events) >= 3
+
+    # Progress should be monotonically increasing
+    for i in range(1, len(events)):
+        assert events[i]["processed"] >= events[i - 1]["processed"]
+
+    # Final event
+    final = events[-1]
+    assert final.get("done") is True
+    assert final["wines_created"] == 75
+    assert final["total"] == 75

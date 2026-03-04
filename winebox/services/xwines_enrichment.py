@@ -164,7 +164,10 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
             for term in terms
         ]
 
-        # Use compound query with must for AND logic, should for score boosting
+        # Use compound query with must for AND logic, should for score boosting.
+        # Atlas Search returns results sorted by searchScore natively, so we
+        # only need $limit (no explicit $sort). The rating_count tiebreaker
+        # is incorporated via a function score on the should clauses.
         pipeline: list[dict] = [
             {
                 "$search": {
@@ -192,15 +195,12 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
                     },
                 }
             },
-            {"$addFields": {"searchScore": {"$meta": "searchScore"}}},
-            {"$sort": {"searchScore": -1, "rating_count": -1}},
             {"$limit": 1},
         ]
         docs = await collection.aggregate(pipeline).to_list(length=1)
         if docs:
-            # Convert raw doc to XWinesWine model
             doc = docs[0]
-            return XWinesWine(**{k: v for k, v in doc.items() if k not in ("_id", "searchScore")})
+            return XWinesWine(**{k: v for k, v in doc.items() if k != "_id"})
     except Exception as e:
         logger.debug("Atlas Search unavailable for enrichment, falling back to regex: %s", e)
 
@@ -358,9 +358,23 @@ async def _find_best_xwines_matches_batch(
                     },
                 }
             },
-            {"$addFields": {"searchScore": {"$meta": "searchScore"}}},
-            {"$sort": {"searchScore": -1, "rating_count": -1}},
             {"$limit": candidate_limit},
+            # Project only the fields needed for scoring + enrichment
+            # (avoids transferring elaborate, harmonize, vintages, etc.)
+            {
+                "$project": {
+                    "_id": 0,
+                    "xwines_id": 1,
+                    "name": 1,
+                    "winery_name": 1,
+                    "wine_type": 1,
+                    "grapes": 1,
+                    "region_name": 1,
+                    "country": 1,
+                    "abv": 1,
+                    "rating_count": 1,
+                }
+            },
         ]
         docs = await collection.aggregate(pipeline).to_list(length=candidate_limit)
 
@@ -368,10 +382,7 @@ async def _find_best_xwines_matches_batch(
             candidates: list[XWinesWine] = []
             for doc in docs:
                 try:
-                    wine = XWinesWine(
-                        **{k: v for k, v in doc.items() if k not in ("_id", "searchScore")}
-                    )
-                    candidates.append(wine)
+                    candidates.append(XWinesWine(**doc))
                 except Exception:
                     continue
 

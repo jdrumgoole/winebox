@@ -104,12 +104,13 @@ async def _atlas_search(
         }
     }
 
-    # Run search pipeline for results (with skip for pagination)
-    # Sort by search score first (phrase matches rank higher), then by popularity
+    # Sort by search score with rating_count as tiebreaker for stable
+    # pagination.  $sort + $limit coalesces into a top-k heap internally,
+    # so MongoDB only maintains (skip + limit) entries — not a full sort.
+    # No $addFields needed: $meta works directly in $sort after $search.
     pipeline: list[dict] = [
         search_stage,
-        {"$addFields": {"searchScore": {"$meta": "searchScore"}}},
-        {"$sort": {"searchScore": -1, "rating_count": -1, "avg_rating": -1}},
+        {"$sort": {"score": {"$meta": "searchScore"}, "rating_count": -1}},
         {"$skip": skip},
         {"$limit": limit},
     ]

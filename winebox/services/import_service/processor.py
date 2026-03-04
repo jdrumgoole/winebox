@@ -1,5 +1,15 @@
-"""Batch processing for wine imports."""
+"""Batch processing for wine imports.
 
+Uses an asyncio pipeline for concurrent enrichment:
+  Raw rows -> split into chunks -> [enrichment queue] -> N enrichment tasks
+  -> [write queue] -> 1 writer task -> MongoDB (insert_many per batch)
+  -> progress queue -> SSE generator
+
+This gives pipeline parallelism: enrichment of chunk N+1 overlaps with
+writing chunk N, and multiple enrichment tasks run concurrently.
+"""
+
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -11,12 +21,222 @@ from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.wine import Wine
 from winebox.services.xwines_enrichment import enrich_batch_with_xwines
 
+from .constants import ENRICHMENT_WORKERS
 from .converters import is_non_wine_row, row_to_wine_data
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_CHUNK_SIZE = 50
 
+
+# ---------------------------------------------------------------------------
+# Chunk dataclass — carries a batch of rows through the pipeline
+# ---------------------------------------------------------------------------
+
+class _Chunk:
+    """A batch of rows moving through the enrichment/write pipeline."""
+
+    __slots__ = ("wine_datas", "chunk_start", "chunk_end", "rows_skipped", "errors")
+
+    def __init__(
+        self,
+        wine_datas: list[tuple[dict[str, Any], int]],
+        chunk_start: int,
+        chunk_end: int,
+        rows_skipped: int,
+        errors: list[str],
+    ) -> None:
+        self.wine_datas = wine_datas
+        self.chunk_start = chunk_start
+        self.chunk_end = chunk_end
+        self.rows_skipped = rows_skipped
+        self.errors = errors
+
+
+# ---------------------------------------------------------------------------
+# Pipeline stages
+# ---------------------------------------------------------------------------
+
+def _convert_chunk(
+    batch: ImportBatch,
+    owner_id: PydanticObjectId,
+    chunk_start: int,
+    chunk_end: int,
+    skip_non_wine: bool,
+    default_quantity: int,
+) -> _Chunk:
+    """Phase 1: Convert raw rows to wine dicts (sync, fast)."""
+    chunk_rows = batch.rows[chunk_start:chunk_end]
+    wine_datas: list[tuple[dict[str, Any], int]] = []
+    rows_skipped = 0
+    errors: list[str] = []
+
+    for offset, row in enumerate(chunk_rows):
+        row_index = chunk_start + offset  # 0-based
+        try:
+            if skip_non_wine and is_non_wine_row(row, batch.column_mapping):
+                rows_skipped += 1
+                continue
+
+            wine_data = row_to_wine_data(row, batch.column_mapping, owner_id, default_quantity)
+            if wine_data is None:
+                rows_skipped += 1
+                continue
+
+            wine_datas.append((wine_data, row_index + 1))
+        except Exception as e:
+            error_msg = f"Row {row_index + 1}: {str(e)}"
+            errors.append(error_msg)
+            logger.warning("Import error on row %d: %s", row_index + 1, e)
+
+    return _Chunk(wine_datas, chunk_start, chunk_end, rows_skipped, errors)
+
+
+async def _enrich_chunk(chunk: _Chunk) -> _Chunk:
+    """Phase 2: Enrich all rows in a chunk with a single batch X-Wines query."""
+    if not chunk.wine_datas:
+        return chunk
+
+    enrichment_inputs = []
+    for wd, _ in chunk.wine_datas:
+        enrichment_inputs.append({
+            "name": wd.get("name"),
+            "winery": wd.get("winery"),
+            "grape_variety": wd.get("grape_variety"),
+            "region": wd.get("region"),
+            "country": wd.get("country"),
+            "alcohol_percentage": wd.get("alcohol_percentage"),
+        })
+    try:
+        await enrich_batch_with_xwines(enrichment_inputs)
+        # Apply enrichment results back to wine_datas
+        for (wd, _), enriched in zip(chunk.wine_datas, enrichment_inputs):
+            enriched_fields = enriched.pop("enriched_fields", None)
+            xwines_id = enriched.pop("xwines_id", None)
+            for key in ("winery", "grape_variety", "region", "country", "alcohol_percentage"):
+                if enriched.get(key):
+                    wd[key] = enriched[key]
+            wd["enriched_fields"] = enriched_fields
+            wd["xwines_id"] = xwines_id
+    except Exception as e:
+        logger.warning(
+            "Batch enrichment failed for chunk %d-%d: %s",
+            chunk.chunk_start + 1, chunk.chunk_end, e,
+        )
+
+    return chunk
+
+
+async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
+    """Phase 3: Batch insert Wine documents. Returns (wines_created, errors)."""
+    if not chunk.wine_datas:
+        return 0, []
+
+    wine_docs = [Wine(**wd) for wd, _ in chunk.wine_datas]
+    errors: list[str] = []
+    wines_created = 0
+
+    try:
+        await Wine.insert_many(wine_docs)
+        wines_created = len(wine_docs)
+    except BulkWriteError as e:
+        n_inserted = e.details.get("nInserted", 0)
+        wines_created = n_inserted
+        failed = len(wine_docs) - n_inserted
+        error_msg = f"Batch insert partial failure: {failed} of {len(wine_docs)} failed"
+        errors.append(error_msg)
+        logger.warning(error_msg)
+    except Exception as e:
+        error_msg = (
+            f"Batch insert failed for rows "
+            f"{chunk.chunk_start + 1}-{chunk.chunk_end}: {str(e)}"
+        )
+        errors.append(error_msg)
+        logger.warning(error_msg)
+
+    return wines_created, errors
+
+
+# ---------------------------------------------------------------------------
+# Enrichment worker — consumes from enrichment_queue, pushes to write_queue
+# ---------------------------------------------------------------------------
+
+async def _enrichment_worker(
+    enrichment_queue: asyncio.Queue[_Chunk | None],
+    write_queue: asyncio.Queue[_Chunk | None],
+) -> None:
+    """Enrichment worker: dequeue chunks, enrich, forward to write queue."""
+    while True:
+        chunk = await enrichment_queue.get()
+        if chunk is None:
+            # Poison pill — signal to stop
+            enrichment_queue.task_done()
+            break
+        try:
+            await _enrich_chunk(chunk)
+        finally:
+            await write_queue.put(chunk)
+            enrichment_queue.task_done()
+
+
+# ---------------------------------------------------------------------------
+# Writer worker — consumes from write_queue, inserts, pushes progress
+# ---------------------------------------------------------------------------
+
+async def _writer_worker(
+    write_queue: asyncio.Queue[_Chunk | None],
+    progress_queue: asyncio.Queue[dict[str, Any]],
+    total: int,
+    num_enrichment_workers: int,
+) -> tuple[int, int, list[str]]:
+    """Writer: dequeue enriched chunks, insert_many, push progress updates.
+
+    Returns cumulative (wines_created, rows_skipped, errors).
+    """
+    wines_created = 0
+    rows_skipped = 0
+    rows_processed = 0  # Cumulative count for monotonic progress
+    errors: list[str] = []
+    poison_pills_seen = 0
+
+    while True:
+        chunk = await write_queue.get()
+        if chunk is None:
+            poison_pills_seen += 1
+            write_queue.task_done()
+            if poison_pills_seen >= num_enrichment_workers:
+                break
+            continue
+
+        # Accumulate skip/error counts from conversion phase
+        rows_skipped += chunk.rows_skipped
+        errors.extend(chunk.errors)
+
+        # Write
+        created, write_errors = await _write_chunk(chunk)
+        wines_created += created
+        errors.extend(write_errors)
+
+        # Track cumulative rows processed (monotonically increasing even
+        # if chunks arrive out of order from enrichment workers)
+        rows_processed += chunk.chunk_end - chunk.chunk_start
+
+        # Push progress
+        await progress_queue.put({
+            "processed": rows_processed,
+            "total": total,
+            "wines_created": wines_created,
+            "rows_skipped": rows_skipped,
+        })
+
+        write_queue.task_done()
+
+    return wines_created, rows_skipped, errors
+
+
+# ---------------------------------------------------------------------------
+# Main pipeline — replaces sequential _process_chunks
+# ---------------------------------------------------------------------------
 
 async def _process_chunks(
     batch: ImportBatch,
@@ -25,13 +245,15 @@ async def _process_chunks(
     default_quantity: int = 1,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
 ) -> AsyncGenerator[dict[str, Any], None]:
-    """Process import rows in chunks, yielding progress after each chunk.
+    """Process import rows using a pipelined async architecture.
 
-    Within each chunk:
-    1. Convert all rows to wine dicts (fast, sync)
-    2. Enrich all rows via single batch X-Wines lookup (one DB query per chunk)
-    3. Insert all Wine docs in one insert_many call (single DB round-trip)
-    4. Yield progress event
+    Pipeline:
+      1. Split rows into chunk-sized batches, convert to wine dicts (sync)
+      2. Feed chunks to enrichment_queue
+      3. N enrichment tasks consume chunks, enrich via batch X-Wines query,
+         push to write_queue
+      4. 1 writer task consumes enriched chunks, does insert_many
+      5. Progress reported via progress_queue -> this generator yields events
 
     Yields dicts with keys: processed, total, wines_created, rows_skipped.
     The final yield includes done=True plus errors list and status.
@@ -44,9 +266,7 @@ async def _process_chunks(
         chunk_size: Number of rows per chunk.
     """
     total = len(batch.rows)
-    wines_created = 0
-    rows_skipped = 0
-    errors: list[str] = []
+    num_workers = ENRICHMENT_WORKERS
 
     # Yield immediately so the client sees progress start without delay
     yield {
@@ -56,90 +276,68 @@ async def _process_chunks(
         "rows_skipped": 0,
     }
 
+    if total == 0:
+        batch.wines_created = 0
+        batch.rows_skipped = 0
+        batch.errors = []
+        batch.status = ImportStatus.COMPLETED
+        await batch.save()
+        yield {
+            "done": True,
+            "processed": 0,
+            "total": 0,
+            "wines_created": 0,
+            "rows_skipped": 0,
+            "errors": [],
+            "status": "completed",
+        }
+        return
+
+    # Queues
+    enrichment_queue: asyncio.Queue[_Chunk | None] = asyncio.Queue(maxsize=num_workers * 2)
+    write_queue: asyncio.Queue[_Chunk | None] = asyncio.Queue(maxsize=num_workers * 2)
+    progress_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    # Start enrichment workers
+    enrichment_tasks = [
+        asyncio.create_task(_enrichment_worker(enrichment_queue, write_queue))
+        for _ in range(num_workers)
+    ]
+
+    # Start writer (runs until all enrichment workers finish)
+    writer_future: asyncio.Future[tuple[int, int, list[str]]] = asyncio.ensure_future(
+        _writer_worker(write_queue, progress_queue, total, num_workers)
+    )
+
+    # Feed chunks into the enrichment queue
     for chunk_start in range(0, total, chunk_size):
         chunk_end = min(chunk_start + chunk_size, total)
-        chunk_rows = batch.rows[chunk_start:chunk_end]
+        chunk = _convert_chunk(
+            batch, owner_id, chunk_start, chunk_end, skip_non_wine, default_quantity,
+        )
+        await enrichment_queue.put(chunk)
 
-        # Phase 1: Convert rows to wine dicts
-        wine_datas: list[tuple[dict[str, Any], int]] = []  # (wine_data, 1-based row_index)
-        for offset, row in enumerate(chunk_rows):
-            row_index = chunk_start + offset  # 0-based
-            try:
-                if skip_non_wine and is_non_wine_row(row, batch.column_mapping):
-                    rows_skipped += 1
-                    continue
+        # Drain any available progress events while feeding
+        while not progress_queue.empty():
+            yield progress_queue.get_nowait()
 
-                wine_data = row_to_wine_data(row, batch.column_mapping, owner_id, default_quantity)
-                if wine_data is None:
-                    rows_skipped += 1
-                    continue
+    # Send poison pills to enrichment workers
+    for _ in range(num_workers):
+        await enrichment_queue.put(None)
 
-                wine_datas.append((wine_data, row_index + 1))
-            except Exception as e:
-                error_msg = f"Row {row_index + 1}: {str(e)}"
-                errors.append(error_msg)
-                logger.warning("Import error on row %d: %s", row_index + 1, e)
+    # Wait for enrichment workers to finish
+    await asyncio.gather(*enrichment_tasks)
 
-        # Phase 2: Enrich all rows in this chunk with a single batch query
-        if wine_datas:
-            enrichment_inputs = []
-            for wd, _ in wine_datas:
-                enrichment_inputs.append({
-                    "name": wd.get("name"),
-                    "winery": wd.get("winery"),
-                    "grape_variety": wd.get("grape_variety"),
-                    "region": wd.get("region"),
-                    "country": wd.get("country"),
-                    "alcohol_percentage": wd.get("alcohol_percentage"),
-                })
-            try:
-                await enrich_batch_with_xwines(enrichment_inputs)
-                # Apply enrichment results back to wine_datas
-                for (wd, _), enriched in zip(wine_datas, enrichment_inputs):
-                    enriched_fields = enriched.pop("enriched_fields", None)
-                    xwines_id = enriched.pop("xwines_id", None)
-                    for key in ("winery", "grape_variety", "region", "country", "alcohol_percentage"):
-                        if enriched.get(key):
-                            wd[key] = enriched[key]
-                    wd["enriched_fields"] = enriched_fields
-                    wd["xwines_id"] = xwines_id
-            except Exception as e:
-                logger.warning("Batch enrichment failed for chunk %d-%d: %s", chunk_start + 1, chunk_end, e)
+    # Forward poison pills to writer (one per enrichment worker)
+    for _ in range(num_workers):
+        await write_queue.put(None)
 
-            # Mid-chunk progress: enrichment done, inserting next
-            yield {
-                "processed": chunk_start,  # Not yet at chunk_end (insert pending)
-                "total": total,
-                "wines_created": wines_created,
-                "rows_skipped": rows_skipped,
-                "phase": "inserting",
-            }
+    # Wait for writer to finish
+    wines_created, rows_skipped, errors = await writer_future
 
-        # Phase 3: Batch insert Wine documents
-        if wine_datas:
-            wine_docs = [Wine(**wd) for wd, _ in wine_datas]
-            try:
-                await Wine.insert_many(wine_docs)
-                wines_created += len(wine_docs)
-            except BulkWriteError as e:
-                n_inserted = e.details.get("nInserted", 0)
-                wines_created += n_inserted
-                failed = len(wine_docs) - n_inserted
-                error_msg = f"Batch insert partial failure: {failed} of {len(wine_docs)} failed"
-                errors.append(error_msg)
-                logger.warning(error_msg)
-            except Exception as e:
-                error_msg = f"Batch insert failed for rows {chunk_start + 1}-{chunk_end}: {str(e)}"
-                errors.append(error_msg)
-                logger.warning(error_msg)
-
-        # Yield progress after each chunk
-        yield {
-            "processed": chunk_end,
-            "total": total,
-            "wines_created": wines_created,
-            "rows_skipped": rows_skipped,
-        }
+    # Drain remaining progress events
+    while not progress_queue.empty():
+        yield progress_queue.get_nowait()
 
     # Save final batch state
     batch.wines_created = wines_created
