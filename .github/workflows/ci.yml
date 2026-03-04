@@ -84,6 +84,9 @@ jobs:
             sleep 3
           done
 
+      - name: Import X-Wines test data
+        run: uv run python deploy/import_xwines_mongo.py --version test --force
+
       - name: Run fast E2E suite
         env:
           WINEBOX_TEST_URL: "http://localhost:8000"
