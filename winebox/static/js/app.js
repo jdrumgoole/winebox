@@ -3239,22 +3239,25 @@ function showSkippedRows() {
     const skippedRows = window._lastSkippedRows || [];
     if (skippedRows.length === 0) return;
 
-    let html = '<table class="wine-table" style="width:100%;"><thead><tr>';
-    html += '<th>Row #</th><th>Reason</th><th>Data</th>';
-    html += '</tr></thead><tbody>';
-
+    let html = '';
     for (const sr of skippedRows) {
-        const dataEntries = Object.entries(sr.data || {})
-            .map(([k, v]) => `<strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v || ''))}`)
-            .join(', ');
-        html += `<tr>
-            <td>${sr.row}</td>
-            <td>${escapeHtml(sr.reason)}</td>
-            <td style="font-size:0.85rem;">${dataEntries}</td>
-        </tr>`;
+        const entries = Object.entries(sr.data || {}).filter(([, v]) => v != null && String(v).trim() !== '');
+        html += `<div style="background:var(--card-background);border:1px solid var(--border-color);border-radius:8px;padding:1rem;margin-bottom:0.75rem;">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+                <span style="background:var(--background-color);border-radius:4px;padding:0.25rem 0.6rem;font-weight:600;font-size:0.85rem;">Row ${sr.row}</span>
+                <span style="color:var(--error-color);font-size:0.9rem;">${escapeHtml(sr.reason)}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.5rem;">
+                ${entries.map(([k, v]) => `
+                    <div>
+                        <div style="font-size:0.7rem;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.05em;">${escapeHtml(k)}</div>
+                        <div style="font-size:0.875rem;">${escapeHtml(String(v))}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
     }
 
-    html += '</tbody></table>';
     document.getElementById('skipped-rows-content').innerHTML = html;
     openModal('skipped-rows-modal');
 }
