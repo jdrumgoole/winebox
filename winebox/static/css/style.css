@@ -62,17 +62,22 @@ header {
     display: block;
 }
 
+.logo-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 .beta-badge {
     background: rgba(255, 255, 255, 0.2);
     color: #fff;
-    font-size: 0.65rem;
+    font-size: 0.55rem;
     font-weight: 700;
-    letter-spacing: 1px;
-    padding: 0.15rem 0.4rem;
+    letter-spacing: 1.5px;
+    padding: 0.1rem 0.4rem;
     border-radius: 3px;
     border: 1px solid rgba(255, 255, 255, 0.4);
-    vertical-align: super;
-    margin-left: -0.25rem;
+    margin-top: 0.15rem;
 }
 
 nav {
