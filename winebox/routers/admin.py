@@ -2,16 +2,16 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Annotated, Any
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from pathlib import Path
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from winebox.models import User, Wine
-from winebox.services.auth import RequireAdmin, get_current_user
+from winebox.services.auth import RequireAdmin
 
 logger = logging.getLogger(__name__)
 
@@ -20,23 +20,13 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get("", response_model=None)
-async def admin_panel(
-    current_user: Annotated[User | None, Depends(get_current_user)],
-) -> FileResponse | RedirectResponse:
+async def admin_panel() -> FileResponse:
     """Serve the admin panel HTML page.
 
-    Requires admin authentication. Non-authenticated users are redirected
-    to the login page. Non-admin users see an access denied message.
+    Auth is not checked here because the token lives in localStorage and is not
+    sent on full-page navigation. The admin page (admin.js) reads the token,
+    calls /admin/api/* with it, and redirects to login if missing or 401/403.
     """
-    # Not logged in - redirect to login
-    if not current_user:
-        return RedirectResponse(url="/?error=login_required", status_code=302)
-
-    # Logged in but not admin - redirect with error
-    if not current_user.is_superuser:
-        return RedirectResponse(url="/?error=admin_required", status_code=302)
-
-    # Admin user - serve the admin panel
     static_path = Path(__file__).parent.parent / "static" / "admin.html"
     return FileResponse(static_path, media_type="text/html")
 

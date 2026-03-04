@@ -11,7 +11,7 @@ function getAuthToken() {
 async function checkAuth() {
     const token = getAuthToken();
     if (!token) {
-        window.location.href = '/static/index.html';
+        window.location.href = '/';
         return false;
     }
     return true;
@@ -32,7 +32,7 @@ async function apiRequest(endpoint, options = {}) {
 
     if (response.status === 401 || response.status === 403) {
         // Not authenticated or not admin
-        window.location.href = '/static/index.html';
+        window.location.href = '/';
         throw new Error('Not authorized');
     }
 
