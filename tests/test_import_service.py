@@ -196,6 +196,16 @@ def test_non_wine_no_type_column() -> None:
     assert is_non_wine_row(row, mapping) is False
 
 
+def test_non_wine_keyword_embedded_in_name() -> None:
+    """Test no false positive when keyword is embedded inside a wine name.
+
+    Regression test: 'ale' was matching inside 'NeroBufaleffj' (Gulfi wine).
+    """
+    row = {"Name": "NeroBufaleffj, Gulfi, Sicily, Italy", "Type": "Red"}
+    mapping = {"Name": "name", "Type": "wine_type_id"}
+    assert is_non_wine_row(row, mapping) is False
+
+
 # =============================================================================
 # Row-to-Wine Data Tests
 # =============================================================================

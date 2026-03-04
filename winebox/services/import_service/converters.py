@@ -1,5 +1,6 @@
 """Row filtering and data conversion functions for wine imports."""
 
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -9,11 +10,19 @@ from winebox.models.wine import InventoryInfo
 
 from .constants import NON_WINE_KEYWORDS, VALID_WINE_FIELDS
 
+# Pre-compile a single regex that matches any non-wine keyword as a whole word
+_NON_WINE_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(kw) for kw in NON_WINE_KEYWORDS) + r")\b",
+    re.IGNORECASE,
+)
+
 
 def is_non_wine_row(row: dict[str, Any], mapping: dict[str, str]) -> bool:
     """Check if a row appears to be a non-wine item (spirits, beer, etc.).
 
     Checks columns mapped to wine_type_id or name for non-wine keywords.
+    Uses word-boundary matching to avoid false positives from keywords
+    embedded inside wine names (e.g. 'ale' inside 'NeroBufaleffj').
 
     Args:
         row: Raw row dict from spreadsheet.
@@ -29,10 +38,9 @@ def is_non_wine_row(row: dict[str, Any], mapping: dict[str, str]) -> bool:
             cols_to_check.append(header)
 
     for col in cols_to_check:
-        value = row.get(col, "").lower().strip()
-        for keyword in NON_WINE_KEYWORDS:
-            if keyword in value:
-                return True
+        value = row.get(col, "").strip()
+        if _NON_WINE_RE.search(value):
+            return True
 
     return False
 
