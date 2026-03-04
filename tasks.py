@@ -488,6 +488,12 @@ def _update_version_files(new_version: str) -> None:
         content = re.sub(r'\?v=[0-9.]+', f'?v={new_version}', content)
         index_html.write_text(content)
 
+    admin_html = Path("winebox/static/admin.html")
+    if admin_html.exists():
+        content = admin_html.read_text()
+        content = re.sub(r'\?v=[0-9.]+', f'?v={new_version}', content)
+        admin_html.write_text(content)
+
     landing_html = Path("winebox/static/landing.html")
     if landing_html.exists():
         content = landing_html.read_text()
