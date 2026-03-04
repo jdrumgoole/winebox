@@ -73,8 +73,10 @@ jobs:
         run: uv run playwright install --with-deps
 
       - name: Start WineBox server (background)
+        env:
+          WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED: "false"
         run: |
-          uv run python -m invoke start-background &
+          WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false uv run python -m invoke start-background &
           for i in {1..20}; do
             if curl -sf http://localhost:8000/health > /dev/null; then
               echo "Server is up"
