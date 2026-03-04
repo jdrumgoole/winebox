@@ -71,13 +71,13 @@ header {
 .beta-badge {
     background: rgba(255, 255, 255, 0.2);
     color: #fff;
-    font-size: 0.55rem;
+    font-size: 0.45rem;
     font-weight: 700;
-    letter-spacing: 1.5px;
-    padding: 0.1rem 0.4rem;
-    border-radius: 3px;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    margin-top: 0.15rem;
+    letter-spacing: 1px;
+    padding: 0.05rem 0.25rem;
+    border-radius: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    margin-top: 0.1rem;
 }
 
 nav {
