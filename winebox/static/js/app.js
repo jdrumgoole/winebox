@@ -402,6 +402,7 @@ async function checkAuth() {
 }
 
 function showLoginPage() {
+    closeModals();
     document.body.classList.add('logged-out');
     document.getElementById('page-login').classList.add('active');
     document.getElementById('user-info').style.display = 'none';
@@ -414,6 +415,11 @@ async function showMainApp() {
     document.getElementById('page-login').classList.remove('active');
     document.getElementById('user-info').style.display = 'flex';
     document.getElementById('username-display').textContent = currentUser.email;
+
+    const adminLink = document.getElementById('admin-link');
+    if (adminLink) {
+        adminLink.style.display = currentUser.is_admin ? '' : 'none';
+    }
 
     // Identify user for analytics
     analytics.identify(currentUser.id, { email: currentUser.email });

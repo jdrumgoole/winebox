@@ -26,7 +26,7 @@ from .converters import is_non_wine_row, row_to_wine_data
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CHUNK_SIZE = 50
+DEFAULT_CHUNK_SIZE = 25
 
 # Sentinel pushed to progress_queue when the writer is done
 _PROGRESS_DONE = object()
@@ -167,8 +167,15 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
 async def _enrichment_worker(
     enrichment_queue: asyncio.Queue[_Chunk | None],
     write_queue: asyncio.Queue[_Chunk | None],
+    progress_queue: asyncio.Queue[dict[str, Any] | object],
+    progress_state: dict[str, int],
+    total: int,
 ) -> None:
-    """Enrichment worker: dequeue chunks, enrich, forward to write queue."""
+    """Enrichment worker: dequeue chunks, enrich, forward to write queue.
+
+    Pushes a progress event after enrichment completes for each chunk,
+    crediting half the chunk's rows to give smoother progress updates.
+    """
     while True:
         chunk = await enrichment_queue.get()
         if chunk is None:
@@ -178,6 +185,15 @@ async def _enrichment_worker(
         try:
             await _enrich_chunk(chunk)
         finally:
+            # Credit half the chunk rows for the enrichment phase
+            chunk_rows = chunk.chunk_end - chunk.chunk_start
+            progress_state["processed"] += chunk_rows // 2
+            await progress_queue.put({
+                "processed": progress_state["processed"],
+                "total": total,
+                "wines_created": progress_state["wines_created"],
+                "rows_skipped": progress_state["rows_skipped"],
+            })
             await write_queue.put(chunk)
             enrichment_queue.task_done()
 
@@ -189,17 +205,18 @@ async def _enrichment_worker(
 async def _writer_worker(
     write_queue: asyncio.Queue[_Chunk | None],
     progress_queue: asyncio.Queue[dict[str, Any] | object],
+    progress_state: dict[str, int],
     total: int,
     num_enrichment_workers: int,
 ) -> tuple[int, int, list[str]]:
     """Writer: dequeue enriched chunks, insert_many, push progress updates.
 
-    Pushes _PROGRESS_DONE sentinel when all work is complete.
+    Credits the remaining half of each chunk's rows (enrichment credited the
+    first half). Pushes _PROGRESS_DONE sentinel when all work is complete.
     Returns cumulative (wines_created, rows_skipped, errors).
     """
     wines_created = 0
     rows_skipped = 0
-    rows_processed = 0  # Cumulative count for monotonic progress
     errors: list[str] = []
     poison_pills_seen = 0
 
@@ -221,13 +238,16 @@ async def _writer_worker(
         wines_created += created
         errors.extend(write_errors)
 
-        # Track cumulative rows processed (monotonically increasing even
-        # if chunks arrive out of order from enrichment workers)
-        rows_processed += chunk.chunk_end - chunk.chunk_start
+        # Credit the remaining half of this chunk's rows (enrichment took first half)
+        chunk_rows = chunk.chunk_end - chunk.chunk_start
+        remaining = chunk_rows - chunk_rows // 2  # handles odd sizes
+        progress_state["processed"] += remaining
+        progress_state["wines_created"] = wines_created
+        progress_state["rows_skipped"] = rows_skipped
 
         # Push progress
         await progress_queue.put({
-            "processed": rows_processed,
+            "processed": progress_state["processed"],
             "total": total,
             "wines_created": wines_created,
             "rows_skipped": rows_skipped,
@@ -344,15 +364,27 @@ async def _process_chunks(
     write_queue: asyncio.Queue[_Chunk | None] = asyncio.Queue(maxsize=num_workers * 2)
     progress_queue: asyncio.Queue[dict[str, Any] | object] = asyncio.Queue()
 
+    # Shared mutable progress state — safe because asyncio is single-threaded.
+    # Enrichment workers credit half the chunk rows; writer credits the other half.
+    progress_state: dict[str, int] = {
+        "processed": 0,
+        "wines_created": 0,
+        "rows_skipped": 0,
+    }
+
     # Start enrichment workers
     enrichment_tasks = [
-        asyncio.create_task(_enrichment_worker(enrichment_queue, write_queue))
+        asyncio.create_task(
+            _enrichment_worker(
+                enrichment_queue, write_queue, progress_queue, progress_state, total,
+            )
+        )
         for _ in range(num_workers)
     ]
 
     # Start writer (pushes progress events; pushes _PROGRESS_DONE when finished)
     writer_future: asyncio.Future[tuple[int, int, list[str]]] = asyncio.ensure_future(
-        _writer_worker(write_queue, progress_queue, total, num_workers)
+        _writer_worker(write_queue, progress_queue, progress_state, total, num_workers)
     )
 
     # Start feeder as a background task so we can drain progress_queue
