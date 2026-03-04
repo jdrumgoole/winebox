@@ -89,3 +89,4 @@ GitHub Actions only publishes to PyPI (no auto-deploy to production).
 - Browser caches can serve stale static files (HTML, JS, CSS) even after server updates
 - When taking screenshots of deployed apps, use cache-busting query parameters (e.g., `?v=0.5.0`) or clear browser cache first
 - **Never modify server configuration piecemeal.** Do not SSH into the server to tweak nginx configs, systemd units, or other settings manually. All server configuration changes must go through a clean `invoke deploy` cycle so the full deployment pipeline runs and the server state matches the repo.
+- **Always check CI status before deploying.** Check `gh run list` for recent failures. If CI is failing, diagnose and fix the failures before deploying. Do not deploy with a broken CI pipeline.
