@@ -1558,12 +1558,12 @@ function renderCellarTable(containerId, wines) {
         const ef = wine.enriched_fields || [];
 
         const additionalFields = [];
-        if (wine.sub_region) additionalFields.push(['Sub-Region', escapeHtml(wine.sub_region) + (ef.includes('sub_region') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
-        if (wine.appellation) additionalFields.push(['Appellation', escapeHtml(wine.appellation) + (ef.includes('appellation') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
-        if (wine.classification) additionalFields.push(['Classification', escapeHtml(wine.classification) + (ef.includes('classification') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
-        if (wine.alcohol_percentage) additionalFields.push(['Alcohol', escapeHtml(String(wine.alcohol_percentage)) + '%' + (ef.includes('alcohol_percentage') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
-        if (wine.wine_type_id) additionalFields.push(['Wine Type', escapeHtml(wine.wine_type_id) + (ef.includes('wine_type_id') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
-        if (wine.price_tier) additionalFields.push(['Price Tier', escapeHtml(wine.price_tier) + (ef.includes('price_tier') ? ' <span class="xwines-badge">X-Wines</span>' : '')]);
+        if (wine.sub_region) additionalFields.push(['Sub-Region', `<span class="${ef.includes('sub_region') ? 'enriched' : ''}">${escapeHtml(wine.sub_region)}</span>`]);
+        if (wine.appellation) additionalFields.push(['Appellation', `<span class="${ef.includes('appellation') ? 'enriched' : ''}">${escapeHtml(wine.appellation)}</span>`]);
+        if (wine.classification) additionalFields.push(['Classification', `<span class="${ef.includes('classification') ? 'enriched' : ''}">${escapeHtml(wine.classification)}</span>`]);
+        if (wine.alcohol_percentage) additionalFields.push(['Alcohol', `<span class="${ef.includes('alcohol_percentage') ? 'enriched' : ''}">${escapeHtml(String(wine.alcohol_percentage))}%</span>`]);
+        if (wine.wine_type_id) additionalFields.push(['Wine Type', `<span class="${ef.includes('wine_type_id') ? 'enriched' : ''}">${escapeHtml(wine.wine_type_id)}</span>`]);
+        if (wine.price_tier) additionalFields.push(['Price Tier', `<span class="${ef.includes('price_tier') ? 'enriched' : ''}">${escapeHtml(wine.price_tier)}</span>`]);
         if (wine.notes) additionalFields.push(['Notes', escapeHtml(wine.notes)]);
         if (wine.custom_fields) {
             Object.entries(wine.custom_fields).forEach(([k, v]) => {
@@ -1591,11 +1591,11 @@ function renderCellarTable(containerId, wines) {
         return `
             <tr class="wine-table-row" data-wine-id="${wine.id}">
                 <td class="wine-table-name">${hasDetails ? `<span class="wine-table-expand" data-wine-id="${wine.id}">&#9654;</span> ` : ''}${escapeHtml(wine.name)}</td>
-                <td>${wine.winery ? escapeHtml(wine.winery) + (ef.includes('winery') ? ' <span class="xwines-badge">X-Wines</span>' : '') : '-'}</td>
+                <td>${wine.winery ? `<span class="${ef.includes('winery') ? 'enriched' : ''}">${escapeHtml(wine.winery)}</span>` : '-'}</td>
                 <td>${wine.vintage || '-'}</td>
-                <td>${wine.grape_variety ? escapeHtml(wine.grape_variety) + (ef.includes('grape_variety') ? ' <span class="xwines-badge">X-Wines</span>' : '') : '-'}</td>
-                <td class="wine-table-hide-mobile">${wine.region ? escapeHtml(wine.region) + (ef.includes('region') ? ' <span class="xwines-badge">X-Wines</span>' : '') : '-'}</td>
-                <td class="wine-table-hide-mobile">${wine.country ? escapeHtml(wine.country) + (ef.includes('country') ? ' <span class="xwines-badge">X-Wines</span>' : '') : '-'}</td>
+                <td>${wine.grape_variety ? `<span class="${ef.includes('grape_variety') ? 'enriched' : ''}">${escapeHtml(wine.grape_variety)}</span>` : '-'}</td>
+                <td class="wine-table-hide-mobile">${wine.region ? `<span class="${ef.includes('region') ? 'enriched' : ''}">${escapeHtml(wine.region)}</span>` : '-'}</td>
+                <td class="wine-table-hide-mobile">${wine.country ? `<span class="${ef.includes('country') ? 'enriched' : ''}">${escapeHtml(wine.country)}</span>` : '-'}</td>
                 <td><span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">${inStock ? quantity : 'Out'}</span></td>
                 <td>${inStock ? `<button class="btn btn-small btn-primary checkout-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Check Out</button>` : ''}</td>
             </tr>
@@ -1665,6 +1665,20 @@ function renderWineGrid(containerId, wines) {
         const inStock = quantity > 0;
         const ef = wine.enriched_fields || [];
 
+        // Build "More" section tags
+        const moreTags = [];
+        if (wine.grape_variety) moreTags.push(`<span class="wine-tag${ef.includes('grape_variety') ? ' enriched' : ''}"><span class="wine-tag-label">Grape:</span> ${escapeHtml(wine.grape_variety)}</span>`);
+        if (wine.appellation) moreTags.push(`<span class="wine-tag${ef.includes('appellation') ? ' enriched' : ''}"><span class="wine-tag-label">Appellation:</span> ${escapeHtml(wine.appellation)}</span>`);
+        if (wine.classification) moreTags.push(`<span class="wine-tag${ef.includes('classification') ? ' enriched' : ''}"><span class="wine-tag-label">Classification:</span> ${escapeHtml(wine.classification)}</span>`);
+        if (wine.sub_region) moreTags.push(`<span class="wine-tag${ef.includes('sub_region') ? ' enriched' : ''}"><span class="wine-tag-label">Sub-region:</span> ${escapeHtml(wine.sub_region)}</span>`);
+        if (wine.alcohol_percentage) moreTags.push(`<span class="wine-tag${ef.includes('alcohol_percentage') ? ' enriched' : ''}"><span class="wine-tag-label">ABV:</span> ${escapeHtml(String(wine.alcohol_percentage))}%</span>`);
+        if (wine.notes) moreTags.push(`<span class="wine-tag wine-tag-custom" title="${escapeHtml(wine.notes)}">${escapeHtml(wine.notes.length > 50 ? wine.notes.substring(0, 50) + '...' : wine.notes)}</span>`);
+        if (wine.custom_fields) {
+            Object.entries(wine.custom_fields).forEach(([k, v]) => {
+                if (v) moreTags.push(`<span class="wine-tag wine-tag-custom"><span class="wine-tag-label">${escapeHtml(k)}:</span> ${escapeHtml(v)}</span>`);
+            });
+        }
+
         return `
             <div class="wine-card" data-wine-id="${wine.id}">
                 <div class="wine-card-image">
@@ -1676,24 +1690,22 @@ function renderWineGrid(containerId, wines) {
                 <div class="wine-card-content">
                     <div class="wine-card-title">${wine.name}</div>
                     <div class="wine-card-subtitle">
-                        ${wine.winery ? wine.winery + (ef.includes('winery') ? ' <span class="xwines-badge">X-Wines</span>' : '') : ''}
+                        ${wine.winery ? `<span class="${ef.includes('winery') ? 'enriched' : ''}">${escapeHtml(wine.winery)}</span>` : ''}
                         ${wine.vintage ? ` - ${wine.vintage}` : ''}
                     </div>
-                    <div class="wine-card-details">
-                        ${wine.grape_variety ? `<span class="wine-tag">${wine.grape_variety}${ef.includes('grape_variety') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
-                        ${wine.region ? `<span class="wine-tag">${wine.region}${ef.includes('region') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
-                        ${wine.appellation ? `<span class="wine-tag">${wine.appellation}${ef.includes('appellation') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
-                        ${wine.classification ? `<span class="wine-tag wine-tag-classification">${wine.classification}${ef.includes('classification') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
-                        ${wine.country ? `<span class="wine-tag">${wine.country}${ef.includes('country') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
+                    <div class="wine-card-fields">
+                        <div class="wine-card-field">
+                            <span class="wine-card-field-label">Country</span>
+                            <span class="wine-card-field-value${ef.includes('country') ? ' enriched' : ''}">${wine.country ? escapeHtml(wine.country) : '\u2014'}</span>
+                        </div>
+                        <div class="wine-card-field">
+                            <span class="wine-card-field-label">Region</span>
+                            <span class="wine-card-field-value${ef.includes('region') ? ' enriched' : ''}">${wine.region ? escapeHtml(wine.region) : '\u2014'}</span>
+                        </div>
                     </div>
-                    ${(wine.sub_region || wine.alcohol_percentage || wine.notes || (wine.custom_fields && Object.keys(wine.custom_fields).length > 0)) ? `
+                    ${moreTags.length > 0 ? `
                         <div class="wine-card-extra" style="display: none;">
-                            ${wine.sub_region ? `<span class="wine-tag">${escapeHtml(wine.sub_region)}${ef.includes('sub_region') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
-                            ${wine.alcohol_percentage ? `<span class="wine-tag">${escapeHtml(String(wine.alcohol_percentage))}%${ef.includes('alcohol_percentage') ? ' <span class="xwines-badge">X-Wines</span>' : ''}</span>` : ''}
-                            ${wine.notes ? `<span class="wine-tag wine-tag-custom" title="${escapeHtml(wine.notes)}">${escapeHtml(wine.notes.length > 50 ? wine.notes.substring(0, 50) + '...' : wine.notes)}</span>` : ''}
-                            ${wine.custom_fields ? Object.entries(wine.custom_fields).map(([k, v]) =>
-                                v ? `<span class="wine-tag wine-tag-custom">${escapeHtml(k)}: ${escapeHtml(v)}</span>` : ''
-                            ).join('') : ''}
+                            ${moreTags.join('')}
                         </div>
                         <span class="wine-card-expand-btn">More...</span>
                     ` : ''}
@@ -1745,9 +1757,7 @@ async function showWineDetail(wineId) {
 
         const quantity = wine.inventory ? wine.inventory.quantity : 0;
         const enrichedFields = wine.enriched_fields || [];
-        const xwinesBadge = (fieldKey) => enrichedFields.includes(fieldKey)
-            ? '<span class="xwines-badge">X-Wines</span>'
-            : '';
+        const enrichedClass = (fieldKey) => enrichedFields.includes(fieldKey) ? ' enriched' : '';
 
         document.getElementById('wine-detail').innerHTML = `
             <div class="wine-detail-images">
@@ -1763,8 +1773,7 @@ async function showWineDetail(wineId) {
             <div class="wine-detail-info">
                 <h3>${wine.name}</h3>
                 <div class="wine-detail-meta">
-                    ${wine.winery ? wine.winery : ''}
-                    ${wine.winery ? xwinesBadge('winery') : ''}
+                    ${wine.winery ? `<span class="${enrichedClass('winery')}">${wine.winery}</span>` : ''}
                     ${wine.vintage ? ` - ${wine.vintage}` : ''}
                 </div>
 
@@ -1776,15 +1785,15 @@ async function showWineDetail(wineId) {
 
                     ${wine.grape_variety ? `
                         <div class="wine-detail-field">
-                            <div class="label">Grape Variety${xwinesBadge('grape_variety')}</div>
-                            <div class="value">${wine.grape_variety}</div>
+                            <div class="label">Grape Variety</div>
+                            <div class="value${enrichedClass('grape_variety')}">${wine.grape_variety}</div>
                         </div>
                     ` : ''}
 
                     ${wine.region ? `
                         <div class="wine-detail-field">
-                            <div class="label">Region${xwinesBadge('region')}</div>
-                            <div class="value">${wine.region}</div>
+                            <div class="label">Region</div>
+                            <div class="value${enrichedClass('region')}">${wine.region}</div>
                         </div>
                     ` : ''}
 
@@ -1804,8 +1813,8 @@ async function showWineDetail(wineId) {
 
                     ${wine.country ? `
                         <div class="wine-detail-field">
-                            <div class="label">Country${xwinesBadge('country')}</div>
-                            <div class="value">${wine.country}</div>
+                            <div class="label">Country</div>
+                            <div class="value${enrichedClass('country')}">${wine.country}</div>
                         </div>
                     ` : ''}
 
@@ -1818,8 +1827,8 @@ async function showWineDetail(wineId) {
 
                     ${wine.alcohol_percentage ? `
                         <div class="wine-detail-field">
-                            <div class="label">Alcohol${xwinesBadge('alcohol_percentage')}</div>
-                            <div class="value">${wine.alcohol_percentage}%</div>
+                            <div class="label">Alcohol</div>
+                            <div class="value${enrichedClass('alcohol_percentage')}">${wine.alcohol_percentage}%</div>
                         </div>
                     ` : ''}
                 </div>

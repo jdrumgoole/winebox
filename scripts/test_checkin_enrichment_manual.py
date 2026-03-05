@@ -137,17 +137,16 @@ async def main() -> None:
             await page.screenshot(path=detail_screenshot, full_page=False)
             print(f"Detail modal screenshot: {detail_screenshot}")
 
-            # Check for X-Wines badges
-            badges = page.locator(".xwines-badge")
-            badge_count = await badges.count()
-            print(f"\nX-Wines badges found: {badge_count}")
-            for i in range(badge_count):
-                parent = badges.nth(i).locator("..")
-                parent_text = await parent.inner_text()
-                print(f"  Badge {i+1}: {parent_text.strip()}")
+            # Check for enriched fields (green-coloured values)
+            enriched = page.locator(".enriched")
+            enriched_count = await enriched.count()
+            print(f"\nEnriched fields found: {enriched_count}")
+            for i in range(enriched_count):
+                el_text = await enriched.nth(i).inner_text()
+                print(f"  Enriched {i+1}: {el_text.strip()}")
 
-            if badge_count == 0:
-                print("\nNo badges found - checking if enriched_fields exist on the wine...")
+            if enriched_count == 0:
+                print("\nNo enriched fields found - checking if enriched_fields exist on the wine...")
                 # Get wine from API to debug
                 async with httpx.AsyncClient(base_url=BASE_URL) as client:
                     resp = await client.get(
