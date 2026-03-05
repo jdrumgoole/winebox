@@ -481,9 +481,12 @@ h3 {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
+    align-items: start;
 }
 
 .wine-card {
+    display: flex;
+    flex-direction: column;
     background: var(--card-background);
     border-radius: var(--radius-lg);
     overflow: hidden;
@@ -515,6 +518,9 @@ h3 {
 
 .wine-card-content {
     padding: 1.25rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .wine-card-title {
@@ -551,6 +557,7 @@ h3 {
     align-items: center;
     padding-top: 1rem;
     border-top: 1px solid var(--border-color);
+    margin-top: auto;
 }
 
 .wine-quantity {
