@@ -1860,6 +1860,22 @@ body.logged-out #user-info {
     font-size: 0.75rem;
 }
 
+#app-footer .footer-feedback {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#app-footer .footer-feedback a {
+    color: var(--secondary-color);
+    text-decoration: none;
+}
+
+#app-footer .footer-feedback a:hover {
+    color: #e8c49a;
+    text-decoration: underline;
+}
+
 /* Autocomplete Dropdown */
 .autocomplete-wrapper {
     position: relative;

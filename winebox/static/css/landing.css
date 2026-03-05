@@ -556,6 +556,11 @@ footer {
     text-decoration: underline;
 }
 
+.footer-bottom .footer-feedback {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
+
 .landing-version {
     background: rgba(255, 255, 255, 0.15);
     padding: 0.15rem 0.5rem;
