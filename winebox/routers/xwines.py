@@ -56,11 +56,14 @@ async def _atlas_search(
     # "Chateau Lynch-Bages, Pauillac, Bordeaux" produce clean terms.
     terms = _tokenize(q)
 
-    # Build must clauses - require ALL terms to appear in name or winery_name
-    # This prevents false positives where only some terms match
-    must_clauses: list[dict] = []
+    # Build term clauses for each token.
+    # For short queries (<=3 terms) use must (AND all).
+    # For longer composite queries (4+ terms) use should with
+    # minimumShouldMatch to tolerate terms like "Bordeaux" that
+    # exist only in region_name (not indexed for text search).
+    term_clauses: list[dict] = []
     for term in terms:
-        must_clauses.append(
+        term_clauses.append(
             {
                 "text": {
                     "query": term,
@@ -70,8 +73,8 @@ async def _atlas_search(
             }
         )
 
-    # Build should clauses for score boosting - phrase matches rank higher
-    should_clauses: list[dict] = [
+    # Phrase-match clauses for score boosting
+    boost_clauses: list[dict] = [
         # Highest priority: exact phrase match in name
         {
             "phrase": {
@@ -96,7 +99,15 @@ async def _atlas_search(
     if country:
         filter_clauses.append({"text": {"query": country, "path": "country_code"}})
 
-    compound: dict = {"must": must_clauses, "should": should_clauses}
+    if len(terms) >= 4:
+        # Allow one unmatched term for composite names (e.g. region/country
+        # tokens that only exist in region_name, not in name/winery_name)
+        compound: dict = {
+            "should": term_clauses + boost_clauses,
+            "minimumShouldMatch": len(terms) - 1,
+        }
+    else:
+        compound = {"must": term_clauses, "should": boost_clauses}
     if filter_clauses:
         compound["filter"] = filter_clauses
 
@@ -128,8 +139,8 @@ async def _atlas_search(
     total = count_result[0]["total"] if count_result else 0
 
     # Run facet pipeline via $searchMeta
-    # Use compound with must clauses to match the search query behavior (AND logic)
-    facet_must_clauses: list[dict] = [
+    # Mirror the same term-matching logic used in the search stage
+    facet_term_clauses: list[dict] = [
         {
             "text": {
                 "query": term,
@@ -139,16 +150,25 @@ async def _atlas_search(
         }
         for term in terms
     ]
+    if len(terms) >= 4:
+        facet_operator: dict = {
+            "compound": {
+                "should": facet_term_clauses,
+                "minimumShouldMatch": len(terms) - 1,
+            }
+        }
+    else:
+        facet_operator = {
+            "compound": {
+                "must": facet_term_clauses,
+            }
+        }
     facet_pipeline: list[dict] = [
         {
             "$searchMeta": {
                 "index": "xwines_search",
                 "facet": {
-                    "operator": {
-                        "compound": {
-                            "must": facet_must_clauses,
-                        }
-                    },
+                    "operator": facet_operator,
                     "facets": {
                         "wine_type": {
                             "type": "string",

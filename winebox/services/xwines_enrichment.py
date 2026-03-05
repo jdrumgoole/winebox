@@ -152,8 +152,12 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
         db = get_database()
         collection = db["xwines_wines"]
 
-        # Build must clauses - require ALL terms to appear (AND logic)
-        must_clauses: list[dict] = [
+        # Build term clauses for each token.
+        # For short queries (<=3 terms) use must (AND all).
+        # For longer composite queries (4+ terms) use should with
+        # minimumShouldMatch to tolerate terms like "Bordeaux" that
+        # exist only in region_name (not indexed for text search).
+        term_clauses: list[dict] = [
             {
                 "text": {
                     "query": term,
@@ -164,35 +168,39 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
             for term in terms
         ]
 
-        # Use compound query with must for AND logic, should for score boosting.
-        # Atlas Search returns results sorted by searchScore natively, so we
-        # only need $limit (no explicit $sort). The rating_count tiebreaker
-        # is incorporated via a function score on the should clauses.
+        compound: dict = {
+            "should": [
+                # Boost exact phrase matches in name
+                {
+                    "phrase": {
+                        "query": name,
+                        "path": "name",
+                        "score": {"boost": {"value": 10}},
+                    }
+                },
+                # Boost phrase matches in winery_name
+                {
+                    "phrase": {
+                        "query": name,
+                        "path": "winery_name",
+                        "score": {"boost": {"value": 5}},
+                    }
+                },
+            ],
+        }
+
+        if len(terms) >= 4:
+            # Allow one unmatched term for composite names
+            compound["should"] = term_clauses + compound["should"]
+            compound["minimumShouldMatch"] = len(terms) - 1
+        else:
+            compound["must"] = term_clauses
+
         pipeline: list[dict] = [
             {
                 "$search": {
                     "index": "xwines_search",
-                    "compound": {
-                        "must": must_clauses,
-                        "should": [
-                            # Boost exact phrase matches in name
-                            {
-                                "phrase": {
-                                    "query": name,
-                                    "path": "name",
-                                    "score": {"boost": {"value": 10}},
-                                }
-                            },
-                            # Boost phrase matches in winery_name
-                            {
-                                "phrase": {
-                                    "query": name,
-                                    "path": "winery_name",
-                                    "score": {"boost": {"value": 5}},
-                                }
-                            },
-                        ],
-                    },
+                    "compound": compound,
                 }
             },
             {"$limit": 1},
