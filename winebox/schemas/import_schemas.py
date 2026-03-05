@@ -33,8 +33,8 @@ class ImportProcessRequest(BaseModel):
     skip_non_wine: bool = Field(True, description="Skip rows that appear to be non-wine items")
     default_quantity: int = Field(1, ge=1, le=10000, description="Default bottle quantity per row")
     skip_enrichment: bool = Field(
-        False,
-        description="Skip X-Wines enrichment for fastest imports (no automatic reference data fill)",
+        True,
+        description="Skip X-Wines enrichment during import (background enrichment runs afterwards)",
     )
 
 

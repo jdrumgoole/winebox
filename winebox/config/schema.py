@@ -54,6 +54,8 @@ class OCRConfig(BaseModel):
     """OCR (Optical Character Recognition) configuration."""
 
     use_claude_vision: bool = True
+    use_claude_matching: bool = True
+    claude_matching_model: str = "claude-haiku-4-5-20251001"
     tesseract_lang: str = "eng"
     tesseract_cmd: str | None = None
 

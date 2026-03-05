@@ -148,6 +148,14 @@ class Settings:
         return self._config.ocr.use_claude_vision
 
     @property
+    def use_claude_matching(self) -> bool:
+        return self._config.ocr.use_claude_matching
+
+    @property
+    def claude_matching_model(self) -> str:
+        return self._config.ocr.claude_matching_model
+
+    @property
     def tesseract_lang(self) -> str:
         return self._config.ocr.tesseract_lang
 

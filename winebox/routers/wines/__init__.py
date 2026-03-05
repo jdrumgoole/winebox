@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from .checkin import checkin_wine, checkout_wine
 from .crud import delete_all_wines, delete_wine, get_wine, list_wines, update_wine
+from .enrichment import enrich_wines, enrichment_progress
 from .grapes import get_wine_grapes, set_wine_grapes
 from .scan import scan_label
 from .scores import (
@@ -17,6 +18,10 @@ router = APIRouter()
 
 # Scan endpoint
 router.add_api_route("/scan", scan_label, methods=["POST"])
+
+# Enrichment endpoints
+router.add_api_route("/enrich", enrich_wines, methods=["POST"])
+router.add_api_route("/enrichment-progress", enrichment_progress, methods=["GET"])
 
 # Check-in/check-out endpoints
 router.add_api_route(

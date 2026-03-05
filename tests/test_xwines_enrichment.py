@@ -1,17 +1,27 @@
 """Tests for X-Wines enrichment service."""
 
 import io
+import os
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
 
+from winebox.config import settings
 from winebox.models import XWinesWine, Wine
 from winebox.services.xwines_enrichment import (
     _score_candidate,
     _tokenize,
     enrich_parsed_with_xwines,
     parse_xwines_grapes,
+)
+
+has_anthropic_key = bool(
+    settings.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+)
+skip_no_key = pytest.mark.skipif(
+    not has_anthropic_key,
+    reason="No Anthropic API key available",
 )
 
 
@@ -143,6 +153,55 @@ def test_score_no_overlap_is_low() -> None:
     )
     score = _score_candidate("Chateau Lynch-Bages, Pauillac, Bordeaux", candidate)
     assert score < 10, f"Expected score < 10 but got {score}"
+
+
+# ---------------------------------------------------------------------------
+# _match_with_claude_or_score — Claude integration in batch matching
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@patch("winebox.services.xwines_enrichment.settings")
+async def test_batch_match_falls_back_when_claude_disabled(mock_settings) -> None:
+    """When use_claude_matching is False, _match_with_claude_or_score returns None."""
+    from winebox.services.xwines_enrichment import _match_with_claude_or_score
+
+    mock_settings.use_claude_matching = False
+    result = await _match_with_claude_or_score(
+        ["Wine A"],
+        [_make_xwines_wine(name="Wine A", xwines_id=1)],
+    )
+    assert result is None
+
+
+@skip_no_key
+@pytest.mark.asyncio
+async def test_batch_match_uses_claude_when_enabled() -> None:
+    """When Claude matching is enabled, it picks the right candidate."""
+    from winebox.services.xwines_enrichment import _match_with_claude_or_score
+
+    correct = _make_xwines_wine(
+        name="Chateau Lynch-Bages",
+        winery_name="Chateau Lynch-Bages",
+        xwines_id=999,
+        rating_count=5000,
+    )
+    wrong = _make_xwines_wine(
+        name="Yellow Tail Shiraz",
+        winery_name="Yellow Tail",
+        xwines_id=1,
+        rating_count=100,
+    )
+
+    result = await _match_with_claude_or_score(
+        ["Lynch-Bages, Pauillac"],
+        [correct, wrong],
+    )
+
+    # Should return a result (not None = not disabled)
+    # and pick the correct candidate
+    assert result is not None
+    assert result["Lynch-Bages, Pauillac"] == correct
 
 
 # ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ from pymongo.errors import BulkWriteError
 from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.import_batch_row import ImportBatchRow
 from winebox.models.wine import Wine
+from winebox.services.background_enrichment import enrich_unenriched_wines
 from winebox.services.xwines_enrichment import enrich_batch_with_xwines
 
 from .constants import ENRICHMENT_WORKERS
@@ -523,6 +524,14 @@ async def _process_chunks(
     batch.status = ImportStatus.COMPLETED
     await batch.save()
 
+    # Start background enrichment if wines were created and inline enrichment was skipped
+    if wines_created > 0 and skip_enrichment:
+        asyncio.create_task(enrich_unenriched_wines(owner_id))
+        logger.info(
+            "Started background enrichment for %d new wines (owner %s)",
+            wines_created, owner_id,
+        )
+
     # Final yield with done=True
     yield {
         "done": True,
@@ -533,6 +542,7 @@ async def _process_chunks(
         "skipped_rows": skipped_rows,
         "errors": errors,
         "status": "completed",
+        "enrichment_started": wines_created > 0 and skip_enrichment,
     }
 
 

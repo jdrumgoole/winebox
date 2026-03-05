@@ -2,10 +2,31 @@
 
 import os
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
+
+@contextmanager
+def clean_winebox_env():
+    """Temporarily remove all WINEBOX_* and ANTHROPIC_API_KEY env vars.
+
+    Used by config tests that need to verify defaults without interference
+    from .env values loaded by conftest.
+    """
+    saved = {}
+    keys_to_remove = [
+        k for k in os.environ
+        if k.startswith("WINEBOX_") or k == "ANTHROPIC_API_KEY"
+    ]
+    for k in keys_to_remove:
+        saved[k] = os.environ.pop(k)
+    try:
+        yield
+    finally:
+        os.environ.update(saved)
 
 from winebox.config.loader import (
     apply_env_overrides,
@@ -166,7 +187,9 @@ use_claude_vision = false
         config_file = tmp_path / "config.toml"
         config_file.write_text(toml_content)
 
-        config = load_config(config_file)
+        with clean_winebox_env():
+            config = load_config(config_file)
+
         assert config.app_name == "CustomApp"
         assert config.server.port == 5000
         assert config.server.workers == 4
@@ -298,7 +321,8 @@ WINEBOX_ANTHROPIC_API_KEY=sk-ant-api-key
         secrets_file = tmp_path / "secrets.env"
         secrets_file.write_text(secrets_content)
 
-        secrets = load_secrets(secrets_file)
+        with clean_winebox_env():
+            secrets = load_secrets(secrets_file)
         assert secrets.secret_key == "file-secret-key"
         assert secrets.anthropic_api_key == "sk-ant-api-key"
 
@@ -332,7 +356,8 @@ class TestSettings:
 
     def test_settings_defaults(self):
         """Test Settings with default configuration."""
-        settings = Settings()
+        with clean_winebox_env():
+            settings = Settings()
         assert settings.app_name == "WineBox"
         assert settings.host == "127.0.0.1"
         assert settings.port == 8000
@@ -352,8 +377,9 @@ WINEBOX_SECRET_KEY=my-provided-key
         secrets_file = tmp_path / "secrets.env"
         secrets_file.write_text(secrets_content)
 
-        secrets = load_secrets(secrets_file)
-        settings = Settings(secrets=secrets)
+        with clean_winebox_env():
+            secrets = load_secrets(secrets_file)
+            settings = Settings(secrets=secrets)
         assert settings.secret_key == "my-provided-key"
 
     def test_settings_property_accessors(self):

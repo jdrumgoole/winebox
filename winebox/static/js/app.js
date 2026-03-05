@@ -3255,6 +3255,87 @@ function showImportResults(result) {
     if (result.wines_created > 0) {
         showToast(`Successfully imported ${result.wines_created} wines!`, 'success');
     }
+
+    // Start enrichment progress tracking if background enrichment was triggered
+    if (result.enrichment_started) {
+        startEnrichmentProgress();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Background enrichment progress (toast-based SSE)
+// ---------------------------------------------------------------------------
+
+function startEnrichmentProgress() {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast info';
+    toast.id = 'enrichment-toast';
+    toast.textContent = 'Enriching wines with reference data...';
+    container.appendChild(toast);
+
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+    // Use fetch + ReadableStream for SSE since EventSource doesn't support auth headers
+    fetch(`${API_BASE}/wines/enrichment-progress`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+    }).then(response => {
+        if (!response.ok) {
+            toast.remove();
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        function read() {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    // Stream ended without done event — clean up
+                    setTimeout(() => toast.remove(), 3000);
+                    return;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop();
+
+                for (const part of parts) {
+                    const trimmed = part.trim();
+                    if (!trimmed.startsWith('data: ')) continue;
+
+                    try {
+                        const data = JSON.parse(trimmed.slice(6));
+
+                        if (data.phase === 'done') {
+                            toast.className = 'toast success';
+                            toast.textContent = `Enrichment complete: ${data.enriched}/${data.total} wines matched`;
+                            setTimeout(() => toast.remove(), 5000);
+                            // Refresh cellar to show enriched data
+                            loadCellar();
+                            return;
+                        } else if (data.phase === 'enriching') {
+                            toast.textContent = `Enriching wines: ${data.enriched}/${data.total}...`;
+                        } else if (data.phase === 'idle') {
+                            toast.remove();
+                            return;
+                        }
+                    } catch (e) {
+                        // Ignore parse errors
+                    }
+                }
+
+                read();
+            }).catch(() => {
+                setTimeout(() => toast.remove(), 3000);
+            });
+        }
+
+        read();
+    }).catch(() => {
+        toast.remove();
+    });
 }
 
 function showSkippedRows() {

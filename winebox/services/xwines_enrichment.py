@@ -12,6 +12,7 @@ import logging
 import re
 import unicodedata
 
+from winebox.config import settings
 from winebox.database import get_database
 from winebox.models import XWinesWine
 
@@ -335,6 +336,105 @@ def _score_candidate(query_name: str, candidate: XWinesWine) -> float:
     return score
 
 
+async def _match_with_claude_or_score(
+    names: list[str],
+    candidates: list[XWinesWine],
+) -> dict[str, XWinesWine | None] | None:
+    """Try Claude re-ranking of candidates. Returns None if unavailable.
+
+    Groups candidates by proximity to each query name (pre-filter via scoring),
+    sends the top candidates to Claude for re-ranking, and returns the
+    matched results. Returns None if Claude matching is disabled or fails,
+    allowing the caller to fall back to pure scoring.
+
+    Args:
+        names: Input wine names.
+        candidates: All candidate XWinesWine objects from Atlas Search.
+
+    Returns:
+        Dict mapping name -> XWinesWine or None, or None if Claude unavailable.
+    """
+    if not settings.use_claude_matching:
+        return None
+
+    try:
+        from winebox.services.xwines_matcher import match_wines_batch
+    except ImportError:
+        return None
+
+    # Build per-query candidate lists (top 10 by score for each query)
+    max_candidates_per_query = 10
+    candidates_per_query: dict[str, list[dict]] = {}
+    candidate_lookup: dict[str, list[XWinesWine]] = {}
+
+    active_names = []
+    for name in names:
+        name_stripped = name.strip() if name else ""
+        if len(name_stripped) < 2:
+            continue
+        active_names.append(name)
+
+        # Score all candidates for this name and take top N
+        scored = []
+        for c in candidates:
+            s = _score_candidate(name_stripped, c)
+            if s >= 5:  # lower threshold than final match to include more options
+                scored.append((s, c))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        top = scored[:max_candidates_per_query]
+
+        if not top:
+            continue
+
+        candidate_lookup[name] = [c for _, c in top]
+        candidates_per_query[name] = [
+            {
+                "name": c.name,
+                "winery_name": c.winery_name,
+                "region_name": c.region_name,
+                "country": c.country,
+                "wine_type": c.wine_type,
+            }
+            for _, c in top
+        ]
+
+    if not candidates_per_query:
+        return None
+
+    try:
+        claude_result = await match_wines_batch(
+            active_names, candidates_per_query,
+        )
+    except Exception as e:
+        logger.debug("Claude matching failed, falling back to scoring: %s", e)
+        return None
+
+    if not claude_result:
+        return None
+
+    # Map Claude's choices back to XWinesWine objects
+    results: dict[str, XWinesWine | None] = {}
+    for name in names:
+        name_stripped = name.strip() if name else ""
+        if len(name_stripped) < 2:
+            results[name] = None
+            continue
+
+        choice = claude_result.get(name)
+        if choice is None or name not in candidate_lookup:
+            results[name] = None
+            continue
+
+        # choice is 1-based index
+        cands = candidate_lookup[name]
+        if 1 <= choice <= len(cands):
+            results[name] = cands[choice - 1]
+        else:
+            results[name] = None
+
+    return results
+
+
 async def _find_best_xwines_matches_batch(
     names: list[str],
 ) -> dict[str, XWinesWine | None]:
@@ -377,7 +477,7 @@ async def _find_best_xwines_matches_batch(
                 }
             })
 
-        candidate_limit = min(len(unique_names) * 3, 500)
+        candidate_limit = min(len(unique_names) * 8, 500)
         pipeline: list[dict] = [
             {
                 "$search": {
@@ -416,8 +516,13 @@ async def _find_best_xwines_matches_batch(
                 except Exception:
                     continue
 
-            # Assign best candidate to each input name
-            results: dict[str, XWinesWine | None] = {}
+            # Try Claude re-ranking first, fall back to _score_candidate
+            results = await _match_with_claude_or_score(names, candidates)
+            if results is not None:
+                return results
+
+            # Fallback: assign best candidate to each input name via scoring
+            results = {}
             for name in names:
                 name_stripped = name.strip() if name else ""
                 if len(name_stripped) < 2:
