@@ -7,6 +7,7 @@
 ## Testing
 - When running tests, use `WINEBOX_USE_CLAUDE_VISION=false` to use Tesseract only and keep costs down
 - Example: `WINEBOX_USE_CLAUDE_VISION=false uv run python -m pytest tests/`
+- Production test credentials are available via `WINEBOX_TEST_USER` and `WINEBOX_TEST_PASSWORD` environment variables in `.env`. This user has been validated and can be used to log in to production for testing.
 
 ## Development Approach
 - Use Test-Driven Development (TDD) for all new components

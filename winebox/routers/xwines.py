@@ -15,6 +15,7 @@ from fastapi.responses import Response
 
 from winebox.database import get_database
 from winebox.models import XWinesMetadata, XWinesWine
+from winebox.services.xwines_enrichment import _tokenize
 from winebox.schemas.export import ExportFormat
 from winebox.schemas.xwines import (
     FacetBucket,
@@ -50,8 +51,10 @@ async def _atlas_search(
     db = get_database()
     collection = db["xwines_wines"]
 
-    # Split query into terms - each term MUST appear (AND logic)
-    terms = q.split()
+    # Split query into clean tokens - each term MUST appear (AND logic)
+    # _tokenize strips commas/punctuation so composite names like
+    # "Chateau Lynch-Bages, Pauillac, Bordeaux" produce clean terms.
+    terms = _tokenize(q)
 
     # Build must clauses - require ALL terms to appear in name or winery_name
     # This prevents false positives where only some terms match
@@ -199,7 +202,7 @@ async def _regex_search(
     Results are combined and deduplicated, preserving priority order.
     """
     escaped_q = re.escape(q)
-    terms = q.split()
+    terms = _tokenize(q)
 
     # Build filter conditions for wine_type and country
     filter_conditions: dict = {}

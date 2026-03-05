@@ -145,7 +145,7 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
     Returns:
         Best matching XWinesWine, or None if no match found.
     """
-    terms = name.split()
+    terms = _tokenize(name)
 
     # Try Atlas Search first with AND logic for all terms
     try:
@@ -270,13 +270,31 @@ def _normalize(s: str) -> str:
     )
 
 
+def _tokenize(s: str) -> list[str]:
+    """Split a string into search tokens, stripping punctuation.
+
+    Splits on commas/semicolons first, then whitespace, and strips trailing
+    punctuation from each token.  This ensures composite names like
+    ``"Chateau Lynch-Bages, Pauillac, Bordeaux"`` produce clean tokens
+    without trailing commas that would break substring matching.
+    """
+    parts = re.split(r'[,;]+', s)
+    tokens: list[str] = []
+    for part in parts:
+        for word in part.split():
+            cleaned = word.strip(".,;:!?()[]\"'")
+            if cleaned:
+                tokens.append(cleaned)
+    return tokens
+
+
 def _score_candidate(query_name: str, candidate: XWinesWine) -> float:
     """Score how well a candidate matches a query wine name.
 
     Returns a float score; higher is better.  0 means no match.
     """
     q = _normalize(query_name)
-    q_terms = set(q.split())
+    q_terms = set(_tokenize(q))
     c_name = _normalize(candidate.name or "")
     c_winery = _normalize(candidate.winery_name or "")
     score = 0.0
@@ -293,6 +311,10 @@ def _score_candidate(query_name: str, candidate: XWinesWine) -> float:
     # Candidate name contained in query
     elif c_name in q:
         score += 20
+
+    # Winery name appears as substring of query (strong signal for composite names)
+    if len(c_winery) >= 4 and c_winery in q:
+        score += 15
 
     # Term overlap (both name and winery)
     if q_terms:

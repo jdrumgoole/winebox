@@ -8,6 +8,8 @@ from httpx import AsyncClient
 
 from winebox.models import XWinesWine, Wine
 from winebox.services.xwines_enrichment import (
+    _score_candidate,
+    _tokenize,
     enrich_parsed_with_xwines,
     parse_xwines_grapes,
 )
@@ -55,6 +57,92 @@ def test_parse_xwines_grapes_plain_string() -> None:
 def test_parse_xwines_grapes_empty_list() -> None:
     """Empty list returns None."""
     assert parse_xwines_grapes("[]") is None
+
+
+# ---------------------------------------------------------------------------
+# _tokenize
+# ---------------------------------------------------------------------------
+
+
+def test_tokenize_composite_name() -> None:
+    """Composite CSV-style name is split into clean tokens."""
+    result = _tokenize("Chateau Lynch-Bages, Pauillac, Bordeaux")
+    assert result == ["Chateau", "Lynch-Bages", "Pauillac", "Bordeaux"]
+
+
+def test_tokenize_strips_trailing_punctuation() -> None:
+    """Trailing punctuation is removed from each token."""
+    result = _tokenize("Lynch-Bages, Pauillac;")
+    assert result == ["Lynch-Bages", "Pauillac"]
+
+
+def test_tokenize_simple_name() -> None:
+    """Simple space-separated name returns individual words."""
+    result = _tokenize("Chateau Margaux")
+    assert result == ["Chateau", "Margaux"]
+
+
+def test_tokenize_empty() -> None:
+    """Empty string returns empty list."""
+    assert _tokenize("") == []
+
+
+# ---------------------------------------------------------------------------
+# _score_candidate
+# ---------------------------------------------------------------------------
+
+
+def _make_xwines_wine(**kwargs: object) -> XWinesWine:
+    """Create an XWinesWine without requiring Beanie DB initialization."""
+    defaults = {
+        "xwines_id": 0,
+        "name": "",
+        "wine_type": "Red",
+        "winery_name": "",
+        "avg_rating": 0.0,
+        "rating_count": 0,
+    }
+    defaults.update(kwargs)
+    return XWinesWine.model_construct(**defaults)
+
+
+def test_score_composite_name_matches_winery() -> None:
+    """Composite name scores >= 10 when winery appears in query."""
+    candidate = _make_xwines_wine(
+        xwines_id=999,
+        name="Pauillac (Grand Cru Classe)",
+        winery_name="Chateau Lynch-Bages",
+        avg_rating=4.0,
+        rating_count=7000,
+    )
+    score = _score_candidate("Chateau Lynch-Bages, Pauillac, Bordeaux", candidate)
+    assert score >= 10, f"Expected score >= 10 but got {score}"
+
+
+def test_score_exact_name_still_high() -> None:
+    """Exact name match still produces a high score."""
+    candidate = _make_xwines_wine(
+        xwines_id=100,
+        name="Chateau Margaux",
+        winery_name="Chateau Margaux",
+        avg_rating=4.5,
+        rating_count=1000,
+    )
+    score = _score_candidate("Chateau Margaux", candidate)
+    assert score >= 100, f"Expected score >= 100 but got {score}"
+
+
+def test_score_no_overlap_is_low() -> None:
+    """Completely unrelated candidate scores near zero."""
+    candidate = _make_xwines_wine(
+        xwines_id=1,
+        name="Yellow Tail Shiraz",
+        winery_name="Yellow Tail",
+        avg_rating=3.0,
+        rating_count=50,
+    )
+    score = _score_candidate("Chateau Lynch-Bages, Pauillac, Bordeaux", candidate)
+    assert score < 10, f"Expected score < 10 but got {score}"
 
 
 # ---------------------------------------------------------------------------
