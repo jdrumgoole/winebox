@@ -115,7 +115,7 @@ WINE_FIELD_DESCRIPTIONS: dict[str, str] = {
 }
 
 # Number of concurrent asyncio enrichment workers for pipelined imports
-ENRICHMENT_WORKERS = 2
+ENRICHMENT_WORKERS = 4
 
 # Non-wine keywords for filtering
 NON_WINE_KEYWORDS = {

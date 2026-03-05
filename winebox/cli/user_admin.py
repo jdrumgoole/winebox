@@ -112,6 +112,26 @@ async def disable_user(email: str, skip_db_init: bool = False) -> None:
     print(f"User '{email}' has been disabled.")
 
 
+async def verify_user(email: str, skip_db_init: bool = False) -> None:
+    """Mark a user's email as verified."""
+    if not skip_db_init:
+        await init_db()
+
+    user = await User.find_one(User.email == email)
+    if not user:
+        print(f"Error: User '{email}' not found.")
+        sys.exit(1)
+
+    if user.is_verified:
+        print(f"User '{email}' is already verified.")
+        return
+
+    user.is_verified = True
+    user.updated_at = datetime.now(timezone.utc)
+    await user.save()
+    print(f"User '{email}' has been verified.")
+
+
 async def enable_user(email: str, skip_db_init: bool = False) -> None:
     """Enable a user account."""
     if not skip_db_init:
@@ -206,6 +226,10 @@ def main() -> int:
     disable_parser = subparsers.add_parser("disable", help="Disable a user account")
     disable_parser.add_argument("email", help="Email of user to disable")
 
+    # Verify user command
+    verify_parser = subparsers.add_parser("verify", help="Mark a user's email as verified")
+    verify_parser.add_argument("email", help="Email of user to verify")
+
     # Enable user command
     enable_parser = subparsers.add_parser("enable", help="Enable a user account")
     enable_parser.add_argument("email", help="Email of user to enable")
@@ -236,6 +260,9 @@ def main() -> int:
 
         elif args.command == "disable":
             asyncio.run(disable_user(args.email))
+
+        elif args.command == "verify":
+            asyncio.run(verify_user(args.email))
 
         elif args.command == "enable":
             asyncio.run(enable_user(args.email))

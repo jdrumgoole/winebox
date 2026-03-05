@@ -32,6 +32,10 @@ class ImportProcessRequest(BaseModel):
 
     skip_non_wine: bool = Field(True, description="Skip rows that appear to be non-wine items")
     default_quantity: int = Field(1, ge=1, le=10000, description="Default bottle quantity per row")
+    skip_enrichment: bool = Field(
+        False,
+        description="Skip X-Wines enrichment for fastest imports (no automatic reference data fill)",
+    )
 
 
 class ImportResultResponse(BaseModel):
@@ -51,6 +55,10 @@ class ParsedUploadRequest(BaseModel):
     headers: list[str] = Field(..., min_length=1, max_length=200)
     preview_rows: list[dict[str, Any]] = Field(..., max_length=5)
     row_count: int = Field(..., ge=1, le=10000)
+    use_ai_mapping: bool = Field(
+        True,
+        description="Whether to use AI for column mapping (can be disabled for faster uploads)",
+    )
 
 
 class RowChunkRequest(BaseModel):

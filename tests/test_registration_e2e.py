@@ -1,18 +1,17 @@
 """End-to-end tests for user registration flow using Playwright.
 
-These tests require a running WineBox server with email verification disabled:
-    WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false uv run python -m invoke start-background
-
+These tests require a running WineBox server.
 For parallel execution, run with: pytest -n auto tests/test_registration_e2e.py
 """
 
 import os
+import subprocess
 import uuid
 
 import pytest
 from playwright.sync_api import Page, expect
 
-from .playwright_utils import BASE_URL, preflight_check
+from .playwright_utils import BASE_URL, PROJECT_DIR, preflight_check
 @pytest.fixture(scope="session", autouse=True)
 def _e2e_preflight() -> None:
     """Fail fast if the E2E server is not reachable."""
@@ -213,7 +212,7 @@ class TestRegistrationE2E:
         assert not is_valid, "Password field should be invalid for short password"
 
     def test_login_after_registration(self, registration_page: Page, unique_user_data: dict) -> None:
-        """Register then immediately login (email verification disabled)."""
+        """Register via UI, verify via CLI, then login."""
         page = registration_page
 
         # Register new user
@@ -224,6 +223,15 @@ class TestRegistrationE2E:
 
         # Wait for registration to complete
         page.wait_for_timeout(2000)
+
+        # Verify the user via CLI (bypasses email verification requirement)
+        subprocess.run(
+            ["uv", "run", "winebox-admin", "verify", unique_user_data["email"]],
+            cwd=PROJECT_DIR,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
 
         # Navigate to login if not already there
         if not page.locator("#login-card").is_visible():

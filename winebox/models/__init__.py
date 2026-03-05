@@ -11,6 +11,7 @@ from winebox.models.xwines import XWinesWine, XWinesMetadata
 from winebox.models.token_blacklist import RevokedToken
 from winebox.models.login_attempt import LoginAttempt
 from winebox.models.import_batch import ImportBatch, ImportStatus
+from winebox.models.import_batch_row import ImportBatchRow
 
 __all__ = [
     # Main documents
@@ -35,4 +36,5 @@ __all__ = [
     # Import
     "ImportBatch",
     "ImportStatus",
+    "ImportBatchRow",
 ]

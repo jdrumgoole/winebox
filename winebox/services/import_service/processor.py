@@ -18,6 +18,7 @@ from beanie import PydanticObjectId
 from pymongo.errors import BulkWriteError
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
+from winebox.models.import_batch_row import ImportBatchRow
 from winebox.models.wine import Wine
 from winebox.services.xwines_enrichment import enrich_batch_with_xwines
 
@@ -26,10 +27,35 @@ from .converters import is_non_wine_row, row_to_wine_data
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CHUNK_SIZE = 25
+DEFAULT_CHUNK_SIZE = 75
+
+# Only push progress to SSE when percentage advances by at least this much (reduces event count)
+PROGRESS_PCT_STEP = 5
 
 # Sentinel pushed to progress_queue when the writer is done
 _PROGRESS_DONE = object()
+
+
+def _maybe_emit_progress(
+    progress_queue: asyncio.Queue[dict[str, Any] | object],
+    progress_state: dict[str, Any],
+    total: int,
+    _phase: str,
+) -> None:
+    """Emit a progress event only when percentage has advanced by PROGRESS_PCT_STEP or we hit 100%."""
+    if total <= 0:
+        return
+    processed = progress_state["processed"]
+    pct = round(100 * processed / total)
+    last_pct = progress_state.get("last_reported_pct", -1)
+    if pct >= 100 or pct >= last_pct + PROGRESS_PCT_STEP or (last_pct < 0 and pct > last_pct):
+        progress_state["last_reported_pct"] = pct
+        progress_queue.put_nowait({
+            "processed": processed,
+            "total": total,
+            "wines_created": progress_state["wines_created"],
+            "rows_skipped": progress_state["rows_skipped"],
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -62,16 +88,17 @@ class _Chunk:
 # Pipeline stages
 # ---------------------------------------------------------------------------
 
-def _convert_chunk(
-    batch: ImportBatch,
+def _convert_chunk_from_rows(
+    rows: list[dict[str, Any]],
+    column_mapping: dict[str, str] | None,
     owner_id: PydanticObjectId,
     chunk_start: int,
     chunk_end: int,
     skip_non_wine: bool,
     default_quantity: int,
 ) -> _Chunk:
-    """Phase 1: Convert raw rows to wine dicts (sync, fast)."""
-    chunk_rows = batch.rows[chunk_start:chunk_end]
+    """Phase 1 helper: Convert raw row dicts to wine dicts (sync, fast)."""
+    chunk_rows = rows
     wine_datas: list[tuple[dict[str, Any], int]] = []
     rows_skipped = 0
     skipped_rows: list[dict[str, Any]] = []
@@ -80,7 +107,7 @@ def _convert_chunk(
     for offset, row in enumerate(chunk_rows):
         row_index = chunk_start + offset  # 0-based
         try:
-            if skip_non_wine and is_non_wine_row(row, batch.column_mapping):
+            if skip_non_wine and is_non_wine_row(row, column_mapping):
                 rows_skipped += 1
                 skipped_rows.append({
                     "row": row_index + 1,
@@ -89,7 +116,7 @@ def _convert_chunk(
                 })
                 continue
 
-            wine_data = row_to_wine_data(row, batch.column_mapping, owner_id, default_quantity)
+            wine_data = row_to_wine_data(row, column_mapping, owner_id, default_quantity)
             if wine_data is None:
                 rows_skipped += 1
                 skipped_rows.append({
@@ -106,6 +133,27 @@ def _convert_chunk(
             logger.warning("Import error on row %d: %s", row_index + 1, e)
 
     return _Chunk(wine_datas, chunk_start, chunk_end, rows_skipped, skipped_rows, errors)
+
+
+def _convert_chunk(
+    batch: ImportBatch,
+    owner_id: PydanticObjectId,
+    chunk_start: int,
+    chunk_end: int,
+    skip_non_wine: bool,
+    default_quantity: int,
+) -> _Chunk:
+    """Phase 1: Convert raw rows from ImportBatch.rows (backwards compatible path)."""
+    chunk_rows = batch.rows[chunk_start:chunk_end]
+    return _convert_chunk_from_rows(
+        chunk_rows,
+        batch.column_mapping,
+        owner_id,
+        chunk_start,
+        chunk_end,
+        skip_non_wine,
+        default_quantity,
+    )
 
 
 async def _enrich_chunk(chunk: _Chunk) -> _Chunk:
@@ -183,6 +231,7 @@ async def _enrichment_worker(
     progress_queue: asyncio.Queue[dict[str, Any] | object],
     progress_state: dict[str, int],
     total: int,
+    skip_enrichment: bool,
 ) -> None:
     """Enrichment worker: dequeue chunks, enrich, forward to write queue.
 
@@ -196,17 +245,15 @@ async def _enrichment_worker(
             enrichment_queue.task_done()
             break
         try:
-            await _enrich_chunk(chunk)
+            if not skip_enrichment:
+                await _enrich_chunk(chunk)
         finally:
             # Credit half the chunk rows for the enrichment phase
             chunk_rows = chunk.chunk_end - chunk.chunk_start
             progress_state["processed"] += chunk_rows // 2
-            await progress_queue.put({
-                "processed": progress_state["processed"],
-                "total": total,
-                "wines_created": progress_state["wines_created"],
-                "rows_skipped": progress_state["rows_skipped"],
-            })
+            _maybe_emit_progress(
+                progress_queue, progress_state, total, "enrichment",
+            )
             await write_queue.put(chunk)
             enrichment_queue.task_done()
 
@@ -260,13 +307,7 @@ async def _writer_worker(
         progress_state["wines_created"] = wines_created
         progress_state["rows_skipped"] = rows_skipped
 
-        # Push progress
-        await progress_queue.put({
-            "processed": progress_state["processed"],
-            "total": total,
-            "wines_created": wines_created,
-            "rows_skipped": rows_skipped,
-        })
+        _maybe_emit_progress(progress_queue, progress_state, total, "writer")
 
         write_queue.task_done()
 
@@ -294,12 +335,46 @@ async def _feeder(
 ) -> None:
     """Feed chunks into the pipeline and manage orderly shutdown."""
     # Convert and enqueue all chunks
-    for chunk_start in range(0, total, chunk_size):
-        chunk_end = min(chunk_start + chunk_size, total)
-        chunk = _convert_chunk(
-            batch, owner_id, chunk_start, chunk_end, skip_non_wine, default_quantity,
-        )
-        await enrichment_queue.put(chunk)
+    if batch.rows:
+        # Backwards compatible path: use rows embedded on ImportBatch
+        for chunk_start in range(0, total, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, total)
+            chunk = await asyncio.to_thread(
+                _convert_chunk,
+                batch,
+                owner_id,
+                chunk_start,
+                chunk_end,
+                skip_non_wine,
+                default_quantity,
+            )
+            await enrichment_queue.put(chunk)
+    else:
+        # New path: stream rows from ImportBatchRow collection by index
+        collection = ImportBatchRow.get_pymongo_collection()
+        for chunk_start in range(0, total, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, total)
+            cursor = collection.find(
+                {
+                    "batch_id": batch.id,
+                    "index": {"$gte": chunk_start, "$lt": chunk_end},
+                }
+            ).sort("index", 1)
+            docs = await cursor.to_list(length=chunk_end - chunk_start)
+            rows = [doc.get("row", {}) for doc in docs]
+            if not rows:
+                continue
+            chunk = await asyncio.to_thread(
+                _convert_chunk_from_rows,
+                rows,
+                batch.column_mapping,
+                owner_id,
+                chunk_start,
+                chunk_end,
+                skip_non_wine,
+                default_quantity,
+            )
+            await enrichment_queue.put(chunk)
 
     # Poison pills for enrichment workers
     for _ in range(num_workers):
@@ -323,6 +398,7 @@ async def _process_chunks(
     skip_non_wine: bool = True,
     default_quantity: int = 1,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
+    skip_enrichment: bool = False,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Process import rows using a pipelined async architecture.
 
@@ -346,7 +422,9 @@ async def _process_chunks(
         default_quantity: Default bottle quantity.
         chunk_size: Number of rows per chunk.
     """
-    total = len(batch.rows)
+    # Determine total rows: prefer ImportBatch.rows for backwards compatibility,
+    # otherwise fall back to row_count (populated when using ImportBatchRow).
+    total = len(batch.rows) if batch.rows else batch.row_count
     num_workers = ENRICHMENT_WORKERS
 
     # Yield immediately so the client sees progress start without delay
@@ -381,17 +459,23 @@ async def _process_chunks(
 
     # Shared mutable progress state — safe because asyncio is single-threaded.
     # Enrichment workers credit half the chunk rows; writer credits the other half.
-    progress_state: dict[str, int] = {
+    progress_state: dict[str, Any] = {
         "processed": 0,
         "wines_created": 0,
         "rows_skipped": 0,
+        "last_reported_pct": -1,
     }
 
     # Start enrichment workers
     enrichment_tasks = [
         asyncio.create_task(
             _enrichment_worker(
-                enrichment_queue, write_queue, progress_queue, progress_state, total,
+                enrichment_queue,
+                write_queue,
+                progress_queue,
+                progress_state,
+                total,
+                skip_enrichment,
             )
         )
         for _ in range(num_workers)
@@ -406,8 +490,16 @@ async def _process_chunks(
     # concurrently instead of being blocked feeding chunks
     feeder_task = asyncio.create_task(
         _feeder(
-            batch, owner_id, skip_non_wine, default_quantity, chunk_size,
-            total, enrichment_queue, enrichment_tasks, write_queue, num_workers,
+            batch,
+            owner_id,
+            skip_non_wine,
+            default_quantity,
+            chunk_size,
+            total,
+            enrichment_queue,
+            enrichment_tasks,
+            write_queue,
+            num_workers,
         )
     )
 
@@ -449,6 +541,7 @@ async def process_import_batch(
     owner_id: PydanticObjectId,
     skip_non_wine: bool = True,
     default_quantity: int = 1,
+    skip_enrichment: bool = False,
 ) -> ImportBatch:
     """Process an import batch: create Wine documents from mapped rows.
 
@@ -470,7 +563,13 @@ async def process_import_batch(
     batch.status = ImportStatus.PROCESSING
     await batch.save()
 
-    async for _progress in _process_chunks(batch, owner_id, skip_non_wine, default_quantity):
+    async for _progress in _process_chunks(
+        batch,
+        owner_id,
+        skip_non_wine,
+        default_quantity,
+        skip_enrichment=skip_enrichment,
+    ):
         pass  # Consume all progress; batch is saved inside _process_chunks
 
     return batch
@@ -481,6 +580,7 @@ async def process_import_batch_streaming(
     owner_id: PydanticObjectId,
     skip_non_wine: bool = True,
     default_quantity: int = 1,
+    skip_enrichment: bool = False,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Process an import batch, yielding progress after each chunk.
 
@@ -511,5 +611,11 @@ async def process_import_batch_streaming(
     batch.status = ImportStatus.PROCESSING
     await batch.save()
 
-    async for progress in _process_chunks(batch, owner_id, skip_non_wine, default_quantity):
+    async for progress in _process_chunks(
+        batch,
+        owner_id,
+        skip_non_wine,
+        default_quantity,
+        skip_enrichment=skip_enrichment,
+    ):
         yield progress

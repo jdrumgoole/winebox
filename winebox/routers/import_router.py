@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from starlette.responses import StreamingResponse
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
+from winebox.models.import_batch_row import ImportBatchRow
 from winebox.schemas.import_schemas import (
     ColumnMappingRequest,
     ImportBatchSummary,
@@ -51,6 +52,10 @@ def _get_file_extension(filename: str | None) -> str:
 async def upload_spreadsheet(
     current_user: RequireAuth,
     file: UploadFile = File(..., description="CSV or XLSX spreadsheet"),
+    use_ai_mapping: bool = Query(
+        True,
+        description="Whether to use AI for column mapping (can be disabled for faster uploads)",
+    ),
 ) -> ImportUploadResponse:
     """Upload a spreadsheet for import.
 
@@ -83,23 +88,74 @@ async def upload_spreadsheet(
     # Parse file
     try:
         if ext == "csv":
+            # Existing CSV path: parse fully, then fan out rows
             headers, rows = parse_csv(content)
+            if not rows:
+                raise ValueError("Spreadsheet has no data rows")
+
+            preview_rows = rows[:5]
+            row_count = len(rows)
         else:
-            headers, rows = parse_xlsx(content)
+            # Streaming XLSX path: parse headers + rows and write directly to ImportBatchRow
+            from io import BytesIO
+
+            from openpyxl import load_workbook
+            from winebox.services.import_service.constants import MAX_ROWS
+
+            wb = load_workbook(filename=BytesIO(content), read_only=True, data_only=True)
+            ws = wb.active
+            if ws is None:
+                wb.close()
+                raise ValueError("XLSX file has no worksheets")
+
+            row_iter = ws.iter_rows(values_only=True)
+            try:
+                raw_headers = next(row_iter)
+            except StopIteration:
+                wb.close()
+                raise ValueError("XLSX file is empty")
+
+            headers = [str(h).strip() if h is not None else "" for h in raw_headers]
+            headers = [h for h in headers if h]
+            if not headers:
+                wb.close()
+                raise ValueError("XLSX file has no valid headers")
+
+            preview_rows: list[dict[str, Any]] = []
+            row_count = 0
+            row_buffer: list[ImportBatchRow] = []
+
+            # We don't yet know batch.id, so we stream rows after batch insert below.
+            # For now, just collect raw row dicts into a temporary list up to MAX_ROWS.
+            temp_rows: list[dict[str, Any]] = []
+            for i, row_values in enumerate(row_iter):
+                if i >= MAX_ROWS:
+                    break
+                row_dict: dict[str, Any] = {}
+                for j, header in enumerate(headers):
+                    val = row_values[j] if j < len(row_values) else None
+                    row_dict[header] = str(val).strip() if val is not None else ""
+                if any(v for v in row_dict.values()):
+                    temp_rows.append(row_dict)
+                    row_count += 1
+                    if len(preview_rows) < 5:
+                        preview_rows.append(row_dict)
+
+            wb.close()
+
+            if not temp_rows:
+                raise ValueError("Spreadsheet has no data rows")
+            rows = temp_rows
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
 
-    if not rows:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Spreadsheet has no data rows",
-        )
-
-    # Suggest column mapping — try AI first, fall back to static aliases
-    ai_mapping = await suggest_column_mapping_ai(headers, rows[:5])
+    # Suggest column mapping — optionally use AI first, fall back to static aliases
+    ai_mapping = None
+    if use_ai_mapping:
+        ai_mapping = await suggest_column_mapping_ai(headers, preview_rows[:5])
     if ai_mapping is not None:
         suggested_mapping = ai_mapping
         mapping_source = "ai"
@@ -115,12 +171,20 @@ async def upload_spreadsheet(
         filename=file.filename or "unknown",
         file_type=ext,
         headers=headers,
-        rows=rows,
-        row_count=len(rows),
-        preview_rows=rows[:5],
+        rows=[],  # rows stored in ImportBatchRow for large imports
+        row_count=row_count,
+        preview_rows=preview_rows,
         status=ImportStatus.UPLOADED,
     )
     await batch.insert()
+
+    # Fan out rows into ImportBatchRow documents so processing can stream them
+    row_docs = [
+        ImportBatchRow(batch_id=batch.id, index=i, row=row)
+        for i, row in enumerate(rows)
+    ]
+    if row_docs:
+        await ImportBatchRow.insert_many(row_docs)
 
     return ImportUploadResponse(
         batch_id=str(batch.id),
@@ -143,8 +207,10 @@ async def upload_parsed(
     The client parses the CSV using PapaParse and sends only metadata here.
     Actual rows are uploaded via POST /{batch_id}/rows in chunks.
     """
-    # Suggest column mapping — try AI first, fall back to static aliases
-    ai_mapping = await suggest_column_mapping_ai(request.headers, request.preview_rows[:5])
+    # Suggest column mapping — optionally use AI first, fall back to static aliases
+    ai_mapping = None
+    if request.use_ai_mapping:
+        ai_mapping = await suggest_column_mapping_ai(request.headers, request.preview_rows[:5])
     if ai_mapping is not None:
         suggested_mapping = ai_mapping
         mapping_source = "ai"
@@ -198,19 +264,25 @@ async def append_rows(
             detail=f"Cannot add rows to batch in '{batch.status.value}' state",
         )
 
-    collection = ImportBatch.get_pymongo_collection()
     if clear:
         # Replace rows (first chunk or retry)
-        await collection.update_one(
-            {"_id": batch.id},
-            {"$set": {"rows": request.rows}},
+        await ImportBatchRow.get_pymongo_collection().delete_many(
+            {"batch_id": batch.id}
         )
+        start_index = 0
     else:
-        # Append rows (subsequent chunks)
-        await collection.update_one(
-            {"_id": batch.id},
-            {"$push": {"rows": {"$each": request.rows}}},
-        )
+        # Append rows (subsequent chunks) - find current max index
+        last = await ImportBatchRow.find(
+            ImportBatchRow.batch_id == batch.id
+        ).sort("-index").first_or_none()
+        start_index = (last.index + 1) if last is not None else 0
+
+    docs = [
+        ImportBatchRow(batch_id=batch.id, index=start_index + i, row=row)
+        for i, row in enumerate(request.rows)
+    ]
+    if docs:
+        await ImportBatchRow.insert_many(docs)
 
     return {"status": "ok", "rows_added": len(request.rows)}
 
@@ -291,6 +363,7 @@ async def process_batch(
         owner_id=current_user.id,
         skip_non_wine=opts.skip_non_wine,
         default_quantity=opts.default_quantity,
+        skip_enrichment=opts.skip_enrichment,
     )
 
     return ImportResultResponse(
@@ -331,6 +404,7 @@ async def process_batch_stream(
             owner_id=current_user.id,
             skip_non_wine=opts.skip_non_wine,
             default_quantity=opts.default_quantity,
+            skip_enrichment=opts.skip_enrichment,
         ):
             yield f"data: {json.dumps(progress)}\n\n"
 

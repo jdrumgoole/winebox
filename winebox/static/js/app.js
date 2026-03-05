@@ -393,7 +393,7 @@ async function checkAuth() {
             throw new Error('Not authenticated');
         }
         currentUser = await response.json();
-        showMainApp();
+        await showMainApp();
     } catch (error) {
         localStorage.removeItem('winebox_token');
         authToken = null;
@@ -435,6 +435,13 @@ async function showMainApp() {
     try {
         const summaryResp = await fetchWithAuth(`${API_BASE}/cellar/summary`);
         const summary = await summaryResp.json();
+
+        // Re-check hash in case the user navigated while we were fetching
+        const currentHash = window.location.hash.slice(1).split('?')[0];
+        if (currentHash && APP_PAGES.includes(currentHash)) {
+            return;
+        }
+
         if (summary.unique_wines === 0) {
             navigateTo('import');
             return;
@@ -443,7 +450,11 @@ async function showMainApp() {
         // Fall through to dashboard on error
     }
 
-    navigateTo('dashboard');
+    // Only navigate to dashboard if user hasn't navigated elsewhere
+    const finalHash = window.location.hash.slice(1).split('?')[0];
+    if (!finalHash || !APP_PAGES.includes(finalHash)) {
+        navigateTo('dashboard');
+    }
 }
 
 async function handleLogin(e) {
@@ -489,7 +500,7 @@ async function handleLogin(e) {
         analytics.capture('frontend_login_success');
 
         form.reset();
-        checkAuth();
+        await checkAuth();
     } catch (error) {
         errorDiv.textContent = error.message;
         errorDiv.style.display = 'block';
@@ -2800,6 +2811,9 @@ async function handleCsvImport(file) {
         // Store rows for later upload after mapping
         pendingCsvRows = parsed.rows;
 
+        const useAiCheckbox = document.getElementById('import-use-ai-mapping');
+        const useAiMapping = !useAiCheckbox || useAiCheckbox.checked;
+
         // Send headers + preview to server for mapping suggestion
         const response = await fetchWithAuth(`${API_BASE}/import/upload-parsed`, {
             method: 'POST',
@@ -2809,6 +2823,7 @@ async function handleCsvImport(file) {
                 headers: parsed.headers,
                 preview_rows: parsed.rows.slice(0, 5),
                 row_count: parsed.rows.length,
+                use_ai_mapping: useAiMapping,
             })
         });
 
@@ -2831,12 +2846,16 @@ async function handleCsvImport(file) {
  * Upload XLSX file to server for server-side parsing (existing flow).
  */
 async function handleXlsxImport(file) {
+    const useAiCheckbox = document.getElementById('import-use-ai-mapping');
+    const useAiMapping = !useAiCheckbox || useAiCheckbox.checked;
+    const query = useAiMapping ? '' : '?use_ai_mapping=false';
+
     const formData = new FormData();
     formData.append('file', file);
 
     try {
         showToast('Uploading and parsing...', 'info');
-        const response = await fetchWithAuth(`${API_BASE}/import/upload`, {
+        const response = await fetchWithAuth(`${API_BASE}/import/upload${query}`, {
             method: 'POST',
             body: formData
         });
@@ -3123,11 +3142,14 @@ async function handleConfirmMapping() {
         document.getElementById('import-progress-text').textContent = '0 / 0 rows';
         document.getElementById('import-progress-percent').textContent = '0%';
 
+        const skipEnrichmentCheckbox = document.getElementById('import-skip-enrichment');
+        const skipEnrichment = !!skipEnrichmentCheckbox && skipEnrichmentCheckbox.checked;
+
         // Stream processing with progress
         const processResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/process-stream`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1 })
+            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1, skip_enrichment: skipEnrichment })
         });
 
         if (!processResponse.ok) {

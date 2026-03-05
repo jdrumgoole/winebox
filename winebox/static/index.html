@@ -548,6 +548,12 @@
                         <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none;">
                         <p class="form-hint">Supported formats: CSV, Excel (.xlsx). Max 10,000 rows.</p>
                     </div>
+                    <div class="form-group" style="margin-top:0.75rem;">
+                        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                            <input type="checkbox" id="import-use-ai-mapping" checked>
+                            <span>Use AI to improve column mapping (slower)</span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -587,6 +593,12 @@
                             <span id="import-progress-created">0 wines created</span>
                             <span id="import-progress-skipped">0 rows skipped</span>
                         </div>
+                    </div>
+                    <div class="form-group" style="margin-top:0.75rem;">
+                        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                            <input type="checkbox" id="import-skip-enrichment">
+                            <span>Skip X-Wines enrichment (fast import, no automatic reference data fill)</span>
+                        </label>
                     </div>
                 </div>
             </div>
