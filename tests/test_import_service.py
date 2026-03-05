@@ -33,7 +33,8 @@ from winebox.services.import_service import (
 def test_parse_csv_basic() -> None:
     """Test basic CSV parsing."""
     content = "Wine Name,Vintage,Country\nChateau Margaux,2015,France\nBarolo,2018,Italy\n"
-    headers, rows = parse_csv(content.encode("utf-8"))
+    headers, row_gen = parse_csv(content.encode("utf-8"))
+    rows = list(row_gen)
     assert headers == ["Wine Name", "Vintage", "Country"]
     assert len(rows) == 2
     assert rows[0]["Wine Name"] == "Chateau Margaux"
@@ -43,7 +44,8 @@ def test_parse_csv_basic() -> None:
 def test_parse_csv_empty_rows() -> None:
     """Test that empty rows are skipped."""
     content = "Name,Vintage\nWine A,2020\n,,\nWine B,2019\n"
-    headers, rows = parse_csv(content.encode("utf-8"))
+    headers, row_gen = parse_csv(content.encode("utf-8"))
+    rows = list(row_gen)
     assert len(rows) == 2
     assert rows[0]["Name"] == "Wine A"
     assert rows[1]["Name"] == "Wine B"
@@ -52,7 +54,8 @@ def test_parse_csv_empty_rows() -> None:
 def test_parse_csv_latin1_encoding() -> None:
     """Test CSV with Latin-1 encoding (accented characters)."""
     content = "Name,Region\nChâteau Lafite,Médoc\n"
-    headers, rows = parse_csv(content.encode("latin-1"))
+    headers, row_gen = parse_csv(content.encode("latin-1"))
+    rows = list(row_gen)
     assert len(rows) == 1
     assert rows[0]["Name"] == "Château Lafite"
     assert rows[0]["Region"] == "Médoc"
@@ -67,7 +70,8 @@ def test_parse_csv_no_headers() -> None:
 def test_parse_csv_headers_only() -> None:
     """Test CSV with headers but no data rows."""
     content = "Name,Vintage\n"
-    headers, rows = parse_csv(content.encode("utf-8"))
+    headers, row_gen = parse_csv(content.encode("utf-8"))
+    rows = list(row_gen)
     assert headers == ["Name", "Vintage"]
     assert len(rows) == 0
 
@@ -98,7 +102,8 @@ def test_parse_xlsx_basic() -> None:
             ["Rioja Gran Reserva", 2014, "Spain"],
         ],
     )
-    headers, rows = parse_xlsx(content)
+    headers, row_gen = parse_xlsx(content)
+    rows = list(row_gen)
     assert headers == ["Wine", "Year", "Country"]
     assert len(rows) == 2
     assert rows[0]["Wine"] == "Barolo Riserva"
@@ -118,7 +123,8 @@ def test_parse_xlsx_first_sheet_only() -> None:
     buf = io.BytesIO()
     wb.save(buf)
 
-    headers, rows = parse_xlsx(buf.getvalue())
+    headers, row_gen = parse_xlsx(buf.getvalue())
+    rows = list(row_gen)
     assert len(rows) == 1
     assert rows[0]["Name"] == "First Sheet Wine"
 
@@ -509,3 +515,33 @@ def test_canonical_fields_subset_of_valid() -> None:
 def test_canonical_fields_name_is_first() -> None:
     """Test that 'name' is the first canonical field (it's required)."""
     assert CANONICAL_WINE_FIELDS[0] == "name"
+
+
+# =============================================================================
+# Generator Contract Tests
+# =============================================================================
+
+
+def test_parse_csv_returns_generator() -> None:
+    """Test that parse_csv returns a generator, not a list."""
+    from collections.abc import Iterator
+
+    content = "Name,Vintage\nWine A,2020\n"
+    headers, row_gen = parse_csv(content.encode("utf-8"))
+    assert isinstance(row_gen, Iterator)
+    assert not isinstance(row_gen, list)
+    # Consuming should still work
+    rows = list(row_gen)
+    assert len(rows) == 1
+
+
+def test_parse_xlsx_returns_generator() -> None:
+    """Test that parse_xlsx returns a generator, not a list."""
+    from collections.abc import Iterator
+
+    content = _make_xlsx(["Name"], [["Wine A"]])
+    headers, row_gen = parse_xlsx(content)
+    assert isinstance(row_gen, Iterator)
+    assert not isinstance(row_gen, list)
+    rows = list(row_gen)
+    assert len(rows) == 1

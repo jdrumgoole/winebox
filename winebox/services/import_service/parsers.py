@@ -2,6 +2,7 @@
 
 import csv
 import io
+from collections.abc import Iterator
 from typing import Any
 
 from openpyxl import load_workbook
@@ -9,8 +10,8 @@ from openpyxl import load_workbook
 from .constants import MAX_ROWS
 
 
-def parse_csv(file_content: bytes) -> tuple[list[str], list[dict[str, Any]]]:
-    """Parse CSV file content into headers and rows.
+def parse_csv(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]]:
+    """Parse CSV file content into headers and a row generator.
 
     Uses streaming decode via TextIOWrapper to avoid holding the entire
     decoded text in memory at once. Tries UTF-8 first, falls back to Latin-1.
@@ -19,7 +20,7 @@ def parse_csv(file_content: bytes) -> tuple[list[str], list[dict[str, Any]]]:
         file_content: Raw CSV file bytes.
 
     Returns:
-        Tuple of (headers, rows) where rows are dicts keyed by header name.
+        Tuple of (headers, row_generator) where rows are dicts keyed by header name.
 
     Raises:
         ValueError: If the CSV is empty or has no headers.
@@ -45,29 +46,30 @@ def parse_csv(file_content: bytes) -> tuple[list[str], list[dict[str, Any]]]:
     if not headers:
         raise ValueError("CSV file has no valid headers")
 
-    rows: list[dict[str, Any]] = []
-    for i, row in enumerate(reader):
-        if i >= MAX_ROWS:
-            break
-        # Only include non-empty rows — process one row at a time
-        cleaned = {h.strip(): str(v).strip() if v else "" for h, v in row.items() if h and h.strip()}
-        if any(v for v in cleaned.values()):
-            rows.append(cleaned)
+    def _row_generator() -> Iterator[dict[str, Any]]:
+        for i, row in enumerate(reader):
+            if i >= MAX_ROWS:
+                break
+            # Only include non-empty rows — process one row at a time
+            cleaned = {h.strip(): str(v).strip() if v else "" for h, v in row.items() if h and h.strip()}
+            if any(v for v in cleaned.values()):
+                yield cleaned
 
-    return headers, rows
+    return headers, _row_generator()
 
 
-def parse_xlsx(file_content: bytes) -> tuple[list[str], list[dict[str, Any]]]:
-    """Parse XLSX file content into headers and rows (first sheet only).
+def parse_xlsx(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]]:
+    """Parse XLSX file content into headers and a row generator (first sheet only).
 
     Uses openpyxl read_only mode and iterates rows lazily to avoid loading
-    the entire sheet into memory at once.
+    the entire sheet into memory at once. The workbook is closed when the
+    generator is exhausted or garbage-collected.
 
     Args:
         file_content: Raw XLSX file bytes.
 
     Returns:
-        Tuple of (headers, rows) where rows are dicts keyed by header name.
+        Tuple of (headers, row_generator) where rows are dicts keyed by header name.
 
     Raises:
         ValueError: If the XLSX is empty or has no headers.
@@ -94,16 +96,18 @@ def parse_xlsx(file_content: bytes) -> tuple[list[str], list[dict[str, Any]]]:
         wb.close()
         raise ValueError("XLSX file has no valid headers")
 
-    rows: list[dict[str, Any]] = []
-    for i, row_values in enumerate(row_iter):
-        if i >= MAX_ROWS:
-            break
-        row_dict: dict[str, Any] = {}
-        for j, header in enumerate(headers):
-            val = row_values[j] if j < len(row_values) else None
-            row_dict[header] = str(val).strip() if val is not None else ""
-        if any(v for v in row_dict.values()):
-            rows.append(row_dict)
+    def _row_generator() -> Iterator[dict[str, Any]]:
+        try:
+            for i, row_values in enumerate(row_iter):
+                if i >= MAX_ROWS:
+                    break
+                row_dict: dict[str, Any] = {}
+                for j, header in enumerate(headers):
+                    val = row_values[j] if j < len(row_values) else None
+                    row_dict[header] = str(val).strip() if val is not None else ""
+                if any(v for v in row_dict.values()):
+                    yield row_dict
+        finally:
+            wb.close()
 
-    wb.close()
-    return headers, rows
+    return headers, _row_generator()

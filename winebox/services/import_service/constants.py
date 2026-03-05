@@ -114,6 +114,9 @@ WINE_FIELD_DESCRIPTIONS: dict[str, str] = {
     "notes": "Tasting notes, description, or general notes",
 }
 
+# Number of rows per insert_many chunk during upload
+UPLOAD_CHUNK_SIZE = 200
+
 # Number of concurrent asyncio enrichment workers for pipelined imports
 ENRICHMENT_WORKERS = 4
 

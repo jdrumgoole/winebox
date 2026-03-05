@@ -5,6 +5,7 @@ from .constants import (
     HEADER_ALIASES,
     MAX_ROWS,
     NON_WINE_KEYWORDS,
+    UPLOAD_CHUNK_SIZE,
     VALID_WINE_FIELDS,
     WINE_FIELD_DESCRIPTIONS,
 )
@@ -24,6 +25,7 @@ from .mapping import (
 )
 from .parsers import parse_csv, parse_xlsx
 from .processor import process_import_batch, process_import_batch_streaming
+from .utils import chunked
 
 __all__ = [
     # Constants
@@ -31,6 +33,7 @@ __all__ = [
     "HEADER_ALIASES",
     "MAX_ROWS",
     "NON_WINE_KEYWORDS",
+    "UPLOAD_CHUNK_SIZE",
     "VALID_WINE_FIELDS",
     "WINE_FIELD_DESCRIPTIONS",
     # Parsers
@@ -51,4 +54,6 @@ __all__ = [
     # Processor
     "process_import_batch",
     "process_import_batch_streaming",
+    # Utils
+    "chunked",
 ]

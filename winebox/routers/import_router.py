@@ -23,7 +23,9 @@ from winebox.schemas.import_schemas import (
 )
 from winebox.services.auth import RequireAuth
 from winebox.services.import_service import (
+    UPLOAD_CHUNK_SIZE,
     VALID_WINE_FIELDS,
+    chunked,
     parse_csv,
     parse_xlsx,
     process_import_batch,
@@ -85,67 +87,22 @@ async def upload_spreadsheet(
         chunks.append(chunk)
     content = b"".join(chunks)
 
-    # Parse file
+    # Parse file — both paths return (headers, row_generator)
     try:
         if ext == "csv":
-            # Existing CSV path: parse fully, then fan out rows
-            headers, rows = parse_csv(content)
-            if not rows:
-                raise ValueError("Spreadsheet has no data rows")
-
-            preview_rows = rows[:5]
-            row_count = len(rows)
+            headers, row_gen = parse_csv(content)
         else:
-            # Streaming XLSX path: parse headers + rows and write directly to ImportBatchRow
-            from io import BytesIO
+            headers, row_gen = parse_xlsx(content)
 
-            from openpyxl import load_workbook
-            from winebox.services.import_service.constants import MAX_ROWS
+        # Consume first 5 rows for preview
+        preview_rows: list[dict] = []
+        for row in row_gen:
+            preview_rows.append(row)
+            if len(preview_rows) >= 5:
+                break
 
-            wb = load_workbook(filename=BytesIO(content), read_only=True, data_only=True)
-            ws = wb.active
-            if ws is None:
-                wb.close()
-                raise ValueError("XLSX file has no worksheets")
-
-            row_iter = ws.iter_rows(values_only=True)
-            try:
-                raw_headers = next(row_iter)
-            except StopIteration:
-                wb.close()
-                raise ValueError("XLSX file is empty")
-
-            headers = [str(h).strip() if h is not None else "" for h in raw_headers]
-            headers = [h for h in headers if h]
-            if not headers:
-                wb.close()
-                raise ValueError("XLSX file has no valid headers")
-
-            preview_rows: list[dict[str, Any]] = []
-            row_count = 0
-            row_buffer: list[ImportBatchRow] = []
-
-            # We don't yet know batch.id, so we stream rows after batch insert below.
-            # For now, just collect raw row dicts into a temporary list up to MAX_ROWS.
-            temp_rows: list[dict[str, Any]] = []
-            for i, row_values in enumerate(row_iter):
-                if i >= MAX_ROWS:
-                    break
-                row_dict: dict[str, Any] = {}
-                for j, header in enumerate(headers):
-                    val = row_values[j] if j < len(row_values) else None
-                    row_dict[header] = str(val).strip() if val is not None else ""
-                if any(v for v in row_dict.values()):
-                    temp_rows.append(row_dict)
-                    row_count += 1
-                    if len(preview_rows) < 5:
-                        preview_rows.append(row_dict)
-
-            wb.close()
-
-            if not temp_rows:
-                raise ValueError("Spreadsheet has no data rows")
-            rows = temp_rows
+        if not preview_rows:
+            raise ValueError("Spreadsheet has no data rows")
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -165,26 +122,41 @@ async def upload_spreadsheet(
         mapping_source = "static"
         logger.info("Using static alias column mapping for %s", file.filename)
 
-    # Create batch document
+    # Create batch document (row_count updated after insertion)
     batch = ImportBatch(
         owner_id=current_user.id,
         filename=file.filename or "unknown",
         file_type=ext,
         headers=headers,
         rows=[],  # rows stored in ImportBatchRow for large imports
-        row_count=row_count,
+        row_count=0,
         preview_rows=preview_rows,
         status=ImportStatus.UPLOADED,
     )
     await batch.insert()
 
-    # Fan out rows into ImportBatchRow documents so processing can stream them
-    row_docs = [
+    # Insert preview rows as first chunk
+    row_index = 0
+    preview_docs = [
         ImportBatchRow(batch_id=batch.id, index=i, row=row)
-        for i, row in enumerate(rows)
+        for i, row in enumerate(preview_rows)
     ]
-    if row_docs:
-        await ImportBatchRow.insert_many(row_docs)
+    if preview_docs:
+        await ImportBatchRow.insert_many(preview_docs)
+    row_index = len(preview_rows)
+
+    # Stream remaining rows in fixed-size chunks
+    for chunk in chunked(row_gen, UPLOAD_CHUNK_SIZE):
+        docs = [
+            ImportBatchRow(batch_id=batch.id, index=row_index + i, row=row)
+            for i, row in enumerate(chunk)
+        ]
+        await ImportBatchRow.insert_many(docs)
+        row_index += len(chunk)
+
+    # Update batch with final row count
+    batch.row_count = row_index
+    await batch.save()
 
     return ImportUploadResponse(
         batch_id=str(batch.id),
