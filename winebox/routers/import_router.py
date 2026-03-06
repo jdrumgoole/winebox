@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 from datetime import datetime, timezone
 
 from beanie import PydanticObjectId
@@ -70,6 +71,8 @@ async def upload_spreadsheet(
             detail=f"Unsupported file type '.{ext}'. Allowed: CSV, XLSX",
         )
 
+    t0 = time.monotonic()
+
     # Parse directly from Starlette's underlying file object — no copy
     try:
         if ext == "csv":
@@ -77,12 +80,18 @@ async def upload_spreadsheet(
         else:
             headers, row_gen = parse_xlsx(file.file)
 
+        t1 = time.monotonic()
+        logger.info("TIMING [%s] parse headers: %.3fs", file.filename, t1 - t0)
+
         # Consume first 5 rows for preview
         preview_rows: list[dict] = []
         for row in row_gen:
             preview_rows.append(row)
             if len(preview_rows) >= 5:
                 break
+
+        t2 = time.monotonic()
+        logger.info("TIMING [%s] preview rows: %.3fs", file.filename, t2 - t1)
 
         if not preview_rows:
             raise ValueError("Spreadsheet has no data rows")
@@ -96,6 +105,9 @@ async def upload_spreadsheet(
     ai_mapping = None
     if use_ai_mapping:
         ai_mapping = await suggest_column_mapping_ai(headers, preview_rows[:5])
+    t3 = time.monotonic()
+    logger.info("TIMING [%s] AI mapping: %.3fs", file.filename, t3 - t2)
+
     if ai_mapping is not None:
         suggested_mapping = ai_mapping
         mapping_source = "ai"
@@ -117,6 +129,8 @@ async def upload_spreadsheet(
         status=ImportStatus.UPLOADED,
     )
     await batch.insert()
+    t4 = time.monotonic()
+    logger.info("TIMING [%s] batch insert: %.3fs", file.filename, t4 - t3)
 
     # Insert preview rows as first chunk
     row_index = 0
@@ -127,8 +141,11 @@ async def upload_spreadsheet(
     if preview_docs:
         await ImportBatchRow.insert_many(preview_docs)
     row_index = len(preview_rows)
+    t5 = time.monotonic()
+    logger.info("TIMING [%s] preview rows insert: %.3fs", file.filename, t5 - t4)
 
     # Stream remaining rows in fixed-size chunks
+    chunk_count = 0
     for chunk in chunked(row_gen, UPLOAD_CHUNK_SIZE):
         docs = [
             ImportBatchRow(batch_id=batch.id, index=row_index + i, row=row)
@@ -136,10 +153,25 @@ async def upload_spreadsheet(
         ]
         await ImportBatchRow.insert_many(docs)
         row_index += len(chunk)
+        chunk_count += 1
+
+    t6 = time.monotonic()
+    logger.info(
+        "TIMING [%s] chunked insert: %.3fs (%d chunks, %d rows)",
+        file.filename, t6 - t5, chunk_count, row_index - len(preview_rows),
+    )
 
     # Update batch with final row count
     batch.row_count = row_index
     await batch.save()
+
+    t7 = time.monotonic()
+    logger.info(
+        "TIMING [%s] TOTAL: %.3fs (parse=%.3f, preview=%.3f, ai_map=%.3f, "
+        "batch_ins=%.3f, preview_ins=%.3f, chunk_ins=%.3f, save=%.3f)",
+        file.filename, t7 - t0,
+        t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5, t7 - t6,
+    )
 
     return ImportUploadResponse(
         batch_id=str(batch.id),
