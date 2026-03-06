@@ -3,21 +3,21 @@
 import csv
 import io
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, BinaryIO, Union
 
 from openpyxl import load_workbook
 
-from .constants import MAX_ROWS
 
-
-def parse_csv(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]]:
+def parse_csv(
+    file_content: Union[bytes, BinaryIO],
+) -> tuple[list[str], Iterator[dict[str, Any]]]:
     """Parse CSV file content into headers and a row generator.
 
     Uses streaming decode via TextIOWrapper to avoid holding the entire
     decoded text in memory at once. Tries UTF-8 first, falls back to Latin-1.
 
     Args:
-        file_content: Raw CSV file bytes.
+        file_content: Raw CSV file bytes or a seekable binary file-like object.
 
     Returns:
         Tuple of (headers, row_generator) where rows are dicts keyed by header name.
@@ -25,18 +25,26 @@ def parse_csv(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]]
     Raises:
         ValueError: If the CSV is empty or has no headers.
     """
-    # Try each encoding with streaming TextIOWrapper (avoids decoding entire
-    # file into a string at once — memory stays ~1x file size, not 3x).
+    if isinstance(file_content, bytes):
+        source: BinaryIO = io.BytesIO(file_content)
+    else:
+        source = file_content
+
     reader = None
+    text_stream = None
     for encoding in ("utf-8", "latin-1"):
         try:
-            text_stream = io.TextIOWrapper(io.BytesIO(file_content), encoding=encoding)
+            source.seek(0)
+            text_stream = io.TextIOWrapper(source, encoding=encoding)
             reader = csv.DictReader(text_stream)
             # Force header read to trigger any decode error early
             _ = reader.fieldnames
             break
         except (UnicodeDecodeError, csv.Error):
+            if text_stream is not None:
+                text_stream.detach()  # Don't close underlying source
             reader = None
+            text_stream = None
             continue
 
     if reader is None or reader.fieldnames is None:
@@ -47,10 +55,7 @@ def parse_csv(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]]
         raise ValueError("CSV file has no valid headers")
 
     def _row_generator() -> Iterator[dict[str, Any]]:
-        for i, row in enumerate(reader):
-            if i >= MAX_ROWS:
-                break
-            # Only include non-empty rows — process one row at a time
+        for row in reader:
             cleaned = {h.strip(): str(v).strip() if v else "" for h, v in row.items() if h and h.strip()}
             if any(v for v in cleaned.values()):
                 yield cleaned
@@ -58,7 +63,9 @@ def parse_csv(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]]
     return headers, _row_generator()
 
 
-def parse_xlsx(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]]:
+def parse_xlsx(
+    file_content: Union[bytes, BinaryIO],
+) -> tuple[list[str], Iterator[dict[str, Any]]]:
     """Parse XLSX file content into headers and a row generator (first sheet only).
 
     Uses openpyxl read_only mode and iterates rows lazily to avoid loading
@@ -66,7 +73,7 @@ def parse_xlsx(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]
     generator is exhausted or garbage-collected.
 
     Args:
-        file_content: Raw XLSX file bytes.
+        file_content: Raw XLSX file bytes or a binary file-like object.
 
     Returns:
         Tuple of (headers, row_generator) where rows are dicts keyed by header name.
@@ -74,7 +81,12 @@ def parse_xlsx(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]
     Raises:
         ValueError: If the XLSX is empty or has no headers.
     """
-    wb = load_workbook(filename=io.BytesIO(file_content), read_only=True, data_only=True)
+    if isinstance(file_content, bytes):
+        source: BinaryIO = io.BytesIO(file_content)
+    else:
+        source = file_content
+
+    wb = load_workbook(filename=source, read_only=True, data_only=True)
     ws = wb.active
     if ws is None:
         wb.close()
@@ -98,9 +110,7 @@ def parse_xlsx(file_content: bytes) -> tuple[list[str], Iterator[dict[str, Any]]
 
     def _row_generator() -> Iterator[dict[str, Any]]:
         try:
-            for i, row_values in enumerate(row_iter):
-                if i >= MAX_ROWS:
-                    break
+            for row_values in row_iter:
                 row_dict: dict[str, Any] = {}
                 for j, header in enumerate(headers):
                     val = row_values[j] if j < len(row_values) else None

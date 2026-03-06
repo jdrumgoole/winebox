@@ -40,7 +40,6 @@ router = APIRouter()
 
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {"csv", "xlsx"}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 def _get_file_extension(filename: str | None) -> str:
@@ -71,28 +70,12 @@ async def upload_spreadsheet(
             detail=f"Unsupported file type '.{ext}'. Allowed: CSV, XLSX",
         )
 
-    # Read in chunks to avoid unbounded memory for oversized files
-    chunks: list[bytes] = []
-    total_size = 0
-    while True:
-        chunk = await file.read(64 * 1024)  # 64 KB chunks
-        if not chunk:
-            break
-        total_size += len(chunk)
-        if total_size > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="File exceeds maximum size of 10 MB",
-            )
-        chunks.append(chunk)
-    content = b"".join(chunks)
-
-    # Parse file — both paths return (headers, row_generator)
+    # Parse directly from Starlette's underlying file object — no copy
     try:
         if ext == "csv":
-            headers, row_gen = parse_csv(content)
+            headers, row_gen = parse_csv(file.file)
         else:
-            headers, row_gen = parse_xlsx(content)
+            headers, row_gen = parse_xlsx(file.file)
 
         # Consume first 5 rows for preview
         preview_rows: list[dict] = []
