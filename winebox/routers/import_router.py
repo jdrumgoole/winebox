@@ -81,7 +81,7 @@ async def upload_spreadsheet(
             headers, row_gen = parse_xlsx(file.file)
 
         t1 = time.monotonic()
-        logger.info("TIMING [%s] parse headers: %.3fs", file.filename, t1 - t0)
+        print(f"TIMING [{file.filename}] parse headers: {t1 - t0:.3f}s", flush=True)
 
         # Consume first 5 rows for preview
         preview_rows: list[dict] = []
@@ -91,7 +91,7 @@ async def upload_spreadsheet(
                 break
 
         t2 = time.monotonic()
-        logger.info("TIMING [%s] preview rows: %.3fs", file.filename, t2 - t1)
+        print(f"TIMING [{file.filename}] preview rows: {t2 - t1:.3f}s", flush=True)
 
         if not preview_rows:
             raise ValueError("Spreadsheet has no data rows")
@@ -106,7 +106,7 @@ async def upload_spreadsheet(
     if use_ai_mapping:
         ai_mapping = await suggest_column_mapping_ai(headers, preview_rows[:5])
     t3 = time.monotonic()
-    logger.info("TIMING [%s] AI mapping: %.3fs", file.filename, t3 - t2)
+    print(f"TIMING [{file.filename}] AI mapping: {t3 - t2:.3f}s", flush=True)
 
     if ai_mapping is not None:
         suggested_mapping = ai_mapping
@@ -130,7 +130,7 @@ async def upload_spreadsheet(
     )
     await batch.insert()
     t4 = time.monotonic()
-    logger.info("TIMING [%s] batch insert: %.3fs", file.filename, t4 - t3)
+    print(f"TIMING [{file.filename}] batch insert: {t4 - t3:.3f}s", flush=True)
 
     # Insert preview rows as first chunk
     row_index = 0
@@ -142,7 +142,7 @@ async def upload_spreadsheet(
         await ImportBatchRow.insert_many(preview_docs)
     row_index = len(preview_rows)
     t5 = time.monotonic()
-    logger.info("TIMING [%s] preview rows insert: %.3fs", file.filename, t5 - t4)
+    print(f"TIMING [{file.filename}] preview rows insert: {t5 - t4:.3f}s", flush=True)
 
     # Stream remaining rows in fixed-size chunks
     chunk_count = 0
@@ -156,9 +156,10 @@ async def upload_spreadsheet(
         chunk_count += 1
 
     t6 = time.monotonic()
-    logger.info(
-        "TIMING [%s] chunked insert: %.3fs (%d chunks, %d rows)",
-        file.filename, t6 - t5, chunk_count, row_index - len(preview_rows),
+    print(
+        f"TIMING [{file.filename}] chunked insert: {t6 - t5:.3f}s "
+        f"({chunk_count} chunks, {row_index - len(preview_rows)} rows)",
+        flush=True,
     )
 
     # Update batch with final row count
@@ -166,11 +167,12 @@ async def upload_spreadsheet(
     await batch.save()
 
     t7 = time.monotonic()
-    logger.info(
-        "TIMING [%s] TOTAL: %.3fs (parse=%.3f, preview=%.3f, ai_map=%.3f, "
-        "batch_ins=%.3f, preview_ins=%.3f, chunk_ins=%.3f, save=%.3f)",
-        file.filename, t7 - t0,
-        t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5, t7 - t6,
+    print(
+        f"TIMING [{file.filename}] TOTAL: {t7 - t0:.3f}s "
+        f"(parse={t1 - t0:.3f}, preview={t2 - t1:.3f}, ai_map={t3 - t2:.3f}, "
+        f"batch_ins={t4 - t3:.3f}, preview_ins={t5 - t4:.3f}, "
+        f"chunk_ins={t6 - t5:.3f}, save={t7 - t6:.3f})",
+        flush=True,
     )
 
     return ImportUploadResponse(
