@@ -61,7 +61,8 @@ async def upload_spreadsheet(
     """Upload a spreadsheet for import.
 
     Parses the file, returns headers and preview rows with suggested column mapping.
-    Row insertion and AI column mapping run concurrently via asyncio.gather.
+    AI column mapping is kicked off immediately after parsing as a background task,
+    then row insertion proceeds — each DB await lets the AI HTTP call progress.
     """
     # Validate file extension
     ext = _get_file_extension(file.filename)
@@ -93,6 +94,16 @@ async def upload_spreadsheet(
             detail=str(e),
         )
 
+    # Fire off AI mapping immediately — it only needs headers + preview_rows,
+    # so it can run in the background while we create the batch and insert rows.
+    # Each subsequent await (batch.insert, insert_many, etc.) yields to the event
+    # loop, letting the AI HTTP call progress concurrently.
+    ai_task: asyncio.Task[dict[str, str] | None] | None = None
+    if use_ai_mapping:
+        ai_task = asyncio.create_task(
+            suggest_column_mapping_ai(headers, preview_rows[:5])
+        )
+
     # Create batch document (row_count updated after insertion)
     batch = ImportBatch(
         owner_id=current_user.id,
@@ -106,40 +117,32 @@ async def upload_spreadsheet(
     )
     await batch.insert()
 
-    # Run row insertion and AI mapping concurrently — the AI call (~1.7s) overlaps
-    # with DB inserts (~30ms), so the upload returns as soon as AI finishes.
-    async def insert_rows() -> int:
-        """Insert preview + remaining rows into raw_uploads collection."""
-        row_index = 0
-        preview_docs = [
-            RawUploadRow(batch_id=batch.id, index=i, row=row)
-            for i, row in enumerate(preview_rows)
+    # Insert rows into raw_uploads — each await lets the AI task progress
+    row_index = 0
+    preview_docs = [
+        RawUploadRow(batch_id=batch.id, index=i, row=row)
+        for i, row in enumerate(preview_rows)
+    ]
+    if preview_docs:
+        await RawUploadRow.insert_many(preview_docs)
+    row_index = len(preview_rows)
+
+    for chunk in chunked(row_gen, UPLOAD_CHUNK_SIZE):
+        docs = [
+            RawUploadRow(batch_id=batch.id, index=row_index + i, row=row)
+            for i, row in enumerate(chunk)
         ]
-        if preview_docs:
-            await RawUploadRow.insert_many(preview_docs)
-        row_index = len(preview_rows)
-
-        for chunk in chunked(row_gen, UPLOAD_CHUNK_SIZE):
-            docs = [
-                RawUploadRow(batch_id=batch.id, index=row_index + i, row=row)
-                for i, row in enumerate(chunk)
-            ]
-            await RawUploadRow.insert_many(docs)
-            row_index += len(chunk)
-
-        return row_index
-
-    async def get_ai_mapping() -> dict[str, str] | None:
-        """Get AI-suggested column mapping if enabled."""
-        if use_ai_mapping:
-            return await suggest_column_mapping_ai(headers, preview_rows[:5])
-        return None
-
-    row_count, ai_mapping = await asyncio.gather(insert_rows(), get_ai_mapping())
+        await RawUploadRow.insert_many(docs)
+        row_index += len(chunk)
 
     # Update batch with final row count
-    batch.row_count = row_count
+    batch.row_count = row_index
     await batch.save()
+
+    # Now collect AI result (likely already finished during DB inserts)
+    ai_mapping = None
+    if ai_task is not None:
+        ai_mapping = await ai_task
 
     # Determine mapping source
     if ai_mapping is not None:
