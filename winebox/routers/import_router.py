@@ -1,9 +1,8 @@
 """Import endpoints for spreadsheet wine collection import."""
 
+import asyncio
 import json
 import logging
-import time
-from datetime import datetime, timezone
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
@@ -12,7 +11,7 @@ from pydantic import ValidationError
 from starlette.responses import StreamingResponse
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
-from winebox.models.import_batch_row import ImportBatchRow
+from winebox.models.import_batch_row import RawUploadRow
 from winebox.schemas.import_schemas import (
     ColumnMappingRequest,
     ImportBatchSummary,
@@ -62,6 +61,7 @@ async def upload_spreadsheet(
     """Upload a spreadsheet for import.
 
     Parses the file, returns headers and preview rows with suggested column mapping.
+    Row insertion and AI column mapping run concurrently via asyncio.gather.
     """
     # Validate file extension
     ext = _get_file_extension(file.filename)
@@ -71,8 +71,6 @@ async def upload_spreadsheet(
             detail=f"Unsupported file type '.{ext}'. Allowed: CSV, XLSX",
         )
 
-    t0 = time.monotonic()
-
     # Parse directly from Starlette's underlying file object — no copy
     try:
         if ext == "csv":
@@ -80,18 +78,12 @@ async def upload_spreadsheet(
         else:
             headers, row_gen = parse_xlsx(file.file)
 
-        t1 = time.monotonic()
-        print(f"TIMING [{file.filename}] parse headers: {t1 - t0:.3f}s", flush=True)
-
-        # Consume first 5 rows for preview
+        # Consume first 5 rows for preview (needed by both insert and AI mapping)
         preview_rows: list[dict] = []
         for row in row_gen:
             preview_rows.append(row)
             if len(preview_rows) >= 5:
                 break
-
-        t2 = time.monotonic()
-        print(f"TIMING [{file.filename}] preview rows: {t2 - t1:.3f}s", flush=True)
 
         if not preview_rows:
             raise ValueError("Spreadsheet has no data rows")
@@ -101,13 +93,55 @@ async def upload_spreadsheet(
             detail=str(e),
         )
 
-    # Suggest column mapping — optionally use AI first, fall back to static aliases
-    ai_mapping = None
-    if use_ai_mapping:
-        ai_mapping = await suggest_column_mapping_ai(headers, preview_rows[:5])
-    t3 = time.monotonic()
-    print(f"TIMING [{file.filename}] AI mapping: {t3 - t2:.3f}s", flush=True)
+    # Create batch document (row_count updated after insertion)
+    batch = ImportBatch(
+        owner_id=current_user.id,
+        filename=file.filename or "unknown",
+        file_type=ext,
+        headers=headers,
+        rows=[],  # rows stored in RawUploadRow collection
+        row_count=0,
+        preview_rows=preview_rows,
+        status=ImportStatus.UPLOADED,
+    )
+    await batch.insert()
 
+    # Run row insertion and AI mapping concurrently — the AI call (~1.7s) overlaps
+    # with DB inserts (~30ms), so the upload returns as soon as AI finishes.
+    async def insert_rows() -> int:
+        """Insert preview + remaining rows into raw_uploads collection."""
+        row_index = 0
+        preview_docs = [
+            RawUploadRow(batch_id=batch.id, index=i, row=row)
+            for i, row in enumerate(preview_rows)
+        ]
+        if preview_docs:
+            await RawUploadRow.insert_many(preview_docs)
+        row_index = len(preview_rows)
+
+        for chunk in chunked(row_gen, UPLOAD_CHUNK_SIZE):
+            docs = [
+                RawUploadRow(batch_id=batch.id, index=row_index + i, row=row)
+                for i, row in enumerate(chunk)
+            ]
+            await RawUploadRow.insert_many(docs)
+            row_index += len(chunk)
+
+        return row_index
+
+    async def get_ai_mapping() -> dict[str, str] | None:
+        """Get AI-suggested column mapping if enabled."""
+        if use_ai_mapping:
+            return await suggest_column_mapping_ai(headers, preview_rows[:5])
+        return None
+
+    row_count, ai_mapping = await asyncio.gather(insert_rows(), get_ai_mapping())
+
+    # Update batch with final row count
+    batch.row_count = row_count
+    await batch.save()
+
+    # Determine mapping source
     if ai_mapping is not None:
         suggested_mapping = ai_mapping
         mapping_source = "ai"
@@ -116,64 +150,6 @@ async def upload_spreadsheet(
         suggested_mapping = suggest_column_mapping(headers)
         mapping_source = "static"
         logger.info("Using static alias column mapping for %s", file.filename)
-
-    # Create batch document (row_count updated after insertion)
-    batch = ImportBatch(
-        owner_id=current_user.id,
-        filename=file.filename or "unknown",
-        file_type=ext,
-        headers=headers,
-        rows=[],  # rows stored in ImportBatchRow for large imports
-        row_count=0,
-        preview_rows=preview_rows,
-        status=ImportStatus.UPLOADED,
-    )
-    await batch.insert()
-    t4 = time.monotonic()
-    print(f"TIMING [{file.filename}] batch insert: {t4 - t3:.3f}s", flush=True)
-
-    # Insert preview rows as first chunk
-    row_index = 0
-    preview_docs = [
-        ImportBatchRow(batch_id=batch.id, index=i, row=row)
-        for i, row in enumerate(preview_rows)
-    ]
-    if preview_docs:
-        await ImportBatchRow.insert_many(preview_docs)
-    row_index = len(preview_rows)
-    t5 = time.monotonic()
-    print(f"TIMING [{file.filename}] preview rows insert: {t5 - t4:.3f}s", flush=True)
-
-    # Stream remaining rows in fixed-size chunks
-    chunk_count = 0
-    for chunk in chunked(row_gen, UPLOAD_CHUNK_SIZE):
-        docs = [
-            ImportBatchRow(batch_id=batch.id, index=row_index + i, row=row)
-            for i, row in enumerate(chunk)
-        ]
-        await ImportBatchRow.insert_many(docs)
-        row_index += len(chunk)
-        chunk_count += 1
-
-    t6 = time.monotonic()
-    print(
-        f"TIMING [{file.filename}] chunked insert: {t6 - t5:.3f}s "
-        f"({chunk_count} chunks, {row_index - len(preview_rows)} rows)",
-        flush=True,
-    )
-
-    # Update batch with final row count
-    batch.row_count = row_index
-    await batch.save()
-
-    t7 = time.monotonic()
-    print(
-        f"TIMING [{file.filename}] TOTAL: {t7 - t0:.3f}s "
-        f"(parse={t1 - t0:.3f}, preview={t2 - t1:.3f}, ai_map={t3 - t2:.3f}, "
-        f"batch_ins={t4 - t3:.3f}, preview_ins={t5 - t4:.3f}, "
-        f"chunk_ins={t6 - t5:.3f}, save={t7 - t6:.3f})",
-        flush=True,
-    )
 
     return ImportUploadResponse(
         batch_id=str(batch.id),
@@ -255,23 +231,23 @@ async def append_rows(
 
     if clear:
         # Replace rows (first chunk or retry)
-        await ImportBatchRow.get_pymongo_collection().delete_many(
+        await RawUploadRow.get_pymongo_collection().delete_many(
             {"batch_id": batch.id}
         )
         start_index = 0
     else:
         # Append rows (subsequent chunks) - find current max index
-        last = await ImportBatchRow.find(
-            ImportBatchRow.batch_id == batch.id
+        last = await RawUploadRow.find(
+            RawUploadRow.batch_id == batch.id
         ).sort("-index").first_or_none()
         start_index = (last.index + 1) if last is not None else 0
 
     docs = [
-        ImportBatchRow(batch_id=batch.id, index=start_index + i, row=row)
+        RawUploadRow(batch_id=batch.id, index=start_index + i, row=row)
         for i, row in enumerate(request.rows)
     ]
     if docs:
-        await ImportBatchRow.insert_many(docs)
+        await RawUploadRow.insert_many(docs)
 
     return {"status": "ok", "rows_added": len(request.rows)}
 

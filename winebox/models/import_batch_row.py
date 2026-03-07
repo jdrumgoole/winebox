@@ -5,21 +5,22 @@ from beanie import Document, Indexed, PydanticObjectId
 from pydantic import Field
 
 
-class ImportBatchRow(Document):
-    """Stores individual import rows for an ImportBatch.
+class RawUploadRow(Document):
+    """Stores individual import rows as a permanent audit trail.
 
-    This keeps large spreadsheets out of the ImportBatch document itself and
-    allows streaming/chunked processing by batch_id + index.
+    Raw upload data lives in the `raw_uploads` collection, timestamped so the
+    same file can be uploaded multiple times. These documents are preserved
+    even when the parent ImportBatch is deleted.
     """
 
     batch_id: Indexed(PydanticObjectId)
     index: Indexed(int)
     row: dict[str, Any] = Field(default_factory=dict)
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
-        name = "import_batch_rows"
+        name = "raw_uploads"
         indexes = [
             [("batch_id", 1), ("index", 1)],
         ]
-

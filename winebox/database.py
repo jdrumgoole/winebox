@@ -25,7 +25,7 @@ def get_document_models() -> list[type["Document"]]:
         Classification,
         GrapeVariety,
         ImportBatch,
-        ImportBatchRow,
+        RawUploadRow,
         LoginAttempt,
         Region,
         RevokedToken,
@@ -50,7 +50,7 @@ def get_document_models() -> list[type["Document"]]:
         RevokedToken,
         LoginAttempt,
         ImportBatch,
-        ImportBatchRow,
+        RawUploadRow,
     ]
 
 

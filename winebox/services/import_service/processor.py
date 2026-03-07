@@ -18,7 +18,7 @@ from beanie import PydanticObjectId
 from pymongo.errors import BulkWriteError
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
-from winebox.models.import_batch_row import ImportBatchRow
+from winebox.models.import_batch_row import RawUploadRow
 from winebox.models.wine import Wine
 from winebox.services.background_enrichment import enrich_unenriched_wines
 from winebox.services.xwines_enrichment import enrich_batch_with_xwines
@@ -351,8 +351,8 @@ async def _feeder(
             )
             await enrichment_queue.put(chunk)
     else:
-        # New path: stream rows from ImportBatchRow collection by index
-        collection = ImportBatchRow.get_pymongo_collection()
+        # New path: stream rows from RawUploadRow collection by index
+        collection = RawUploadRow.get_pymongo_collection()
         for chunk_start in range(0, total, chunk_size):
             chunk_end = min(chunk_start + chunk_size, total)
             cursor = collection.find(
@@ -424,7 +424,7 @@ async def _process_chunks(
         chunk_size: Number of rows per chunk.
     """
     # Determine total rows: prefer ImportBatch.rows for backwards compatibility,
-    # otherwise fall back to row_count (populated when using ImportBatchRow).
+    # otherwise fall back to row_count (populated when using RawUploadRow).
     total = len(batch.rows) if batch.rows else batch.row_count
     num_workers = ENRICHMENT_WORKERS
 
