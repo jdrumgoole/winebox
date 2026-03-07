@@ -458,3 +458,38 @@ class TestFindSecretsFile:
         monkeypatch.chdir(tmp_path)
         found = find_secrets_file()
         assert found is None
+
+
+class TestConfigEdgeCases:
+    """Test additional configuration edge cases."""
+
+    def test_load_config_defaults(self, tmp_path, monkeypatch):
+        """No file/env -> all defaults applied."""
+        monkeypatch.chdir(tmp_path)
+        # Clear env vars that affect config to test true defaults
+        monkeypatch.delenv("WINEBOX_USE_CLAUDE_VISION", raising=False)
+        config = load_config(tmp_path / "nonexistent.toml")
+        assert config.app_name == "WineBox"
+        assert config.server.port == 8000
+        assert config.server.debug is False
+        assert config.ocr.use_claude_vision is True
+
+    def test_env_override_ocr(self):
+        """WINEBOX_USE_CLAUDE_VISION override."""
+        config_dict = {}
+        with patch.dict(os.environ, {"WINEBOX_USE_CLAUDE_VISION": "false"}):
+            apply_env_overrides(config_dict)
+        assert config_dict["ocr"]["use_claude_vision"] is False
+
+    def test_env_override_auth(self):
+        """WINEBOX_REGISTRATION_ENABLED override."""
+        config_dict = {}
+        with patch.dict(os.environ, {"WINEBOX_REGISTRATION_ENABLED": "false"}):
+            apply_env_overrides(config_dict)
+        assert config_dict["auth"]["registration_enabled"] is False
+
+    def test_load_secrets_env_only(self, tmp_path):
+        """No secrets file, env vars work."""
+        with patch.dict(os.environ, {"WINEBOX_SECRET_KEY": "env-only-key"}):
+            secrets = load_secrets(tmp_path / "nonexistent.env")
+        assert secrets.secret_key == "env-only-key"

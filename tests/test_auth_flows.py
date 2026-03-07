@@ -200,3 +200,68 @@ class TestPasswordChange:
         assert response.status_code == 400
 
 
+class TestAccountLockout:
+    """Tests for account lockout after failed login attempts."""
+
+    @pytest.mark.asyncio
+    async def test_login_locked_after_five_failures(self, client: AsyncClient, test_user):
+        """5 wrong passwords -> 6th returns 429."""
+        for _ in range(5):
+            await client.post(
+                "/api/auth/token",
+                data={"username": test_user["email"], "password": "wrong"},
+            )
+
+        # 6th attempt should be locked
+        response = await client.post(
+            "/api/auth/token",
+            data={"username": test_user["email"], "password": "wrong"},
+        )
+        assert response.status_code == 429
+
+    @pytest.mark.asyncio
+    async def test_successful_login_clears_attempts(self, client: AsyncClient, test_user):
+        """Success resets failure counter."""
+        # Record 4 failures (below threshold)
+        for _ in range(4):
+            await client.post(
+                "/api/auth/token",
+                data={"username": test_user["email"], "password": "wrong"},
+            )
+
+        # Successful login should clear attempts
+        response = await client.post(
+            "/api/auth/token",
+            data={"username": test_user["email"], "password": test_user["password"]},
+        )
+        assert response.status_code == 200
+
+        # Now 5 more failures should be needed to lock
+        for _ in range(4):
+            await client.post(
+                "/api/auth/token",
+                data={"username": test_user["email"], "password": "wrong"},
+            )
+
+        # Should not be locked yet (only 4 failures since clear)
+        response = await client.post(
+            "/api/auth/token",
+            data={"username": test_user["email"], "password": test_user["password"]},
+        )
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_lockout_includes_retry_after(self, client: AsyncClient, test_user):
+        """Response has Retry-After header."""
+        for _ in range(5):
+            await client.post(
+                "/api/auth/token",
+                data={"username": test_user["email"], "password": "wrong"},
+            )
+
+        response = await client.post(
+            "/api/auth/token",
+            data={"username": test_user["email"], "password": "wrong"},
+        )
+        assert response.status_code == 429
+        assert "retry-after" in response.headers
