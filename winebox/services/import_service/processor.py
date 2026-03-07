@@ -516,6 +516,10 @@ async def _process_chunks(
     wines_created, rows_skipped, skipped_rows, errors = await writer_future
     await feeder_task
 
+    # Clear embedded rows — feeder has consumed them and audit data lives in
+    # raw_uploads. This avoids writing the full rows list in the final save.
+    batch.rows = []
+
     # Save final batch state
     batch.wines_created = wines_created
     batch.rows_skipped = rows_skipped

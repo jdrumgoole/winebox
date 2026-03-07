@@ -25,7 +25,6 @@ from winebox.services.auth import RequireAuth
 from winebox.services.import_service import (
     UPLOAD_CHUNK_SIZE,
     VALID_WINE_FIELDS,
-    chunked,
     parse_csv,
     parse_xlsx,
     process_import_batch,
@@ -61,8 +60,9 @@ async def upload_spreadsheet(
     """Upload a spreadsheet for import.
 
     Parses the file, returns headers and preview rows with suggested column mapping.
-    AI column mapping is kicked off immediately after parsing as a background task,
-    then row insertion proceeds — each DB await lets the AI HTTP call progress.
+    AI mapping runs concurrently with row consumption (in a thread). Rows are
+    embedded in the batch document for immediate availability; a background task
+    copies them to raw_uploads for the permanent audit trail.
     """
     # Validate file extension
     ext = _get_file_extension(file.filename)
@@ -72,14 +72,16 @@ async def upload_spreadsheet(
             detail=f"Unsupported file type '.{ext}'. Allowed: CSV, XLSX",
         )
 
-    # Parse directly from Starlette's underlying file object — no copy
+    # Read file into memory so the generator survives after the request body closes
+    file_bytes = await file.read()
+
     try:
         if ext == "csv":
-            headers, row_gen = parse_csv(file.file)
+            headers, row_gen = parse_csv(file_bytes)
         else:
-            headers, row_gen = parse_xlsx(file.file)
+            headers, row_gen = parse_xlsx(file_bytes)
 
-        # Consume first 5 rows for preview (needed by both insert and AI mapping)
+        # Consume first 5 rows for preview
         preview_rows: list[dict] = []
         for row in row_gen:
             preview_rows.append(row)
@@ -94,52 +96,36 @@ async def upload_spreadsheet(
             detail=str(e),
         )
 
-    # Fire off AI mapping immediately — it only needs headers + preview_rows,
-    # so it can run in the background while we create the batch and insert rows.
-    # Each subsequent await (batch.insert, insert_many, etc.) yields to the event
-    # loop, letting the AI HTTP call progress concurrently.
+    # Fire off AI mapping immediately (only needs headers + preview)
     ai_task: asyncio.Task[dict[str, str] | None] | None = None
     if use_ai_mapping:
         ai_task = asyncio.create_task(
             suggest_column_mapping_ai(headers, preview_rows[:5])
         )
 
-    # Create batch document (row_count updated after insertion)
+    # Consume remaining rows in a thread — unblocks the event loop so the
+    # AI HTTP call can progress concurrently with openpyxl/CSV parsing
+    remaining_rows: list[dict] = await asyncio.to_thread(list, row_gen)
+    all_rows = preview_rows + remaining_rows
+
+    # Create batch with rows embedded (single document write, no chunked inserts).
+    # The processor reads directly from batch.rows — no wait for raw_uploads.
     batch = ImportBatch(
         owner_id=current_user.id,
         filename=file.filename or "unknown",
         file_type=ext,
         headers=headers,
-        rows=[],  # rows stored in RawUploadRow collection
-        row_count=0,
+        rows=all_rows,
+        row_count=len(all_rows),
         preview_rows=preview_rows,
         status=ImportStatus.UPLOADED,
     )
     await batch.insert()
 
-    # Insert rows into raw_uploads — each await lets the AI task progress
-    row_index = 0
-    preview_docs = [
-        RawUploadRow(batch_id=batch.id, index=i, row=row)
-        for i, row in enumerate(preview_rows)
-    ]
-    if preview_docs:
-        await RawUploadRow.insert_many(preview_docs)
-    row_index = len(preview_rows)
+    # Copy rows to raw_uploads for permanent audit trail (background, non-blocking)
+    asyncio.create_task(_insert_raw_upload_rows(batch.id, all_rows))
 
-    for chunk in chunked(row_gen, UPLOAD_CHUNK_SIZE):
-        docs = [
-            RawUploadRow(batch_id=batch.id, index=row_index + i, row=row)
-            for i, row in enumerate(chunk)
-        ]
-        await RawUploadRow.insert_many(docs)
-        row_index += len(chunk)
-
-    # Update batch with final row count
-    batch.row_count = row_index
-    await batch.save()
-
-    # Now collect AI result (likely already finished during DB inserts)
+    # Collect AI result (likely already finished during row consumption + batch insert)
     ai_mapping = None
     if ai_task is not None:
         ai_mapping = await ai_task
@@ -163,6 +149,24 @@ async def upload_spreadsheet(
         suggested_mapping=suggested_mapping,
         mapping_source=mapping_source,
     )
+
+
+async def _insert_raw_upload_rows(
+    batch_id: PydanticObjectId, rows: list[dict],
+) -> None:
+    """Insert rows into raw_uploads collection for audit trail (background task)."""
+    try:
+        for i in range(0, len(rows), UPLOAD_CHUNK_SIZE):
+            chunk = rows[i : i + UPLOAD_CHUNK_SIZE]
+            docs = [
+                RawUploadRow(batch_id=batch_id, index=i + j, row=row)
+                for j, row in enumerate(chunk)
+            ]
+            await RawUploadRow.insert_many(docs)
+    except Exception:
+        logger.exception(
+            "Failed to insert raw upload rows for batch %s", batch_id
+        )
 
 
 @router.post("/upload-parsed", response_model=ImportUploadResponse)
