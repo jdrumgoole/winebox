@@ -1,6 +1,6 @@
 [project]
 name = "winebox"
-version = "0.5.81"
+version = "0.5.82"
 description = "Wine Cellar Management Application with OCR label scanning"
 readme = "README.md"
 requires-python = ">=3.11"
