@@ -122,7 +122,11 @@ class LoginAttempt(Document):
             return 0
 
         # Calculate when lockout expires (from the Nth failed attempt)
-        lockout_end = latest_attempt.attempted_at + timedelta(
+        # Ensure timezone-aware comparison (MongoDB may strip tzinfo on load)
+        attempted_at = latest_attempt.attempted_at
+        if attempted_at.tzinfo is None:
+            attempted_at = attempted_at.replace(tzinfo=timezone.utc)
+        lockout_end = attempted_at + timedelta(
             minutes=cls.LOCKOUT_DURATION_MINUTES
         )
         remaining = (lockout_end - datetime.now(timezone.utc)).total_seconds()

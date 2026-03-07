@@ -46,11 +46,14 @@ def create_test_app():
     )
 
     # Copy routes from the main app
-    from winebox.main import app as main_app
+    from winebox.main import app as main_app, SecurityHeadersMiddleware
 
     # Copy all routes
     for route in main_app.routes:
         test_app.routes.append(route)
+
+    # Add security headers middleware (same as main app)
+    test_app.add_middleware(SecurityHeadersMiddleware)
 
     # Add health check
     @test_app.get("/health", tags=["Health"])
