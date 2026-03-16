@@ -8,9 +8,9 @@ from winebox.models import User, Wine
 
 
 @pytest_asyncio.fixture
-async def unenriched_wines(client, init_test_db):
+async def unenriched_wines(client, init_test_db, test_user_email):
     """Create wines without xwines_id for enrichment testing."""
-    user = await User.find_one(User.email == "test@example.com")
+    user = await User.find_one(User.email == test_user_email)
     wines = []
     for i in range(3):
         wine = Wine(
@@ -28,9 +28,9 @@ async def unenriched_wines(client, init_test_db):
 
 
 @pytest_asyncio.fixture
-async def enriched_wines(client, init_test_db):
+async def enriched_wines(client, init_test_db, test_user_email):
     """Create wines that are already enriched."""
-    user = await User.find_one(User.email == "test@example.com")
+    user = await User.find_one(User.email == test_user_email)
     wines = []
     for i in range(2):
         wine = Wine(

@@ -1,4 +1,9 @@
-"""Pytest configuration and fixtures for WineBox tests with real MongoDB."""
+"""Pytest configuration and fixtures for WineBox tests with real MongoDB.
+
+Database strategy: one database per xdist worker (session-scoped), data
+accumulates across tests just like production. Each test gets its own
+unique user so user-scoped data is naturally isolated.
+"""
 
 import asyncio
 import os
@@ -9,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()  # Load .env so API keys etc. are available to tests
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator
 import tempfile
@@ -94,13 +99,11 @@ def event_loop_policy():
     return asyncio.DefaultEventLoopPolicy()
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture(scope="session")
 async def mongo_client():
     """Create a MongoDB client for testing.
 
-    Function-scoped to avoid event loop issues with pytest-xdist.
-    Motor manages its own connection pool internally, so connections
-    are reused at the driver level even with function-scoped fixtures.
+    Session-scoped: one client per xdist worker process.
     """
     client = AsyncIOMotorClient(
         TEST_MONGODB_URL,
@@ -111,15 +114,15 @@ async def mongo_client():
     client.close()
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture(scope="session")
 async def init_test_db(mongo_client):
-    """Initialize Beanie with a unique test database.
+    """Initialize Beanie with a shared test database per worker.
 
-    Creates a unique database for each test function and drops it after the test.
-    The MongoDB client connection is reused across tests within each worker.
+    Session-scoped: one database per xdist worker. Data accumulates
+    across tests, mirroring production behaviour. The database is
+    dropped when the worker session ends.
     """
-    # Create unique database name for this test
-    db_name = f"test_winebox_{uuid.uuid4().hex[:8]}"
+    db_name = f"test_winebox_{os.getpid()}"
     db = mongo_client[db_name]
 
     await init_beanie(
@@ -128,27 +131,36 @@ async def init_test_db(mongo_client):
     )
     yield db
 
-    # Cleanup: drop the entire test database
+    # Cleanup: drop the entire test database when the worker finishes
     await mongo_client.drop_database(db_name)
 
 
+@pytest.fixture
+def test_user_email():
+    """Generate a unique email for each test's user.
+
+    Function-scoped so each test gets its own user. Fixtures that need
+    the current test user's email should depend on this fixture.
+    """
+    return f"test-{uuid.uuid4().hex[:8]}@example.com"
+
+
 @pytest_asyncio.fixture(scope="function")
-async def client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
-    """Create an async test client with overridden database and auth."""
-    # Create a test user
+async def client(init_test_db, test_user_email) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client with a unique authenticated user."""
     test_user = User(
-        email="test@example.com",
+        email=test_user_email,
         hashed_password=get_password_hash("testpassword"),
         is_active=True,
         is_verified=True,
         is_superuser=False,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     await test_user.insert()
 
     # Create auth token with email as subject
-    access_token = create_access_token(data={"sub": "test@example.com"})
+    access_token = create_access_token(data={"sub": test_user_email})
 
     # Use test app instead of main app
     app = get_test_app()
@@ -195,10 +207,10 @@ def sample_image_bytes() -> bytes:
 
 
 @pytest.fixture
-def test_user() -> dict:
+def test_user(test_user_email) -> dict:
     """Return test user credentials."""
     return {
-        "email": "test@example.com",
+        "email": test_user_email,
         "password": "testpassword",
     }
 

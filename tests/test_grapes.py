@@ -18,9 +18,9 @@ async def grape_varieties(client, init_test_db):
 
 
 @pytest_asyncio.fixture
-async def wine_with_grapes(client, init_test_db, grape_varieties):
+async def wine_with_grapes(client, init_test_db, grape_varieties, test_user_email):
     """Create a wine with grape blend."""
-    user = await User.find_one(User.email == "test@example.com")
+    user = await User.find_one(User.email == test_user_email)
     wine = Wine(
         name="Bordeaux Blend",
         vintage=2018,
@@ -49,9 +49,9 @@ async def wine_with_grapes(client, init_test_db, grape_varieties):
 
 
 @pytest_asyncio.fixture
-async def wine_no_grapes(client, init_test_db):
+async def wine_no_grapes(client, init_test_db, test_user_email):
     """Create a wine without grape blend."""
-    user = await User.find_one(User.email == "test@example.com")
+    user = await User.find_one(User.email == test_user_email)
     wine = Wine(
         name="Mystery Wine",
         vintage=2020,

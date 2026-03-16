@@ -1,5 +1,6 @@
 """Tests for X-Wines enrichment during CSV/spreadsheet import."""
 
+import random
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -19,10 +20,15 @@ from winebox.services.import_service.processor import (
 
 
 async def _insert_xwines_wine(**kwargs) -> XWinesWine:
-    """Insert an XWinesWine with sensible defaults."""
+    """Insert an XWinesWine with sensible defaults.
+
+    Uses a random xwines_id and a unique name to avoid collisions
+    with XWinesWine documents from other tests in a shared database.
+    """
+    unique_suffix = random.randint(900_000, 999_999)
     defaults = {
-        "xwines_id": 600,
-        "name": "Import Test Wine",
+        "xwines_id": unique_suffix,
+        "name": f"ImportTestWine Zinfandel Reserve {unique_suffix}",
         "wine_type": "Red",
         "winery_name": "Import Winery",
         "country": "France",
@@ -61,12 +67,13 @@ def _make_batch(owner_id: PydanticObjectId, rows: list[dict], mapping: dict) -> 
 @pytest.mark.asyncio
 async def test_import_enriches_empty_fields(init_test_db) -> None:
     """Import a wine with only a name — X-Wines should fill empty fields."""
-    await _insert_xwines_wine()
+    xwine = await _insert_xwines_wine()
+    wine_name = xwine.name
 
     owner_id = PydanticObjectId()
     batch = _make_batch(
         owner_id=owner_id,
-        rows=[{"Wine Name": "Import Test Wine"}],
+        rows=[{"Wine Name": wine_name}],
         mapping={"Wine Name": "name"},
     )
     await batch.insert()
@@ -76,14 +83,14 @@ async def test_import_enriches_empty_fields(init_test_db) -> None:
     assert result.status == ImportStatus.COMPLETED
     assert result.wines_created == 1
 
-    wine = await Wine.find_one(Wine.name == "Import Test Wine")
+    wine = await Wine.find_one(Wine.name == wine_name)
     assert wine is not None
     assert wine.winery == "Import Winery"
     assert wine.grape_variety == "Pinot Noir"
     assert wine.region == "Burgundy"
     assert wine.country == "France"
     assert wine.alcohol_percentage == 12.5
-    assert wine.xwines_id == 600
+    assert wine.xwines_id == xwine.xwines_id
     assert wine.enriched_fields is not None
     assert "winery" in wine.enriched_fields
     assert "grape_variety" in wine.enriched_fields
@@ -100,13 +107,14 @@ async def test_import_enriches_empty_fields(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_import_preserves_csv_values(init_test_db) -> None:
     """CSV-provided grape and region should NOT be overwritten by X-Wines."""
-    await _insert_xwines_wine()
+    xwine = await _insert_xwines_wine()
+    wine_name = xwine.name
 
     owner_id = PydanticObjectId()
     batch = _make_batch(
         owner_id=owner_id,
         rows=[{
-            "Wine Name": "Import Test Wine",
+            "Wine Name": wine_name,
             "Grape": "Chardonnay",
             "Region": "Napa Valley",
         }],
@@ -122,7 +130,7 @@ async def test_import_preserves_csv_values(init_test_db) -> None:
 
     assert result.wines_created == 1
 
-    wine = await Wine.find_one(Wine.name == "Import Test Wine")
+    wine = await Wine.find_one(Wine.name == wine_name)
     assert wine is not None
 
     # CSV values preserved
@@ -132,7 +140,7 @@ async def test_import_preserves_csv_values(init_test_db) -> None:
     # Empty fields still enriched
     assert wine.winery == "Import Winery"
     assert wine.country == "France"
-    assert wine.xwines_id == 600
+    assert wine.xwines_id == xwine.xwines_id
 
     # Only truly enriched fields listed
     assert "grape_variety" not in wine.enriched_fields

@@ -1,6 +1,7 @@
 """Tests for wine ownership and data isolation between users."""
 
 import io
+import uuid
 from datetime import datetime
 
 import pytest
@@ -19,9 +20,13 @@ async def two_users_clients(init_test_db):
     """
     from tests.conftest import get_test_app
 
+    # Generate unique emails to avoid conflicts with shared database
+    user1_email = f"user1-{uuid.uuid4().hex[:8]}@example.com"
+    user2_email = f"user2-{uuid.uuid4().hex[:8]}@example.com"
+
     # Create user 1
     user1 = User(
-        email="user1@example.com",
+        email=user1_email,
         hashed_password=get_password_hash("password1"),
         is_active=True,
         is_verified=True,
@@ -30,11 +35,11 @@ async def two_users_clients(init_test_db):
         updated_at=datetime.utcnow(),
     )
     await user1.insert()
-    token1 = create_access_token(data={"sub": "user1@example.com"})
+    token1 = create_access_token(data={"sub": user1_email})
 
     # Create user 2
     user2 = User(
-        email="user2@example.com",
+        email=user2_email,
         hashed_password=get_password_hash("password2"),
         is_active=True,
         is_verified=True,
@@ -43,7 +48,7 @@ async def two_users_clients(init_test_db):
         updated_at=datetime.utcnow(),
     )
     await user2.insert()
-    token2 = create_access_token(data={"sub": "user2@example.com"})
+    token2 = create_access_token(data={"sub": user2_email})
 
     app = get_test_app()
 
