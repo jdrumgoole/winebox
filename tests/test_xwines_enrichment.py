@@ -17,7 +17,9 @@ from winebox.services.xwines_enrichment import (
 )
 
 has_anthropic_key = bool(
-    settings.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+    settings.anthropic_api_key
+    or os.getenv("WINEBOX_ANTHROPIC_API_KEY")
+    or os.getenv("ANTHROPIC_API_KEY")
 )
 skip_no_key = pytest.mark.skipif(
     not has_anthropic_key,
