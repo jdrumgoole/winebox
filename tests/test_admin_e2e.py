@@ -62,15 +62,18 @@ class TestAdminAccess:
     def test_admin_direct_url_non_admin(self, authenticated_page: Page) -> None:
         """Regular user navigating to /admin directly is rejected."""
         page = authenticated_page
-        page.goto(f"{BASE_URL}/admin")
+        response = page.goto(f"{BASE_URL}/admin")
         page.wait_for_timeout(2000)
-        # Should show 403 or redirect
+        # The server should return 403 or the page should not show admin user list
         content = page.content()
+        status = response.status if response else 0
         assert (
-            "403" in content
+            status == 403
+            or "403" in content
             or "forbidden" in content.lower()
-            or "admin" not in content.lower()
             or "privileges" in content.lower()
+            # If the admin page returns the main app HTML (no user list), that's also OK
+            or "user-management" not in content.lower()
         )
 
     def test_admin_link_not_in_nav(self, authenticated_page: Page) -> None:

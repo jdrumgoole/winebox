@@ -227,6 +227,245 @@ def test_e2e_full(ctx: Context, verbose: bool = False, workers: int = 4) -> None
     ctx.run(cmd, pty=True)
 
 
+@task(name="test-e2e-db")
+def test_e2e_db(
+    ctx: Context,
+    verbose: bool = False,
+    workers: int = 1,
+    port: int = 8001,
+    database: str = "e2e",
+    cleanup: bool = False,
+    pattern: str = "",
+) -> None:
+    """Run E2E tests against production MongoDB but in a separate database.
+
+    Starts a local server on a different port, configured to use the production
+    MongoDB Atlas connection but with a separate database (default: 'e2e').
+    This lets you test against real infrastructure without touching production data.
+
+    The server uses the same WINEBOX_MONGODB_URL from your .env/secrets.env
+    (i.e. the production Atlas cluster), but overrides the database name.
+
+    Args:
+        ctx: Invoke context
+        verbose: Enable verbose output
+        workers: Number of parallel workers (default: 1; increase with care on Atlas)
+        port: Port for the e2e test server (default: 8001)
+        database: Database name to use (default: 'e2e')
+        cleanup: Drop the e2e database after tests (default: False, preserves data)
+        pattern: Optional test file pattern (e.g. 'test_checkin_e2e.py')
+    """
+    import os
+    import signal
+    import subprocess
+
+    e2e_port = port
+    e2e_db = database
+    server_url = f"http://localhost:{e2e_port}"
+    pid_file = Path(f"data/winebox-e2e-{e2e_port}.pid")
+    log_file = Path(f"data/winebox-e2e-{e2e_port}.log")
+    Path("data").mkdir(parents=True, exist_ok=True)
+
+    # Load X-Wines test data before starting server (to avoid index conflicts
+    # between the import's text index and Beanie's model indexes)
+    _ensure_xwines_data(ctx, e2e_db)
+
+    print(f"Starting e2e test server on port {e2e_port} with database '{e2e_db}'...")
+
+    # Use a fixed secret key so the server and CLI (winebox-admin) share the
+    # same JWT signing key.  Without this, the server generates a random key
+    # on startup and tokens created by the CLI are rejected.
+    e2e_secret = "e2e-test-secret-key-not-for-production-use-1234567890"
+
+    # Build env for the server subprocess — inherit current env + overrides
+    server_env = os.environ.copy()
+    server_env["WINEBOX_MONGODB_DATABASE"] = e2e_db
+    server_env["WINEBOX_USE_CLAUDE_VISION"] = "false"
+    server_env["WINEBOX_SECRET_KEY"] = e2e_secret
+
+    # Start uvicorn directly (not via winebox-server, to avoid PID conflicts)
+    uvicorn_cmd = [
+        sys.executable, "-m", "uvicorn",
+        "winebox.main:app",
+        "--host", "0.0.0.0",
+        "--port", str(e2e_port),
+    ]
+
+    with open(log_file, "w") as log:
+        server_proc = subprocess.Popen(
+            uvicorn_cmd,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env=server_env,
+        )
+    pid_file.write_text(str(server_proc.pid))
+    print(f"  Server PID: {server_proc.pid}, logs: {log_file}")
+
+    # Wait for server to be ready
+    print(f"Waiting for server at {server_url}...")
+    ready = False
+    for _attempt in range(30):
+        try:
+            resp = urllib.request.urlopen(f"{server_url}/health", timeout=2)
+            if resp.status == 200:
+                ready = True
+                break
+        except Exception:
+            pass
+        # Check if process died
+        if server_proc.poll() is not None:
+            print(f"ERROR: Server process exited with code {server_proc.returncode}")
+            print(f"  Check logs: {log_file}")
+            pid_file.unlink(missing_ok=True)
+            sys.exit(1)
+        time.sleep(1)
+
+    if not ready:
+        print(f"ERROR: Server at {server_url} did not become ready within 30s")
+        print(f"  Check logs: {log_file}")
+        server_proc.terminate()
+        pid_file.unlink(missing_ok=True)
+        sys.exit(1)
+
+    print(f"Server ready at {server_url} (database: {e2e_db})")
+
+    # Build test command — must override addopts to remove the default
+    # '-m "not e2e"' filter that excludes e2e tests from normal runs
+    if pattern:
+        test_files = f"tests/{pattern}"
+    else:
+        test_files = "-m e2e"
+
+    test_cmd = (
+        f"WINEBOX_TEST_URL={server_url} "
+        f"WINEBOX_MONGODB_DATABASE={e2e_db} "
+        f"WINEBOX_SECRET_KEY={e2e_secret} "
+        f"WINEBOX_USE_CLAUDE_VISION=false "
+        f'uv run python -m pytest {test_files} -n {workers} --override-ini="addopts="'
+    )
+    if verbose:
+        test_cmd += " -v"
+
+    # Run tests
+    try:
+        print(f"\nRunning e2e tests against {server_url}...")
+        ctx.run(test_cmd, pty=True)
+    finally:
+        # Always stop the server
+        print(f"\nStopping e2e test server (PID: {server_proc.pid})...")
+        try:
+            os.kill(server_proc.pid, signal.SIGTERM)
+            server_proc.wait(timeout=10)
+        except ProcessLookupError:
+            pass
+        except subprocess.TimeoutExpired:
+            os.kill(server_proc.pid, signal.SIGKILL)
+        pid_file.unlink(missing_ok=True)
+
+        # Drop the e2e database only if --cleanup is explicitly set
+        if cleanup:
+            _drop_e2e_database(ctx, e2e_db)
+        else:
+            print(f"Database '{e2e_db}' preserved (use --cleanup to drop it)")
+
+
+def _ensure_xwines_data(ctx: Context, db_name: str) -> None:
+    """Load X-Wines test data into the e2e database if not already present."""
+    print(f"Checking X-Wines data in '{db_name}'...")
+    check_script = Path("data/_check_xwines.py")
+    check_script.write_text(
+        "import os\n"
+        "from pymongo import MongoClient\n"
+        "from winebox.config import settings\n"
+        f"db_name = '{db_name}'\n"
+        "client = MongoClient(settings.mongodb_url)\n"
+        "db = client[db_name]\n"
+        "# Drop any conflicting text indexes that would clash with Beanie\n"
+        "try:\n"
+        "    for idx in db.xwines_wines.list_indexes():\n"
+        "        if idx.get('textIndexVersion'):\n"
+        "            db.xwines_wines.drop_index(idx['name'])\n"
+        "except Exception:\n"
+        "    pass\n"
+        "count = db.xwines_wines.count_documents({})\n"
+        "client.close()\n"
+        "print(count)\n"
+    )
+    try:
+        result = ctx.run(f"uv run python {check_script}", hide=True, warn=True)
+        count = int(result.stdout.strip()) if result and result.stdout.strip().isdigit() else 0
+    finally:
+        check_script.unlink(missing_ok=True)
+
+    if count > 0:
+        print(f"  X-Wines data already loaded ({count} wines)")
+        return
+
+    print("  Loading X-Wines test dataset (100 wines)...")
+    import_script = Path("data/_import_xwines.py")
+    import_script.write_text(
+        "import os\n"
+        "os.environ.setdefault('WINEBOX_MONGODB_DATABASE', '" + db_name + "')\n"
+        "# Patch the import script to use the correct database\n"
+        "import deploy.import_xwines_mongo as importer\n"
+        "# Override get_mongodb_url to ensure it reads our env\n"
+        "original_import = importer.import_to_mongodb\n"
+        "def patched_import(wines, ratings_agg, version, force=False, dry_run=False):\n"
+        "    from pymongo import MongoClient\n"
+        "    from winebox.config import settings\n"
+        "    mongo_url = settings.mongodb_url\n"
+        "    client = MongoClient(mongo_url)\n"
+        "    db = client['" + db_name + "']\n"
+        "    wines_col = db['xwines_wines']\n"
+        "    metadata_col = db['xwines_metadata']\n"
+        "    # Drop and re-create\n"
+        "    wines_col.drop()\n"
+        "    if wines:\n"
+        "        wines_col.insert_many(wines)\n"
+        "    metadata_col.delete_many({})\n"
+        "    from datetime import datetime, timezone\n"
+        "    metadata_col.insert_one({'key': 'version', 'value': version})\n"
+        "    metadata_col.insert_one({'key': 'wine_count', 'value': len(wines)})\n"
+        "    metadata_col.insert_one({'key': 'imported_at', 'value': datetime.now(timezone.utc).isoformat()})\n"
+        "    # Do NOT create a text index — Beanie will create its own on startup\n"
+        "    client.close()\n"
+        "    print(f'  Loaded {len(wines)} wines into {db.name}')\n"
+        "    return 0\n"
+        "importer.import_to_mongodb = patched_import\n"
+        "importer.main()\n"
+    )
+    try:
+        ctx.run(
+            f"uv run python {import_script} --version test --force",
+            warn=True,
+        )
+    finally:
+        import_script.unlink(missing_ok=True)
+
+
+def _drop_e2e_database(ctx: Context, db_name: str) -> None:
+    """Drop the e2e test database."""
+    print(f"Dropping e2e database '{db_name}'...")
+    # Use a script file to avoid shell quoting issues
+    script = Path("data/_drop_e2e_db.py")
+    script.write_text(
+        "import asyncio\n"
+        "from motor.motor_asyncio import AsyncIOMotorClient\n"
+        "from winebox.config import settings\n"
+        "async def drop():\n"
+        f"    client = AsyncIOMotorClient(settings.mongodb_url)\n"
+        f"    await client.drop_database('{db_name}')\n"
+        "    client.close()\n"
+        f"    print('  Dropped database: {db_name}')\n"
+        "asyncio.run(drop())\n"
+    )
+    try:
+        ctx.run(f"uv run python {script}", warn=True)
+    finally:
+        script.unlink(missing_ok=True)
+
+
 @task(name="init-db")
 def init_db(ctx: Context) -> None:
     """Initialize the database."""

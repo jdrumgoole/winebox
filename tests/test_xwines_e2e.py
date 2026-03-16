@@ -7,29 +7,12 @@ These tests require:
 For parallel execution: pytest -n auto tests/test_xwines_e2e.py
 """
 
-import json
-import os
-import sys
-import time
-import uuid
 from typing import Generator
-from urllib.request import Request, urlopen
 
 import pytest
 from playwright.sync_api import Page, expect
-from pymongo import MongoClient
 
-from .playwright_utils import BASE_URL, preflight_check
-
-# MongoDB URL for verifying test users (same as server when not overridden)
-TEST_MONGODB_URL = os.environ.get("TEST_MONGODB_URL", os.environ.get("WINEBOX_MONGODB_URL", "mongodb://localhost:27017"))
-
-
-def get_worker_id(request: pytest.FixtureRequest) -> str:
-    """Get the pytest-xdist worker ID, or 'main' if not running in parallel."""
-    if hasattr(request.config, "workerinput"):
-        return request.config.workerinput["workerid"]
-    return "main"
+from .playwright_utils import BASE_URL, create_cli_worker_user, login_via_ui, preflight_check
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -46,43 +29,12 @@ def base_url() -> str:
 
 @pytest.fixture(scope="session")
 def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], None, None]:
-    """Create a test user for this worker via the registration API and mark verified in MongoDB."""
-    worker_id = get_worker_id(request)
-    unique = uuid.uuid4().hex[:6]
-    email = f"e2e_xwines_{worker_id}_{unique}@test.example.com"
-    password = "TestPass1234"
-
-    # Register via the HTTP API
-    try:
-        payload = json.dumps({
-            "email": email,
-            "password": password,
-        }).encode()
-        req = Request(
-            f"{BASE_URL}/api/auth/register",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urlopen(req, timeout=10) as resp:
-            resp.read()
-    except Exception as e:
-        print(f"WARNING: Failed to register user {email}: {e}", file=sys.stderr)
-
-    # Mark user as verified in MongoDB so login works
-    try:
-        client: MongoClient = MongoClient(TEST_MONGODB_URL)
-        db = client["winebox"]
-        result = db.users.update_one(
-            {"email": email},
-            {"$set": {"is_verified": True}},
-        )
-        if result.modified_count == 0:
-            print(f"WARNING: Could not verify user {email}", file=sys.stderr)
-        client.close()
-    except Exception as e:
-        print(f"WARNING: Failed to verify user {email}: {e}", file=sys.stderr)
-
+    """Create a test user for this worker via the CLI."""
+    email, password = create_cli_worker_user(
+        request,
+        email_prefix="e2e_xwines",
+        password="testpass123",
+    )
     yield email, password
 
 
@@ -92,50 +44,26 @@ def test_user(worker_user: tuple[str, str]) -> tuple[str, str]:
     return worker_user
 
 
-def _get_auth_token(email: str, password: str, max_attempts: int = 5, retry_delay: float = 2.0) -> str:
-    """Get auth token with retries to handle 429 rate limit when workers start in parallel."""
-    import urllib.parse
-
-    last_error = None
-    for attempt in range(max_attempts):
-        try:
-            form_data = urllib.parse.urlencode({
-                "username": email,
-                "password": password,
-            }).encode()
-            req = Request(
-                f"{BASE_URL}/api/auth/token",
-                data=form_data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                method="POST",
-            )
-            with urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read())
-            return data["access_token"]
-        except Exception as e:
-            last_error = e
-            if getattr(e, "code", None) == 429 and attempt < max_attempts - 1:
-                time.sleep(retry_delay)
-                continue
-            raise
-    raise last_error or RuntimeError("Failed to get auth token")
-
-
 @pytest.fixture(scope="session")
-def auth_token(worker_user: tuple[str, str]) -> str:
-    """Get an auth token via the API once per session (with retry for rate limits)."""
-    email, password = worker_user
-    return _get_auth_token(email, password)
+def xwines_data_available() -> bool:
+    """Check whether X-Wines data is loaded by querying the API."""
+    import json
+    import urllib.request
+
+    try:
+        url = f"{BASE_URL}/api/xwines/types"
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read())
+            return len(data) > 0
+    except Exception:
+        return False
 
 
 @pytest.fixture(scope="function")
-def authenticated_page(page: Page, auth_token: str) -> Page:
-    """Set the auth token in localStorage and navigate to the app."""
-    page.goto(BASE_URL)
-    page.evaluate(f"localStorage.setItem('winebox_token', '{auth_token}')")
-    page.reload()
-
-    page.wait_for_selector("#main-content", state="visible", timeout=15000)
+def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
+    """Log in via UI and return an authenticated page."""
+    email, password = worker_user
+    login_via_ui(page, email=email, password=password)
     return page
 
 

@@ -22,22 +22,21 @@ async def list_wines(
     skip: int = 0,
     limit: int = 100,
     in_stock: bool | None = None,
+    collection: str | None = None,
 ) -> list[WineWithInventory]:
     """List all wines with optional filtering."""
-    # Filter by owner
-    if in_stock is True:
-        query = Wine.find(
-            Wine.owner_id == current_user.id,
-            Wine.inventory.quantity > 0,
-        )
-    elif in_stock is False:
-        query = Wine.find(
-            Wine.owner_id == current_user.id,
-            Wine.inventory.quantity == 0,
-        )
-    else:
-        query = Wine.find(Wine.owner_id == current_user.id)
+    # Build filter conditions
+    conditions = [Wine.owner_id == current_user.id]
 
+    if collection:
+        conditions.append(Wine.collection == collection)
+
+    if in_stock is True:
+        conditions.append(Wine.inventory.quantity > 0)
+    elif in_stock is False:
+        conditions.append(Wine.inventory.quantity == 0)
+
+    query = Wine.find(*conditions)
     wines = await query.skip(skip).limit(limit).sort(-Wine.created_at).to_list()
 
     return [WineWithInventory.model_validate(wine) for wine in wines]

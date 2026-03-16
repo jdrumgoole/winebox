@@ -46,6 +46,9 @@ let currentUser = null;
 let lastScanResult = null;  // Store last scan result to avoid rescanning on checkin
 let cellarViewMode = 'cards';
 let cellarLastWines = [];
+let metViewMode = 'cards';
+let metLastWines = [];
+let selectedMetWineId = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -58,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initXWinesPage();
     initImportPage();
     initCustomFields();
+    initMetPage();
+    initAddToCellarPage();
     checkAuth();
     loadAppInfo();
 });
@@ -408,7 +413,7 @@ function showLoginPage() {
     document.getElementById('user-info').style.display = 'none';
 }
 
-const APP_PAGES = ['dashboard', 'import', 'checkin', 'cellar', 'history', 'search', 'xwines', 'settings'];
+const APP_PAGES = ['dashboard', 'import', 'checkin', 'cellar', 'met', 'add-to-cellar', 'history', 'search', 'xwines', 'settings'];
 
 async function showMainApp() {
     document.body.classList.remove('logged-out');
@@ -836,6 +841,12 @@ function navigateTo(page) {
         case 'cellar':
             loadCellar();
             break;
+        case 'met':
+            loadMet();
+            break;
+        case 'add-to-cellar':
+            resetAddToCellarWizard();
+            break;
         case 'history':
             loadHistory();
             break;
@@ -1140,7 +1151,6 @@ function handleCheckin(e) {
         classification: document.getElementById('classification').value,
         alcohol: document.getElementById('alcohol').value,
         wineTypeId: document.getElementById('wine-type').value,
-        quantity: document.getElementById('quantity').value || '1',
         notes: document.getElementById('notes').value,
         frontLabelText: lastScanResult?.ocr?.front_label_text || '',
         backLabelText: lastScanResult?.ocr?.back_label_text || '',
@@ -1178,7 +1188,6 @@ function showCheckinConfirmation() {
     document.getElementById('confirm-country').value = data.country || '';
     document.getElementById('confirm-classification').value = data.classification || '';
     document.getElementById('confirm-alcohol').value = data.alcohol || '';
-    document.getElementById('confirm-quantity').value = data.quantity || '1';
     document.getElementById('confirm-notes').value = data.notes || '';
 
     // Set Wine Type in confirmation modal
@@ -1268,7 +1277,6 @@ async function submitCheckin() {
     if (alcohol) formData.append('alcohol_percentage', alcohol);
     const wineTypeId = document.getElementById('confirm-wine-type').value;
     if (wineTypeId) formData.append('wine_type_id', wineTypeId);
-    formData.append('quantity', document.getElementById('confirm-quantity').value || '1');
     formData.append('notes', document.getElementById('confirm-notes').value);
 
     // Include pre-scanned OCR text to avoid rescanning (saves API costs)
@@ -1286,23 +1294,22 @@ async function submitCheckin() {
     }
 
     try {
-        const response = await fetchWithAuth(`${API_BASE}/wines/checkin`, {
+        const response = await fetchWithAuth(`${API_BASE}/wines/met`, {
             method: 'POST',
             body: formData
         });
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || 'Check-in failed');
+            throw new Error(error.detail || 'Failed to record wine');
         }
 
         const wine = await response.json();
-        showToast(`Successfully checked in: ${wine.name}`, 'success');
+        showToast(`Recorded: ${wine.name}`, 'success');
 
-        // Track check-in event
-        analytics.capture('frontend_wine_checkin', {
+        // Track record event
+        analytics.capture('frontend_wine_met_recorded', {
             wine_name: wine.name,
-            quantity: document.getElementById('confirm-quantity').value || '1',
             country: document.getElementById('confirm-country').value || null
         });
 
@@ -1315,8 +1322,8 @@ async function submitCheckin() {
         lastScanResult = null;
         pendingCheckinData = null;
 
-        // Navigate to cellar
-        navigateTo('cellar');
+        // Navigate to met wines
+        navigateTo('met');
     } catch (error) {
         showToast(error.message, 'error');
     }
@@ -1431,6 +1438,15 @@ async function loadDashboard() {
         renderChartList('by-country', summary.by_country);
         renderChartList('by-grape', summary.by_grape_variety);
         renderChartList('by-vintage', summary.by_vintage);
+
+        // Load met summary
+        try {
+            const metResponse = await fetchWithAuth(`${API_BASE}/met/summary`);
+            const metSummary = await metResponse.json();
+            document.getElementById('stat-wines-met').textContent = metSummary.total_met;
+        } catch {
+            document.getElementById('stat-wines-met').textContent = '0';
+        }
 
         // Load recent transactions
         const transResponse = await fetchWithAuth(`${API_BASE}/transactions?limit=10`);
@@ -3384,4 +3400,419 @@ function resetImportPage() {
     currentImportData = null;
     pendingCsvRows = null;
     isUploadingRows = false;
+}
+
+// ==================== Wines I've Met ====================
+
+function initMetPage() {
+    const searchInput = document.getElementById('met-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(filterMetWines, 300));
+    }
+    document.getElementById('met-view-cards')?.addEventListener('click', () => setMetViewMode('cards'));
+    document.getElementById('met-view-table')?.addEventListener('click', () => setMetViewMode('table'));
+}
+
+async function loadMet() {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/met`);
+        metLastWines = await response.json();
+        renderMetView();
+    } catch (error) {
+        console.error('Failed to load met wines:', error);
+    }
+}
+
+function filterMetWines() {
+    const search = (document.getElementById('met-search')?.value || '').toLowerCase();
+    if (!search) {
+        renderMetView();
+        return;
+    }
+    const filtered = metLastWines.filter(w =>
+        w.name.toLowerCase().includes(search) ||
+        (w.winery && w.winery.toLowerCase().includes(search)) ||
+        (w.country && w.country.toLowerCase().includes(search))
+    );
+    renderMetViewWith(filtered);
+}
+
+function setMetViewMode(mode) {
+    metViewMode = mode;
+    document.getElementById('met-view-cards')?.classList.toggle('active', mode === 'cards');
+    document.getElementById('met-view-table')?.classList.toggle('active', mode === 'table');
+    const metList = document.getElementById('met-list');
+    if (mode === 'table') {
+        metList.classList.remove('wine-grid');
+    } else {
+        metList.classList.add('wine-grid');
+    }
+    if (metLastWines.length > 0) renderMetView();
+}
+
+function renderMetView() {
+    renderMetViewWith(metLastWines);
+}
+
+function renderMetViewWith(wines) {
+    if (metViewMode === 'table') {
+        renderMetTable('met-list', wines);
+    } else {
+        renderMetGrid('met-list', wines);
+    }
+}
+
+function renderMetGrid(containerId, wines) {
+    const container = document.getElementById(containerId);
+    if (!wines || wines.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No wines recorded yet</h3><p>Use Record Wine to scan a label</p></div>';
+        return;
+    }
+
+    container.innerHTML = wines.map(wine => {
+        const ef = wine.enriched_fields || [];
+        const inCellarBadge = wine.added_to_cellar
+            ? '<span class="in-cellar-badge">In Cellar</span>'
+            : '';
+
+        return `
+            <div class="wine-card" data-wine-id="${wine.id}">
+                <div class="wine-card-image">
+                    ${wine.front_label_image_path
+                        ? `<img src="/api/images/${wine.front_label_image_path}" alt="${escapeHtml(wine.name)}">`
+                        : '<span style="color: white; opacity: 0.6;">No Image</span>'
+                    }
+                    ${inCellarBadge}
+                </div>
+                <div class="wine-card-content">
+                    <div class="wine-card-title">${escapeHtml(wine.name)}</div>
+                    <div class="wine-card-subtitle">
+                        ${wine.winery ? `<span class="${ef.includes('winery') ? 'enriched' : ''}">${escapeHtml(wine.winery)}</span>` : ''}
+                        ${wine.vintage ? ` - ${wine.vintage}` : ''}
+                    </div>
+                    <div class="wine-card-fields">
+                        <div class="wine-card-field">
+                            <span class="wine-card-field-label">Country</span>
+                            <span class="wine-card-field-value${ef.includes('country') ? ' enriched' : ''}">${wine.country ? escapeHtml(wine.country) : '\u2014'}</span>
+                        </div>
+                        <div class="wine-card-field">
+                            <span class="wine-card-field-label">Region</span>
+                            <span class="wine-card-field-value${ef.includes('region') ? ' enriched' : ''}">${wine.region ? escapeHtml(wine.region) : '\u2014'}</span>
+                        </div>
+                    </div>
+                    <div class="wine-card-footer">
+                        ${wine.added_to_cellar
+                            ? '<span class="wine-quantity">Already in cellar</span>'
+                            : `<button class="btn btn-small btn-primary add-to-cellar-btn" data-wine-id="${wine.id}">Add to Cellar</button>`
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Click handlers for cards
+    container.querySelectorAll('.wine-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('add-to-cellar-btn')) {
+                showWineDetail(card.dataset.wineId);
+            }
+        });
+    });
+
+    container.querySelectorAll('.add-to-cellar-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            goToAddFromMet(btn.dataset.wineId);
+        });
+    });
+}
+
+function renderMetTable(containerId, wines) {
+    const container = document.getElementById(containerId);
+    if (!wines || wines.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>No wines recorded yet</h3><p>Use Record Wine to scan a label</p></div>';
+        return;
+    }
+
+    const rows = wines.map(wine => {
+        const ef = wine.enriched_fields || [];
+        return `
+            <tr class="wine-table-row" data-wine-id="${wine.id}">
+                <td class="wine-table-name">${escapeHtml(wine.name)}</td>
+                <td>${wine.winery ? `<span class="${ef.includes('winery') ? 'enriched' : ''}">${escapeHtml(wine.winery)}</span>` : '-'}</td>
+                <td>${wine.vintage || '-'}</td>
+                <td class="wine-table-hide-mobile">${wine.country ? `<span class="${ef.includes('country') ? 'enriched' : ''}">${escapeHtml(wine.country)}</span>` : '-'}</td>
+                <td>${wine.added_to_cellar ? '<span class="in-cellar-badge">In Cellar</span>' : `<button class="btn btn-small btn-primary add-to-cellar-btn" data-wine-id="${wine.id}">Add to Cellar</button>`}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="wine-table-wrapper">
+            <table class="wine-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Winery</th>
+                        <th>Vintage</th>
+                        <th class="wine-table-hide-mobile">Country</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+
+    container.querySelectorAll('.wine-table-row').forEach(row => {
+        row.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('add-to-cellar-btn')) {
+                showWineDetail(row.dataset.wineId);
+            }
+        });
+    });
+
+    container.querySelectorAll('.add-to-cellar-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            goToAddFromMet(btn.dataset.wineId);
+        });
+    });
+}
+
+function goToAddFromMet(wineId) {
+    navigateTo('add-to-cellar');
+    // Auto-select "from-met" path and pre-select the wine
+    setTimeout(() => {
+        selectEntryPath('from-met');
+        selectMetWineForCellar(wineId);
+    }, 50);
+}
+
+// ==================== Add to Cellar Wizard ====================
+
+function initAddToCellarPage() {
+    // Entry path card clicks
+    document.querySelectorAll('.entry-path-card').forEach(card => {
+        card.addEventListener('click', () => {
+            selectEntryPath(card.dataset.path);
+        });
+    });
+
+    // Manual entry form
+    const manualForm = document.getElementById('manual-cellar-form');
+    if (manualForm) {
+        manualForm.addEventListener('submit', handleManualCellarSubmit);
+    }
+
+    // Back buttons
+    document.getElementById('manual-back-btn')?.addEventListener('click', () => resetAddToCellarWizard());
+    document.getElementById('from-met-back-btn')?.addEventListener('click', () => resetAddToCellarWizard());
+    document.getElementById('met-picker-back-btn')?.addEventListener('click', () => {
+        document.getElementById('met-picker-selected').style.display = 'none';
+        document.getElementById('met-picker-list').style.display = '';
+        document.getElementById('met-picker-back-container').style.display = '';
+        selectedMetWineId = null;
+    });
+    document.getElementById('import-back-btn')?.addEventListener('click', () => resetAddToCellarWizard());
+
+    // Met picker search
+    document.getElementById('met-picker-search')?.addEventListener('input', debounce(filterMetPicker, 300));
+
+    // Quantity presets
+    document.querySelectorAll('.qty-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.qty-preset').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('met-picker-quantity').value = btn.dataset.qty;
+        });
+    });
+
+    // Add to cellar from met button
+    document.getElementById('met-add-to-cellar-btn')?.addEventListener('click', handleAddMetToCellar);
+}
+
+function resetAddToCellarWizard() {
+    // Show cards, hide all sub-wizards
+    document.getElementById('entry-path-cards').style.display = '';
+    document.querySelectorAll('.add-cellar-subwizard').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.entry-path-card').forEach(c => c.classList.remove('active'));
+    selectedMetWineId = null;
+}
+
+function selectEntryPath(path) {
+    // Hide cards, show selected sub-wizard
+    document.getElementById('entry-path-cards').style.display = 'none';
+    document.querySelectorAll('.add-cellar-subwizard').forEach(el => el.style.display = 'none');
+
+    document.querySelectorAll('.entry-path-card').forEach(c => {
+        c.classList.toggle('active', c.dataset.path === path);
+    });
+
+    if (path === 'manual') {
+        document.getElementById('add-cellar-manual').style.display = 'block';
+    } else if (path === 'from-met') {
+        document.getElementById('add-cellar-from-met').style.display = 'block';
+        loadMetPickerList();
+    } else if (path === 'import') {
+        document.getElementById('add-cellar-import').style.display = 'block';
+    }
+}
+
+async function handleManualCellarSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData();
+
+    // We need a front_label image for the checkin endpoint — create a minimal placeholder
+    const placeholder = new Blob([new Uint8Array([
+        0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,
+        0x00,0x00,0x00,0x0D,0x49,0x48,0x44,0x52,
+        0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x01,
+        0x08,0x02,0x00,0x00,0x00,0x90,0x77,0x53,
+        0xDE,0x00,0x00,0x00,0x0C,0x49,0x44,0x41,
+        0x54,0x08,0xD7,0x63,0xF8,0xFF,0xFF,0x3F,
+        0x00,0x05,0xFE,0x02,0xFE,0xA3,0x1A,0x8D,
+        0xEB,0x00,0x00,0x00,0x00,0x49,0x45,0x4E,
+        0x44,0xAE,0x42,0x60,0x82
+    ])], { type: 'image/png' });
+    formData.append('front_label', placeholder, 'placeholder.png');
+
+    formData.append('name', document.getElementById('manual-wine-name').value);
+    const winery = document.getElementById('manual-winery').value;
+    if (winery) formData.append('winery', winery);
+    const vintage = document.getElementById('manual-vintage').value;
+    if (vintage) formData.append('vintage', vintage);
+    const grape = document.getElementById('manual-grape-variety').value;
+    if (grape) formData.append('grape_variety', grape);
+    const region = document.getElementById('manual-region').value;
+    if (region) formData.append('region', region);
+    const country = document.getElementById('manual-country').value;
+    if (country) formData.append('country', country);
+    const wineType = document.getElementById('manual-wine-type').value;
+    if (wineType) formData.append('wine_type_id', wineType);
+    formData.append('quantity', document.getElementById('manual-quantity').value || '1');
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/wines/checkin`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to add wine');
+        }
+        const wine = await response.json();
+        showToast(`Added to cellar: ${wine.name}`, 'success');
+        form.reset();
+        navigateTo('cellar');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function loadMetPickerList() {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/met`);
+        const wines = await response.json();
+        // Filter out wines already in cellar
+        const available = wines.filter(w => !w.added_to_cellar);
+        renderMetPickerList(available);
+    } catch (error) {
+        console.error('Failed to load met wines for picker:', error);
+    }
+}
+
+function renderMetPickerList(wines) {
+    const container = document.getElementById('met-picker-list');
+    if (!wines || wines.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No wines available to add. Record a wine first!</p></div>';
+        return;
+    }
+
+    container.innerHTML = wines.map(wine => `
+        <div class="met-picker-item" data-wine-id="${wine.id}">
+            <div class="met-picker-item-image">
+                ${wine.front_label_image_path
+                    ? `<img src="/api/images/${wine.front_label_image_path}" alt="${escapeHtml(wine.name)}">`
+                    : '<span>No Image</span>'
+                }
+            </div>
+            <div class="met-picker-item-info">
+                <div class="met-picker-item-name">${escapeHtml(wine.name)}</div>
+                <div class="met-picker-item-details">
+                    ${wine.winery ? escapeHtml(wine.winery) : ''}
+                    ${wine.vintage ? ` - ${wine.vintage}` : ''}
+                    ${wine.country ? ` · ${escapeHtml(wine.country)}` : ''}
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    container.querySelectorAll('.met-picker-item').forEach(item => {
+        item.addEventListener('click', () => {
+            selectMetWineForCellar(item.dataset.wineId);
+        });
+    });
+}
+
+function filterMetPicker() {
+    const search = (document.getElementById('met-picker-search')?.value || '').toLowerCase();
+    const items = document.querySelectorAll('.met-picker-item');
+    items.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(search) ? '' : 'none';
+    });
+}
+
+async function selectMetWineForCellar(wineId) {
+    selectedMetWineId = wineId;
+
+    // Find the wine in metLastWines or fetch it
+    let wine = metLastWines.find(w => w.id === wineId);
+    if (!wine) {
+        try {
+            const response = await fetchWithAuth(`${API_BASE}/wines/${wineId}`);
+            wine = await response.json();
+        } catch {
+            showToast('Could not load wine details', 'error');
+            return;
+        }
+    }
+
+    document.getElementById('met-picker-wine-name').textContent = wine.name;
+    document.getElementById('met-picker-wine-details').textContent = [
+        wine.winery, wine.vintage, wine.country
+    ].filter(Boolean).join(' · ');
+
+    document.getElementById('met-picker-list').style.display = 'none';
+    document.getElementById('met-picker-back-container').style.display = 'none';
+    document.getElementById('met-picker-selected').style.display = 'block';
+    document.getElementById('met-picker-quantity').value = 1;
+    document.querySelectorAll('.qty-preset').forEach(b => b.classList.remove('active'));
+}
+
+async function handleAddMetToCellar() {
+    if (!selectedMetWineId) return;
+
+    const quantity = document.getElementById('met-picker-quantity').value || '1';
+    const formData = new FormData();
+    formData.append('quantity', quantity);
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/wines/${selectedMetWineId}/add-to-cellar`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to add to cellar');
+        }
+        const wine = await response.json();
+        showToast(`Added ${quantity} bottle${quantity > 1 ? 's' : ''} of ${wine.name} to cellar`, 'success');
+        navigateTo('cellar');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
 }

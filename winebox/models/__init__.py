@@ -1,6 +1,6 @@
 """MongoDB document models for WineBox."""
 
-from winebox.models.wine import Wine, InventoryInfo, GrapeBlendEntry, ScoreEntry
+from winebox.models.wine import Wine, WineCollection, InventoryInfo, GrapeBlendEntry, ScoreEntry
 from winebox.models.transaction import Transaction, TransactionType
 from winebox.models.user import User
 from winebox.models.wine_type import WineType
@@ -16,6 +16,7 @@ from winebox.models.import_batch_row import RawUploadRow
 __all__ = [
     # Main documents
     "Wine",
+    "WineCollection",
     "Transaction",
     "TransactionType",
     "User",

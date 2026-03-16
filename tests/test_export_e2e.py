@@ -56,23 +56,24 @@ class TestExportFromCellar:
         """Export dropdown menu opens on click."""
         _navigate_to_cellar(authenticated_page)
         authenticated_page.click("#cellar-export-btn")
-        authenticated_page.wait_for_timeout(500)
-        expect(authenticated_page.locator(".export-dropdown-menu")).to_be_visible()
+        # Scope to cellar export dropdown specifically
+        dropdown = authenticated_page.locator("#cellar-export-dropdown .export-dropdown-menu")
+        expect(dropdown).to_be_visible(timeout=5000)
 
     def test_export_csv_option_exists(self, authenticated_page: Page) -> None:
         """CSV export option exists in dropdown."""
         _navigate_to_cellar(authenticated_page)
         authenticated_page.click("#cellar-export-btn")
-        authenticated_page.wait_for_timeout(500)
-        csv_option = authenticated_page.locator("[data-format='csv']")
+        authenticated_page.wait_for_selector("#cellar-export-dropdown .export-dropdown-menu", state="visible", timeout=5000)
+        csv_option = authenticated_page.locator("#cellar-export-dropdown [data-format='csv']")
         expect(csv_option).to_be_visible()
 
     def test_export_xlsx_option_exists(self, authenticated_page: Page) -> None:
         """XLSX export option exists in dropdown."""
         _navigate_to_cellar(authenticated_page)
         authenticated_page.click("#cellar-export-btn")
-        authenticated_page.wait_for_timeout(500)
-        xlsx_option = authenticated_page.locator("[data-format='xlsx']")
+        authenticated_page.wait_for_selector("#cellar-export-dropdown .export-dropdown-menu", state="visible", timeout=5000)
+        xlsx_option = authenticated_page.locator("#cellar-export-dropdown [data-format='xlsx']")
         expect(xlsx_option).to_be_visible()
 
     def test_export_csv_triggers_download(self, authenticated_page: Page) -> None:

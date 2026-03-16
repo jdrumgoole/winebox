@@ -40,8 +40,8 @@ def create_cli_worker_user(
     request: pytest.FixtureRequest,
     email_prefix: str,
     password: str = "testpass123",
-    max_retries: int = 3,
-    retry_delay: float = 1.0,
+    max_retries: int = 5,
+    retry_delay: float = 2.0,
 ) -> tuple[str, str]:
     """Create (or reuse) a CLI-managed test user for the current worker.
 
@@ -69,7 +69,7 @@ def create_cli_worker_user(
                 cwd=PROJECT_DIR,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=60,
             )
         except subprocess.SubprocessError as exc:
             print(f"WARNING: subprocess error creating user {email}: {exc}", file=sys.stderr)
@@ -80,6 +80,11 @@ def create_cli_worker_user(
         combined = (result.stdout or "") + (result.stderr or "")
         if result.returncode == 0 or "already exists" in combined or "already in use" in combined:
             created = True
+            print(
+                f"User {email}: {'reused' if 'already' in combined else 'created'} "
+                f"(db={os.environ.get('WINEBOX_MONGODB_DATABASE', 'default')})",
+                file=sys.stderr,
+            )
             break
 
         if attempt < max_retries - 1:
@@ -88,11 +93,13 @@ def create_cli_worker_user(
     if not created:
         print(f"WARNING: Failed to create user {email}", file=sys.stderr)
         if result is not None:
+            print(f"  returncode: {result.returncode}", file=sys.stderr)
             print(f"  stdout: {result.stdout}", file=sys.stderr)
             print(f"  stderr: {result.stderr}", file=sys.stderr)
+        print(f"  WINEBOX_MONGODB_DATABASE={os.environ.get('WINEBOX_MONGODB_DATABASE', 'NOT SET')}", file=sys.stderr)
 
-    # Small delay to reduce chances of race conditions with database writes.
-    time.sleep(0.5)
+    # Delay to allow Atlas replica propagation before login attempts.
+    time.sleep(2.0)
     return email, password
 
 
@@ -126,29 +133,51 @@ def preflight_check(timeout_seconds: int = 10) -> None:
     pytest.skip(msg)
 
 
-def login_via_ui(page: Page, email: str, password: str, *, timeout_ms: int = 15000) -> None:
+def login_via_ui(
+    page: Page, email: str, password: str, *,
+    timeout_ms: int = 15000, max_retries: int = 3, retry_delay_ms: int = 2000,
+) -> None:
     """Log in through the UI and wait for main content to be visible.
 
-    Raises an AssertionError with a helpful message if login fails.
+    Retries on failure to handle transient issues (Atlas latency, race conditions
+    with user creation, etc.).
+
+    Raises an AssertionError with a helpful message if login fails after all retries.
     """
-    page.context.clear_cookies()
-    page.goto(BASE_URL)
-    page.evaluate("localStorage.clear()")
-    page.reload()
+    last_error: Exception | None = None
 
-    page.wait_for_selector("#login-form", state="visible", timeout=timeout_ms)
-    page.fill("#login-email", email)
-    page.fill("#login-password", password)
-    page.click("#login-form button[type='submit']")
+    for attempt in range(max_retries):
+        try:
+            page.context.clear_cookies()
+            page.goto(BASE_URL)
+            page.evaluate("localStorage.clear()")
+            page.reload()
 
-    try:
-        page.wait_for_selector("#main-content", state="visible", timeout=timeout_ms)
-    except Exception:
-        error_elem = page.locator("#login-error")
-        if error_elem.is_visible():
-            error_text = error_elem.text_content() or ""
-            raise AssertionError(f"Login failed for user '{email}': {error_text}")
-        raise
+            page.wait_for_selector("#login-form", state="visible", timeout=timeout_ms)
+            page.fill("#login-email", email)
+            page.fill("#login-password", password)
+            page.click("#login-form button[type='submit']")
+
+            page.wait_for_selector("#main-content", state="visible", timeout=timeout_ms)
+            return  # Success
+        except Exception as exc:
+            last_error = exc
+            error_elem = page.locator("#login-error")
+            if error_elem.is_visible():
+                error_text = error_elem.text_content() or ""
+                if attempt < max_retries - 1:
+                    print(
+                        f"Login attempt {attempt + 1}/{max_retries} failed for "
+                        f"'{email}': {error_text}. Retrying...",
+                        file=__import__("sys").stderr,
+                    )
+                    page.wait_for_timeout(retry_delay_ms)
+                    continue
+                raise AssertionError(f"Login failed for user '{email}': {error_text}")
+            if attempt < max_retries - 1:
+                page.wait_for_timeout(retry_delay_ms)
+                continue
+            raise
 
 
 def capture_artifacts(page: Page, name: str) -> None:
