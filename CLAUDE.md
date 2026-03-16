@@ -1,5 +1,13 @@
 # WineBox Project Guidelines
 
+## UX Philosophy
+- The target user is a **non-technical wine consumer**, not a developer or power user.
+- All UI language, flows, and terminology must be approachable and jargon-free.
+- Avoid exposing technical concepts (batch IDs, collection fields, API errors) in the UI.
+- Prefer guided wizards over forms with many fields. Break complex tasks into clear steps.
+- Use wine-world language: "cellar", "bottle", "case", "label" — not "record", "entry", "document", "import batch".
+- When in doubt, optimise for simplicity over flexibility.
+
 ## Scripts
 - Always write Python scripts instead of bash/shell scripts
 - All scripts should be in the `scripts/` or `deploy/` directories
