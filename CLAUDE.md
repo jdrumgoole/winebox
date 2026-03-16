@@ -77,7 +77,35 @@
 
 ## Releases & Deployment
 
-Single command handles everything:
+There are two deployment environments:
+
+### OAT (Pre-release Testing)
+- **URL:** https://oat.winebox.app
+- **Database:** `winebox-oat` (isolated from production)
+- **Droplet:** `winebox-oat` (46.101.134.8, 1 worker due to small memory)
+- **When the user says "make an OAT release"** or "deploy to OAT": run `invoke deploy-oat`
+
+Deploy to OAT:
+
+    invoke deploy-oat                        # Latest version from PyPI
+    invoke deploy-oat --version 0.6.0        # Specific version
+
+OAT management tasks:
+- `invoke oat-setup` — Initial droplet setup
+- `invoke oat-ssl` — Set up SSL certificates
+- `invoke deploy-oat` — Deploy app to OAT
+- `invoke oat-deploy-xwines` — Load X-Wines test data
+- `invoke oat-status` — Check server health
+- `invoke oat-logs` — View server logs
+- `invoke test-e2e-oat` — Run E2E tests against OAT
+
+### Production
+- **URL:** https://booze.winebox.app
+- **Database:** `winebox`
+- **Droplet:** `winebox-droplet` (104.248.46.96)
+- **When the user says "make a production release"** or "make a release" or "deploy": run `invoke deploy`
+
+Full production release (tests, version bump, PyPI publish, deploy):
 
     invoke deploy
 
@@ -100,6 +128,8 @@ Options:
 To re-deploy an existing version without making a new release:
 
     invoke deploy-only --version 0.5.8
+
+### Deployment Rules (both environments)
 
 GitHub Actions only publishes to PyPI (no auto-deploy to production).
 

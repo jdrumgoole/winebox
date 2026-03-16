@@ -2745,6 +2745,44 @@ body.logged-out #user-info {
     position: relative;
 }
 
+/* Wizard Breadcrumb */
+.wizard-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+}
+
+.wizard-breadcrumb a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.wizard-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.breadcrumb-sep {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+#breadcrumb-current {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+/* Scanning Indicator (for scan sub-wizard) */
+.scanning-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
 /* Entry Path Cards */
 .entry-path-cards {
     display: flex;

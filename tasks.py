@@ -1301,7 +1301,18 @@ def deploy_oat(
     # Override nginx config for OAT
     ctx.run(cmd, pty=True, env={"WINEBOX_NGINX_CONF": OAT_NGINX_CONF})
 
+    # Upload OAT-specific service file (1 worker to fit small droplet memory)
     if not dry_run:
+        from deploy.common import run_ssh, upload_file
+        service_file = Path("deploy/winebox-oat.service")
+        if service_file.exists():
+            upload_file(oat_host, "root", service_file, "/tmp/winebox.service")
+            run_ssh(oat_host, "root", [
+                "mv /tmp/winebox.service /etc/systemd/system/winebox.service",
+                "systemctl daemon-reload",
+                "systemctl restart winebox",
+            ])
+
         print(f"\nOAT deployment complete!")
         print(f"  URL: https://{OAT_DOMAIN}")
         print(f"  Database: {OAT_DATABASE}")

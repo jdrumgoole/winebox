@@ -847,14 +847,16 @@ function navigateTo(page) {
         case 'add-to-cellar':
             resetAddToCellarWizard();
             break;
+        case 'import':
+            // Import has been merged into Add to Cellar wizard — redirect
+            navigateTo('add-to-cellar');
+            setTimeout(() => selectEntryPath('import'), 50);
+            return;
         case 'history':
             loadHistory();
             break;
         case 'search':
             // Search results loaded on form submit
-            break;
-        case 'import':
-            // Import page is ready as-is
             break;
         case 'xwines':
             loadXWinesFilters();
@@ -3592,12 +3594,26 @@ function goToAddFromMet(wineId) {
 
 // ==================== Add to Cellar Wizard ====================
 
+// Path labels for breadcrumbs
+const ENTRY_PATH_LABELS = {
+    'scan': 'Scan a Label',
+    'manual': 'Enter Details Manually',
+    'from-met': 'From a Wine I\'ve Met',
+    'import': 'Import from File',
+};
+
 function initAddToCellarPage() {
     // Entry path card clicks
     document.querySelectorAll('.entry-path-card').forEach(card => {
         card.addEventListener('click', () => {
             selectEntryPath(card.dataset.path);
         });
+    });
+
+    // Breadcrumb root link
+    document.getElementById('breadcrumb-root')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        resetAddToCellarWizard();
     });
 
     // Manual entry form
@@ -3608,6 +3624,7 @@ function initAddToCellarPage() {
 
     // Back buttons
     document.getElementById('manual-back-btn')?.addEventListener('click', () => resetAddToCellarWizard());
+    document.getElementById('scan-back-btn')?.addEventListener('click', () => resetAddToCellarWizard());
     document.getElementById('from-met-back-btn')?.addEventListener('click', () => resetAddToCellarWizard());
     document.getElementById('met-picker-back-btn')?.addEventListener('click', () => {
         document.getElementById('met-picker-selected').style.display = 'none';
@@ -3631,6 +3648,9 @@ function initAddToCellarPage() {
 
     // Add to cellar from met button
     document.getElementById('met-add-to-cellar-btn')?.addEventListener('click', handleAddMetToCellar);
+
+    // Scan sub-wizard
+    initScanCellarSubwizard();
 }
 
 function resetAddToCellarWizard() {
@@ -3639,6 +3659,10 @@ function resetAddToCellarWizard() {
     document.querySelectorAll('.add-cellar-subwizard').forEach(el => el.style.display = 'none');
     document.querySelectorAll('.entry-path-card').forEach(c => c.classList.remove('active'));
     selectedMetWineId = null;
+
+    // Hide breadcrumb, show subtitle
+    document.getElementById('add-cellar-breadcrumb').style.display = 'none';
+    document.getElementById('add-cellar-subtitle').style.display = '';
 }
 
 function selectEntryPath(path) {
@@ -3650,13 +3674,162 @@ function selectEntryPath(path) {
         c.classList.toggle('active', c.dataset.path === path);
     });
 
-    if (path === 'manual') {
+    // Show breadcrumb, hide subtitle
+    const breadcrumb = document.getElementById('add-cellar-breadcrumb');
+    breadcrumb.style.display = '';
+    document.getElementById('breadcrumb-current').textContent = ENTRY_PATH_LABELS[path] || path;
+    document.getElementById('add-cellar-subtitle').style.display = 'none';
+
+    if (path === 'scan') {
+        document.getElementById('add-cellar-scan').style.display = 'block';
+    } else if (path === 'manual') {
         document.getElementById('add-cellar-manual').style.display = 'block';
     } else if (path === 'from-met') {
         document.getElementById('add-cellar-from-met').style.display = 'block';
         loadMetPickerList();
     } else if (path === 'import') {
         document.getElementById('add-cellar-import').style.display = 'block';
+    }
+}
+
+// Scan-to-cellar sub-wizard
+let scanCellarResult = null;
+
+function initScanCellarSubwizard() {
+    const frontInput = document.getElementById('scan-front-label');
+    const backInput = document.getElementById('scan-back-label');
+    const frontPreview = document.getElementById('scan-front-preview');
+    const backPreview = document.getElementById('scan-back-preview');
+
+    if (!frontInput) return;
+
+    frontInput.addEventListener('change', (e) => {
+        previewImage(e.target, 'scan-front-preview');
+        scanCellarLabels();
+    });
+    backInput.addEventListener('change', (e) => {
+        previewImage(e.target, 'scan-back-preview');
+        scanCellarLabels();
+    });
+
+    frontPreview.addEventListener('click', () => frontInput.click());
+    backPreview.addEventListener('click', () => backInput.click());
+
+    document.getElementById('scan-add-to-cellar-btn')?.addEventListener('click', handleScanCellarSubmit);
+}
+
+async function scanCellarLabels() {
+    const frontInput = document.getElementById('scan-front-label');
+    if (!frontInput.files || !frontInput.files[0]) return;
+
+    const backInput = document.getElementById('scan-back-label');
+    const formData = new FormData();
+    formData.append('front_label', frontInput.files[0]);
+    if (backInput.files && backInput.files[0]) {
+        formData.append('back_label', backInput.files[0]);
+    }
+
+    // Show scanning indicator
+    document.getElementById('scan-cellar-scanning').style.display = 'flex';
+    document.getElementById('scan-cellar-fields').style.display = 'none';
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/wines/scan`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) throw new Error('Scan failed');
+
+        const result = await response.json();
+        scanCellarResult = result;
+
+        // Populate fields
+        const parsed = result.parsed;
+        const fields = {
+            'scan-wine-name': parsed.name,
+            'scan-winery': parsed.winery,
+            'scan-vintage': parsed.vintage,
+            'scan-grape-variety': parsed.grape_variety,
+            'scan-region': parsed.region,
+            'scan-country': parsed.country,
+        };
+        for (const [id, value] of Object.entries(fields)) {
+            const el = document.getElementById(id);
+            if (el && value != null) el.value = value;
+        }
+        if (parsed.wine_type) {
+            const sel = document.getElementById('scan-wine-type');
+            if (sel) sel.value = parsed.wine_type.toLowerCase();
+        }
+
+        document.getElementById('scan-cellar-fields').style.display = 'block';
+        showToast('Label scanned successfully', 'success');
+    } catch (error) {
+        showToast(`Scan failed: ${error.message}`, 'error');
+    } finally {
+        document.getElementById('scan-cellar-scanning').style.display = 'none';
+    }
+}
+
+async function handleScanCellarSubmit() {
+    const frontInput = document.getElementById('scan-front-label');
+    if (!frontInput.files || !frontInput.files[0]) {
+        showToast('Please scan a label first', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('front_label', frontInput.files[0]);
+
+    const backInput = document.getElementById('scan-back-label');
+    if (backInput.files && backInput.files[0]) {
+        formData.append('back_label', backInput.files[0]);
+    }
+
+    formData.append('name', document.getElementById('scan-wine-name').value);
+    const winery = document.getElementById('scan-winery').value;
+    if (winery) formData.append('winery', winery);
+    const vintage = document.getElementById('scan-vintage').value;
+    if (vintage) formData.append('vintage', vintage);
+    const grape = document.getElementById('scan-grape-variety').value;
+    if (grape) formData.append('grape_variety', grape);
+    const region = document.getElementById('scan-region').value;
+    if (region) formData.append('region', region);
+    const country = document.getElementById('scan-country').value;
+    if (country) formData.append('country', country);
+    const wineType = document.getElementById('scan-wine-type').value;
+    if (wineType) formData.append('wine_type_id', wineType);
+    formData.append('quantity', document.getElementById('scan-quantity').value || '1');
+
+    // Pass pre-scanned text to avoid re-scanning
+    if (scanCellarResult?.ocr?.front_label_text) {
+        formData.append('front_label_text', scanCellarResult.ocr.front_label_text);
+    }
+    if (scanCellarResult?.ocr?.back_label_text) {
+        formData.append('back_label_text', scanCellarResult.ocr.back_label_text);
+    }
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/wines/checkin`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to add wine');
+        }
+        const wine = await response.json();
+        showToast(`Added to cellar: ${wine.name}`, 'success');
+        // Reset scan form
+        scanCellarResult = null;
+        document.getElementById('scan-front-label').value = '';
+        document.getElementById('scan-back-label').value = '';
+        document.getElementById('scan-front-preview').innerHTML = 'Tap to take photo or select image';
+        document.getElementById('scan-back-preview').innerHTML = 'Tap to take photo or select image';
+        document.getElementById('scan-cellar-fields').style.display = 'none';
+        navigateTo('cellar');
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 }
 

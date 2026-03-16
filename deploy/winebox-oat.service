@@ -1,0 +1,27 @@
+[Unit]
+Description=WineBox FastAPI Application (OAT)
+After=network.target
+
+[Service]
+Type=exec
+User=winebox
+Group=winebox
+WorkingDirectory=/opt/winebox
+Environment="PATH=/opt/winebox/.venv/bin:/usr/local/bin:/usr/bin"
+EnvironmentFile=/opt/winebox/secrets.env
+ExecStart=/opt/winebox/.venv/bin/uvicorn winebox.main:app --host 127.0.0.1 --port 8000 --workers 1
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/winebox/data /opt/winebox/logs
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

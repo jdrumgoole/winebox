@@ -98,9 +98,12 @@ def csv_with_spirits(tmp_path: Path) -> Path:
 
 
 def _navigate_to_import(page: Page) -> None:
-    """Navigate to the import page via URL hash (no nav link since it moved into the wizard)."""
-    page.goto(f"{BASE_URL}/#import")
-    page.wait_for_selector("#page-import", state="visible")
+    """Navigate to the import wizard (embedded in Add to Cellar page)."""
+    page.goto(f"{BASE_URL}/#add-to-cellar")
+    page.wait_for_selector("#page-add-to-cellar", state="visible")
+    # Click the "Import from File" entry path card
+    page.click(".entry-path-card[data-path='import']")
+    page.wait_for_selector("#import-step-upload", state="visible", timeout=5000)
 
 
 def _upload_csv(page: Page, csv_path: Path, timeout_ms: int = 25000) -> None:
@@ -114,18 +117,17 @@ def _upload_csv(page: Page, csv_path: Path, timeout_ms: int = 25000) -> None:
 class TestImportPageNavigation:
     """Test basic import page navigation and display."""
 
-    def test_import_page_accessible_via_hash(self, authenticated_page: Page) -> None:
-        """Test that the Import page is accessible via URL hash."""
+    def test_import_wizard_accessible(self, authenticated_page: Page) -> None:
+        """Test that the Import wizard is accessible via Add to Cellar."""
         page = authenticated_page
         _navigate_to_import(page)
-        expect(page.locator("#page-import")).to_be_visible()
+        expect(page.locator("#import-step-upload")).to_be_visible()
 
     def test_navigate_to_import_page(self, authenticated_page: Page) -> None:
-        """Test navigating to the import page shows upload area."""
+        """Test navigating to the import wizard shows upload area."""
         page = authenticated_page
         _navigate_to_import(page)
 
-        expect(page.locator("#page-import")).to_be_visible()
         expect(page.locator(".import-upload-area")).to_be_visible()
         expect(page.locator("#import-file-input")).to_be_attached()
 

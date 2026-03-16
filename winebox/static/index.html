@@ -445,9 +445,24 @@
         <!-- Add to Cellar Wizard Page -->
         <section id="page-add-to-cellar" class="page" aria-labelledby="page-add-to-cellar-title">
             <h2 id="page-add-to-cellar-title">Add Wine to Your Cellar</h2>
-            <p class="page-subtitle">Choose how you'd like to add a wine</p>
+            <nav class="wizard-breadcrumb" id="add-cellar-breadcrumb" style="display:none;">
+                <a href="#" id="breadcrumb-root">Add to Cellar</a>
+                <span class="breadcrumb-sep">&rsaquo;</span>
+                <span id="breadcrumb-current"></span>
+            </nav>
+            <p class="page-subtitle" id="add-cellar-subtitle">Choose how you'd like to add a wine</p>
 
             <div class="entry-path-cards" id="entry-path-cards">
+                <div class="entry-path-card" data-path="scan">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                    </div>
+                    <h3>Scan a Label</h3>
+                    <p>Take a photo to auto-detect wine details</p>
+                </div>
                 <div class="entry-path-card" data-path="manual">
                     <div class="entry-path-icon">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -477,6 +492,81 @@
                     </div>
                     <h3>Import from File</h3>
                     <p>Upload a CSV or Excel spreadsheet</p>
+                </div>
+            </div>
+
+            <!-- Scan a Label Sub-wizard -->
+            <div id="add-cellar-scan" class="add-cellar-subwizard" style="display:none;">
+                <div class="form-section">
+                    <h3>Scan Label</h3>
+                    <div class="image-upload-grid">
+                        <div class="image-upload">
+                            <label for="scan-front-label">Front Label (Required)</label>
+                            <input type="file" id="scan-front-label" accept="image/*" capture="environment">
+                            <div id="scan-front-preview" class="image-preview">Tap to take photo or select image</div>
+                        </div>
+                        <div class="image-upload">
+                            <label for="scan-back-label">Back Label (Optional)</label>
+                            <input type="file" id="scan-back-label" accept="image/*" capture="environment">
+                            <div id="scan-back-preview" class="image-preview">Tap to take photo or select image</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="scan-cellar-scanning" class="scanning-indicator" style="display:none;">
+                    <div class="spinner"></div>
+                    <span>Scanning label...</span>
+                </div>
+                <div id="scan-cellar-fields" style="display:none;">
+                    <div class="form-section">
+                        <h3>Wine Details</h3>
+                        <p class="form-note">Detected from label &mdash; edit as needed</p>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="scan-wine-name">Wine Name</label>
+                                <input type="text" id="scan-wine-name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-winery">Winery</label>
+                                <input type="text" id="scan-winery">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-vintage">Vintage</label>
+                                <input type="number" id="scan-vintage" min="1900" max="2100">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-grape-variety">Grape Variety</label>
+                                <input type="text" id="scan-grape-variety">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-region">Region</label>
+                                <input type="text" id="scan-region">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-country">Country</label>
+                                <input type="text" id="scan-country">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-wine-type">Wine Type</label>
+                                <select id="scan-wine-type">
+                                    <option value="">Unknown</option>
+                                    <option value="red">Red</option>
+                                    <option value="white">White</option>
+                                    <option value="ros&eacute;">Ros&eacute;</option>
+                                    <option value="sparkling">Sparkling</option>
+                                    <option value="fortified">Fortified</option>
+                                    <option value="dessert">Dessert</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-quantity">Quantity (Bottles)</label>
+                                <input type="number" id="scan-quantity" min="1" value="1" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="scan-add-to-cellar-btn">Add to Cellar</button>
+                        <button type="button" class="btn btn-secondary" id="scan-back-btn">Back</button>
+                    </div>
                 </div>
             </div>
 
@@ -560,13 +650,90 @@
                 </div>
             </div>
 
-            <!-- Import Sub-wizard (content loaded from import page logic) -->
+            <!-- Import Sub-wizard (full import UI embedded here) -->
             <div id="add-cellar-import" class="add-cellar-subwizard" style="display:none;">
-                <div id="import-wizard-inline">
-                    <p>Go to the <a href="#" onclick="navigateTo('import'); return false;">Import page</a> to upload a spreadsheet.</p>
+                <!-- Step 1: Upload -->
+                <div id="import-step-upload" class="import-step">
+                    <div class="form-section">
+                        <h3>Upload Spreadsheet</h3>
+                        <div class="import-upload-area" id="import-drop-zone">
+                            <div class="import-upload-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <p>Drag and drop your file here, or</p>
+                            <label for="import-file-input" class="btn btn-primary" style="cursor:pointer;">Browse Files</label>
+                            <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none;">
+                            <p class="form-hint">Supported formats: CSV, Excel (.xlsx). Max 10,000 rows.</p>
+                        </div>
+                        <div class="form-group" style="margin-top:0.75rem;">
+                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                                <input type="checkbox" id="import-use-ai-mapping" checked>
+                                <span>Use AI to improve column mapping (slower)</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" id="import-back-btn">Back</button>
+
+                <!-- Step 2: Map Columns -->
+                <div id="import-step-map" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                            <h3>Map Columns</h3>
+                            <span id="import-file-info" class="form-hint"></span>
+                        </div>
+                        <p class="form-note">Match your spreadsheet columns to wine fields. Unmapped columns can be saved as custom fields.</p>
+                        <div id="import-mapping-table-container"></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Preview</h3>
+                        <div id="import-preview-container" style="overflow-x:auto;"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="import-confirm-mapping-btn">Confirm Mapping &amp; Import</button>
+                        <button type="button" class="btn btn-secondary" id="import-back-to-upload-btn">Back</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Processing Progress -->
+                <div id="import-step-progress" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3>Importing Wines...</h3>
+                        <div class="import-progress-container">
+                            <div class="import-progress-bar-track">
+                                <div class="import-progress-bar-fill" id="import-progress-fill" style="width:0%"></div>
+                            </div>
+                            <div class="import-progress-stats">
+                                <span id="import-progress-text">0 / 0 rows</span>
+                                <span id="import-progress-percent">0%</span>
+                            </div>
+                            <div class="import-progress-details" id="import-progress-details">
+                                <span id="import-progress-created">0 wines created</span>
+                                <span id="import-progress-skipped">0 rows skipped</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:0.75rem;">
+                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                                <input type="checkbox" id="import-skip-enrichment">
+                                <span>Skip X-Wines enrichment (fast import, no automatic reference data fill)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Results -->
+                <div id="import-step-results" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3>Import Results</h3>
+                        <div id="import-results-content"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="import-new-btn">Import Another File</button>
+                        <button type="button" class="btn btn-secondary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -673,94 +840,7 @@
         </section>
 
         <!-- Import Page -->
-        <section id="page-import" class="page" aria-labelledby="page-import-title">
-            <h2 id="page-import-title">Import Wine Collection</h2>
-            <p class="page-subtitle">Upload a CSV or Excel spreadsheet to import your wine collection</p>
-
-            <!-- Step 1: Upload -->
-            <div id="import-step-upload" class="import-step">
-                <div class="form-section">
-                    <h3>Step 1: Upload Spreadsheet</h3>
-                    <div class="import-upload-area" id="import-drop-zone">
-                        <div class="import-upload-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="17 8 12 3 7 8"></polyline>
-                                <line x1="12" y1="3" x2="12" y2="15"></line>
-                            </svg>
-                        </div>
-                        <p>Drag and drop your file here, or</p>
-                        <label for="import-file-input" class="btn btn-primary" style="cursor:pointer;">Browse Files</label>
-                        <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none;">
-                        <p class="form-hint">Supported formats: CSV, Excel (.xlsx). Max 10,000 rows.</p>
-                    </div>
-                    <div class="form-group" style="margin-top:0.75rem;">
-                        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
-                            <input type="checkbox" id="import-use-ai-mapping" checked>
-                            <span>Use AI to improve column mapping (slower)</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Step 2: Map Columns -->
-            <div id="import-step-map" class="import-step" style="display:none;">
-                <div class="form-section">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-                        <h3>Step 2: Map Columns</h3>
-                        <span id="import-file-info" class="form-hint"></span>
-                    </div>
-                    <p class="form-note">Match your spreadsheet columns to wine fields. Unmapped columns can be saved as custom fields.</p>
-                    <div id="import-mapping-table-container"></div>
-                </div>
-                <div class="form-section">
-                    <h3>Preview</h3>
-                    <div id="import-preview-container" style="overflow-x:auto;"></div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-primary" id="import-confirm-mapping-btn">Confirm Mapping &amp; Import</button>
-                    <button type="button" class="btn btn-secondary" id="import-back-to-upload-btn">Back</button>
-                </div>
-            </div>
-
-            <!-- Step 3: Processing Progress -->
-            <div id="import-step-progress" class="import-step" style="display:none;">
-                <div class="form-section">
-                    <h3>Importing Wines...</h3>
-                    <div class="import-progress-container">
-                        <div class="import-progress-bar-track">
-                            <div class="import-progress-bar-fill" id="import-progress-fill" style="width:0%"></div>
-                        </div>
-                        <div class="import-progress-stats">
-                            <span id="import-progress-text">0 / 0 rows</span>
-                            <span id="import-progress-percent">0%</span>
-                        </div>
-                        <div class="import-progress-details" id="import-progress-details">
-                            <span id="import-progress-created">0 wines created</span>
-                            <span id="import-progress-skipped">0 rows skipped</span>
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-top:0.75rem;">
-                        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
-                            <input type="checkbox" id="import-skip-enrichment">
-                            <span>Skip X-Wines enrichment (fast import, no automatic reference data fill)</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Step 4: Results -->
-            <div id="import-step-results" class="import-step" style="display:none;">
-                <div class="form-section">
-                    <h3>Import Results</h3>
-                    <div id="import-results-content"></div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-primary" id="import-new-btn">Import Another File</button>
-                    <button type="button" class="btn btn-secondary" onclick="navigateTo('cellar')">Go to Cellar</button>
-                </div>
-            </div>
-        </section>
+        <!-- Import page removed — import UI is now in the Add to Cellar wizard -->
 
         <!-- X-Wines Search Page -->
         <section id="page-xwines" class="page">
