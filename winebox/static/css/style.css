@@ -1867,12 +1867,12 @@ body.logged-out #user-info {
 }
 
 #app-footer .footer-feedback a {
-    color: var(--secondary-color);
+    color: rgba(255, 255, 255, 0.9);
     text-decoration: none;
 }
 
 #app-footer .footer-feedback a:hover {
-    color: #e8c49a;
+    color: #ffffff;
     text-decoration: underline;
 }
 

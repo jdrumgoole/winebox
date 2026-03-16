@@ -561,6 +561,14 @@ footer {
     font-size: 0.85rem;
 }
 
+.footer-bottom .footer-feedback a {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.footer-bottom .footer-feedback a:hover {
+    color: #ffffff;
+}
+
 .landing-version {
     background: rgba(255, 255, 255, 0.15);
     padding: 0.15rem 0.5rem;
