@@ -56,6 +56,7 @@ def deploy_xwines(
     host: str,
     user: str,
     version: str = "full",
+    database: str | None = None,
     dry_run: bool = False,
 ) -> None:
     """Deploy X-Wines dataset to production server.
@@ -64,9 +65,12 @@ def deploy_xwines(
         host: Droplet IP address
         user: SSH username
         version: Dataset version ("full" or "test")
+        database: Override MongoDB database name (reads from server config.toml if not set)
         dry_run: If True, preview without applying
     """
     print(f"Deploying X-Wines dataset ({version}) to {host}...")
+    if database:
+        print(f"Database: {database}")
     print("=" * 50)
 
     # Upload import script first (always, to pick up any changes)
@@ -74,8 +78,10 @@ def deploy_xwines(
     if not dry_run:
         _upload_import_script(host, user)
 
+    # Build env prefix for database override
+    env_prefix = f"WINEBOX_MONGODB_DATABASE={database} " if database else ""
     import_cmd = (
-        f"sudo -u winebox /opt/winebox/.venv/bin/python "
+        f"sudo -u winebox {env_prefix}/opt/winebox/.venv/bin/python "
         f"{REMOTE_IMPORT_SCRIPT} --version {version} --force"
     )
 
@@ -189,6 +195,10 @@ Examples:
         help="Use test dataset (100 wines) instead of full dataset",
     )
     parser.add_argument(
+        "--database",
+        help="MongoDB database name (default: reads from server config)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview changes without applying",
@@ -213,6 +223,7 @@ Examples:
         host=host,
         user=config.user,
         version=version,
+        database=args.database,
         dry_run=args.dry_run,
     )
 

@@ -7,6 +7,7 @@
 - Prefer guided wizards over forms with many fields. Break complex tasks into clear steps.
 - Use wine-world language: "cellar", "bottle", "case", "label" — not "record", "entry", "document", "import batch".
 - When in doubt, optimise for simplicity over flexibility.
+- **When renaming UI elements, update the code to match.** If a button label changes from "Check In" to "Record Wine", rename the corresponding HTML IDs, CSS classes, JS functions, API endpoints, and test references too. The codebase must reflect what the user sees on screen — stale names like `checkin-form` for a "Record Wine" feature create confusion and maintenance burden.
 
 ## Scripts
 - Always write Python scripts instead of bash/shell scripts

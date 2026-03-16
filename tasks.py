@@ -1329,7 +1329,7 @@ def oat_deploy_xwines(ctx: Context, host: str = "", test: bool = True, dry_run: 
         dry_run: Preview changes
     """
     oat_host = _resolve_oat_host(ctx, host or None)
-    cmd = f"uv run python -m deploy.xwines --host {oat_host}"
+    cmd = f"uv run python -m deploy.xwines --host {oat_host} --database {OAT_DATABASE}"
     if test:
         cmd += " --test"
     if dry_run:
