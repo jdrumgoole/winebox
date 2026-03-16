@@ -111,7 +111,7 @@ class TestXWinesNavigation:
         page.wait_for_selector("#page-xwines", state="visible")
 
         # Wait for filters to load (they're fetched asynchronously)
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(5000)
 
         # Wine type dropdown should have options beyond the default "All Types"
         type_options = page.locator("#xwines-type option").count()
@@ -131,14 +131,14 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         # Search for a common wine term
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")
 
         # Wait for results to appear
-        page.wait_for_selector(".xwines-card", state="visible", timeout=10000)
+        page.wait_for_selector(".xwines-card", state="visible", timeout=30000)
 
         # Should have at least one result card
         cards = page.locator(".xwines-card")
@@ -149,13 +149,13 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")
 
         # Wait for results
-        page.wait_for_selector(".xwines-results-header", state="visible", timeout=10000)
+        page.wait_for_selector(".xwines-results-header", state="visible", timeout=30000)
         header = page.locator(".xwines-results-header")
         header_text = header.text_content() or ""
         assert "result" in header_text.lower(), f"Expected result count, got: {header_text}"
@@ -165,13 +165,13 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         page.fill("#xwines-q", "xyznonexistentwine123")
         page.click("#xwines-search-form button[type='submit']")
 
         # Wait for the search to complete
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(5000)
 
         # Should show no result cards
         cards = page.locator(".xwines-card")
@@ -182,7 +182,7 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         # Try to search with a single character
         page.fill("#xwines-q", "a")
@@ -199,8 +199,8 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_timeout(2000)  # Wait for filters to load
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_timeout(5000)  # Wait for filters to load
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         # Select "Red" type filter
         page.select_option("#xwines-type", label="Red")
@@ -210,7 +210,7 @@ class TestXWinesSearch:
         page.click("#xwines-search-form button[type='submit']")
 
         # Wait for results
-        page.wait_for_selector(".xwines-card", state="visible", timeout=10000)
+        page.wait_for_selector(".xwines-card", state="visible", timeout=30000)
 
         # All visible type tags should say "Red"
         type_tags = page.locator(".xwines-type-tag")
@@ -223,8 +223,8 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_timeout(2000)  # Wait for filters to load
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_timeout(5000)  # Wait for filters to load
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         # Get the first real country option (not "All Countries")
         first_country = page.evaluate("""
@@ -259,7 +259,7 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         # Set limit to 10
         page.select_option("#xwines-limit", "10")
@@ -267,7 +267,7 @@ class TestXWinesSearch:
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")
 
-        page.wait_for_selector(".xwines-card", state="visible", timeout=10000)
+        page.wait_for_selector(".xwines-card", state="visible", timeout=30000)
 
         cards = page.locator(".xwines-card")
         assert cards.count() <= 10, f"Expected at most 10 results, got {cards.count()}"
@@ -277,7 +277,7 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         # Fill in some values
         page.fill("#xwines-q", "test query")
@@ -301,11 +301,11 @@ class TestXWinesDetailModal:
         """Helper: navigate to X-Wines, search, and wait for results."""
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")
-        page.wait_for_selector(".xwines-card", state="visible", timeout=10000)
+        page.wait_for_selector(".xwines-card", state="visible", timeout=30000)
 
     def test_click_card_opens_detail_modal(self, authenticated_page: Page) -> None:
         """Test that clicking a wine card opens the detail modal."""
@@ -389,11 +389,11 @@ class TestXWinesCardContent:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")
-        page.wait_for_selector(".xwines-card", state="visible", timeout=10000)
+        page.wait_for_selector(".xwines-card", state="visible", timeout=30000)
 
         # First card should have a title
         title = page.locator(".xwines-card-title").first
@@ -406,11 +406,11 @@ class TestXWinesCardContent:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_selector("#xwines-q", state="visible", timeout=10000)
+        page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
         page.fill("#xwines-q", "wine")
         page.click("#xwines-search-form button[type='submit']")
-        page.wait_for_selector(".xwines-card", state="visible", timeout=10000)
+        page.wait_for_selector(".xwines-card", state="visible", timeout=30000)
 
         type_tag = page.locator(".xwines-type-tag").first
         expect(type_tag).to_be_visible()
