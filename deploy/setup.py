@@ -30,7 +30,7 @@ from deploy.common import (
 # =============================================================================
 
 CONFIG_TOML_TEMPLATE = """\
-# WineBox Configuration - Production
+# WineBox Configuration - {env_label}
 # See config/config.toml.example for all options
 
 [server]
@@ -41,7 +41,7 @@ debug = false
 enforce_https = true
 
 [database]
-mongodb_database = "winebox"
+mongodb_database = "{mongodb_database}"
 # mongodb_url is set via WINEBOX_MONGODB_URL in secrets.env
 
 [storage]
@@ -203,7 +203,7 @@ def create_virtualenv(host: str, user: str) -> None:
     print("Static files symlink created")
 
 
-def setup_config_files(host: str, user: str, domain: str) -> None:
+def setup_config_files(host: str, user: str, domain: str, mongodb_database: str = "winebox") -> None:
     """Create config.toml and secrets.env on remote host."""
     step("Setting up configuration files")
 
@@ -215,8 +215,13 @@ def setup_config_files(host: str, user: str, domain: str) -> None:
     )
 
     if "exists" not in result:
+        env_label = "OAT" if mongodb_database != "winebox" else "Production"
         # Create config.toml locally and upload
-        config_content = CONFIG_TOML_TEMPLATE.format(domain=domain)
+        config_content = CONFIG_TOML_TEMPLATE.format(
+            domain=domain,
+            mongodb_database=mongodb_database,
+            env_label=env_label,
+        )
         with tempfile.NamedTemporaryFile(mode='w', suffix='.toml', delete=False) as f:
             f.write(config_content)
             temp_config = Path(f.name)
@@ -256,7 +261,7 @@ def setup_config_files(host: str, user: str, domain: str) -> None:
         print("secrets.env already exists, skipping")
 
 
-def setup_service_files(host: str, user: str) -> None:
+def setup_service_files(host: str, user: str, nginx_conf: str | None = None) -> None:
     """Upload and configure systemd and nginx files."""
     deploy_dir = Path(__file__).parent
 
@@ -270,7 +275,8 @@ def setup_service_files(host: str, user: str) -> None:
 
     # Upload nginx config
     step("Setting up nginx")
-    upload_file(host, user, deploy_dir / "nginx-winebox.conf", "/tmp/nginx-winebox.conf")
+    nginx_file = deploy_dir / (nginx_conf or "nginx-winebox.conf")
+    upload_file(host, user, nginx_file, "/tmp/nginx-winebox.conf")
     run_ssh(host, user, "mv /tmp/nginx-winebox.conf /etc/nginx/sites-available/winebox")
     run_ssh(host, user, "ln -sf /etc/nginx/sites-available/winebox /etc/nginx/sites-enabled/")
     run_ssh(host, user, "rm -f /etc/nginx/sites-enabled/default")
@@ -342,16 +348,19 @@ URLs:
 """)
 
 
-def setup(host: str, user: str, domain: str) -> None:
+def setup(host: str, user: str, domain: str, mongodb_database: str = "winebox", nginx_conf: str | None = None) -> None:
     """Run initial setup on a Digital Ocean droplet.
 
     Args:
         host: Droplet IP address
         user: SSH username
         domain: Domain name for the application
+        mongodb_database: MongoDB database name (default: 'winebox')
+        nginx_conf: Path to nginx config file to use (default: nginx-winebox.conf)
     """
     print(f"Setting up WineBox on {host}...")
     print(f"Domain: {domain}")
+    print(f"Database: {mongodb_database}")
     print("=" * 60)
 
     # Run setup steps
@@ -361,8 +370,8 @@ def setup(host: str, user: str, domain: str) -> None:
     create_winebox_user(host, user)
     setup_directories(host, user)
     create_virtualenv(host, user)
-    setup_config_files(host, user, domain)
-    setup_service_files(host, user)
+    setup_config_files(host, user, domain, mongodb_database)
+    setup_service_files(host, user, nginx_conf=nginx_conf)
     setup_firewall(host, user)
 
     # Print next steps
@@ -389,6 +398,15 @@ def main() -> None:
         default="booze.winebox.app",
         help="Domain name for the app (default: booze.winebox.app)",
     )
+    parser.add_argument(
+        "--mongodb-database",
+        default="winebox",
+        help="MongoDB database name (default: winebox)",
+    )
+    parser.add_argument(
+        "--nginx-conf",
+        help="Nginx config filename in deploy/ (default: nginx-winebox.conf)",
+    )
 
     args = parser.parse_args()
 
@@ -410,6 +428,8 @@ def main() -> None:
         host=host,
         user=config.user,
         domain=config.domain,
+        mongodb_database=args.mongodb_database,
+        nginx_conf=args.nginx_conf,
     )
 
 

@@ -23,6 +23,7 @@ Environment variables (in .env):
 """
 
 import argparse
+import os
 
 from pathlib import Path
 
@@ -117,6 +118,7 @@ def deploy(
     setup_dns_flag: bool = False,
     domain: str = "booze.winebox.app",
     dry_run: bool = False,
+    nginx_conf: str | None = None,
 ) -> None:
     """Deploy WineBox to the production server.
 
@@ -180,16 +182,16 @@ def deploy(
     step += 1
     print(f"\n[{step}/{total_steps}] Syncing nginx config...")
     if not dry_run:
-        nginx_conf = Path(__file__).parent / "nginx-winebox.conf"
-        if nginx_conf.exists():
-            upload_file(host, user, nginx_conf, "/tmp/nginx-winebox.conf")
+        nginx_conf_file = Path(__file__).parent / (nginx_conf or "nginx-winebox.conf")
+        if nginx_conf_file.exists():
+            upload_file(host, user, nginx_conf_file, "/tmp/nginx-winebox.conf")
             run_ssh(host, user, [
                 "mv /tmp/nginx-winebox.conf /etc/nginx/sites-available/winebox",
                 "ln -sf /etc/nginx/sites-available/winebox /etc/nginx/sites-enabled/",
             ])
             print("  nginx config synced")
         else:
-            print(f"  Warning: {nginx_conf} not found, skipping")
+            print(f"  Warning: {nginx_conf_file} not found, skipping")
 
     # Step: Update static files symlink and reload nginx
     step += 1
@@ -330,6 +332,7 @@ Examples:
         setup_dns_flag=args.setup_dns,
         domain=config.domain,
         dry_run=args.dry_run,
+        nginx_conf=os.environ.get("WINEBOX_NGINX_CONF"),
     )
 
 

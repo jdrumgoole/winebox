@@ -1165,3 +1165,245 @@ def generate_test_data(
         f"uv run python scripts/generate_test_csv.py -n {rows} -o {output} --seed {seed}",
         pty=True,
     )
+
+
+# =============================================================================
+# OAT (Pre-release Testing) Environment
+# =============================================================================
+
+OAT_DROPLET_NAME = "winebox-oat"
+OAT_DOMAIN = "oat.winebox.app"
+OAT_DATABASE = "winebox-oat"
+OAT_NGINX_CONF = "nginx-winebox-oat.conf"
+OAT_WINEBOX_ADMIN = "/opt/winebox/.venv/bin/winebox-admin"
+
+
+def _resolve_oat_host(ctx: Context, host: str | None = None) -> str:
+    """Resolve the OAT droplet IP."""
+    if host:
+        return host
+    # Use DO API to find the droplet
+    result = ctx.run(
+        f'uv run python -c "'
+        f"from deploy.common import get_droplet_ip; "
+        f"import os; "
+        f"from dotenv import load_dotenv; load_dotenv('.env'); "
+        f"ip = get_droplet_ip(os.environ['WINEBOX_DO_TOKEN'], '{OAT_DROPLET_NAME}'); "
+        f"print(ip or '')"
+        f'"',
+        hide=True,
+    )
+    ip = result.stdout.strip()
+    if not ip:
+        print(f"Error: Could not find droplet '{OAT_DROPLET_NAME}'")
+        sys.exit(1)
+    return ip
+
+
+@task(name="oat-setup")
+def oat_setup(ctx: Context, host: str = "", dry_run: bool = False) -> None:
+    """Set up the OAT (pre-release testing) droplet.
+
+    Runs initial server setup on the winebox-oat droplet with:
+    - oat.winebox.app domain
+    - winebox-oat database
+    - OAT-specific nginx config (no landing page)
+
+    Args:
+        ctx: Invoke context
+        host: Override droplet IP
+        dry_run: Preview changes
+    """
+    oat_host = _resolve_oat_host(ctx, host or None)
+    print(f"Setting up OAT environment on {oat_host}...")
+    print(f"Domain: {OAT_DOMAIN}")
+    print(f"Database: {OAT_DATABASE}")
+
+    if dry_run:
+        print("DRY RUN - Would run setup with OAT configuration")
+        return
+
+    cmd = (
+        f"uv run python -m deploy.setup "
+        f"--host {oat_host} "
+        f"--domain {OAT_DOMAIN} "
+        f"--mongodb-database {OAT_DATABASE} "
+        f"--nginx-conf {OAT_NGINX_CONF}"
+    )
+    ctx.run(cmd, pty=True)
+
+
+@task(name="oat-ssl")
+def oat_ssl(ctx: Context, host: str = "") -> None:
+    """Set up SSL certificates for oat.winebox.app.
+
+    Must be run after oat-setup and after DNS has propagated.
+
+    Args:
+        ctx: Invoke context
+        host: Override droplet IP
+    """
+    oat_host = _resolve_oat_host(ctx, host or None)
+    print(f"Setting up SSL for {OAT_DOMAIN} on {oat_host}...")
+
+    from deploy.common import run_ssh
+
+    # Stop nginx to free port 80
+    run_ssh(oat_host, "root", "systemctl stop nginx", check=False)
+
+    # Request certificate
+    run_ssh(
+        oat_host, "root",
+        f"certbot certonly --standalone --non-interactive --agree-tos "
+        f"--email support@winebox.app -d {OAT_DOMAIN}",
+    )
+
+    # Start nginx
+    run_ssh(oat_host, "root", "systemctl start nginx")
+    print(f"SSL configured for {OAT_DOMAIN}")
+
+
+@task(name="deploy-oat")
+def deploy_oat(
+    ctx: Context,
+    host: str = "",
+    version: str = "",
+    no_secrets: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Deploy WineBox to the OAT (pre-release testing) server.
+
+    Uses the same deployment pipeline as production but targets the OAT
+    droplet with its own domain and database.
+
+    Args:
+        ctx: Invoke context
+        host: Override droplet IP
+        version: Package version to install (default: latest)
+        no_secrets: Skip syncing secrets
+        dry_run: Preview changes
+    """
+    oat_host = _resolve_oat_host(ctx, host or None)
+    print(f"Deploying to OAT: {oat_host} ({OAT_DOMAIN})")
+
+    cmd = (
+        f"uv run python -m deploy.app "
+        f"--host {oat_host} "
+        f"--domain {OAT_DOMAIN} "
+    )
+    if version:
+        cmd += f"--version {version} "
+    if no_secrets:
+        cmd += "--no-secrets "
+    if dry_run:
+        cmd += "--dry-run "
+
+    # Override nginx config for OAT
+    ctx.run(cmd, pty=True, env={"WINEBOX_NGINX_CONF": OAT_NGINX_CONF})
+
+    if not dry_run:
+        print(f"\nOAT deployment complete!")
+        print(f"  URL: https://{OAT_DOMAIN}")
+        print(f"  Database: {OAT_DATABASE}")
+
+
+@task(name="oat-deploy-xwines")
+def oat_deploy_xwines(ctx: Context, host: str = "", test: bool = True, dry_run: bool = False) -> None:
+    """Deploy X-Wines dataset to the OAT server.
+
+    Args:
+        ctx: Invoke context
+        host: Override droplet IP
+        test: Use test dataset (default: True for OAT)
+        dry_run: Preview changes
+    """
+    oat_host = _resolve_oat_host(ctx, host or None)
+    cmd = f"uv run python -m deploy.xwines --host {oat_host}"
+    if test:
+        cmd += " --test"
+    if dry_run:
+        cmd += " --dry-run"
+    ctx.run(cmd, pty=True)
+
+
+def _oat_ssh_cmd(host: str, cmd: str) -> str:
+    """Build SSH command for OAT server."""
+    return f'ssh -o StrictHostKeyChecking=accept-new root@{host} "{cmd}"'
+
+
+@task(name="oat-status")
+def oat_status(ctx: Context, host: str = "") -> None:
+    """Check the status of the OAT server.
+
+    Args:
+        ctx: Invoke context
+        host: Override droplet IP
+    """
+    oat_host = _resolve_oat_host(ctx, host or None)
+    print(f"OAT server: {oat_host} ({OAT_DOMAIN})")
+    ctx.run(_oat_ssh_cmd(oat_host, "systemctl status winebox"), pty=True, warn=True)
+    ctx.run(_oat_ssh_cmd(oat_host, "curl -sf http://localhost:8000/health || echo 'Health check failed'"), pty=True, warn=True)
+
+
+@task(name="oat-logs")
+def oat_logs(ctx: Context, host: str = "", lines: int = 50, follow: bool = False) -> None:
+    """View OAT server logs.
+
+    Args:
+        ctx: Invoke context
+        host: Override droplet IP
+        lines: Number of lines to show
+        follow: Follow log output
+    """
+    oat_host = _resolve_oat_host(ctx, host or None)
+    follow_flag = "-f" if follow else ""
+    ctx.run(
+        f'ssh -o StrictHostKeyChecking=accept-new root@{oat_host} '
+        f'"journalctl -u winebox -n {lines} --no-pager {follow_flag}"',
+        pty=True,
+    )
+
+
+@task(name="test-e2e-oat")
+def test_e2e_oat(
+    ctx: Context,
+    verbose: bool = False,
+    workers: int = 1,
+    pattern: str = "",
+    host: str = "",
+) -> None:
+    """Run E2E tests against the OAT server.
+
+    Runs Playwright e2e tests against the live OAT server at oat.winebox.app.
+    Uses the winebox-oat database via the server's own config.
+
+    Args:
+        ctx: Invoke context
+        verbose: Enable verbose output
+        workers: Number of parallel workers (default: 1)
+        pattern: Optional test file pattern (e.g. 'test_checkin_e2e.py')
+        host: Override droplet IP for user creation
+    """
+    oat_url = f"https://{OAT_DOMAIN}"
+    oat_host = _resolve_oat_host(ctx, host or None)
+
+    print(f"Running E2E tests against OAT: {oat_url}")
+
+    # Build test command
+    if pattern:
+        test_files = f"tests/{pattern}"
+    else:
+        test_files = "-m e2e"
+
+    # Create users via SSH on the OAT server instead of local CLI
+    # (since the OAT server has its own database)
+    test_cmd = (
+        f"WINEBOX_TEST_URL={oat_url} "
+        f"WINEBOX_MONGODB_DATABASE={OAT_DATABASE} "
+        f"WINEBOX_USE_CLAUDE_VISION=false "
+        f'uv run python -m pytest {test_files} -n {workers} --override-ini="addopts="'
+    )
+    if verbose:
+        test_cmd += " -v"
+
+    ctx.run(test_cmd, pty=True)
