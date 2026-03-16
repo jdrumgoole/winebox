@@ -125,8 +125,8 @@ def _load_csv_data(csv_path: Path) -> tuple[list[str], list[dict[str, str]]]:
 
 
 def _navigate_to_import(page: Page) -> None:
-    """Navigate to the import page."""
-    page.click("a[data-page='import']")
+    """Navigate to the import page via URL hash (no nav link since it moved into the wizard)."""
+    page.goto(f"{BASE_URL}/#import")
     page.wait_for_selector("#page-import", state="visible")
 
 

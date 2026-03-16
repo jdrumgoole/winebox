@@ -136,13 +136,13 @@ class TestCheckinFlow:
         page.wait_for_selector("#front-preview img, #wine-name:not([value=''])",
                                state="visible", timeout=30000)
 
-    def test_checkin_button_opens_confirmation_dialog(
+    def test_record_wine_button_opens_confirmation_dialog(
         self, authenticated_page: Page, wine_images: list[Path]
     ) -> None:
-        """Test that clicking Check In opens confirmation dialog without saving."""
+        """Test that clicking Record Wine opens confirmation dialog without saving."""
         page = authenticated_page
 
-        # Navigate to checkin
+        # Navigate to checkin (now "Record Wine")
         page.click("a[data-page='checkin']")
         page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
@@ -150,20 +150,16 @@ class TestCheckinFlow:
         image_path = wine_images[0]
         page.set_input_files("#front-label", str(image_path))
 
-        # Wait for scan to complete (either preview shows or we have form data)
-        page.wait_for_timeout(3000)  # Give time for OCR/scan
-        page.wait_for_selector("#quantity", state="visible", timeout=15000)
+        # Wait for scan to complete
+        page.wait_for_timeout(3000)
 
-        # Fill in quantity
-        page.fill("#quantity", "2")
-
-        # Click Check In button
+        # Click Record Wine button
         page.click("#checkin-form button[type='submit']")
 
         # Confirmation dialog should appear
         expect(page.locator("#checkin-confirm-modal")).to_have_class(re.compile(r"active"))
 
-        # Confirm and Cancel buttons should be visible
+        # Save and Cancel buttons should be visible
         expect(page.locator("#checkin-confirm-btn")).to_be_visible()
         expect(page.locator("#checkin-cancel-btn")).to_be_visible()
 
@@ -173,7 +169,7 @@ class TestCheckinFlow:
         """Test that Cancel closes the dialog and returns to form."""
         page = authenticated_page
 
-        # Navigate to checkin
+        # Navigate to checkin (Record Wine)
         page.click("a[data-page='checkin']")
         page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
@@ -181,10 +177,8 @@ class TestCheckinFlow:
         image_path = wine_images[0]
         page.set_input_files("#front-label", str(image_path))
         page.wait_for_timeout(3000)
-        page.wait_for_selector("#quantity", state="visible", timeout=15000)
 
-        # Fill quantity and click Check In
-        page.fill("#quantity", "1")
+        # Click Record Wine
         page.click("#checkin-form button[type='submit']")
 
         # Wait for confirmation dialog
@@ -199,13 +193,13 @@ class TestCheckinFlow:
         # Should still be on checkin page
         expect(page.locator("#page-checkin")).to_be_visible()
 
-    def test_confirm_saves_wine_to_database(
+    def test_confirm_saves_wine_to_met(
         self, authenticated_page: Page, wine_images: list[Path]
     ) -> None:
-        """Test that Confirm actually saves the wine to the database."""
+        """Test that Save records the wine to Wines I've Met."""
         page = authenticated_page
 
-        # Navigate to checkin
+        # Navigate to checkin (Record Wine)
         page.click("a[data-page='checkin']")
         page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
@@ -213,27 +207,21 @@ class TestCheckinFlow:
         image_path = wine_images[0]
         page.set_input_files("#front-label", str(image_path))
         page.wait_for_timeout(3000)
-        page.wait_for_selector("#quantity", state="visible", timeout=15000)
 
-        # Fill in details
-        page.fill("#quantity", "3")
+        # Fill in wine name
         page.fill("#wine-name", f"E2E Test Wine - {image_path.stem}")
 
-        # Click Check In
+        # Click Record Wine
         page.click("#checkin-form button[type='submit']")
 
         # Wait for confirmation dialog
         page.wait_for_selector("#checkin-confirm-modal.active", state="visible")
 
-        # Click Confirm
+        # Click Save
         page.click("#checkin-confirm-btn")
 
-        # Should show cellar page after successful checkin
-        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
-
-        # The wine should now appear in the cellar
-        # Look for at least one wine card (use .first to avoid strict mode error)
-        expect(page.locator(".wine-card").first).to_be_visible(timeout=5000)
+        # Should navigate to met page after successful record
+        page.wait_for_selector("#page-met", state="visible", timeout=10000)
 
     def test_confirmation_dialog_has_editable_fields(
         self, authenticated_page: Page, wine_images: list[Path]
@@ -241,7 +229,7 @@ class TestCheckinFlow:
         """Test that the confirmation dialog fields are editable."""
         page = authenticated_page
 
-        # Navigate to checkin
+        # Navigate to checkin (Record Wine)
         page.click("a[data-page='checkin']")
         page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
 
@@ -252,7 +240,6 @@ class TestCheckinFlow:
 
         # Fill initial data
         page.fill("#wine-name", "Initial Name")
-        page.fill("#quantity", "1")
 
         # Open confirmation dialog
         page.click("#checkin-form button[type='submit']")
@@ -265,11 +252,11 @@ class TestCheckinFlow:
         # Change the name in the dialog
         confirm_name_field.fill("Modified Name in Dialog")
 
-        # Click Confirm
+        # Click Save
         page.click("#checkin-confirm-btn")
 
-        # Wait for save and navigation
-        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        # Wait for save and navigation to met page
+        page.wait_for_selector("#page-met", state="visible", timeout=10000)
 
 
 @pytest.mark.e2e
@@ -303,8 +290,7 @@ class TestWineImageUploads:
         # Wait a bit for OCR/scan if enabled
         page.wait_for_timeout(2000)
 
-        # Should be able to fill quantity and click Check In
-        page.fill("#quantity", "1")
+        # Click Record Wine
         page.click("#checkin-form button[type='submit']")
 
         # Confirmation dialog should appear

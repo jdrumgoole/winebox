@@ -88,13 +88,18 @@ class WineWithInventory(WineBase):
     created_at: datetime
     updated_at: datetime
     inventory: InventoryInfo | None = None
+    collection: str = "cellar"
+    added_to_cellar: bool = False
+    cellar_wine_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_validator("id", mode="before")
+    @field_validator("id", "cellar_wine_id", mode="before")
     @classmethod
-    def convert_objectid_to_str(cls, v: Any) -> str:
+    def convert_objectid_to_str(cls, v: Any) -> str | None:
         """Convert ObjectId to string."""
+        if v is None:
+            return None
         if isinstance(v, PydanticObjectId):
             return str(v)
         return v

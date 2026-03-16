@@ -32,6 +32,7 @@ async def search_wines(
     checked_out_after: Annotated[datetime | None, Query(description="Checked out after date")] = None,
     checked_out_before: Annotated[datetime | None, Query(description="Checked out before date")] = None,
     in_stock: Annotated[bool | None, Query(description="Only wines currently in stock")] = None,
+    collection: Annotated[str | None, Query(description="Filter by collection: cellar or met")] = None,
     skip: int = 0,
     limit: int = 100,
 ) -> list[WineWithInventory]:
@@ -42,6 +43,9 @@ async def search_wines(
     """
     # Build filter conditions - always filter by owner
     conditions = {"owner_id": current_user.id}
+
+    if collection:
+        conditions["collection"] = collection
 
     # Use MongoDB text search for full-text queries when available
     # Falls back to regex for compatibility (e.g., mongomock in tests)

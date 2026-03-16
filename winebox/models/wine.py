@@ -1,10 +1,18 @@
 """Wine document model for MongoDB with embedded subdocuments."""
 
+import enum
 from datetime import datetime, timezone
 from typing import Optional
 
 from beanie import Document, Indexed, PydanticObjectId
 from pydantic import BaseModel, Field
+
+
+class WineCollection(str, enum.Enum):
+    """Which collection a wine belongs to: cellar or met (encountered)."""
+
+    CELLAR = "cellar"
+    MET = "met"
 
 
 class InventoryInfo(BaseModel):
@@ -48,10 +56,15 @@ class ScoreEntry(BaseModel):
 
 
 class Wine(Document):
-    """Wine document model representing a wine in the cellar."""
+    """Wine document model representing a wine in the cellar or a wine the user has met."""
 
     # Owner reference for data isolation
     owner_id: Indexed(PydanticObjectId)
+
+    # Collection: "cellar" (owned bottles) or "met" (wines encountered)
+    collection: WineCollection = WineCollection.CELLAR
+    added_to_cellar: bool = False  # Only meaningful when collection="met"
+    cellar_wine_id: Optional[PydanticObjectId] = None  # Links met wine → cellar wine
 
     # Basic wine information
     name: Indexed(str)
@@ -106,6 +119,7 @@ class Wine(Document):
             "country",
             "wine_type_id",
             [("owner_id", 1), ("inventory.quantity", 1)],  # Compound index for cellar queries
+            [("owner_id", 1), ("collection", 1)],  # Compound index for met/cellar queries
             [
                 ("name", "text"),
                 ("winery", "text"),

@@ -98,8 +98,8 @@ def csv_with_spirits(tmp_path: Path) -> Path:
 
 
 def _navigate_to_import(page: Page) -> None:
-    """Navigate to the import page."""
-    page.click("a[data-page='import']")
+    """Navigate to the import page via URL hash (no nav link since it moved into the wizard)."""
+    page.goto(f"{BASE_URL}/#import")
     page.wait_for_selector("#page-import", state="visible")
 
 
@@ -114,12 +114,11 @@ def _upload_csv(page: Page, csv_path: Path, timeout_ms: int = 25000) -> None:
 class TestImportPageNavigation:
     """Test basic import page navigation and display."""
 
-    def test_import_link_visible(self, authenticated_page: Page) -> None:
-        """Test that the Import link appears in the navigation."""
+    def test_import_page_accessible_via_hash(self, authenticated_page: Page) -> None:
+        """Test that the Import page is accessible via URL hash."""
         page = authenticated_page
-        import_link = page.locator("a[data-page='import']")
-        expect(import_link).to_be_visible()
-        expect(import_link).to_have_text("Import")
+        _navigate_to_import(page)
+        expect(page.locator("#page-import")).to_be_visible()
 
     def test_navigate_to_import_page(self, authenticated_page: Page) -> None:
         """Test navigating to the import page shows upload area."""

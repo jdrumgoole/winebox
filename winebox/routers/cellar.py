@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from winebox.models import Wine
+from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
 
@@ -18,6 +19,7 @@ async def get_cellar_inventory(
     """Get current cellar inventory (wines in stock)."""
     wines = await Wine.find(
         Wine.owner_id == current_user.id,
+        Wine.collection == WineCollection.CELLAR,
         Wine.inventory.quantity > 0,
     ).skip(skip).limit(limit).sort(Wine.name).to_list()
 
@@ -31,25 +33,29 @@ async def get_cellar_summary(
     """Get cellar summary statistics."""
     # Total bottles in cellar using aggregation (filtered by owner)
     total_bottles_pipeline = [
-        {"$match": {"owner_id": current_user.id, "inventory.quantity": {"$gt": 0}}},
+        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}}},
         {"$group": {"_id": None, "total": {"$sum": "$inventory.quantity"}}},
     ]
     cursor = Wine.get_pymongo_collection().aggregate(total_bottles_pipeline)
     total_bottles_result = await cursor.to_list(length=None)
     total_bottles = total_bottles_result[0]["total"] if total_bottles_result else 0
 
-    # Unique wines in stock (filtered by owner)
+    # Unique wines in stock (filtered by owner, cellar only)
     unique_wines = await Wine.find(
         Wine.owner_id == current_user.id,
+        Wine.collection == WineCollection.CELLAR,
         Wine.inventory.quantity > 0,
     ).count()
 
-    # Total wines ever tracked (including out of stock, filtered by owner)
-    total_wines_tracked = await Wine.find(Wine.owner_id == current_user.id).count()
+    # Total wines ever tracked (including out of stock, cellar only)
+    total_wines_tracked = await Wine.find(
+        Wine.owner_id == current_user.id,
+        Wine.collection == WineCollection.CELLAR,
+    ).count()
 
     # Wines by vintage (in stock, filtered by owner)
     by_vintage_pipeline = [
-        {"$match": {"owner_id": current_user.id, "inventory.quantity": {"$gt": 0}, "vintage": {"$ne": None}}},
+        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "vintage": {"$ne": None}}},
         {"$group": {"_id": "$vintage", "count": {"$sum": "$inventory.quantity"}}},
         {"$sort": {"_id": -1}},
     ]
@@ -59,7 +65,7 @@ async def get_cellar_summary(
 
     # Wines by country (in stock, filtered by owner)
     by_country_pipeline = [
-        {"$match": {"owner_id": current_user.id, "inventory.quantity": {"$gt": 0}, "country": {"$ne": None}}},
+        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "country": {"$ne": None}}},
         {"$group": {"_id": "$country", "count": {"$sum": "$inventory.quantity"}}},
         {"$sort": {"count": -1}},
     ]
@@ -69,7 +75,7 @@ async def get_cellar_summary(
 
     # Wines by grape variety (in stock, filtered by owner)
     by_grape_pipeline = [
-        {"$match": {"owner_id": current_user.id, "inventory.quantity": {"$gt": 0}, "grape_variety": {"$ne": None}}},
+        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "grape_variety": {"$ne": None}}},
         {"$group": {"_id": "$grape_variety", "count": {"$sum": "$inventory.quantity"}}},
         {"$sort": {"count": -1}},
     ]

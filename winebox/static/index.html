@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="/static/logos/favicon.png">
     <link rel="apple-touch-icon" href="/static/logos/favicon.png">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.5.85">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.5.86">
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
 </head>
@@ -25,9 +25,10 @@
             </div>
             <nav id="main-nav">
                 <a href="#" data-page="dashboard" class="nav-link active" aria-current="page">Dashboard</a>
-                <a href="#" data-page="import" class="nav-link">Import</a>
-                <a href="#" data-page="checkin" class="nav-link">Check In</a>
-                <a href="#" data-page="cellar" class="nav-link">Cellar</a>
+                <a href="#" data-page="checkin" class="nav-link">Record Wine</a>
+                <a href="#" data-page="add-to-cellar" class="nav-link">Add to Cellar</a>
+                <a href="#" data-page="cellar" class="nav-link">My Cellar</a>
+                <a href="#" data-page="met" class="nav-link">Wines I've Met</a>
                 <a href="#" data-page="history" class="nav-link">History</a>
                 <a href="#" data-page="search" class="nav-link">Search</a>
                 <a href="#" data-page="xwines" class="nav-link">X-Wines</a>
@@ -223,6 +224,10 @@
                     <div class="stat-value" id="stat-total-tracked">-</div>
                     <div class="stat-label">Wines Tracked</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-wines-met">-</div>
+                    <div class="stat-label">Wines I've Met</div>
+                </div>
             </div>
 
             <div class="dashboard-sections">
@@ -246,7 +251,8 @@
 
         <!-- Check In Page -->
         <section id="page-checkin" class="page" aria-labelledby="page-checkin-title">
-            <h2 id="page-checkin-title">Check In Wine</h2>
+            <h2 id="page-checkin-title">Record Wine</h2>
+            <p class="page-subtitle">Scan a label to record a wine you've encountered</p>
             <form id="checkin-form" enctype="multipart/form-data">
                 <div class="form-section">
                     <h3>Label Images</h3>
@@ -306,10 +312,7 @@
                             <label for="alcohol">Alcohol %</label>
                             <input type="number" id="alcohol" name="alcohol_percentage" min="0" max="100" step="0.1" placeholder="Auto-detected">
                         </div>
-                        <div class="form-group">
-                            <label for="quantity">Quantity (Bottles)</label>
-                            <input type="number" id="quantity" name="quantity" min="1" value="1" required>
-                        </div>
+                        <!-- Quantity removed: Record Wine creates met entries with no quantity -->
                         <div class="form-group">
                             <label for="wine-type">Wine Type</label>
                             <select id="wine-type" name="wine_type_id">
@@ -389,7 +392,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Check In Wine</button>
+                    <button type="submit" class="btn btn-primary">Record Wine</button>
                     <button type="reset" class="btn btn-secondary">Clear Form</button>
                 </div>
             </form>
@@ -423,6 +426,149 @@
                 </div>
             </div>
             <div id="cellar-list" class="wine-grid"></div>
+        </section>
+
+        <!-- Wines I've Met Page -->
+        <section id="page-met" class="page" aria-labelledby="page-met-title">
+            <h2 id="page-met-title">Wines I've Met</h2>
+            <p class="page-subtitle">Wines you've encountered in shops, restaurants, and tastings</p>
+            <div class="filter-bar">
+                <input type="text" id="met-search" placeholder="Search wines I've met...">
+                <div class="view-toggle">
+                    <button id="met-view-cards" class="active" title="Card view">Cards</button>
+                    <button id="met-view-table" title="Table view">Table</button>
+                </div>
+            </div>
+            <div id="met-list" class="wine-grid"></div>
+        </section>
+
+        <!-- Add to Cellar Wizard Page -->
+        <section id="page-add-to-cellar" class="page" aria-labelledby="page-add-to-cellar-title">
+            <h2 id="page-add-to-cellar-title">Add Wine to Your Cellar</h2>
+            <p class="page-subtitle">Choose how you'd like to add a wine</p>
+
+            <div class="entry-path-cards" id="entry-path-cards">
+                <div class="entry-path-card" data-path="manual">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </div>
+                    <h3>Enter Details Manually</h3>
+                    <p>Type in the wine details and quantity</p>
+                </div>
+                <div class="entry-path-card" data-path="from-met">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                    </div>
+                    <h3>From a Wine I've Met</h3>
+                    <p>Add a wine you previously recorded</p>
+                </div>
+                <div class="entry-path-card" data-path="import">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <h3>Import from File</h3>
+                    <p>Upload a CSV or Excel spreadsheet</p>
+                </div>
+            </div>
+
+            <!-- Manual Entry Sub-wizard -->
+            <div id="add-cellar-manual" class="add-cellar-subwizard" style="display:none;">
+                <h3>Enter Wine Details</h3>
+                <form id="manual-cellar-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="manual-wine-name">Wine Name</label>
+                            <input type="text" id="manual-wine-name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-winery">Winery</label>
+                            <input type="text" id="manual-winery" name="winery">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-vintage">Vintage</label>
+                            <input type="number" id="manual-vintage" name="vintage" min="1900" max="2100">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-grape-variety">Grape Variety</label>
+                            <input type="text" id="manual-grape-variety" name="grape_variety">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-region">Region</label>
+                            <input type="text" id="manual-region" name="region">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-country">Country</label>
+                            <input type="text" id="manual-country" name="country">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-wine-type">Wine Type</label>
+                            <select id="manual-wine-type" name="wine_type_id">
+                                <option value="">Unknown</option>
+                                <option value="red">Red</option>
+                                <option value="white">White</option>
+                                <option value="ros&eacute;">Ros&eacute;</option>
+                                <option value="sparkling">Sparkling</option>
+                                <option value="fortified">Fortified</option>
+                                <option value="dessert">Dessert</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-quantity">Quantity (Bottles)</label>
+                            <input type="number" id="manual-quantity" name="quantity" min="1" value="1" required>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Add to Cellar</button>
+                        <button type="button" class="btn btn-secondary" id="manual-back-btn">Back</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- From Met Wine Sub-wizard -->
+            <div id="add-cellar-from-met" class="add-cellar-subwizard" style="display:none;">
+                <h3>Select a Wine You've Met</h3>
+                <input type="text" id="met-picker-search" placeholder="Search your met wines..." class="met-picker-search">
+                <div id="met-picker-list" class="met-picker-list"></div>
+                <div id="met-picker-selected" class="met-picker-selected" style="display:none;">
+                    <h4 id="met-picker-wine-name"></h4>
+                    <p id="met-picker-wine-details"></p>
+                    <div class="quantity-selector">
+                        <label>How many bottles?</label>
+                        <div class="quantity-presets">
+                            <button type="button" class="qty-preset" data-qty="1">1 bottle</button>
+                            <button type="button" class="qty-preset" data-qty="6">6 (half case)</button>
+                            <button type="button" class="qty-preset" data-qty="12">12 (case)</button>
+                        </div>
+                        <input type="number" id="met-picker-quantity" min="1" value="1">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="met-add-to-cellar-btn">Add to Cellar</button>
+                        <button type="button" class="btn btn-secondary" id="met-picker-back-btn">Back</button>
+                    </div>
+                </div>
+                <div class="form-actions" id="met-picker-back-container">
+                    <button type="button" class="btn btn-secondary" id="from-met-back-btn">Back</button>
+                </div>
+            </div>
+
+            <!-- Import Sub-wizard (content loaded from import page logic) -->
+            <div id="add-cellar-import" class="add-cellar-subwizard" style="display:none;">
+                <div id="import-wizard-inline">
+                    <p>Go to the <a href="#" onclick="navigateTo('import'); return false;">Import page</a> to upload a spreadsheet.</p>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="import-back-btn">Back</button>
+                </div>
+            </div>
         </section>
 
         <!-- Wine Detail Modal -->
@@ -832,10 +978,7 @@
                                 <label for="confirm-alcohol">Alcohol %</label>
                                 <input type="number" id="confirm-alcohol" min="0" max="100" step="0.1">
                             </div>
-                            <div class="form-group">
-                                <label for="confirm-quantity">Quantity</label>
-                                <input type="number" id="confirm-quantity" min="1" value="1" required>
-                            </div>
+                            <!-- Quantity removed from confirmation: met wines have no quantity -->
                             <div class="form-group">
                                 <label for="confirm-wine-type">Wine Type</label>
                                 <select id="confirm-wine-type">
@@ -904,7 +1047,7 @@
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-primary" id="checkin-confirm-btn">Confirm</button>
+                    <button type="button" class="btn btn-primary" id="checkin-confirm-btn">Save</button>
                     <button type="button" class="btn btn-secondary" id="checkin-cancel-btn">Cancel</button>
                 </div>
             </div>
@@ -969,6 +1112,6 @@
     <div id="toast-container"></div>
 
     <script src="/static/js/papaparse.min.js?v=0.5.85"></script>
-    <script src="/static/js/app.js?v=0.5.85"></script>
+    <script src="/static/js/app.js?v=0.5.86"></script>
 </body>
 </html>

@@ -90,3 +90,30 @@ class TestCoreNavigation:
         expect(page.locator(".danger-zone")).to_be_visible()
         expect(page.locator("#delete-collection-btn")).to_be_visible()
 
+    def test_navigate_to_met(self, authenticated_page: Page) -> None:
+        """Test navigating to Wines I've Met page."""
+        page = authenticated_page
+        page.click("a[data-page='met']")
+        expect(page.locator("#page-met")).to_be_visible()
+        expect(page.locator("#met-list")).to_be_visible()
+
+    def test_navigate_to_add_to_cellar(self, authenticated_page: Page) -> None:
+        """Test navigating to Add to Cellar wizard page."""
+        page = authenticated_page
+        page.click("a[data-page='add-to-cellar']")
+        expect(page.locator("#page-add-to-cellar")).to_be_visible()
+        expect(page.locator(".entry-path-cards")).to_be_visible()
+
+    def test_navigate_to_record_wine(self, authenticated_page: Page) -> None:
+        """Test navigating to Record Wine page (renamed from Check In)."""
+        page = authenticated_page
+        page.click("a[data-page='checkin']")
+        expect(page.locator("#page-checkin")).to_be_visible()
+        expect(page.locator("#front-label")).to_be_visible()
+
+    def test_record_wine_nav_text(self, authenticated_page: Page) -> None:
+        """Test that the nav link says 'Record Wine' not 'Check In'."""
+        page = authenticated_page
+        nav_link = page.locator("a[data-page='checkin']")
+        expect(nav_link).to_have_text("Record Wine")
+
