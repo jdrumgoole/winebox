@@ -156,3 +156,75 @@ async def test_search_combined_filters(client: AsyncClient, sample_image_bytes: 
     wines = response.json()
     assert len(wines) == 1
     assert wines[0]["name"] == "Wine A"
+
+
+@pytest.mark.asyncio
+async def test_search_by_winery(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Test search by winery name."""
+    files = {
+        "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+    }
+    data = {"name": "Test Wine", "winery": "Opus One Winery", "quantity": "1"}
+    await client.post("/api/wines/checkin", files=files, data=data)
+
+    response = await client.get("/api/search?winery=Opus")
+    assert response.status_code == 200
+    wines = response.json()
+    assert len(wines) == 1
+
+
+@pytest.mark.asyncio
+async def test_search_out_of_stock_filter(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Test search with in_stock=false filter."""
+    # Check in two wines
+    for i in range(2):
+        files = {
+            "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+        }
+        data = {"name": f"Wine {i}", "quantity": "2"}
+        await client.post("/api/wines/checkin", files=files, data=data)
+
+    # Check out all of first wine
+    list_response = await client.get("/api/wines")
+    wine_id = list_response.json()[0]["id"]
+    await client.post(f"/api/wines/{wine_id}/checkout", data={"quantity": "2"})
+
+    # Search for out of stock only
+    response = await client.get("/api/search?in_stock=false")
+    assert response.status_code == 200
+    wines = response.json()
+    assert len(wines) == 1
+    assert wines[0]["inventory"]["quantity"] <= 0
+
+
+@pytest.mark.asyncio
+async def test_search_pagination(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Test search with skip and limit."""
+    for i in range(5):
+        files = {
+            "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+        }
+        data = {"name": f"Wine {i}", "quantity": "1"}
+        await client.post("/api/wines/checkin", files=files, data=data)
+
+    response = await client.get("/api/search?limit=2")
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+    response = await client.get("/api/search?skip=3&limit=10")
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
+@pytest.mark.asyncio
+async def test_search_no_results(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Test search returning no results."""
+    files = {
+        "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+    }
+    data = {"name": "Test Wine", "quantity": "1"}
+    await client.post("/api/wines/checkin", files=files, data=data)
+
+    response = await client.get("/api/search?q=NonexistentWine")
+    assert response.status_code == 200
+    assert len(response.json()) == 0
