@@ -110,8 +110,11 @@ class TestXWinesNavigation:
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
 
-        # Wait for filters to load (they're fetched asynchronously)
-        page.wait_for_timeout(5000)
+        # Wait for filters to load — poll until dropdown has more than the default option
+        page.wait_for_function(
+            "document.querySelectorAll('#xwines-type option').length > 1",
+            timeout=30000,
+        )
 
         # Wine type dropdown should have options beyond the default "All Types"
         type_options = page.locator("#xwines-type option").count()
@@ -226,6 +229,12 @@ class TestXWinesSearch:
         page.wait_for_timeout(5000)  # Wait for filters to load
         page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
+        # Wait for country dropdown to be populated
+        page.wait_for_function(
+            "document.querySelectorAll('#xwines-country option').length > 1",
+            timeout=30000,
+        )
+
         # Get the first real country option (not "All Countries")
         first_country = page.evaluate("""
             (() => {
@@ -236,9 +245,6 @@ class TestXWinesSearch:
                 return null;
             })()
         """)
-
-        if not first_country:
-            pytest.skip("No country options available in dropdown")
 
         # Select the first country
         page.select_option("#xwines-country", index=1)
