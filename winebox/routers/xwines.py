@@ -339,13 +339,17 @@ async def search_wines(
     Uses Atlas Search when available (fuzzy matching, relevance scoring, facets).
     Falls back to regex search on local MongoDB instances.
     """
-    # Try Atlas Search first
+    # Try Atlas Search first — fall back to regex if it fails or returns
+    # empty (Atlas Search silently returns 0 results when no search index
+    # exists for the database, rather than raising an exception).
     try:
         docs, total, facets = await _atlas_search(q, limit, wine_type, country, skip)
-        results = [_wine_doc_to_result(doc) for doc in docs]
-        return XWinesSearchResponse(
-            results=results, total=total, skip=skip, limit=limit, facets=facets
-        )
+        if total > 0:
+            results = [_wine_doc_to_result(doc) for doc in docs]
+            return XWinesSearchResponse(
+                results=results, total=total, skip=skip, limit=limit, facets=facets
+            )
+        logger.debug("Atlas Search returned 0 results, falling back to regex")
     except Exception as e:
         logger.debug("Atlas Search unavailable, falling back to regex: %s", e)
 
