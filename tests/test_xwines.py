@@ -10,8 +10,9 @@ from winebox.models import XWinesMetadata, XWinesWine
 
 @pytest.mark.asyncio
 async def test_xwines_search_empty(client: AsyncClient) -> None:
-    """Test search with no X-Wines data."""
-    response = await client.get("/api/xwines/search?q=merlot")
+    """Test search with a term that matches no X-Wines data."""
+    # Use a unique nonsense term to avoid false matches from parallel tests
+    response = await client.get("/api/xwines/search?q=zzzyyyxxx_nonexistent_42")
     assert response.status_code == 200
     data = response.json()
     assert data["results"] == []

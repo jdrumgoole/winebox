@@ -235,6 +235,11 @@ class TestPurgeData:
         """Test counting wine data."""
         from winebox.cli.purge_data import count_wine_data
 
+        # Record baseline counts before creating test data
+        baseline = await count_wine_data(skip_db_init=True)
+        baseline_wines = baseline["wines"]
+        baseline_transactions = baseline["transactions"]
+
         # Create some wines and transactions
         wine = Wine(
             owner_id=TEST_OWNER_ID,
@@ -256,8 +261,8 @@ class TestPurgeData:
 
         counts = await count_wine_data(skip_db_init=True)
 
-        assert counts["wines"] == 1
-        assert counts["transactions"] == 1
+        assert counts["wines"] == baseline_wines + 1
+        assert counts["transactions"] == baseline_transactions + 1
 
     @pytest.mark.asyncio
     async def test_count_all_data(self, init_test_db):

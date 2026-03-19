@@ -42,7 +42,6 @@ class XWinesWine(Document):
     class Settings:
         name = "xwines_wines"
         indexes = [
-            "xwines_id",
             "name",
             "wine_type",
             "country_code",
