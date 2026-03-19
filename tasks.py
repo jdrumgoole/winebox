@@ -279,7 +279,7 @@ def test_e2e_db(
 
     # Build env for the server subprocess — inherit current env + overrides
     server_env = os.environ.copy()
-    server_env["WINEBOX_MONGODB_DATABASE"] = e2e_db
+    server_env["WINEBOX_DATABASE"] = e2e_db
     server_env["WINEBOX_USE_CLAUDE_VISION"] = "false"
     server_env["WINEBOX_SECRET_KEY"] = e2e_secret
 
@@ -339,7 +339,7 @@ def test_e2e_db(
 
     test_cmd = (
         f"WINEBOX_TEST_URL={server_url} "
-        f"WINEBOX_MONGODB_DATABASE={e2e_db} "
+        f"WINEBOX_DATABASE={e2e_db} "
         f"WINEBOX_SECRET_KEY={e2e_secret} "
         f"WINEBOX_USE_CLAUDE_VISION=false "
         f'uv run python -m pytest {test_files} -n {workers} --override-ini="addopts="'
@@ -406,7 +406,7 @@ def _ensure_xwines_data(ctx: Context, db_name: str) -> None:
     import_script = Path("data/_import_xwines.py")
     import_script.write_text(
         "import os\n"
-        "os.environ.setdefault('WINEBOX_MONGODB_DATABASE', '" + db_name + "')\n"
+        "os.environ.setdefault('WINEBOX_DATABASE', '" + db_name + "')\n"
         "# Patch the import script to use the correct database\n"
         "import deploy.import_xwines_mongo as importer\n"
         "# Override get_mongodb_url to ensure it reads our env\n"
@@ -1465,7 +1465,7 @@ def test_e2e_oat(
     test_cmd = (
         f"WINEBOX_TEST_URL={oat_url} "
         f"WINEBOX_MONGODB_URL='{mongodb_url}' "
-        f"WINEBOX_MONGODB_DATABASE={OAT_DATABASE} "
+        f"WINEBOX_DATABASE={OAT_DATABASE} "
         f"WINEBOX_SECRET_KEY={secret_key} "
         f"WINEBOX_USE_CLAUDE_VISION=false "
         f'uv run python -m pytest {test_files} -n {workers} --override-ini="addopts="'

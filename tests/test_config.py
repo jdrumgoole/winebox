@@ -282,7 +282,7 @@ class TestEnvOverrides:
             os.environ,
             {
                 "WINEBOX_MONGODB_URL": "mongodb://custom:27017",
-                "WINEBOX_MONGODB_DATABASE": "custom_db",
+                "WINEBOX_DATABASE": "custom_db",
             },
         ):
             apply_env_overrides(config_dict)

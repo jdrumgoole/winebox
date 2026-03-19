@@ -143,7 +143,7 @@ def apply_env_overrides(config_dict: dict[str, Any], prefix: str = "WINEBOX") ->
 
     Environment variables are mapped as follows:
     - WINEBOX_SERVER_HOST -> config_dict["server"]["host"]
-    - WINEBOX_DATABASE_MONGODB_URL -> config_dict["database"]["mongodb_url"]
+    - WINEBOX_DATABASE -> config_dict["database"]["mongodb_database"]
     - etc.
 
     Note: This modifies config_dict in place.
@@ -160,9 +160,8 @@ def apply_env_overrides(config_dict: dict[str, Any], prefix: str = "WINEBOX") ->
         f"{prefix}_PORT": ("server", "port"),  # Shorthand
         # Database
         f"{prefix}_DATABASE_MONGODB_URL": ("database", "mongodb_url"),
-        f"{prefix}_DATABASE_MONGODB_DATABASE": ("database", "mongodb_database"),
         f"{prefix}_MONGODB_URL": ("database", "mongodb_url"),  # Shorthand
-        f"{prefix}_MONGODB_DATABASE": ("database", "mongodb_database"),  # Shorthand
+        f"{prefix}_DATABASE": ("database", "mongodb_database"),  # e.g. WINEBOX_DATABASE=winebox-oat
         # Storage
         f"{prefix}_STORAGE_DATA_DIR": ("storage", "data_dir"),
         f"{prefix}_STORAGE_LOG_DIR": ("storage", "log_dir"),

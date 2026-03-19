@@ -82,7 +82,7 @@ def create_cli_worker_user(
             created = True
             print(
                 f"User {email}: {'reused' if 'already' in combined else 'created'} "
-                f"(db={os.environ.get('WINEBOX_MONGODB_DATABASE', 'default')})",
+                f"(db={os.environ.get('WINEBOX_DATABASE', 'default')})",
                 file=sys.stderr,
             )
             break
@@ -96,7 +96,7 @@ def create_cli_worker_user(
             print(f"  returncode: {result.returncode}", file=sys.stderr)
             print(f"  stdout: {result.stdout}", file=sys.stderr)
             print(f"  stderr: {result.stderr}", file=sys.stderr)
-        print(f"  WINEBOX_MONGODB_DATABASE={os.environ.get('WINEBOX_MONGODB_DATABASE', 'NOT SET')}", file=sys.stderr)
+        print(f"  WINEBOX_DATABASE={os.environ.get('WINEBOX_DATABASE', 'NOT SET')}", file=sys.stderr)
 
     # Delay to allow Atlas replica propagation before login attempts.
     time.sleep(2.0)

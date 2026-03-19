@@ -172,7 +172,7 @@ WINEBOX_{SECTION}_{KEY}
 | `server.port` | `WINEBOX_PORT` or `WINEBOX_SERVER_PORT` |
 | `server.debug` | `WINEBOX_DEBUG` |
 | `database.mongodb_url` | `WINEBOX_MONGODB_URL` |
-| `database.mongodb_database` | `WINEBOX_MONGODB_DATABASE` |
+| `database.mongodb_database` | `WINEBOX_DATABASE` |
 | `ocr.use_claude_vision` | `WINEBOX_USE_CLAUDE_VISION` |
 | `auth.registration_enabled` | `WINEBOX_REGISTRATION_ENABLED` |
 | `email.backend` | `WINEBOX_EMAIL_BACKEND` |

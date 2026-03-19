@@ -13,7 +13,7 @@ Usage:
 
 Environment variables:
     WINEBOX_MONGODB_URL: MongoDB connection URL (default: mongodb://localhost:27017)
-    WINEBOX_MONGODB_DATABASE: MongoDB database name (default: winebox)
+    WINEBOX_DATABASE: MongoDB database name (default: winebox)
     WINEBOX_SQLITE_PATH: Path to SQLite database (default: data/winebox.db)
 """
 
@@ -210,7 +210,7 @@ async def migrate():
     # Configuration
     sqlite_path = os.environ.get("WINEBOX_SQLITE_PATH", "data/winebox.db")
     mongodb_url = os.environ.get("WINEBOX_MONGODB_URL", "mongodb://localhost:27017")
-    mongodb_database = os.environ.get("WINEBOX_MONGODB_DATABASE", "winebox")
+    mongodb_database = os.environ.get("WINEBOX_DATABASE", "winebox")
 
     print(f"SQLite path: {sqlite_path}")
     print(f"MongoDB URL: {mongodb_url}")
@@ -576,7 +576,7 @@ def main():
     if args.mongodb_url:
         os.environ["WINEBOX_MONGODB_URL"] = args.mongodb_url
     if args.mongodb_database:
-        os.environ["WINEBOX_MONGODB_DATABASE"] = args.mongodb_database
+        os.environ["WINEBOX_DATABASE"] = args.mongodb_database
 
     asyncio.run(migrate())
 

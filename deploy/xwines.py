@@ -79,7 +79,7 @@ def deploy_xwines(
         _upload_import_script(host, user)
 
     # Build env prefix for database override
-    env_prefix = f"WINEBOX_MONGODB_DATABASE={database} " if database else ""
+    env_prefix = f"WINEBOX_DATABASE={database} " if database else ""
     import_cmd = (
         f"sudo -u winebox {env_prefix}/opt/winebox/.venv/bin/python "
         f"{REMOTE_IMPORT_SCRIPT} --version {version} --force"

@@ -238,7 +238,7 @@ def import_to_mongodb(
     masked_url = mongo_url[:30] + "..." if len(mongo_url) > 30 else mongo_url
     print(f"Connecting to MongoDB: {masked_url}")
 
-    db_name = os.environ.get("WINEBOX_MONGODB_DATABASE", "winebox")
+    db_name = os.environ.get("WINEBOX_DATABASE", "winebox")
     client: MongoClient = MongoClient(mongo_url)
     db = client[db_name]
     print(f"Database: {db_name}")
