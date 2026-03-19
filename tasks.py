@@ -784,6 +784,119 @@ def deploy_setup(ctx: Context, host: str = "", domain: str = "booze.winebox.app"
     ctx.run(cmd, pty=True)
 
 
+def _release_to_pypi(
+    ctx: Context,
+    version: str = "",
+    minor: bool = False,
+    major: bool = False,
+    skip_tests: bool = False,
+    dry_run: bool = False,
+) -> str:
+    """Run the release pipeline: tests, version bump, PyPI publish.
+
+    Shared by deploy (production) and deploy-oat --release.
+    Returns the new version string.
+    """
+    # Pre-flight: Auto-commit any uncommitted changes so they are included
+    # in the PyPI package. Excludes uv.lock (committed with version bump)
+    # and .claude/ (not tracked).
+    dirty = ctx.run(
+        "git diff --name-only HEAD -- . ':!uv.lock'",
+        hide=True, warn=True,
+    ).stdout.strip()
+    untracked = ctx.run(
+        "git ls-files --others --exclude-standard -- . ':!uv.lock' ':!.claude/'",
+        hide=True, warn=True,
+    ).stdout.strip()
+    if dirty or untracked:
+        changed_files = [f for f in (dirty + "\n" + untracked).strip().splitlines() if f]
+        print("\n  Uncommitted changes detected:")
+        for f in changed_files:
+            print(f"    {f}")
+        if dry_run:
+            print("  DRY RUN - Would commit these files before deploying")
+        else:
+            # Stage all changed/untracked files (excluding .claude/)
+            for f in changed_files:
+                ctx.run(f"git add {f}", hide=True)
+            ctx.run(
+                'git commit -m "chore: Pre-deploy commit of pending changes"',
+                pty=True,
+            )
+            print("  Committed pending changes.")
+
+    # Step 1: Run tests
+    if not skip_tests:
+        print("\n[1/6] Running test suite...")
+        if dry_run:
+            print("  DRY RUN - Would run: uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py -v")
+        else:
+            ctx.run(
+                "WINEBOX_USE_CLAUDE_VISION=false uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py -v",
+                pty=True,
+            )
+            print("  Tests passed!")
+    else:
+        print("\n[1/6] Skipping tests (--skip-tests)")
+
+    # Step 2: Determine new version
+    print("\n[2/6] Determining version...")
+    current_version = _get_current_version()
+    if version:
+        new_version = version
+        print(f"  Using explicit version: {current_version} -> {new_version}")
+    else:
+        new_version = _bump_version(current_version, major=major, minor=minor)
+        bump_type = "major" if major else ("minor" if minor else "patch")
+        print(f"  Auto-bump ({bump_type}): {current_version} -> {new_version}")
+
+    # Step 3: Bump version in files
+    print("\n[3/6] Updating version files...")
+    if dry_run:
+        print(f"  DRY RUN - Would update pyproject.toml and winebox/__init__.py to {new_version}")
+    else:
+        _update_version_files(new_version)
+        print(f"  Updated pyproject.toml and winebox/__init__.py to {new_version}")
+
+    # Step 4: Commit, tag, push
+    print("\n[4/6] Committing, tagging, and pushing...")
+    if dry_run:
+        print(f"  DRY RUN - Would commit, tag v{new_version}, and push")
+    else:
+        ctx.run(
+            f"git add pyproject.toml winebox/__init__.py winebox/static/index.html winebox/static/landing.html && "
+            f'git commit -m "chore: Bump version to {new_version}"',
+            pty=True,
+        )
+        ctx.run(f'git tag -a v{new_version} -m "Release v{new_version}"', pty=True)
+        ctx.run("git push && git push --tags", pty=True)
+        print(f"  Pushed tag v{new_version}")
+
+    # Step 5: Create GitHub release
+    print("\n[5/6] Creating GitHub release...")
+    if dry_run:
+        print(f"  DRY RUN - Would create GitHub release v{new_version}")
+    else:
+        ctx.run(
+            f'gh release create v{new_version} --title "v{new_version}" --generate-notes',
+            pty=True,
+        )
+        print(f"  GitHub release v{new_version} created")
+
+    # Step 6: Wait for PyPI
+    print("\n[6/6] Waiting for PyPI availability...")
+    if dry_run:
+        print(f"  DRY RUN - Would poll PyPI for winebox=={new_version}")
+    else:
+        if not _wait_for_pypi(new_version):
+            print(f"  ERROR: Timed out waiting for v{new_version} on PyPI")
+            print("  The GitHub release was created. PyPI publish may still be in progress.")
+            print(f"  You can deploy manually later with: invoke deploy-only --version {new_version}")
+            sys.exit(1)
+
+    return new_version
+
+
 @task
 def deploy(
     ctx: Context,
@@ -823,104 +936,16 @@ def deploy(
     print("WineBox Release & Deploy Pipeline")
     print("=" * 60)
 
-    # Pre-flight: Auto-commit any uncommitted changes so they are included
-    # in the PyPI package. Excludes uv.lock (committed with version bump)
-    # and .claude/ (not tracked).
-    dirty = ctx.run(
-        "git diff --name-only HEAD -- . ':!uv.lock'",
-        hide=True, warn=True,
-    ).stdout.strip()
-    untracked = ctx.run(
-        "git ls-files --others --exclude-standard -- . ':!uv.lock' ':!.claude/'",
-        hide=True, warn=True,
-    ).stdout.strip()
-    if dirty or untracked:
-        changed_files = [f for f in (dirty + "\n" + untracked).strip().splitlines() if f]
-        print("\n  Uncommitted changes detected:")
-        for f in changed_files:
-            print(f"    {f}")
-        if dry_run:
-            print("  DRY RUN - Would commit these files before deploying")
-        else:
-            # Stage all changed/untracked files (excluding .claude/)
-            for f in changed_files:
-                ctx.run(f"git add {f}", hide=True)
-            ctx.run(
-                'git commit -m "chore: Pre-deploy commit of pending changes"',
-                pty=True,
-            )
-            print("  Committed pending changes.")
+    new_version = _release_to_pypi(
+        ctx,
+        version=version,
+        minor=minor,
+        major=major,
+        skip_tests=skip_tests,
+        dry_run=dry_run,
+    )
 
-    # Step 1: Run tests
-    if not skip_tests:
-        print("\n[1/7] Running test suite...")
-        if dry_run:
-            print("  DRY RUN - Would run: uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py -v")
-        else:
-            ctx.run(
-                "WINEBOX_USE_CLAUDE_VISION=false uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py -v",
-                pty=True,
-            )
-            print("  Tests passed!")
-    else:
-        print("\n[1/7] Skipping tests (--skip-tests)")
-
-    # Step 2: Determine new version
-    print("\n[2/7] Determining version...")
-    current_version = _get_current_version()
-    if version:
-        new_version = version
-        print(f"  Using explicit version: {current_version} -> {new_version}")
-    else:
-        new_version = _bump_version(current_version, major=major, minor=minor)
-        bump_type = "major" if major else ("minor" if minor else "patch")
-        print(f"  Auto-bump ({bump_type}): {current_version} -> {new_version}")
-
-    # Step 3: Bump version in files
-    print("\n[3/7] Updating version files...")
-    if dry_run:
-        print(f"  DRY RUN - Would update pyproject.toml and winebox/__init__.py to {new_version}")
-    else:
-        _update_version_files(new_version)
-        print(f"  Updated pyproject.toml and winebox/__init__.py to {new_version}")
-
-    # Step 4: Commit, tag, push
-    print("\n[4/7] Committing, tagging, and pushing...")
-    if dry_run:
-        print(f"  DRY RUN - Would commit, tag v{new_version}, and push")
-    else:
-        ctx.run(
-            f"git add pyproject.toml winebox/__init__.py winebox/static/index.html winebox/static/landing.html && "
-            f'git commit -m "chore: Bump version to {new_version}"',
-            pty=True,
-        )
-        ctx.run(f'git tag -a v{new_version} -m "Release v{new_version}"', pty=True)
-        ctx.run("git push && git push --tags", pty=True)
-        print(f"  Pushed tag v{new_version}")
-
-    # Step 5: Create GitHub release
-    print("\n[5/7] Creating GitHub release...")
-    if dry_run:
-        print(f"  DRY RUN - Would create GitHub release v{new_version}")
-    else:
-        ctx.run(
-            f'gh release create v{new_version} --title "v{new_version}" --generate-notes',
-            pty=True,
-        )
-        print(f"  GitHub release v{new_version} created")
-
-    # Step 6: Wait for PyPI
-    print("\n[6/7] Waiting for PyPI availability...")
-    if dry_run:
-        print(f"  DRY RUN - Would poll PyPI for winebox=={new_version}")
-    else:
-        if not _wait_for_pypi(new_version):
-            print(f"  ERROR: Timed out waiting for v{new_version} on PyPI")
-            print("  The GitHub release was created. PyPI publish may still be in progress.")
-            print("  You can deploy manually later with: invoke deploy-only --version {new_version}")
-            sys.exit(1)
-
-    # Step 7: Deploy to server
+    # Deploy to server
     print("\n[7/7] Deploying to production server...")
     deploy_cmd = f"uv run python -m deploy.app --version {new_version}"
     if host:
@@ -1270,11 +1295,19 @@ def deploy_oat(
     version: str = "",
     no_secrets: bool = False,
     dry_run: bool = False,
+    release: bool = False,
+    minor: bool = False,
+    major: bool = False,
+    skip_tests: bool = False,
 ) -> None:
     """Deploy WineBox to the OAT (pre-release testing) server.
 
     Uses the same deployment pipeline as production but targets the OAT
     droplet with its own domain and database.
+
+    With --release: runs the full release pipeline (tests, version bump,
+    PyPI publish) before deploying to OAT. Without --release, deploys
+    the specified or latest version already on PyPI.
 
     Args:
         ctx: Invoke context
@@ -1282,9 +1315,26 @@ def deploy_oat(
         version: Package version to install (default: latest)
         no_secrets: Skip syncing secrets
         dry_run: Preview changes
+        release: Run version bump + PyPI publish before deploying
+        minor: Bump minor version (requires --release)
+        major: Bump major version (requires --release)
+        skip_tests: Skip test suite (requires --release)
     """
+    if release:
+        print("=" * 60)
+        print("WineBox OAT Release & Deploy Pipeline")
+        print("=" * 60)
+        version = _release_to_pypi(
+            ctx,
+            version=version,
+            minor=minor,
+            major=major,
+            skip_tests=skip_tests,
+            dry_run=dry_run,
+        )
+
     oat_host = _resolve_oat_host(ctx, host or None)
-    print(f"Deploying to OAT: {oat_host} ({OAT_DOMAIN})")
+    print(f"\nDeploying to OAT: {oat_host} ({OAT_DOMAIN})")
 
     cmd = (
         f"uv run python -m deploy.app "

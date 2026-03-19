@@ -84,12 +84,13 @@ There are two deployment environments:
 - **URL:** https://oat.winebox.app
 - **Database:** `winebox-oat` (isolated from production)
 - **Droplet:** `winebox-oat` (46.101.134.8, 1 worker due to small memory)
-- **When the user says "make an OAT release"** or "deploy to OAT": run `invoke deploy-oat`
+- **When the user says "make an OAT release"** or "deploy to OAT": run `invoke deploy-oat --release`
 
 Deploy to OAT:
 
-    invoke deploy-oat                        # Latest version from PyPI
-    invoke deploy-oat --version 0.6.0        # Specific version
+    invoke deploy-oat --release              # Bump version, publish to PyPI, deploy to OAT
+    invoke deploy-oat                        # Latest version already on PyPI
+    invoke deploy-oat --version 0.6.0        # Specific version already on PyPI
 
 OAT management tasks:
 - `invoke oat-setup` — Initial droplet setup
