@@ -53,8 +53,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
+    gap: 0.75rem;
 }
 
 .header-logo {
@@ -66,6 +65,7 @@ header {
     display: flex;
     flex-direction: column;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .beta-badge {
@@ -82,17 +82,26 @@ header {
 
 nav {
     display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    gap: 0.25rem;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+nav::-webkit-scrollbar {
+    display: none;
 }
 
 .nav-link {
     color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 0.5rem;
     border-radius: var(--radius);
     transition: all 0.2s ease;
     font-weight: 500;
+    white-space: nowrap;
+    font-size: 0.875rem;
 }
 
 .nav-link:hover {
@@ -166,6 +175,14 @@ h3 {
     font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.stat-hint {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    font-style: italic;
+    opacity: 0.7;
 }
 
 /* Dashboard Sections */
@@ -406,6 +423,47 @@ h3 {
     margin-top: 1.5rem;
 }
 
+/* Advanced fields collapsible section */
+details.advanced-fields {
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.5rem;
+}
+
+details.advanced-fields summary {
+    cursor: pointer;
+    color: var(--primary-color);
+    font-weight: 500;
+    font-size: 0.95rem;
+    padding: 0.5rem 0;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+details.advanced-fields summary::-webkit-details-marker {
+    display: none;
+}
+
+details.advanced-fields summary::before {
+    content: '▸';
+    font-size: 0.85rem;
+    transition: transform 0.2s ease;
+}
+
+details.advanced-fields[open] summary::before {
+    transform: rotate(90deg);
+}
+
+details.advanced-fields summary:hover {
+    color: var(--primary-dark);
+}
+
+details.advanced-fields .form-grid {
+    margin-top: 0.75rem;
+}
+
 .btn {
     display: inline-flex;
     align-items: center;
@@ -452,6 +510,17 @@ h3 {
 
 .btn-danger:hover {
     background: #8b3235;
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-outline:hover {
+    background: var(--primary-color);
+    color: white;
 }
 
 /* Filter Bar */
@@ -1023,6 +1092,38 @@ h3 {
     margin-bottom: 0.5rem;
 }
 
+/* Hamburger button - hidden on desktop */
+.hamburger-btn {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hamburger-btn span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: white;
+    border-radius: 1px;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.hamburger-btn[aria-expanded="true"] span:nth-child(1) {
+    transform: rotate(45deg) translate(4px, 4px);
+}
+
+.hamburger-btn[aria-expanded="true"] span:nth-child(2) {
+    opacity: 0;
+}
+
+.hamburger-btn[aria-expanded="true"] span:nth-child(3) {
+    transform: rotate(-45deg) translate(4px, -4px);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     header {
@@ -1030,25 +1131,47 @@ h3 {
     }
 
     .header-content {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .hamburger-btn {
+        display: flex;
+        order: 2;
+    }
+
+    .logo-wrapper {
+        order: 1;
+    }
+
+    #user-info {
+        order: 3;
+        width: auto;
     }
 
     nav {
         width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+        order: 4;
+        display: none;
+        flex-direction: column;
+        padding-top: 0.5rem;
     }
 
-    nav::-webkit-scrollbar {
-        display: none;
+    nav.nav-open {
+        display: flex;
     }
 
     .nav-link {
-        padding: 0.5rem 0.75rem;
-        font-size: 0.9rem;
+        padding: 0.6rem 0.75rem;
+        font-size: 0.95rem;
         white-space: nowrap;
+        border-radius: var(--radius);
+    }
+
+    .nav-link:hover {
+        background: rgba(255, 255, 255, 0.1);
     }
 
     main {
@@ -1364,9 +1487,11 @@ h3 {
 .user-info {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.5rem;
     color: rgba(255, 255, 255, 0.9);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .user-info #username-display {
@@ -1379,6 +1504,9 @@ h3 {
     padding: 0.4rem 0.75rem;
     border-radius: var(--radius);
     transition: all 0.2s ease;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .user-info .username-link:hover {
@@ -1396,6 +1524,26 @@ h3 {
 
 .user-info .btn:hover {
     background: rgba(255, 255, 255, 0.3);
+}
+
+.settings-icon-link {
+    color: rgba(255, 255, 255, 0.7);
+    padding: 0.3rem;
+    border-radius: var(--radius);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.settings-icon-link:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.user-info .username-link.active,
+.settings-icon-link.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
 }
 
 /* Settings Page */

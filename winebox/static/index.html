@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#8B1A4A">
@@ -23,19 +23,28 @@
                 <img src="/static/logos/logo-compact-dark.svg" alt="WineBox" class="header-logo" height="32">
                 <span class="beta-badge">BETA</span>
             </div>
+            <button id="hamburger-btn" class="hamburger-btn" aria-label="Menu" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
             <nav id="main-nav">
                 <a href="#" data-page="dashboard" class="nav-link active" aria-current="page">Dashboard</a>
-                <a href="#" data-page="checkin" class="nav-link">Record Wine</a>
+                <a href="#" data-page="checkin" class="nav-link">Add Wine</a>
                 <a href="#" data-page="add-to-cellar" class="nav-link">Add to Cellar</a>
                 <a href="#" data-page="cellar" class="nav-link">My Cellar</a>
                 <a href="#" data-page="met" class="nav-link">Wines I've Met</a>
                 <a href="#" data-page="history" class="nav-link">History</a>
                 <a href="#" data-page="search" class="nav-link">Search</a>
-                <a href="#" data-page="xwines" class="nav-link">X-Wines</a>
+                <a href="#" data-page="xwines" class="nav-link">Wine Reference</a>
             </nav>
             <div id="user-info" class="user-info" style="display: none;">
                 <a href="/admin" id="admin-link" class="nav-link" style="display: none;">Admin</a>
-                <a href="#" id="username-display" data-page="settings" class="username-link"></a>
+                <a href="#" id="username-display" data-page="settings" class="username-link" title="Settings"></a>
+                <a href="#" data-page="settings" class="settings-icon-link" title="Settings" aria-label="Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </a>
                 <button id="logout-btn" class="btn btn-small btn-secondary">Logout</button>
             </div>
         </div>
@@ -144,8 +153,8 @@
                     <div id="forgot-success" class="login-success" style="display: none;"></div>
                     <button type="submit" class="btn btn-primary btn-full">Send Reset Link</button>
                 </form>
-                <div class="login-links">
-                    <a href="#" id="show-login-from-forgot">Back to sign in</a>
+                <div class="login-links" style="text-align: center;">
+                    <a href="#" id="show-login-from-forgot" class="btn btn-outline btn-full" style="margin-top: 0.5rem;">← Back to sign in</a>
                 </div>
             </div>
 
@@ -215,18 +224,22 @@
                 <div class="stat-card">
                     <div class="stat-value" id="stat-total-bottles">-</div>
                     <div class="stat-label">Total Bottles</div>
+                    <div class="stat-hint">bottles in your cellar</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-unique-wines">-</div>
                     <div class="stat-label">Unique Wines</div>
+                    <div class="stat-hint">different wines</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-total-tracked">-</div>
                     <div class="stat-label">Wines Tracked</div>
+                    <div class="stat-hint">including consumed</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-wines-met">-</div>
                     <div class="stat-label">Wines I've Met</div>
+                    <div class="stat-hint">wines you've tried</div>
                 </div>
             </div>
 
@@ -251,7 +264,7 @@
 
         <!-- Check In Page -->
         <section id="page-checkin" class="page" aria-labelledby="page-checkin-title">
-            <h2 id="page-checkin-title">Record Wine</h2>
+            <h2 id="page-checkin-title">Add Wine</h2>
             <p class="page-subtitle">Scan a label to record a wine you've encountered</p>
             <form id="checkin-form" enctype="multipart/form-data">
                 <div class="form-section">
@@ -282,41 +295,28 @@
                         </div>
                         <div class="form-group">
                             <label for="winery">Winery</label>
-                            <input type="text" id="winery" name="winery" placeholder="Auto-detected from label">
+                            <input type="text" id="winery" name="winery" placeholder="e.g., Chateau Margaux">
                         </div>
                         <div class="form-group">
                             <label for="vintage">Vintage</label>
-                            <input type="number" id="vintage" name="vintage" min="1900" max="2100" placeholder="Auto-detected">
+                            <input type="number" id="vintage" name="vintage" min="1900" max="2100" placeholder="e.g., 2020">
                         </div>
                         <div class="form-group">
                             <label for="grape-variety">Grape Variety</label>
-                            <input type="text" id="grape-variety" name="grape_variety" placeholder="Auto-detected">
+                            <input type="text" id="grape-variety" name="grape_variety" placeholder="e.g., Cabernet Sauvignon">
                         </div>
                         <div class="form-group">
                             <label for="region">Region</label>
-                            <input type="text" id="region" name="region" placeholder="Auto-detected">
-                        </div>
-                        <div class="form-group">
-                            <label for="sub-region">Sub-Region</label>
-                            <input type="text" id="sub-region" name="sub_region" placeholder="e.g., C&ocirc;te de Nuits">
-                        </div>
-                        <div class="form-group">
-                            <label for="appellation">Appellation</label>
-                            <input type="text" id="appellation" name="appellation" placeholder="e.g., Nuits-St-Georges, Pomerol">
+                            <input type="text" id="region" name="region" placeholder="e.g., Bordeaux">
                         </div>
                         <div class="form-group">
                             <label for="country">Country</label>
-                            <input type="text" id="country" name="country" placeholder="Auto-detected">
+                            <input type="text" id="country" name="country" placeholder="e.g., France">
                         </div>
-                        <div class="form-group">
-                            <label for="alcohol">Alcohol %</label>
-                            <input type="number" id="alcohol" name="alcohol_percentage" min="0" max="100" step="0.1" placeholder="Auto-detected">
-                        </div>
-                        <!-- Quantity removed: Record Wine creates met entries with no quantity -->
                         <div class="form-group">
                             <label for="wine-type">Wine Type</label>
                             <select id="wine-type" name="wine_type_id">
-                                <option value="">Auto-detected</option>
+                                <option value="">Select type</option>
                                 <option value="red">Red</option>
                                 <option value="white">White</option>
                                 <option value="rosé">Rosé</option>
@@ -325,40 +325,58 @@
                                 <option value="dessert">Dessert</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="classification">Classification</label>
-                            <input type="text" id="classification" name="classification" placeholder="e.g., Grand Cru, DOCG, Reserve">
-                        </div>
-                        <div class="form-group">
-                            <label for="price-tier">Price Tier</label>
-                            <select id="price-tier" name="price_tier">
-                                <option value="">Unknown</option>
-                                <option value="budget">Budget (&lt; $15)</option>
-                                <option value="value">Value ($15-25)</option>
-                                <option value="mid_range">Mid-Range ($25-50)</option>
-                                <option value="premium">Premium ($50-100)</option>
-                                <option value="luxury">Luxury ($100-250)</option>
-                                <option value="ultra_premium">Ultra Premium (&gt; $250)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="producer-type">Producer Type</label>
-                            <select id="producer-type" name="producer_type">
-                                <option value="">Unknown</option>
-                                <option value="estate">Estate</option>
-                                <option value="negociant">Négociant</option>
-                                <option value="cooperative">Cooperative</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="drink-window-start">Drink Window Start</label>
-                            <input type="number" id="drink-window-start" name="drink_window_start" min="1900" max="2200" placeholder="Year">
-                        </div>
-                        <div class="form-group">
-                            <label for="drink-window-end">Drink Window End</label>
-                            <input type="number" id="drink-window-end" name="drink_window_end" min="1900" max="2200" placeholder="Year">
-                        </div>
                     </div>
+
+                    <details class="advanced-fields">
+                        <summary>More Details</summary>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="sub-region">Sub-Region</label>
+                                <input type="text" id="sub-region" name="sub_region" placeholder="e.g., C&ocirc;te de Nuits">
+                            </div>
+                            <div class="form-group">
+                                <label for="appellation">Appellation</label>
+                                <input type="text" id="appellation" name="appellation" placeholder="e.g., Nuits-St-Georges, Pomerol">
+                            </div>
+                            <div class="form-group">
+                                <label for="alcohol">Alcohol %</label>
+                                <input type="number" id="alcohol" name="alcohol_percentage" min="0" max="100" step="0.1" placeholder="e.g., 13.5">
+                            </div>
+                            <div class="form-group">
+                                <label for="classification">Classification</label>
+                                <input type="text" id="classification" name="classification" placeholder="e.g., Grand Cru, DOCG, Reserve">
+                            </div>
+                            <div class="form-group">
+                                <label for="price-tier">Price Tier</label>
+                                <select id="price-tier" name="price_tier">
+                                    <option value="">Unknown</option>
+                                    <option value="budget">Budget (&lt; $15)</option>
+                                    <option value="value">Value ($15-25)</option>
+                                    <option value="mid_range">Mid-Range ($25-50)</option>
+                                    <option value="premium">Premium ($50-100)</option>
+                                    <option value="luxury">Luxury ($100-250)</option>
+                                    <option value="ultra_premium">Ultra Premium (&gt; $250)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="producer-type">Producer Type</label>
+                                <select id="producer-type" name="producer_type">
+                                    <option value="">Unknown</option>
+                                    <option value="estate">Estate</option>
+                                    <option value="negociant">Négociant</option>
+                                    <option value="cooperative">Cooperative</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="drink-window-start">Drink Window Start</label>
+                                <input type="number" id="drink-window-start" name="drink_window_start" min="1900" max="2200" placeholder="Year">
+                            </div>
+                            <div class="form-group">
+                                <label for="drink-window-end">Drink Window End</label>
+                                <input type="number" id="drink-window-end" name="drink_window_end" min="1900" max="2200" placeholder="Year">
+                            </div>
+                        </div>
+                    </details>
 
                     <div class="form-group full-width">
                         <label>Custom Fields</label>
@@ -392,7 +410,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Record Wine</button>
+                    <button type="submit" class="btn btn-primary">Add Wine</button>
                     <button type="reset" class="btn btn-secondary">Clear Form</button>
                 </div>
             </form>
@@ -775,62 +793,65 @@
         <section id="page-search" class="page" aria-labelledby="page-search-title">
             <h2 id="page-search-title">Search Wines</h2>
             <form id="search-form">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="search-q">Text Search</label>
-                        <input type="text" id="search-q" name="q" placeholder="Search name, winery, region...">
-                    </div>
-                    <div class="form-group">
-                        <label for="search-vintage">Vintage</label>
-                        <input type="number" id="search-vintage" name="vintage" min="1900" max="2100">
-                    </div>
-                    <div class="form-group">
-                        <label for="search-grape">Grape Variety</label>
-                        <input type="text" id="search-grape" name="grape">
-                    </div>
-                    <div class="form-group">
-                        <label for="search-winery">Winery</label>
-                        <input type="text" id="search-winery" name="winery">
-                    </div>
-                    <div class="form-group">
-                        <label for="search-region">Region</label>
-                        <input type="text" id="search-region" name="region">
-                    </div>
-                    <div class="form-group">
-                        <label for="search-country">Country</label>
-                        <input type="text" id="search-country" name="country">
-                    </div>
-                    <div class="form-group">
-                        <label for="search-wine-type">Wine Type</label>
-                        <select id="search-wine-type" name="wine_type">
-                            <option value="">All Types</option>
-                            <option value="red">Red</option>
-                            <option value="white">White</option>
-                            <option value="rosé">Rosé</option>
-                            <option value="sparkling">Sparkling</option>
-                            <option value="fortified">Fortified</option>
-                            <option value="dessert">Dessert</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="search-price-tier">Price Tier</label>
-                        <select id="search-price-tier" name="price_tier">
-                            <option value="">All Tiers</option>
-                            <option value="budget">Budget</option>
-                            <option value="value">Value</option>
-                            <option value="mid_range">Mid-Range</option>
-                            <option value="premium">Premium</option>
-                            <option value="luxury">Luxury</option>
-                            <option value="ultra_premium">Ultra Premium</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="search-in-stock">
-                            <input type="checkbox" id="search-in-stock" name="in_stock">
-                            In Stock Only
-                        </label>
-                    </div>
+                <div class="form-group full-width">
+                    <label for="search-q">Search</label>
+                    <input type="text" id="search-q" name="q" placeholder="Search by name, winery, region, grape...">
                 </div>
+                <details class="advanced-fields">
+                    <summary>Advanced Filters</summary>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="search-vintage">Vintage</label>
+                            <input type="number" id="search-vintage" name="vintage" min="1900" max="2100">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-grape">Grape Variety</label>
+                            <input type="text" id="search-grape" name="grape">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-winery">Winery</label>
+                            <input type="text" id="search-winery" name="winery">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-region">Region</label>
+                            <input type="text" id="search-region" name="region">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-country">Country</label>
+                            <input type="text" id="search-country" name="country">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-wine-type">Wine Type</label>
+                            <select id="search-wine-type" name="wine_type">
+                                <option value="">All Types</option>
+                                <option value="red">Red</option>
+                                <option value="white">White</option>
+                                <option value="rosé">Rosé</option>
+                                <option value="sparkling">Sparkling</option>
+                                <option value="fortified">Fortified</option>
+                                <option value="dessert">Dessert</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="search-price-tier">Price Tier</label>
+                            <select id="search-price-tier" name="price_tier">
+                                <option value="">All Tiers</option>
+                                <option value="budget">Budget</option>
+                                <option value="value">Value</option>
+                                <option value="mid_range">Mid-Range</option>
+                                <option value="premium">Premium</option>
+                                <option value="luxury">Luxury</option>
+                                <option value="ultra_premium">Ultra Premium</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="search-in-stock">
+                                <input type="checkbox" id="search-in-stock" name="in_stock">
+                                In Stock Only
+                            </label>
+                        </div>
+                    </div>
+                </details>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Search</button>
                     <button type="reset" class="btn btn-secondary">Clear</button>
@@ -844,8 +865,8 @@
 
         <!-- X-Wines Search Page -->
         <section id="page-xwines" class="page">
-            <h2>X-Wines Database</h2>
-            <p class="page-subtitle">Search over 100,000 wines from the X-Wines reference dataset</p>
+            <h2>Wine Reference</h2>
+            <p class="page-subtitle">Search over 100,000 wines from around the world</p>
             <form id="xwines-search-form">
                 <div class="form-grid">
                     <div class="form-group">
@@ -980,7 +1001,7 @@
                 <p class="settings-description">
                     Permanently delete your entire wine collection, including all wines, transactions, label images, and import history. This action cannot be undone.
                 </p>
-                <button type="button" class="btn btn-danger" id="delete-collection-btn">Delete Entire Collection</button>
+                <button type="button" class="btn btn-danger" id="delete-collection-btn">Delete All My Wines</button>
             </div>
         </section>
     </main>

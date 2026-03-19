@@ -436,24 +436,7 @@ async function showMainApp() {
         return;
     }
 
-    // For first-time users (empty cellar), start on the Import page
-    try {
-        const summaryResp = await fetchWithAuth(`${API_BASE}/cellar/summary`);
-        const summary = await summaryResp.json();
-
-        // Re-check hash in case the user navigated while we were fetching
-        const currentHash = window.location.hash.slice(1).split('?')[0];
-        if (currentHash && APP_PAGES.includes(currentHash)) {
-            return;
-        }
-
-        if (summary.unique_wines === 0) {
-            navigateTo('import');
-            return;
-        }
-    } catch (e) {
-        // Fall through to dashboard on error
-    }
+    // Always start on Dashboard — empty cellar state has a call-to-action
 
     // Only navigate to dashboard if user hasn't navigated elsewhere
     const finalHash = window.location.hash.slice(1).split('?')[0];
@@ -802,8 +785,25 @@ function initNavigation() {
             if (!page) return; // Let normal links (e.g. Admin) navigate normally
             e.preventDefault();
             navigateTo(page);
+            // Close mobile menu on navigation
+            const nav = document.getElementById('main-nav');
+            const hamburger = document.getElementById('hamburger-btn');
+            if (nav && hamburger) {
+                nav.classList.remove('nav-open');
+                hamburger.setAttribute('aria-expanded', 'false');
+            }
         });
     });
+
+    // Hamburger menu toggle
+    const hamburger = document.getElementById('hamburger-btn');
+    const nav = document.getElementById('main-nav');
+    if (hamburger && nav) {
+        hamburger.addEventListener('click', () => {
+            const isOpen = nav.classList.toggle('nav-open');
+            hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+    }
 }
 
 function navigateTo(page) {
@@ -1117,7 +1117,7 @@ function showScanningIndicator(show) {
     } else {
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.textContent = submitBtn.dataset.originalText || 'Check In Wine';
+            submitBtn.textContent = submitBtn.dataset.originalText || 'Add Wine';
         }
         if (formNote) {
             formNote.textContent = formNote.dataset.originalText || 'Leave fields blank to use OCR-detected values';
@@ -1542,6 +1542,11 @@ function renderCellarView() {
     } else {
         renderWineGrid('cellar-list', cellarLastWines);
     }
+    // Disable export when there's nothing to export
+    const exportBtn = document.getElementById('cellar-export-btn');
+    if (exportBtn) {
+        exportBtn.disabled = cellarLastWines.length === 0;
+    }
 }
 
 function setCellarViewMode(mode) {
@@ -1566,7 +1571,13 @@ function setCellarViewMode(mode) {
 function renderCellarTable(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
+        const hasFilters = document.getElementById('cellar-filter').value !== 'all' ||
+                          document.getElementById('cellar-search').value.trim() !== '';
+        if (hasFilters) {
+            container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
+        } else {
+            container.innerHTML = '<div class="empty-state"><h3>Your cellar is empty</h3><p>Add your first wine to get started!</p><a href="#" data-page="checkin" class="btn btn-primary" style="margin-top:1rem">Add Wine</a></div>';
+        }
         return;
     }
 
@@ -1674,7 +1685,13 @@ function renderCellarTable(containerId, wines) {
 function renderWineGrid(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
+        const hasFilters = document.getElementById('cellar-filter').value !== 'all' ||
+                          document.getElementById('cellar-search').value.trim() !== '';
+        if (hasFilters) {
+            container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
+        } else {
+            container.innerHTML = '<div class="empty-state"><h3>Your cellar is empty</h3><p>Add your first wine to get started!</p><a href="#" data-page="checkin" class="btn btn-primary" style="margin-top:1rem">Add Wine</a></div>';
+        }
         return;
     }
 
@@ -1965,8 +1982,13 @@ async function loadHistory() {
 
 function renderTransactionList(transactions) {
     const container = document.getElementById('history-list');
+    // Disable export when there's nothing to export
+    const historyExportBtn = document.getElementById('history-export-btn');
+    if (historyExportBtn) {
+        historyExportBtn.disabled = !transactions || transactions.length === 0;
+    }
     if (!transactions || transactions.length === 0) {
-        container.innerHTML = '<div class="empty-state"><h3>No transactions yet</h3><p>Check in some wine to get started</p></div>';
+        container.innerHTML = '<div class="empty-state"><h3>No transactions yet</h3><p>Add some wine to get started</p></div>';
         return;
     }
 
@@ -3467,7 +3489,7 @@ function renderMetViewWith(wines) {
 function renderMetGrid(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        container.innerHTML = '<div class="empty-state"><h3>No wines recorded yet</h3><p>Use Record Wine to scan a label</p></div>';
+        container.innerHTML = '<div class="empty-state"><h3>No wines recorded yet</h3><p>Use Add Wine to scan a label</p></div>';
         return;
     }
 
@@ -3533,7 +3555,7 @@ function renderMetGrid(containerId, wines) {
 function renderMetTable(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        container.innerHTML = '<div class="empty-state"><h3>No wines recorded yet</h3><p>Use Record Wine to scan a label</p></div>';
+        container.innerHTML = '<div class="empty-state"><h3>No wines recorded yet</h3><p>Use Add Wine to scan a label</p></div>';
         return;
     }
 
