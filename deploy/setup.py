@@ -39,6 +39,7 @@ port = 8000
 workers = 2
 debug = false
 enforce_https = true
+rate_limit_per_minute = {rate_limit}
 
 [database]
 mongodb_database = "{mongodb_database}"
@@ -57,6 +58,7 @@ tesseract_lang = "eng"
 enabled = true
 registration_enabled = true
 email_verification_required = true
+auth_rate_limit_per_minute = {auth_rate_limit}
 
 [email]
 backend = "ses"
@@ -215,12 +217,16 @@ def setup_config_files(host: str, user: str, domain: str, mongodb_database: str 
     )
 
     if "exists" not in result:
-        env_label = "OAT" if mongodb_database != "winebox" else "Production"
+        is_oat = mongodb_database != "winebox"
+        env_label = "OAT" if is_oat else "Production"
         # Create config.toml locally and upload
+        # OAT gets higher rate limits for e2e testing
         config_content = CONFIG_TOML_TEMPLATE.format(
             domain=domain,
             mongodb_database=mongodb_database,
             env_label=env_label,
+            rate_limit=300 if is_oat else 60,
+            auth_rate_limit=300 if is_oat else 30,
         )
         with tempfile.NamedTemporaryFile(mode='w', suffix='.toml', delete=False) as f:
             f.write(config_content)

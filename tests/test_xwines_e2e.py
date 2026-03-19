@@ -110,10 +110,11 @@ class TestXWinesNavigation:
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
 
-        # Wait for filters to load — poll until dropdown has more than the default option
+        # Wait for filters to load — the /types and /countries API calls can
+        # take 7-10s on the OAT server due to aggregation on 100K docs
         page.wait_for_function(
-            "document.querySelectorAll('#xwines-type option').length > 1",
-            timeout=30000,
+            "() => document.querySelectorAll('#xwines-type option').length > 1",
+            timeout=60000,
         )
 
         # Wine type dropdown should have options beyond the default "All Types"
@@ -202,8 +203,13 @@ class TestXWinesSearch:
         page = authenticated_page
         page.click("a[data-page='xwines']")
         page.wait_for_selector("#page-xwines", state="visible")
-        page.wait_for_timeout(5000)  # Wait for filters to load
         page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
+
+        # Wait for type dropdown to be populated before selecting
+        page.wait_for_function(
+            "() => document.querySelectorAll('#xwines-type option').length > 1",
+            timeout=60000,
+        )
 
         # Select "Red" type filter
         page.select_option("#xwines-type", label="Red")
@@ -229,10 +235,10 @@ class TestXWinesSearch:
         page.wait_for_timeout(5000)  # Wait for filters to load
         page.wait_for_selector("#xwines-q", state="visible", timeout=30000)
 
-        # Wait for country dropdown to be populated
+        # Wait for country dropdown to be populated (can take 7-10s on OAT)
         page.wait_for_function(
-            "document.querySelectorAll('#xwines-country option').length > 1",
-            timeout=30000,
+            "() => document.querySelectorAll('#xwines-country option').length > 1",
+            timeout=60000,
         )
 
         # Get the first real country option (not "All Countries")

@@ -1406,11 +1406,17 @@ def test_e2e_oat(
     else:
         test_files = "-m e2e"
 
-    # Create users via SSH on the OAT server instead of local CLI
-    # (since the OAT server has its own database)
+    # Load .env to get WINEBOX_MONGODB_URL for user creation via winebox-admin
+    from dotenv import dotenv_values
+    env_values = dotenv_values(Path(".env"))
+    mongodb_url = env_values.get("WINEBOX_MONGODB_URL", "")
+    secret_key = env_values.get("WINEBOX_SECRET_KEY", "oat-e2e-test-secret-key-1234567890")
+
     test_cmd = (
         f"WINEBOX_TEST_URL={oat_url} "
+        f"WINEBOX_MONGODB_URL='{mongodb_url}' "
         f"WINEBOX_MONGODB_DATABASE={OAT_DATABASE} "
+        f"WINEBOX_SECRET_KEY={secret_key} "
         f"WINEBOX_USE_CLAUDE_VISION=false "
         f'uv run python -m pytest {test_files} -n {workers} --override-ini="addopts="'
     )
