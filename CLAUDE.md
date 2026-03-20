@@ -65,7 +65,7 @@
 
 ### Data Isolation
 - ALL database queries for user data MUST filter by `owner_id`
-- Use the pattern: `Wine.find(Wine.owner_id == current_user.id, ...)`
+- Use the pattern: `Wine.find({"owner_id": current_user.id, ...})`
 - Admin endpoints that access all users' data must verify `RequireAdmin`
 
 ### Datetime Handling

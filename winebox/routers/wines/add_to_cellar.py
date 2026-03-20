@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import Form, HTTPException, status
 from pydantic import ValidationError
@@ -31,8 +31,7 @@ async def add_met_wine_to_cellar(
     # Load the met wine
     try:
         met_wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(met_wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(met_wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid met wine ID format: %s - %s", met_wine_id, e)

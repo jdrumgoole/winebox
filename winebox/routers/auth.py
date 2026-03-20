@@ -151,7 +151,7 @@ async def change_password(
             detail="Current password is incorrect",
         )
 
-    # Update password using Beanie
+    # Update password
     current_user.hashed_password = get_password_hash(password_request.new_password)
     current_user.updated_at = datetime.now(timezone.utc)
     await current_user.save()

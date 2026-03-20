@@ -412,6 +412,6 @@ async def test_checkin_accepts_wine_type_id(client: AsyncClient, init_test_db, s
     assert wine_data["wine_type_id"] == "red"
 
     # Verify in database
-    wine = await Wine.find_one(Wine.name == "Checkin Wine Type Test")
+    wine = await Wine.find_one({"name": "Checkin Wine Type Test"})
     assert wine is not None
     assert wine.wine_type_id == "red"

@@ -4,7 +4,7 @@ import random
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from beanie import PydanticObjectId
+from bson import ObjectId
 
 from winebox.models import Wine, XWinesWine
 from winebox.models.import_batch import ImportBatch, ImportStatus
@@ -45,7 +45,7 @@ async def _insert_xwines_wine(**kwargs) -> XWinesWine:
     return xwine
 
 
-def _make_batch(owner_id: PydanticObjectId, rows: list[dict], mapping: dict) -> ImportBatch:
+def _make_batch(owner_id: ObjectId, rows: list[dict], mapping: dict) -> ImportBatch:
     """Create an ImportBatch document (unsaved) with the given rows and mapping."""
     return ImportBatch(
         owner_id=owner_id,
@@ -70,7 +70,7 @@ async def test_import_enriches_empty_fields(init_test_db) -> None:
     xwine = await _insert_xwines_wine()
     wine_name = xwine.name
 
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
     batch = _make_batch(
         owner_id=owner_id,
         rows=[{"Wine Name": wine_name}],
@@ -83,7 +83,7 @@ async def test_import_enriches_empty_fields(init_test_db) -> None:
     assert result.status == ImportStatus.COMPLETED
     assert result.wines_created == 1
 
-    wine = await Wine.find_one(Wine.name == wine_name)
+    wine = await Wine.find_one({"name": wine_name})
     assert wine is not None
     assert wine.winery == "Import Winery"
     assert wine.grape_variety == "Pinot Noir"
@@ -110,7 +110,7 @@ async def test_import_preserves_csv_values(init_test_db) -> None:
     xwine = await _insert_xwines_wine()
     wine_name = xwine.name
 
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
     batch = _make_batch(
         owner_id=owner_id,
         rows=[{
@@ -130,7 +130,7 @@ async def test_import_preserves_csv_values(init_test_db) -> None:
 
     assert result.wines_created == 1
 
-    wine = await Wine.find_one(Wine.name == wine_name)
+    wine = await Wine.find_one({"name": wine_name})
     assert wine is not None
 
     # CSV values preserved
@@ -159,7 +159,7 @@ async def test_import_no_match_no_enrichment(init_test_db) -> None:
     """Wine with no X-Wines match should have no enrichment metadata."""
     # No X-Wines data inserted
 
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
     batch = _make_batch(
         owner_id=owner_id,
         rows=[{"Wine Name": "Totally Unknown Wine ABCXYZ"}],
@@ -171,7 +171,7 @@ async def test_import_no_match_no_enrichment(init_test_db) -> None:
 
     assert result.wines_created == 1
 
-    wine = await Wine.find_one(Wine.name == "Totally Unknown Wine ABCXYZ")
+    wine = await Wine.find_one({"name": "Totally Unknown Wine ABCXYZ"})
     assert wine is not None
     assert wine.enriched_fields is None
     assert wine.xwines_id is None
@@ -185,7 +185,7 @@ async def test_import_no_match_no_enrichment(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_import_enrichment_failure_nonfatal(init_test_db) -> None:
     """If X-Wines lookup raises an exception, the wine is still imported."""
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
     batch = _make_batch(
         owner_id=owner_id,
         rows=[{"Wine Name": "Some Wine"}],
@@ -203,7 +203,7 @@ async def test_import_enrichment_failure_nonfatal(init_test_db) -> None:
     assert result.status == ImportStatus.COMPLETED
     assert result.wines_created == 1
 
-    wine = await Wine.find_one(Wine.name == "Some Wine")
+    wine = await Wine.find_one({"name": "Some Wine"})
     assert wine is not None
     # No enrichment metadata since the service failed
     assert wine.enriched_fields is None
@@ -218,7 +218,7 @@ async def test_import_enrichment_failure_nonfatal(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_import_multi_chunk_pipeline(init_test_db) -> None:
     """Import 120 rows (3 chunks of 50+50+20) — all should be created."""
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
     rows = [{"Wine Name": f"Pipeline Wine {i}"} for i in range(120)]
     batch = _make_batch(
         owner_id=owner_id,
@@ -238,7 +238,7 @@ async def test_import_multi_chunk_pipeline(init_test_db) -> None:
     assert result.rows_skipped == 0
     assert result.errors == []
 
-    count = await Wine.find(Wine.owner_id == owner_id).count()
+    count = await Wine.find({"owner_id": owner_id}).count()
     assert count == 120
 
 
@@ -250,7 +250,7 @@ async def test_import_multi_chunk_pipeline(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_import_streaming_progress_monotonic(init_test_db) -> None:
     """Streaming progress should be monotonically increasing even with pipeline."""
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
     rows = [{"Wine Name": f"Progress Wine {i}"} for i in range(75)]
     batch = _make_batch(
         owner_id=owner_id,

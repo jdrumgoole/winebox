@@ -59,9 +59,9 @@ def test_enrichment_progress_lifecycle() -> None:
 @pytest.mark.asyncio
 async def test_enrich_empty_set(init_test_db) -> None:
     """No unenriched wines returns zero counts."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
     result = await enrich_unenriched_wines(owner_id)
 
     assert result["total"] == 0
@@ -72,9 +72,9 @@ async def test_enrich_empty_set(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_enrich_skips_already_enriched(init_test_db) -> None:
     """Wines with xwines_id set are not re-enriched."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
 
     # Create a wine that already has xwines_id
     wine = Wine(
@@ -91,9 +91,9 @@ async def test_enrich_skips_already_enriched(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_enrich_updates_wine_documents(init_test_db) -> None:
     """Unenriched wines are updated with X-Wines data."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
 
     # Create an unenriched wine
     wine = Wine(
@@ -137,9 +137,9 @@ async def test_enrich_updates_wine_documents(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_enrich_preserves_existing_fields(init_test_db) -> None:
     """Existing wine fields are not overwritten by enrichment."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
 
     # Create a wine with some fields already set
     wine = Wine(
@@ -176,9 +176,9 @@ async def test_enrich_preserves_existing_fields(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_enrich_progress_callback(init_test_db) -> None:
     """Progress callback is invoked after each batch."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
 
     # Create a couple of unenriched wines
     for i in range(3):
@@ -205,9 +205,9 @@ async def test_enrich_progress_callback(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_enrich_sets_progress_store(init_test_db) -> None:
     """Progress store is updated during enrichment."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
     owner_str = str(owner_id)
 
     await Wine(owner_id=owner_id, name="Test Wine").insert()

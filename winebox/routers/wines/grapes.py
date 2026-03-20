@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timezone
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 from pydantic import ValidationError
@@ -28,8 +28,7 @@ async def get_wine_grapes(
     # Verify wine exists and belongs to current user
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
@@ -80,8 +79,7 @@ async def set_wine_grapes(
     # Verify wine exists and belongs to current user
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
@@ -99,7 +97,7 @@ async def set_wine_grapes(
     for grape_data in blend.grapes:
         # Try to find grape variety
         try:
-            grape = await GrapeVariety.get(PydanticObjectId(grape_data.grape_variety_id))
+            grape = await GrapeVariety.get(ObjectId(grape_data.grape_variety_id))
         except (InvalidId, ValidationError) as e:
             logger.debug("Invalid grape variety ID format: %s - %s", grape_data.grape_variety_id, e)
             grape = None

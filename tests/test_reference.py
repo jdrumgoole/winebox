@@ -21,7 +21,7 @@ async def seed_wine_types(init_test_db):
     ]
     types = []
     for td in types_data:
-        existing = await WineType.find_one(WineType.type_id == td["type_id"])
+        existing = await WineType.find_one({"type_id": td["type_id"]})
         if existing:
             types.append(existing)
         else:
@@ -42,7 +42,7 @@ async def seed_grape_varieties(init_test_db):
     ]
     varieties = []
     for vd in varieties_data:
-        existing = await GrapeVariety.find_one(GrapeVariety.name == vd["name"])
+        existing = await GrapeVariety.find_one({"name": vd["name"]})
         if existing:
             varieties.append(existing)
         else:
@@ -56,13 +56,13 @@ async def seed_grape_varieties(init_test_db):
 async def seed_regions(init_test_db):
     """Seed regions with hierarchy for testing (idempotent)."""
     # France (level 0)
-    france = await Region.find_one(Region.name == "france", Region.level == 0)
+    france = await Region.find_one({"name": "france", "level": 0})
     if not france:
         france = Region(name="france", display_name="France", level=0, country="France")
         await france.insert()
 
     # Bordeaux (level 1, child of France)
-    bordeaux = await Region.find_one(Region.name == "bordeaux", Region.level == 1)
+    bordeaux = await Region.find_one({"name": "bordeaux", "level": 1})
     if not bordeaux:
         bordeaux = Region(
             name="bordeaux", display_name="Bordeaux", level=1,
@@ -71,7 +71,7 @@ async def seed_regions(init_test_db):
         await bordeaux.insert()
 
     # Médoc (level 2, child of Bordeaux)
-    medoc = await Region.find_one(Region.name == "medoc", Region.level == 2)
+    medoc = await Region.find_one({"name": "medoc", "level": 2})
     if not medoc:
         medoc = Region(
             name="medoc", display_name="Médoc", level=2,
@@ -80,13 +80,13 @@ async def seed_regions(init_test_db):
         await medoc.insert()
 
     # Italy (level 0)
-    italy = await Region.find_one(Region.name == "italy", Region.level == 0)
+    italy = await Region.find_one({"name": "italy", "level": 0})
     if not italy:
         italy = Region(name="italy", display_name="Italy", level=0, country="Italy")
         await italy.insert()
 
     # Tuscany (level 1, child of Italy)
-    tuscany = await Region.find_one(Region.name == "tuscany", Region.level == 1)
+    tuscany = await Region.find_one({"name": "tuscany", "level": 1})
     if not tuscany:
         tuscany = Region(
             name="tuscany", display_name="Tuscany", level=1,
@@ -127,8 +127,7 @@ async def seed_classifications(init_test_db):
     classifications = []
     for cd in classifications_data:
         existing = await Classification.find_one(
-            Classification.name == cd["name"],
-            Classification.system == cd["system"],
+            {"name": cd["name"], "system": cd["system"]}
         )
         if existing:
             classifications.append(existing)

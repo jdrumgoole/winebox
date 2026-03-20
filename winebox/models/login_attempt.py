@@ -3,11 +3,12 @@
 from datetime import datetime, timedelta, timezone
 from typing import ClassVar
 
-from beanie import Document, Indexed
 from pydantic import Field
 
+from winebox.db import MongoDocument
 
-class LoginAttempt(Document):
+
+class LoginAttempt(MongoDocument):
     """Tracks failed login attempts for account lockout.
 
     After MAX_FAILED_ATTEMPTS failures within LOCKOUT_WINDOW_MINUTES,
@@ -15,7 +16,7 @@ class LoginAttempt(Document):
     """
 
     # Email being attempted (case-insensitive lookup via index)
-    email: Indexed(str)
+    email: str
 
     # Timestamp of the attempt
     attempted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -28,10 +29,6 @@ class LoginAttempt(Document):
 
     class Settings:
         name = "login_attempts"
-        indexes = [
-            "email",
-            "attempted_at",
-        ]
 
     # Lockout configuration (ClassVar to avoid Pydantic treating as fields)
     MAX_FAILED_ATTEMPTS: ClassVar[int] = 5
@@ -45,16 +42,7 @@ class LoginAttempt(Document):
         failed: bool = True,
         ip_address: str | None = None,
     ) -> "LoginAttempt":
-        """Record a login attempt.
-
-        Args:
-            email: Email address attempted.
-            failed: Whether the attempt failed.
-            ip_address: Client IP address.
-
-        Returns:
-            The created LoginAttempt document.
-        """
+        """Record a login attempt."""
         attempt = cls(
             email=email.lower(),
             failed=failed,
@@ -65,64 +53,52 @@ class LoginAttempt(Document):
 
     @classmethod
     async def is_locked_out(cls, email: str) -> bool:
-        """Check if an email is locked out due to too many failed attempts.
-
-        Args:
-            email: Email address to check.
-
-        Returns:
-            True if the email is locked out, False otherwise.
-        """
+        """Check if an email is locked out due to too many failed attempts."""
         window_start = datetime.now(timezone.utc) - timedelta(
             minutes=cls.LOCKOUT_WINDOW_MINUTES
         )
 
-        # Count failed attempts in the lockout window
         failed_count = await cls.find(
-            cls.email == email.lower(),
-            cls.failed == True,  # noqa: E712
-            cls.attempted_at >= window_start,
+            {
+                "email": email.lower(),
+                "failed": True,
+                "attempted_at": {"$gte": window_start},
+            }
         ).count()
 
         return failed_count >= cls.MAX_FAILED_ATTEMPTS
 
     @classmethod
     async def get_lockout_remaining_seconds(cls, email: str) -> int:
-        """Get remaining lockout time in seconds.
-
-        Args:
-            email: Email address to check.
-
-        Returns:
-            Remaining lockout time in seconds, or 0 if not locked out.
-        """
+        """Get remaining lockout time in seconds."""
         window_start = datetime.now(timezone.utc) - timedelta(
             minutes=cls.LOCKOUT_WINDOW_MINUTES
         )
 
-        # Get the most recent failed attempt
         latest_attempt = await cls.find_one(
-            cls.email == email.lower(),
-            cls.failed == True,  # noqa: E712
-            cls.attempted_at >= window_start,
+            {
+                "email": email.lower(),
+                "failed": True,
+                "attempted_at": {"$gte": window_start},
+            },
             sort=[("attempted_at", -1)],
         )
 
         if not latest_attempt:
             return 0
 
-        # Count failed attempts
         failed_count = await cls.find(
-            cls.email == email.lower(),
-            cls.failed == True,  # noqa: E712
-            cls.attempted_at >= window_start,
+            {
+                "email": email.lower(),
+                "failed": True,
+                "attempted_at": {"$gte": window_start},
+            }
         ).count()
 
         if failed_count < cls.MAX_FAILED_ATTEMPTS:
             return 0
 
-        # Calculate when lockout expires (from the Nth failed attempt)
-        # Ensure timezone-aware comparison (MongoDB may strip tzinfo on load)
+        # Ensure timezone-aware comparison
         attempted_at = latest_attempt.attempted_at
         if attempted_at.tzinfo is None:
             attempted_at = attempted_at.replace(tzinfo=timezone.utc)
@@ -135,27 +111,13 @@ class LoginAttempt(Document):
 
     @classmethod
     async def clear_attempts(cls, email: str) -> int:
-        """Clear all login attempts for an email (after successful login).
-
-        Args:
-            email: Email address to clear.
-
-        Returns:
-            Number of attempts cleared.
-        """
-        result = await cls.find(cls.email == email.lower()).delete()
+        """Clear all login attempts for an email (after successful login)."""
+        result = await cls.find({"email": email.lower()}).delete()
         return result.deleted_count if result else 0
 
     @classmethod
     async def cleanup_old_attempts(cls, older_than_hours: int = 24) -> int:
-        """Remove old login attempts for cleanup.
-
-        Args:
-            older_than_hours: Remove attempts older than this many hours.
-
-        Returns:
-            Number of attempts removed.
-        """
+        """Remove old login attempts for cleanup."""
         cutoff = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
-        result = await cls.find(cls.attempted_at < cutoff).delete()
+        result = await cls.find({"attempted_at": {"$lt": cutoff}}).delete()
         return result.deleted_count if result else 0

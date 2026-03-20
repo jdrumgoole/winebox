@@ -3,8 +3,9 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from beanie import Document, Indexed
 from pydantic import Field
+
+from winebox.db import MongoDocument
 
 
 def _utc_now() -> datetime:
@@ -12,13 +13,13 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class User(Document):
+class User(MongoDocument):
     """User document model for authentication.
 
-    This model is compatible with fastapi-users BeanieUserDatabase.
+    Compatible with fastapi-users via MotorUserDatabase adapter.
 
     Fields:
-    - id: ObjectId primary key (from Document)
+    - id: ObjectId primary key (from MongoDocument)
     - email: unique email (required by fastapi-users)
     - hashed_password: password hash
     - is_active: account active status
@@ -32,7 +33,7 @@ class User(Document):
     """
 
     # Required fields for fastapi-users
-    email: Indexed(str, unique=True)
+    email: str
     hashed_password: str
     is_active: bool = True
     is_superuser: bool = False
@@ -48,8 +49,6 @@ class User(Document):
 
     class Settings:
         name = "users"
-        use_state_management = True
-        email_collation = None  # Use default case-insensitive collation
 
     # Alias is_superuser as is_admin for backward compatibility
     @property

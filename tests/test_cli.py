@@ -4,7 +4,7 @@ import uuid
 import pytest
 from datetime import datetime, timezone
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 
 from winebox.models.user import User
 from winebox.models.wine import Wine
@@ -13,7 +13,7 @@ from winebox.services.auth import get_password_hash
 
 
 # Test owner ID for wines/transactions that need one
-TEST_OWNER_ID = PydanticObjectId("000000000000000000000001")
+TEST_OWNER_ID = ObjectId("000000000000000000000001")
 
 
 class TestUserAdmin:
@@ -28,7 +28,7 @@ class TestUserAdmin:
         email = f"newuser-{unique}@example.com"
         await add_user(email, "password123", is_admin=False, skip_db_init=True)
 
-        user = await User.find_one(User.email == email)
+        user = await User.find_one({"email": email})
         assert user is not None
         assert user.email == email
         assert user.is_superuser is False
@@ -44,7 +44,7 @@ class TestUserAdmin:
         email = f"admin-{unique}@example.com"
         await add_user(email, "adminpass", is_admin=True, skip_db_init=True)
 
-        user = await User.find_one(User.email == email)
+        user = await User.find_one({"email": email})
         assert user is not None
         assert user.is_superuser is True
 
@@ -124,7 +124,7 @@ class TestUserAdmin:
         await disable_user(email, skip_db_init=True)
 
         # Reload and check
-        user = await User.find_one(User.email == email)
+        user = await User.find_one({"email": email})
         assert user.is_active is False
 
         captured = capsys.readouterr()
@@ -161,7 +161,7 @@ class TestUserAdmin:
         await enable_user(email, skip_db_init=True)
 
         # Reload and check
-        user = await User.find_one(User.email == email)
+        user = await User.find_one({"email": email})
         assert user.is_active is True
 
         captured = capsys.readouterr()
@@ -190,7 +190,7 @@ class TestUserAdmin:
         await remove_user(email, force=True, skip_db_init=True)
 
         # Check user is gone
-        user = await User.find_one(User.email == email)
+        user = await User.find_one({"email": email})
         assert user is None
 
         captured = capsys.readouterr()
@@ -219,7 +219,7 @@ class TestUserAdmin:
         await change_password(email, "newpassword123", skip_db_init=True)
 
         # Reload and verify new password works
-        user = await User.find_one(User.email == email)
+        user = await User.find_one({"email": email})
         assert verify_password("newpassword123", user.hashed_password)
         assert not verify_password("oldpassword", user.hashed_password)
 
@@ -337,7 +337,7 @@ class TestPurgeData:
         assert result.get("email") == email
 
         # Verify user is gone
-        user = await User.find_one(User.email == email)
+        user = await User.find_one({"email": email})
         assert user is None
 
     @pytest.mark.asyncio

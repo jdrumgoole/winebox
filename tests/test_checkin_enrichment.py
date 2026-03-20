@@ -230,7 +230,7 @@ async def test_checkin_enrichment_persisted_in_db(
     assert response.status_code == 201
 
     # Verify directly in database
-    wine = await Wine.find_one(Wine.name == wine_name)
+    wine = await Wine.find_one({"name": wine_name})
     assert wine is not None
     assert wine.xwines_id == xwine.xwines_id
     assert wine.enriched_fields is not None

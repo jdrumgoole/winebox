@@ -14,8 +14,9 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from beanie import PydanticObjectId
 from pymongo.errors import BulkWriteError
+
+from winebox.db import PyObjectId
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.import_batch_row import RawUploadRow
@@ -92,7 +93,7 @@ class _Chunk:
 def _convert_chunk_from_rows(
     rows: list[dict[str, Any]],
     column_mapping: dict[str, str] | None,
-    owner_id: PydanticObjectId,
+    owner_id: PyObjectId,
     chunk_start: int,
     chunk_end: int,
     skip_non_wine: bool,
@@ -138,7 +139,7 @@ def _convert_chunk_from_rows(
 
 def _convert_chunk(
     batch: ImportBatch,
-    owner_id: PydanticObjectId,
+    owner_id: PyObjectId,
     chunk_start: int,
     chunk_end: int,
     skip_non_wine: bool,
@@ -324,7 +325,7 @@ async def _writer_worker(
 
 async def _feeder(
     batch: ImportBatch,
-    owner_id: PydanticObjectId,
+    owner_id: PyObjectId,
     skip_non_wine: bool,
     default_quantity: int,
     chunk_size: int,
@@ -395,7 +396,7 @@ async def _feeder(
 
 async def _process_chunks(
     batch: ImportBatch,
-    owner_id: PydanticObjectId,
+    owner_id: PyObjectId,
     skip_non_wine: bool = True,
     default_quantity: int = 1,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
@@ -552,7 +553,7 @@ async def _process_chunks(
 
 async def process_import_batch(
     batch: ImportBatch,
-    owner_id: PydanticObjectId,
+    owner_id: PyObjectId,
     skip_non_wine: bool = True,
     default_quantity: int = 1,
     skip_enrichment: bool = False,
@@ -591,7 +592,7 @@ async def process_import_batch(
 
 async def process_import_batch_streaming(
     batch: ImportBatch,
-    owner_id: PydanticObjectId,
+    owner_id: PyObjectId,
     skip_non_wine: bool = True,
     default_quantity: int = 1,
     skip_enrichment: bool = False,

@@ -70,7 +70,8 @@ async def _refresh_filter_cache() -> None:
             {"$group": {"_id": "$wine_type"}},
             {"$sort": {"_id": 1}},
         ]
-        types_results = await collection.aggregate(types_pipeline).to_list(length=100)
+        types_cursor = await collection.aggregate(types_pipeline)
+        types_results = await types_cursor.to_list(length=100)
         types = [doc["_id"] for doc in types_results if doc["_id"]]
 
         countries_pipeline: list[dict] = [
@@ -83,7 +84,8 @@ async def _refresh_filter_cache() -> None:
             },
             {"$sort": {"count": -1, "_id.name": 1}},
         ]
-        countries_results = await collection.aggregate(countries_pipeline).to_list(length=500)
+        countries_cursor = await collection.aggregate(countries_pipeline)
+        countries_results = await countries_cursor.to_list(length=500)
         countries = [
             {"code": doc["_id"]["code"], "name": doc["_id"]["name"], "count": doc["count"]}
             for doc in countries_results
@@ -195,14 +197,16 @@ async def _atlas_search(
         {"$skip": skip},
         {"$limit": limit},
     ]
-    results = await collection.aggregate(pipeline).to_list(length=limit)
+    cursor = await collection.aggregate(pipeline)
+    results = await cursor.to_list(length=limit)
 
     # Run count pipeline
     count_pipeline: list[dict] = [
         search_stage,
         {"$count": "total"},
     ]
-    count_result = await collection.aggregate(count_pipeline).to_list(length=1)
+    count_cursor = await collection.aggregate(count_pipeline)
+    count_result = await count_cursor.to_list(length=1)
     total = count_result[0]["total"] if count_result else 0
 
     # Run facet pipeline via $searchMeta
@@ -252,7 +256,8 @@ async def _atlas_search(
             }
         }
     ]
-    facet_result = await collection.aggregate(facet_pipeline).to_list(length=1)
+    facet_cursor = await collection.aggregate(facet_pipeline)
+    facet_result = await facet_cursor.to_list(length=1)
 
     facets = None
     if facet_result:
@@ -399,7 +404,7 @@ def _wine_doc_to_result(doc: dict, price_data: dict | None = None) -> XWinesWine
 
 
 def _wine_model_to_result(wine: XWinesWine, price_data: dict | None = None) -> XWinesWineSearchResult:
-    """Convert a Beanie model to a search result."""
+    """Convert a MongoDocument model to a search result."""
     prices = price_data or {}
     return XWinesWineSearchResult(
         id=wine.xwines_id,
@@ -465,7 +470,7 @@ async def search_wines(
 @router.get("/wines/{wine_id}", response_model=XWinesWineDetail)
 async def get_wine(wine_id: int) -> XWinesWineDetail:
     """Get full details for a specific X-Wines wine."""
-    wine = await XWinesWine.find_one(XWinesWine.xwines_id == wine_id)
+    wine = await XWinesWine.find_one({"xwines_id": wine_id})
 
     if not wine:
         raise HTTPException(status_code=404, detail="Wine not found")

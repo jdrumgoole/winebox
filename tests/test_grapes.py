@@ -10,17 +10,21 @@ from winebox.models.wine import GrapeBlendEntry
 @pytest_asyncio.fixture
 async def grape_varieties(client, init_test_db):
     """Create grape varieties for testing."""
-    cab = GrapeVariety(name="Cabernet Sauvignon", color="red", category="international")
-    await cab.insert()
-    merlot = GrapeVariety(name="Merlot", color="red", category="international")
-    await merlot.insert()
+    cab = await GrapeVariety.find_one({"name": "Cabernet Sauvignon"})
+    if not cab:
+        cab = GrapeVariety(name="Cabernet Sauvignon", color="red", category="international")
+        await cab.insert()
+    merlot = await GrapeVariety.find_one({"name": "Merlot"})
+    if not merlot:
+        merlot = GrapeVariety(name="Merlot", color="red", category="international")
+        await merlot.insert()
     return {"cab": cab, "merlot": merlot}
 
 
 @pytest_asyncio.fixture
 async def wine_with_grapes(client, init_test_db, grape_varieties, test_user_email):
     """Create a wine with grape blend."""
-    user = await User.find_one(User.email == test_user_email)
+    user = await User.find_one({"email": test_user_email})
     wine = Wine(
         name="Bordeaux Blend",
         vintage=2018,
@@ -51,7 +55,7 @@ async def wine_with_grapes(client, init_test_db, grape_varieties, test_user_emai
 @pytest_asyncio.fixture
 async def wine_no_grapes(client, init_test_db, test_user_email):
     """Create a wine without grape blend."""
-    user = await User.find_one(User.email == test_user_email)
+    user = await User.find_one({"email": test_user_email})
     wine = Wine(
         name="Mystery Wine",
         vintage=2020,

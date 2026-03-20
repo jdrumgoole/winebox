@@ -12,7 +12,7 @@ import random
 import string
 
 import httpx
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from playwright.async_api import async_playwright
 
 BASE_URL = os.environ.get("WINEBOX_URL", "http://localhost:8000")
@@ -35,7 +35,7 @@ async def create_verified_user(email: str, password: str) -> str:
     async with httpx.AsyncClient(base_url=BASE_URL) as client:
         await client.post("/api/auth/register", json={"email": email, "password": password})
 
-    mongo = AsyncIOMotorClient(mongodb_url)
+    mongo = AsyncMongoClient(mongodb_url)
     await mongo[db_name].users.update_one({"email": email}, {"$set": {"is_verified": True}})
     mongo.close()
 

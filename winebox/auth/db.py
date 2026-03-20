@@ -1,16 +1,15 @@
-"""Database adapter for fastapi-users with Beanie/MongoDB."""
+"""Database adapter for fastapi-users with motor/MongoDB."""
 
 from collections.abc import AsyncGenerator
 
-from fastapi_users_db_beanie import BeanieUserDatabase
-
+from winebox.db.user_db import MotorUserDatabase
 from winebox.models.user import User
 
 
-async def get_user_db() -> AsyncGenerator[BeanieUserDatabase, None]:
-    """Get the Beanie user database adapter.
+async def get_user_db() -> AsyncGenerator[MotorUserDatabase, None]:
+    """Get the motor user database adapter.
 
     Yields:
-        BeanieUserDatabase instance for User document.
+        MotorUserDatabase instance for User document.
     """
-    yield BeanieUserDatabase(User)
+    yield MotorUserDatabase(User, lambda: User._get_collection())

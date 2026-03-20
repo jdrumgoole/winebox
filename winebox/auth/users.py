@@ -5,15 +5,16 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import Optional
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, FastAPIUsers
-from fastapi_users_db_beanie import BeanieUserDatabase, ObjectIDIDMixin
 
 from winebox.auth.backend import auth_backend
 from winebox.auth.db import get_user_db
 from winebox.auth.schemas import UserCreate
 from winebox.config import settings
+from winebox.db import PyObjectId
+from winebox.db.user_db import MotorUserDatabase
 from winebox.models.user import User
 from winebox.services.analytics import posthog_service
 from winebox.services.email import get_email_service
@@ -26,36 +27,32 @@ def _derive_secret(base_secret: str, purpose: str) -> str:
 
     This ensures that different token types use different secrets,
     so compromising one type doesn't compromise others.
-
-    Args:
-        base_secret: The main application secret key.
-        purpose: A string identifying the purpose (e.g., 'reset_password').
-
-    Returns:
-        A derived secret string.
     """
     combined = f"{base_secret}:{purpose}"
     return hashlib.sha256(combined.encode()).hexdigest()
 
 
-class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
+class ObjectIDIDMixin:
+    """Mixin to handle ObjectId parsing for fastapi-users."""
+
+    async def parse_id(self, value: str) -> ObjectId:
+        """Parse a string ID to ObjectId."""
+        return ObjectId(value)
+
+
+class UserManager(ObjectIDIDMixin, BaseUserManager[User, PyObjectId]):
     """Custom user manager with email verification and password reset callbacks."""
 
     # Use derived secrets for different token types (security best practice)
-    # This ensures JWT secret compromise doesn't affect reset/verification tokens
     reset_password_token_secret = _derive_secret(settings.secret_key, "reset_password")
     verification_token_secret = _derive_secret(settings.secret_key, "verification")
 
     async def on_after_register(
         self, user: User, request: Optional[Request] = None
     ) -> None:
-        """Called after successful user registration.
-
-        Sends verification email if email verification is required.
-        """
+        """Called after successful user registration."""
         logger.info("User registered (id=%s, email=%s)", user.id, user.email)
 
-        # Track registration event
         posthog_service.capture(
             distinct_id=str(user.id),
             event="user_registered",
@@ -72,10 +69,7 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
     ) -> None:
-        """Called after a password reset was requested.
-
-        Sends password reset email.
-        """
+        """Called after a password reset was requested."""
         logger.info("Password reset requested for user (id=%s)", user.id)
 
         email_service = get_email_service()
@@ -98,10 +92,7 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
     async def on_after_request_verify(
         self, user: User, token: str, request: Optional[Request] = None
     ) -> None:
-        """Called after a verification email was requested.
-
-        Sends verification email.
-        """
+        """Called after a verification email was requested."""
         logger.info("Verification requested for user (id=%s)", user.id)
 
         email_service = get_email_service()
@@ -130,7 +121,6 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
         """Called after successful login."""
         logger.info("User logged in (id=%s)", user.id)
 
-        # Track login event
         posthog_service.capture(
             distinct_id=str(user.id),
             event="user_login",
@@ -139,18 +129,11 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
 
 
 async def get_user_manager(
-    user_db: BeanieUserDatabase = Depends(get_user_db),
+    user_db: MotorUserDatabase = Depends(get_user_db),
 ) -> AsyncGenerator[UserManager, None]:
-    """Get the user manager instance.
-
-    Args:
-        user_db: Beanie user database adapter.
-
-    Yields:
-        UserManager instance.
-    """
+    """Get the user manager instance."""
     yield UserManager(user_db)
 
 
 # FastAPIUsers instance
-fastapi_users = FastAPIUsers[User, PydanticObjectId](get_user_manager, [auth_backend])
+fastapi_users = FastAPIUsers[User, PyObjectId](get_user_manager, [auth_backend])

@@ -65,7 +65,7 @@ class TestAddUser:
         output = capsys.readouterr().out
         assert "created successfully" in output
 
-        user = await User.find_one(User.email == unique_email)
+        user = await User.find_one({"email": unique_email})
         assert user is not None
         assert user.is_active is True
         assert user.is_verified is True
@@ -78,7 +78,7 @@ class TestAddUser:
         output = capsys.readouterr().out
         assert "admin" in output
 
-        user = await User.find_one(User.email == unique_email)
+        user = await User.find_one({"email": unique_email})
         assert user.is_superuser is True
 
     @pytest.mark.asyncio
@@ -116,7 +116,7 @@ class TestDisableUser:
         output = capsys.readouterr().out
         assert "disabled" in output
 
-        user = await User.find_one(User.email == regular_user.email)
+        user = await User.find_one({"email": regular_user.email})
         assert user.is_active is False
 
     @pytest.mark.asyncio
@@ -144,7 +144,7 @@ class TestEnableUser:
         output = capsys.readouterr().out
         assert "enabled" in output
 
-        user = await User.find_one(User.email == regular_user.email)
+        user = await User.find_one({"email": regular_user.email})
         assert user.is_active is True
 
     @pytest.mark.asyncio
@@ -191,7 +191,7 @@ class TestRemoveUser:
         output = capsys.readouterr().out
         assert "removed" in output
 
-        user = await User.find_one(User.email == regular_user.email)
+        user = await User.find_one({"email": regular_user.email})
         assert user is None
 
     @pytest.mark.asyncio
@@ -209,7 +209,7 @@ class TestChangePassword:
         output = capsys.readouterr().out
         assert "updated" in output
 
-        user = await User.find_one(User.email == regular_user.email)
+        user = await User.find_one({"email": regular_user.email})
         assert verify_password("newpassword", user.hashed_password)
 
     @pytest.mark.asyncio

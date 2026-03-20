@@ -2,7 +2,7 @@
 
 import logging
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException, status
 from pydantic import ValidationError
@@ -33,13 +33,13 @@ async def list_transactions(
 
     if wine_id:
         try:
-            conditions["wine_id"] = PydanticObjectId(wine_id)
+            conditions["wine_id"] = ObjectId(wine_id)
         except (InvalidId, ValidationError) as e:
             logger.debug("Invalid wine ID format in filter: %s - %s", wine_id, e)
 
     transactions = await Transaction.find(
         conditions
-    ).skip(skip).limit(limit).sort(-Transaction.transaction_date).to_list()
+    ).skip(skip).limit(limit).sort([("transaction_date", -1)]).to_list()
 
     # Batch fetch all wine details (fixes N+1 query)
     wine_ids = list({t.wine_id for t in transactions})
@@ -75,8 +75,7 @@ async def get_transaction(
     """Get a single transaction by ID."""
     try:
         transaction = await Transaction.find_one(
-            Transaction.id == PydanticObjectId(transaction_id),
-            Transaction.owner_id == current_user.id,
+            {"_id": ObjectId(transaction_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid transaction ID format: %s - %s", transaction_id, e)

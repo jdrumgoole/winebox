@@ -2,23 +2,19 @@
 
 from typing import Optional
 
-from beanie import Document, Indexed
+from winebox.db import MongoDocument
 
 
-class GrapeVariety(Document):
+class GrapeVariety(MongoDocument):
     """Grape variety document model representing wine grapes."""
 
-    name: Indexed(str, unique=True)
+    name: str
     color: str  # 'red' or 'white'
     category: Optional[str] = None  # 'international' or 'regional'
     origin_country: Optional[str] = None
 
     class Settings:
         name = "grape_varieties"
-        indexes = [
-            "name",
-            "color",
-        ]
 
     def __repr__(self) -> str:
         return f"<GrapeVariety(id={self.id}, name={self.name}, color={self.color})>"

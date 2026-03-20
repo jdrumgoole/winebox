@@ -68,8 +68,7 @@ async def enrich_wines(current_user: RequireAuth) -> dict:
     """
     # Count unenriched wines
     unenriched_count = await Wine.find(
-        Wine.owner_id == current_user.id,
-        Wine.xwines_id == None,  # noqa: E711
+        {"owner_id": current_user.id, "xwines_id": None}
     ).count()
 
     if unenriched_count == 0:

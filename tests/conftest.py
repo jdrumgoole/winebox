@@ -28,11 +28,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
-from beanie import init_beanie
 from httpx import ASGITransport, AsyncClient
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
-from winebox.database import get_document_models
+from winebox.database import init_db
 from winebox.models import User
 from winebox.services.auth import get_password_hash, create_access_token
 
@@ -111,30 +110,29 @@ async def mongo_client():
 
     Session-scoped: one client per xdist worker process.
     """
-    client = AsyncIOMotorClient(
+    client = AsyncMongoClient(
         TEST_MONGODB_URL,
         maxPoolSize=10,
         minPoolSize=1,
     )
     yield client
-    client.close()
+    await client.close()
 
 
 @pytest_asyncio.fixture(scope="session")
 async def init_test_db(mongo_client):
-    """Initialize Beanie with a shared test database per worker.
+    """Initialize database with a shared test database per worker.
 
     Session-scoped: one database per xdist worker. Data accumulates
     across tests, mirroring production behaviour. The database is
     dropped when the worker session ends.
     """
     db_name = f"test_winebox_{os.getpid()}"
-    db = mongo_client[db_name]
 
-    await init_beanie(
-        database=db,
-        document_models=get_document_models(),
-    )
+    await init_db(mongo_client=mongo_client, mongodb_database=db_name)
+
+    from winebox.database import get_database
+    db = get_database()
     yield db
 
     # Cleanup: drop the entire test database when the worker finishes

@@ -4,8 +4,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
-from beanie import Document, Indexed, PydanticObjectId
 from pydantic import Field
+
+from winebox.db import MongoDocument, PyObjectId
 
 
 class ImportStatus(str, Enum):
@@ -18,10 +19,10 @@ class ImportStatus(str, Enum):
     FAILED = "failed"
 
 
-class ImportBatch(Document):
+class ImportBatch(MongoDocument):
     """Tracks a spreadsheet import batch through the upload/map/process workflow."""
 
-    owner_id: Indexed(PydanticObjectId)
+    owner_id: PyObjectId
     filename: str
     file_type: str  # "csv" or "xlsx"
     imported_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

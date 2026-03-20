@@ -1,80 +1,40 @@
-"""MongoDB database setup and Beanie ODM initialization."""
+"""MongoDB database setup using native async pymongo."""
 
-from typing import TYPE_CHECKING
+import logging
 
-from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo import AsyncMongoClient
+from pymongo.asynchronous.database import AsyncDatabase
 
 from winebox.config import settings
 
-if TYPE_CHECKING:
-    from beanie import Document
+logger = logging.getLogger(__name__)
 
 # Global database client and database references
-client: AsyncIOMotorClient | None = None
-database: AsyncIOMotorDatabase | None = None
-
-
-def get_document_models() -> list[type["Document"]]:
-    """Get all Beanie document models for initialization.
-
-    Returns:
-        List of Document model classes.
-    """
-    from winebox.models import (
-        Classification,
-        GrapeVariety,
-        ImportBatch,
-        RawUploadRow,
-        LoginAttempt,
-        Region,
-        RevokedToken,
-        Transaction,
-        User,
-        Wine,
-        WineType,
-        XWinesMetadata,
-        XWinesWine,
-    )
-
-    return [
-        User,
-        Wine,
-        Transaction,
-        WineType,
-        GrapeVariety,
-        Region,
-        Classification,
-        XWinesWine,
-        XWinesMetadata,
-        RevokedToken,
-        LoginAttempt,
-        ImportBatch,
-        RawUploadRow,
-    ]
+client: AsyncMongoClient | None = None
+database: AsyncDatabase | None = None
 
 
 async def init_db(
     mongodb_url: str | None = None,
     mongodb_database: str | None = None,
-    motor_client: AsyncIOMotorClient | None = None,
+    mongo_client: AsyncMongoClient | None = None,
 ) -> None:
-    """Initialize the MongoDB database connection and Beanie ODM.
+    """Initialize the MongoDB database connection.
 
     Args:
         mongodb_url: Optional MongoDB connection URL. Defaults to settings.
         mongodb_database: Optional database name. Defaults to settings.
-        motor_client: Optional pre-configured motor client (for testing).
+        mongo_client: Optional pre-configured client (for testing).
     """
     global client, database
 
-    if motor_client is not None:
-        # Use provided client (e.g., for testing with mongomock)
-        client = motor_client
+    if mongo_client is not None:
+        # Use provided client (e.g., for testing)
+        client = mongo_client
     else:
         # Create new client from settings with connection pool configuration
         url = mongodb_url or settings.mongodb_url
-        client = AsyncIOMotorClient(
+        client = AsyncMongoClient(
             url,
             minPoolSize=settings.min_pool_size,
             maxPoolSize=settings.max_pool_size,
@@ -83,11 +43,12 @@ async def init_db(
     db_name = mongodb_database or settings.mongodb_database
     database = client[db_name]
 
-    # Initialize Beanie with all document models
-    await init_beanie(
-        database=database,
-        document_models=get_document_models(),
-    )
+    # Create indexes (idempotent)
+    from winebox.db.indexes import ensure_indexes
+
+    await ensure_indexes(database)
+
+    logger.info("Database initialized: %s", db_name)
 
 
 async def close_db() -> None:
@@ -95,12 +56,12 @@ async def close_db() -> None:
     global client, database
 
     if client is not None:
-        client.close()
+        await client.close()
         client = None
         database = None
 
 
-def get_database() -> AsyncIOMotorDatabase:
+def get_database() -> AsyncDatabase:
     """Get the current database instance.
 
     Returns:

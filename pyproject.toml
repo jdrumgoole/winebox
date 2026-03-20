@@ -39,9 +39,8 @@ dependencies = [
     "pyyaml>=6.0.0",
     "aioboto3>=13.0.0",
     # MongoDB dependencies
-    "motor>=3.3.0",
-    "beanie>=1.25.0",
-    "fastapi-users[beanie]>=14.0.0",
+    "pymongo>=4.10.0",
+    "fastapi-users>=14.0.0",
     # Export dependencies
     "openpyxl>=3.1.0",
     # Analytics

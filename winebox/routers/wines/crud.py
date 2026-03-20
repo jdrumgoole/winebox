@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timezone
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 from pydantic import ValidationError
@@ -26,18 +26,18 @@ async def list_wines(
 ) -> list[WineWithInventory]:
     """List all wines with optional filtering."""
     # Build filter conditions
-    conditions = [Wine.owner_id == current_user.id]
+    conditions: dict = {"owner_id": current_user.id}
 
     if collection:
-        conditions.append(Wine.collection == collection)
+        conditions["collection"] = collection
 
     if in_stock is True:
-        conditions.append(Wine.inventory.quantity > 0)
+        conditions["inventory.quantity"] = {"$gt": 0}
     elif in_stock is False:
-        conditions.append(Wine.inventory.quantity == 0)
+        conditions["inventory.quantity"] = 0
 
-    query = Wine.find(*conditions)
-    wines = await query.skip(skip).limit(limit).sort(-Wine.created_at).to_list()
+    query = Wine.find(conditions)
+    wines = await query.skip(skip).limit(limit).sort([("created_at", -1)]).to_list()
 
     return [WineWithInventory.model_validate(wine) for wine in wines]
 
@@ -49,8 +49,7 @@ async def get_wine(
     """Get wine details with full transaction history."""
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
@@ -64,8 +63,8 @@ async def get_wine(
 
     # Get transactions for this wine (owner already verified via wine ownership)
     transactions = await Transaction.find(
-        Transaction.wine_id == wine.id
-    ).sort(-Transaction.transaction_date).to_list()
+        {"wine_id": wine.id}
+    ).sort([("transaction_date", -1)]).to_list()
 
     # Build response with transactions
     response_data = wine.model_dump()
@@ -82,8 +81,7 @@ async def update_wine(
     """Update wine metadata."""
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
@@ -118,7 +116,7 @@ async def delete_all_wines(
 ) -> dict:
     """Delete all wines, transactions, images, and import batches for the current user."""
     # Find all wines belonging to the current user
-    wines = await Wine.find(Wine.owner_id == current_user.id).to_list()
+    wines = await Wine.find({"owner_id": current_user.id}).to_list()
 
     # Delete label images for all wines
     deleted_images = 0
@@ -132,19 +130,19 @@ async def delete_all_wines(
 
     # Delete all transactions for this user
     delete_transactions_result = await Transaction.find(
-        Transaction.owner_id == current_user.id
+        {"owner_id": current_user.id}
     ).delete()
     deleted_transactions = delete_transactions_result.deleted_count if delete_transactions_result else 0
 
     # Delete all import batches for this user
     delete_batches_result = await ImportBatch.find(
-        ImportBatch.owner_id == current_user.id
+        {"owner_id": current_user.id}
     ).delete()
     deleted_import_batches = delete_batches_result.deleted_count if delete_batches_result else 0
 
     # Delete all wines for this user
     delete_wines_result = await Wine.find(
-        Wine.owner_id == current_user.id
+        {"owner_id": current_user.id}
     ).delete()
     deleted_wines = delete_wines_result.deleted_count if delete_wines_result else 0
 
@@ -168,8 +166,7 @@ async def delete_wine(
     """Delete wine and all associated history."""
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
@@ -188,7 +185,7 @@ async def delete_wine(
         await image_storage.delete_image(wine.back_label_image_path)
 
     # Delete transactions
-    await Transaction.find(Transaction.wine_id == wine.id).delete()
+    await Transaction.find({"wine_id": wine.id}).delete()
 
     # Delete wine
     await wine.delete()

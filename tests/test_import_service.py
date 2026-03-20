@@ -219,11 +219,11 @@ def test_non_wine_keyword_embedded_in_name() -> None:
 
 def test_row_to_wine_data_basic() -> None:
     """Test basic row conversion."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
     row = {"Wine": "Margaux 2015", "Producer": "Chateau Margaux", "Country": "France"}
     mapping = {"Wine": "name", "Producer": "winery", "Country": "country"}
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
 
     result = row_to_wine_data(row, mapping, owner_id)
     assert result is not None
@@ -236,11 +236,11 @@ def test_row_to_wine_data_basic() -> None:
 
 def test_row_to_wine_data_custom_fields() -> None:
     """Test custom fields extraction."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
     row = {"Name": "Test Wine", "Location": "Rack 3", "Rating": "95"}
     mapping = {"Name": "name", "Location": "custom:Cellar Location", "Rating": "custom:My Rating"}
-    owner_id = PydanticObjectId()
+    owner_id = ObjectId()
 
     result = row_to_wine_data(row, mapping, owner_id)
     assert result is not None
@@ -252,51 +252,51 @@ def test_row_to_wine_data_custom_fields() -> None:
 
 def test_row_to_wine_data_no_name_returns_none() -> None:
     """Test that a row without a name returns None."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
     row = {"Producer": "Some Winery", "Country": "France"}
     mapping = {"Producer": "winery", "Country": "country"}
-    result = row_to_wine_data(row, mapping, PydanticObjectId())
+    result = row_to_wine_data(row, mapping, ObjectId())
     assert result is None
 
 
 def test_row_to_wine_vintage_coercion() -> None:
     """Test vintage year coercion from string."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
     row = {"Name": "Test", "Year": "2018"}
     mapping = {"Name": "name", "Year": "vintage"}
-    result = row_to_wine_data(row, mapping, PydanticObjectId())
+    result = row_to_wine_data(row, mapping, ObjectId())
     assert result["vintage"] == 2018
 
 
 def test_row_to_wine_vintage_float_coercion() -> None:
     """Test vintage coercion from float string (Excel format)."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
     row = {"Name": "Test", "Year": "2018.0"}
     mapping = {"Name": "name", "Year": "vintage"}
-    result = row_to_wine_data(row, mapping, PydanticObjectId())
+    result = row_to_wine_data(row, mapping, ObjectId())
     assert result["vintage"] == 2018
 
 
 def test_row_to_wine_alcohol_coercion() -> None:
     """Test alcohol percentage coercion."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
     row = {"Name": "Test", "ABV": "13.5%"}
     mapping = {"Name": "name", "ABV": "alcohol_percentage"}
-    result = row_to_wine_data(row, mapping, PydanticObjectId())
+    result = row_to_wine_data(row, mapping, ObjectId())
     assert result["alcohol_percentage"] == 13.5
 
 
 def test_row_to_wine_quantity_from_row() -> None:
     """Test quantity taken from row when mapped."""
-    from beanie import PydanticObjectId
+    from bson import ObjectId
 
     row = {"Name": "Test", "Qty": "6"}
     mapping = {"Name": "name", "Qty": "quantity"}
-    result = row_to_wine_data(row, mapping, PydanticObjectId())
+    result = row_to_wine_data(row, mapping, ObjectId())
     assert result["inventory"].quantity == 6
 
 
