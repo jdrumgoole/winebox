@@ -1363,9 +1363,9 @@ def deploy_oat(
     # Override nginx config for OAT
     ctx.run(cmd, pty=True, env={"WINEBOX_NGINX_CONF": OAT_NGINX_CONF})
 
-        print(f"\nOAT deployment complete!")
-        print(f"  URL: https://{OAT_DOMAIN}")
-        print(f"  Database: {OAT_DATABASE}")
+    print(f"\nOAT deployment complete!")
+    print(f"  URL: https://{OAT_DOMAIN}")
+    print(f"  Database: {OAT_DATABASE}")
 
 
 @task(name="oat-deploy-xwines")
