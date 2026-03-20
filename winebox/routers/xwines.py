@@ -9,6 +9,8 @@ Provides endpoints for:
 
 import logging
 import re
+import time
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
@@ -28,6 +30,71 @@ from winebox.schemas.xwines import (
 from winebox.services import export_service
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# In-memory cache for filter dropdowns (types & countries).
+# These change only when xwines data is re-imported, so a long TTL is fine.
+# ---------------------------------------------------------------------------
+_FILTER_CACHE_TTL = 3600  # 1 hour
+
+_filter_cache: dict[str, Any] = {
+    "types": None,
+    "countries": None,
+    "updated_at": 0.0,
+}
+
+
+def _cache_is_valid() -> bool:
+    return (
+        _filter_cache["types"] is not None
+        and _filter_cache["countries"] is not None
+        and (time.monotonic() - _filter_cache["updated_at"]) < _FILTER_CACHE_TTL
+    )
+
+
+def invalidate_filter_cache() -> None:
+    """Invalidate the filter cache, forcing a refresh on next request."""
+    _filter_cache["types"] = None
+    _filter_cache["countries"] = None
+    _filter_cache["updated_at"] = 0.0
+
+
+async def _refresh_filter_cache() -> None:
+    """Populate the types/countries cache from the database."""
+    try:
+        collection = XWinesWine.get_pymongo_collection()
+
+        types_pipeline: list[dict] = [
+            {"$match": {"wine_type": {"$ne": None}}},
+            {"$group": {"_id": "$wine_type"}},
+            {"$sort": {"_id": 1}},
+        ]
+        types_results = await collection.aggregate(types_pipeline).to_list(length=100)
+        types = [doc["_id"] for doc in types_results if doc["_id"]]
+
+        countries_pipeline: list[dict] = [
+            {"$match": {"country_code": {"$ne": None}, "country": {"$ne": None}}},
+            {
+                "$group": {
+                    "_id": {"code": "$country_code", "name": "$country"},
+                    "count": {"$sum": 1},
+                }
+            },
+            {"$sort": {"count": -1, "_id.name": 1}},
+        ]
+        countries_results = await collection.aggregate(countries_pipeline).to_list(length=500)
+        countries = [
+            {"code": doc["_id"]["code"], "name": doc["_id"]["name"], "count": doc["count"]}
+            for doc in countries_results
+        ]
+
+        _filter_cache["types"] = types
+        _filter_cache["countries"] = countries
+        _filter_cache["updated_at"] = time.monotonic()
+        logger.info("X-Wines filter cache refreshed: %d types, %d countries", len(types), len(countries))
+    except Exception:
+        logger.exception("Failed to refresh X-Wines filter cache")
 
 router = APIRouter()
 
@@ -453,65 +520,18 @@ async def get_stats() -> XWinesStats:
 
 @router.get("/types", response_model=list[str])
 async def list_wine_types() -> list[str]:
-    """List distinct wine types in the X-Wines dataset."""
-    # Use MongoDB aggregation for efficient distinct values
-    # Falls back to Python aggregation if aggregation is not supported (e.g., mongomock)
-    try:
-        pipeline: list[dict] = [
-            {"$match": {"wine_type": {"$ne": None}}},
-            {"$group": {"_id": "$wine_type"}},
-            {"$sort": {"_id": 1}},
-        ]
-        results = await XWinesWine.aggregate(pipeline).to_list()
-        return [doc["_id"] for doc in results if doc["_id"]]
-    except Exception:
-        # Fallback to Python aggregation for compatibility
-        wines = await XWinesWine.find(
-            XWinesWine.wine_type != None  # noqa: E711
-        ).to_list()
-        types = set(wine.wine_type for wine in wines if wine.wine_type)
-        return sorted(list(types))
+    """List distinct wine types in the X-Wines dataset (cached)."""
+    if not _cache_is_valid():
+        await _refresh_filter_cache()
+    return _filter_cache["types"] or []
 
 
 @router.get("/countries", response_model=list[dict])
 async def list_countries() -> list[dict]:
-    """List countries with wine counts in the X-Wines dataset."""
-    # Use MongoDB aggregation for efficient grouping
-    # Falls back to Python aggregation if aggregation is not supported (e.g., mongomock)
-    try:
-        pipeline: list[dict] = [
-            {"$match": {"country_code": {"$ne": None}, "country": {"$ne": None}}},
-            {
-                "$group": {
-                    "_id": {"code": "$country_code", "name": "$country"},
-                    "count": {"$sum": 1},
-                }
-            },
-            {"$sort": {"count": -1, "_id.name": 1}},
-        ]
-        results = await XWinesWine.aggregate(pipeline).to_list()
-        return [
-            {"code": doc["_id"]["code"], "name": doc["_id"]["name"], "count": doc["count"]}
-            for doc in results
-        ]
-    except Exception:
-        # Fallback to Python aggregation for compatibility
-        from collections import Counter
-
-        wines = await XWinesWine.find(
-            XWinesWine.country_code != None  # noqa: E711
-        ).to_list()
-
-        country_counts: Counter[tuple[str, str]] = Counter()
-        for wine in wines:
-            if wine.country_code and wine.country:
-                country_counts[(wine.country_code, wine.country)] += 1
-
-        sorted_countries = sorted(country_counts.items(), key=lambda x: (-x[1], x[0][1]))
-        return [
-            {"code": code, "name": name, "count": count}
-            for (code, name), count in sorted_countries
-        ]
+    """List countries with wine counts in the X-Wines dataset (cached)."""
+    if not _cache_is_valid():
+        await _refresh_filter_cache()
+    return _filter_cache["countries"] or []
 
 
 @router.get("/export")
