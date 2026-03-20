@@ -403,6 +403,9 @@ async def get_wine(wine_id: int) -> XWinesWineDetail:
     if not wine:
         raise HTTPException(status_code=404, detail="Wine not found")
 
+    price_map = await _batch_lookup_prices([wine_id])
+    prices = price_map.get(wine_id, {})
+
     return XWinesWineDetail(
         id=wine.xwines_id,
         name=wine.name,
@@ -423,6 +426,9 @@ async def get_wine(wine_id: int) -> XWinesWineDetail:
         vintages=wine.vintages,
         avg_rating=wine.avg_rating,
         rating_count=wine.rating_count,
+        price_low_usd=prices.get("price_low_usd"),
+        price_high_usd=prices.get("price_high_usd"),
+        price_tier=prices.get("price_tier"),
     )
 
 

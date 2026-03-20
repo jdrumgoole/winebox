@@ -2681,6 +2681,7 @@ async function showXWinesDetail(wineId) {
 
                 <div class="xwines-detail-rating">
                     <div class="xwines-detail-stars">${ratingDisplay}</div>
+                    ${formatXWinesPrice(wine) ? `<div class="xwines-detail-price">${formatXWinesPrice(wine)}</div>` : ''}
                 </div>
 
                 <div class="xwines-detail-fields">

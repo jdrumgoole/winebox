@@ -2274,6 +2274,13 @@ body.logged-out #user-info {
     font-weight: 600;
 }
 
+.xwines-detail-price {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--success-color, #2d6a4f);
+    margin-top: 0.25rem;
+}
+
 .xwines-detail-fields {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
