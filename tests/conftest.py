@@ -12,6 +12,12 @@ import uuid
 from dotenv import load_dotenv
 
 load_dotenv()  # Load .env so API keys etc. are available to tests
+
+# Ensure tests never accidentally use the production database name.
+# The actual test database is created per-worker in init_test_db fixture,
+# but Settings() is loaded globally and must not trigger the safety guard.
+if "WINEBOX_DATABASE" not in os.environ:
+    os.environ["WINEBOX_DATABASE"] = "winebox_test"
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone

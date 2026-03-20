@@ -88,6 +88,8 @@ class Wine(Document):
     wine_subtype: Optional[str] = None  # e.g., 'full_bodied', 'champagne'
     classification: Optional[str] = None  # e.g., Grand Cru, DOCG, Reserve
     price_tier: Optional[str] = None  # 'budget', 'value', etc.
+    estimated_price_low: Optional[float] = None  # From X-Wines price data (USD)
+    estimated_price_high: Optional[float] = None  # From X-Wines price data (USD)
     drink_window_start: Optional[int] = None  # Year
     drink_window_end: Optional[int] = None  # Year
     producer_type: Optional[str] = None  # 'estate', 'negociant', 'cooperative'

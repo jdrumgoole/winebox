@@ -296,8 +296,25 @@ async def _regex_search(
     return wines, total
 
 
-def _wine_doc_to_result(doc: dict) -> XWinesWineSearchResult:
+async def _batch_lookup_prices(xwines_ids: list[int]) -> dict[int, dict]:
+    """Batch lookup price data for X-Wines IDs from the xwines_prices collection."""
+    if not xwines_ids:
+        return {}
+    try:
+        db = get_database()
+        cursor = db["xwines_prices"].find(
+            {"xwines_id": {"$in": xwines_ids}},
+            {"_id": 0, "xwines_id": 1, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
+        )
+        return {doc["xwines_id"]: doc async for doc in cursor}
+    except Exception as e:
+        logger.debug("Price lookup failed: %s", e)
+        return {}
+
+
+def _wine_doc_to_result(doc: dict, price_data: dict | None = None) -> XWinesWineSearchResult:
     """Convert a raw MongoDB document to a search result."""
+    prices = price_data or {}
     return XWinesWineSearchResult(
         id=doc.get("xwines_id", 0),
         name=doc.get("name", ""),
@@ -308,11 +325,15 @@ def _wine_doc_to_result(doc: dict) -> XWinesWineSearchResult:
         abv=doc.get("abv"),
         avg_rating=doc.get("avg_rating"),
         rating_count=doc.get("rating_count", 0),
+        price_low_usd=prices.get("price_low_usd"),
+        price_high_usd=prices.get("price_high_usd"),
+        price_tier=prices.get("price_tier"),
     )
 
 
-def _wine_model_to_result(wine: XWinesWine) -> XWinesWineSearchResult:
+def _wine_model_to_result(wine: XWinesWine, price_data: dict | None = None) -> XWinesWineSearchResult:
     """Convert a Beanie model to a search result."""
+    prices = price_data or {}
     return XWinesWineSearchResult(
         id=wine.xwines_id,
         name=wine.name,
@@ -323,6 +344,9 @@ def _wine_model_to_result(wine: XWinesWine) -> XWinesWineSearchResult:
         abv=wine.abv,
         avg_rating=wine.avg_rating,
         rating_count=wine.rating_count,
+        price_low_usd=prices.get("price_low_usd"),
+        price_high_usd=prices.get("price_high_usd"),
+        price_tier=prices.get("price_tier"),
     )
 
 
@@ -345,7 +369,12 @@ async def search_wines(
     try:
         docs, total, facets = await _atlas_search(q, limit, wine_type, country, skip)
         if total > 0:
-            results = [_wine_doc_to_result(doc) for doc in docs]
+            xwines_ids = [doc.get("xwines_id") for doc in docs if doc.get("xwines_id")]
+            price_map = await _batch_lookup_prices(xwines_ids)
+            results = [
+                _wine_doc_to_result(doc, price_map.get(doc.get("xwines_id")))
+                for doc in docs
+            ]
             return XWinesSearchResponse(
                 results=results, total=total, skip=skip, limit=limit, facets=facets
             )
@@ -355,7 +384,12 @@ async def search_wines(
 
     # Fallback to regex search
     wines, total = await _regex_search(q, limit, wine_type, country, skip)
-    results = [_wine_model_to_result(wine) for wine in wines]
+    xwines_ids = [wine.xwines_id for wine in wines if wine.xwines_id]
+    price_map = await _batch_lookup_prices(xwines_ids)
+    results = [
+        _wine_model_to_result(wine, price_map.get(wine.xwines_id))
+        for wine in wines
+    ]
     return XWinesSearchResponse(
         results=results, total=total, skip=skip, limit=limit, facets=None
     )
@@ -489,11 +523,15 @@ async def export_xwines_search(
     # Execute search without pagination (get all results up to limit)
     try:
         docs, total, _ = await _atlas_search(q, limit, wine_type, country, skip=0)
-        results = [_wine_doc_to_result(doc) for doc in docs]
+        xwines_ids = [doc.get("xwines_id") for doc in docs if doc.get("xwines_id")]
+        price_map = await _batch_lookup_prices(xwines_ids)
+        results = [_wine_doc_to_result(doc, price_map.get(doc.get("xwines_id"))) for doc in docs]
     except Exception as e:
         logger.debug("Atlas Search unavailable, falling back to regex: %s", e)
         wines, total = await _regex_search(q, limit, wine_type, country, skip=0)
-        results = [_wine_model_to_result(wine) for wine in wines]
+        xwines_ids = [wine.xwines_id for wine in wines if wine.xwines_id]
+        price_map = await _batch_lookup_prices(xwines_ids)
+        results = [_wine_model_to_result(wine, price_map.get(wine.xwines_id)) for wine in wines]
 
     # Build filters applied metadata
     filters_applied = {"q": q}

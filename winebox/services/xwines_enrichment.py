@@ -129,6 +129,23 @@ async def enrich_parsed_with_xwines(parsed: dict) -> dict:
     if enriched_fields:
         parsed["enriched_fields"] = enriched_fields
 
+    # Look up estimated price data
+    try:
+        db = get_database()
+        price_doc = await db["xwines_prices"].find_one(
+            {"xwines_id": match.xwines_id},
+            {"_id": 0, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
+        )
+        if price_doc:
+            if not parsed.get("estimated_price_low") and price_doc.get("price_low_usd"):
+                parsed["estimated_price_low"] = price_doc["price_low_usd"]
+            if not parsed.get("estimated_price_high") and price_doc.get("price_high_usd"):
+                parsed["estimated_price_high"] = price_doc["price_high_usd"]
+            if not parsed.get("price_tier") and price_doc.get("price_tier"):
+                parsed["price_tier"] = price_doc["price_tier"]
+    except Exception as e:
+        logger.debug("Price lookup during enrichment failed: %s", e)
+
     return parsed
 
 
@@ -605,3 +622,29 @@ async def enrich_batch_with_xwines(parsed_list: list[dict]) -> None:
         parsed["xwines_id"] = match.xwines_id
         if enriched_fields:
             parsed["enriched_fields"] = enriched_fields
+
+    # Batch price lookup for all matched wines
+    try:
+        matched_ids = [
+            p["xwines_id"] for p in parsed_list if p.get("xwines_id")
+        ]
+        if matched_ids:
+            db = get_database()
+            cursor = db["xwines_prices"].find(
+                {"xwines_id": {"$in": matched_ids}},
+                {"_id": 0, "xwines_id": 1, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
+            )
+            price_map: dict[int, dict] = {doc["xwines_id"]: doc async for doc in cursor}
+
+            for parsed in parsed_list:
+                xid = parsed.get("xwines_id")
+                if xid and xid in price_map:
+                    price_doc = price_map[xid]
+                    if not parsed.get("estimated_price_low") and price_doc.get("price_low_usd"):
+                        parsed["estimated_price_low"] = price_doc["price_low_usd"]
+                    if not parsed.get("estimated_price_high") and price_doc.get("price_high_usd"):
+                        parsed["estimated_price_high"] = price_doc["price_high_usd"]
+                    if not parsed.get("price_tier") and price_doc.get("price_tier"):
+                        parsed["price_tier"] = price_doc["price_tier"]
+    except Exception as e:
+        logger.debug("Batch price lookup during enrichment failed: %s", e)

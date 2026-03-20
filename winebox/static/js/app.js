@@ -2025,6 +2025,13 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function formatXWinesPrice(wine) {
+    if (wine.price_low_usd && wine.price_high_usd)
+        return `$${Math.round(wine.price_low_usd)}\u2013$${Math.round(wine.price_high_usd)}`;
+    if (wine.price_tier) return wine.price_tier.replace(/_/g, ' ');
+    return '';
+}
+
 function parsePythonList(str) {
     if (!str) return '';
     try {
@@ -2509,6 +2516,7 @@ function renderXWinesTable(containerId, results, total) {
         const ratingDisplay = wine.avg_rating
             ? `${wine.avg_rating.toFixed(1)} (${wine.rating_count})`
             : '-';
+        const priceDisplay = formatXWinesPrice(wine);
 
         return `
             <tr class="xwines-table-row" data-xwine-id="${wine.id}">
@@ -2519,6 +2527,7 @@ function renderXWinesTable(containerId, results, total) {
                 <td>${wine.region ? escapeHtml(wine.region) : '-'}</td>
                 <td>${wine.abv ? `${wine.abv}%` : '-'}</td>
                 <td class="xwines-table-rating">${ratingDisplay}</td>
+                <td class="xwines-table-price">${priceDisplay || '-'}</td>
             </tr>
         `;
     }).join('');
@@ -2536,6 +2545,7 @@ function renderXWinesTable(containerId, results, total) {
                         <th>Region</th>
                         <th>ABV</th>
                         <th>Rating</th>
+                        <th>Price</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -2617,6 +2627,7 @@ function renderXWinesGrid(containerId, results, total) {
                 </div>
                 <div class="xwines-card-footer">
                     ${ratingDisplay}
+                    ${formatXWinesPrice(wine) ? `<span class="xwines-price-tag">${formatXWinesPrice(wine)}</span>` : ''}
                 </div>
             </div>
         `;

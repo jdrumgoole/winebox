@@ -17,6 +17,9 @@ class XWinesWineSearchResult(BaseModel):
     abv: float | None = Field(None, description="Alcohol by volume percentage")
     avg_rating: float | None = Field(None, description="Average community rating (1-5)")
     rating_count: int = Field(0, description="Number of ratings")
+    price_low_usd: float | None = Field(None, description="Estimated low retail price (USD)")
+    price_high_usd: float | None = Field(None, description="Estimated high retail price (USD)")
+    price_tier: str | None = Field(None, description="Price tier")
 
     model_config = ConfigDict(from_attributes=True)
 

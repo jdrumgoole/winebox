@@ -2170,10 +2170,18 @@ body.logged-out #user-info {
 .xwines-card-footer {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.5rem;
     padding: 0.75rem 1.25rem;
     border-top: 1px solid var(--border-color);
     background: var(--background-color);
+}
+
+.xwines-price-tag {
+    font-weight: 600;
+    color: var(--success-color, #2d6a4f);
+    font-size: 0.9rem;
+    white-space: nowrap;
 }
 
 /* X-Wines Rating */
