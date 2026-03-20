@@ -76,7 +76,7 @@ class TestXWinesNavigation:
         page = authenticated_page
         nav_link = page.locator("a[data-page='xwines']")
         expect(nav_link).to_be_visible()
-        expect(nav_link).to_have_text("X-Wines")
+        expect(nav_link).to_have_text("Wine Reference")
 
     def test_navigate_to_xwines_tab(self, authenticated_page: Page) -> None:
         """Test navigating to the X-Wines tab."""

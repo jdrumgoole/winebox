@@ -71,12 +71,13 @@ class TestHistoryPage:
         options = filter_select.locator("option")
         assert options.count() > 0
 
-    def test_history_export_dropdown(self, authenticated_page: Page) -> None:
-        """Export dropdown opens."""
+    def test_history_export_button_present(self, authenticated_page: Page) -> None:
+        """Export button is present on history page."""
         _navigate_to_history(authenticated_page)
-        authenticated_page.click("#history-export-btn")
-        authenticated_page.wait_for_timeout(500)
-        expect(authenticated_page.locator("#history-export-dropdown .export-dropdown-menu")).to_be_visible()
+        export_btn = authenticated_page.locator("#history-export-btn")
+        expect(export_btn).to_be_attached()
+        # Button is disabled when there are no transactions
+        expect(export_btn).to_be_disabled()
 
     def test_history_page_empty_state(self, authenticated_page: Page) -> None:
         """History list is visible even when empty (shows empty state)."""

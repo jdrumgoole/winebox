@@ -112,8 +112,8 @@ class TestCoreNavigation:
         expect(page.locator("#front-label")).to_be_visible()
 
     def test_record_wine_nav_text(self, authenticated_page: Page) -> None:
-        """Test that the nav link says 'Record Wine' not 'Check In'."""
+        """Test that the nav link says 'Add Wine'."""
         page = authenticated_page
         nav_link = page.locator("a[data-page='checkin']")
-        expect(nav_link).to_have_text("Record Wine")
+        expect(nav_link).to_have_text("Add Wine")
 

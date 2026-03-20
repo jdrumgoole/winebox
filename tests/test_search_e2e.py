@@ -43,6 +43,14 @@ def _navigate_to_search(page: Page) -> None:
     page.wait_for_selector("#page-search", state="visible", timeout=5000)
 
 
+def _expand_advanced_filters(page: Page) -> None:
+    """Expand the Advanced Filters toggle so filter fields become visible."""
+    # The filters are inside a <details> element — click the <summary> to expand
+    if not page.locator("#search-country").is_visible():
+        page.locator("#search-form details.advanced-fields summary").click()
+        page.wait_for_timeout(300)
+
+
 @pytest.mark.e2e
 class TestSearchPage:
     """E2E tests for the search page."""
@@ -78,6 +86,7 @@ class TestSearchPage:
     def test_search_filter_by_country(self, authenticated_page: Page) -> None:
         """Country filter field is functional."""
         _navigate_to_search(authenticated_page)
+        _expand_advanced_filters(authenticated_page)
         country_input = authenticated_page.locator("#search-country")
         expect(country_input).to_be_visible()
         country_input.fill("France")
@@ -85,16 +94,19 @@ class TestSearchPage:
     def test_search_filter_by_vintage(self, authenticated_page: Page) -> None:
         """Vintage filter field is functional."""
         _navigate_to_search(authenticated_page)
+        _expand_advanced_filters(authenticated_page)
         vintage_input = authenticated_page.locator("#search-vintage")
         expect(vintage_input).to_be_visible()
         vintage_input.fill("2020")
 
     def test_search_has_wine_type_filter(self, authenticated_page: Page) -> None:
-        """Wine type filter select is present."""
+        """Wine type filter select is present in advanced filters."""
         _navigate_to_search(authenticated_page)
+        _expand_advanced_filters(authenticated_page)
         expect(authenticated_page.locator("#search-wine-type")).to_be_visible()
 
     def test_search_has_in_stock_filter(self, authenticated_page: Page) -> None:
-        """In stock checkbox filter is present."""
+        """In stock checkbox filter is present in advanced filters."""
         _navigate_to_search(authenticated_page)
+        _expand_advanced_filters(authenticated_page)
         expect(authenticated_page.locator("#search-in-stock")).to_be_visible()
