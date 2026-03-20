@@ -2514,7 +2514,7 @@ function renderXWinesTable(containerId, results, total) {
 
     const tableRows = results.map(wine => {
         const ratingDisplay = wine.avg_rating
-            ? `${wine.avg_rating.toFixed(1)} (${wine.rating_count})`
+            ? `${wine.avg_rating.toFixed(1)} (${wine.rating_count.toLocaleString()} ratings)`
             : '-';
         const priceDisplay = formatXWinesPrice(wine);
 
@@ -2608,7 +2608,7 @@ function renderXWinesGrid(containerId, results, total) {
 
     container.innerHTML = header + results.map(wine => {
         const ratingDisplay = wine.avg_rating
-            ? `<span class="xwines-rating">${'★'.repeat(Math.round(wine.avg_rating))}${'☆'.repeat(5 - Math.round(wine.avg_rating))} ${wine.avg_rating.toFixed(1)}</span><span class="xwines-rating-count">(${wine.rating_count})</span>`
+            ? `<span class="xwines-rating">${'★'.repeat(Math.round(wine.avg_rating))}${'☆'.repeat(5 - Math.round(wine.avg_rating))} ${wine.avg_rating.toFixed(1)}</span><span class="xwines-rating-count">(${wine.rating_count.toLocaleString()} ratings)</span>`
             : '<span class="xwines-rating xwines-no-rating">No ratings</span>';
 
         return `
