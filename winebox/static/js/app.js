@@ -2319,6 +2319,15 @@ function initXWinesPage() {
 async function loadXWinesFilters() {
     if (xwinesFiltersLoaded) return;
 
+    const typeSelect = document.getElementById('xwines-type');
+    const countrySelect = document.getElementById('xwines-country');
+
+    // Show loading state while fetching filters
+    typeSelect.disabled = true;
+    countrySelect.disabled = true;
+    typeSelect.options[0].textContent = 'Loading\u2026';
+    countrySelect.options[0].textContent = 'Loading\u2026';
+
     try {
         const [typesRes, countriesRes] = await Promise.all([
             fetchWithAuth(`${API_BASE}/xwines/types`),
@@ -2327,7 +2336,6 @@ async function loadXWinesFilters() {
 
         if (typesRes.ok) {
             const types = await typesRes.json();
-            const typeSelect = document.getElementById('xwines-type');
             types.forEach(t => {
                 const opt = document.createElement('option');
                 opt.value = t;
@@ -2338,7 +2346,6 @@ async function loadXWinesFilters() {
 
         if (countriesRes.ok) {
             const countries = await countriesRes.json();
-            const countrySelect = document.getElementById('xwines-country');
             countries.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.code;
@@ -2350,6 +2357,12 @@ async function loadXWinesFilters() {
         xwinesFiltersLoaded = true;
     } catch (error) {
         console.error('Failed to load X-Wines filters:', error);
+    } finally {
+        // Restore default labels and re-enable
+        typeSelect.options[0].textContent = 'All Types';
+        countrySelect.options[0].textContent = 'All Countries';
+        typeSelect.disabled = false;
+        countrySelect.disabled = false;
     }
 }
 
