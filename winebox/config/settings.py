@@ -10,7 +10,9 @@ while internally using the structured configuration.
 """
 
 import logging
+import os
 import secrets as secrets_module
+import socket
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -21,6 +23,48 @@ if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
+
+# The production database name. Only the production server is allowed to use it.
+_PRODUCTION_DATABASE = "winebox"
+_PRODUCTION_HOSTS = {"104.248.46.96", "winebox-droplet"}
+
+
+def _check_database_safety(database_name: str, mongodb_url: str) -> None:
+    """Prevent non-production hosts from accessing the production database.
+
+    This is a critical safety check to ensure that local development,
+    test environments, and OAT never accidentally connect to the
+    production 'winebox' database on Atlas.
+
+    The check only triggers when connecting to a remote MongoDB (Atlas),
+    not when using a local MongoDB instance (localhost/127.0.0.1).
+
+    Raises:
+        RuntimeError: If a non-production host tries to use the production database.
+    """
+    if database_name != _PRODUCTION_DATABASE:
+        return
+
+    # Local MongoDB is safe — no risk of hitting production data
+    if "localhost" in mongodb_url or "127.0.0.1" in mongodb_url:
+        return
+
+    # Allow if explicitly opted in (e.g. production deploy scripts)
+    if os.environ.get("WINEBOX_ALLOW_PRODUCTION_DB") == "1":
+        return
+
+    # Check if we're running on a known production host
+    hostname = socket.gethostname()
+    if hostname in _PRODUCTION_HOSTS:
+        return
+
+    raise RuntimeError(
+        f"SAFETY CHECK FAILED: Refusing to connect to production database "
+        f"'{_PRODUCTION_DATABASE}' on remote MongoDB from host '{hostname}'. "
+        f"Set WINEBOX_DATABASE to a different database name "
+        f"(e.g. 'winebox-oat', 'winebox-dev'). "
+        f"If this is genuinely production, set WINEBOX_ALLOW_PRODUCTION_DB=1."
+    )
 
 
 class Settings:
@@ -46,6 +90,12 @@ class Settings:
         """
         self._config = config or load_config()
         self._secrets = secrets or load_secrets()
+
+        # Safety check: prevent non-production hosts from using production DB
+        _check_database_safety(
+            self._config.database.mongodb_database,
+            self._config.database.mongodb_url,
+        )
 
         # Handle secret key - generate if not set
         if not self._secrets.secret_key:

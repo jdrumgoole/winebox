@@ -365,7 +365,8 @@ class TestSettings:
 
     def test_settings_generates_secret_key(self):
         """Test that a secret key is generated if not provided."""
-        settings = Settings()
+        with clean_winebox_env():
+            settings = Settings()
         assert settings.secret_key is not None
         assert len(settings.secret_key) > 20
 
@@ -408,18 +409,22 @@ WINEBOX_SECRET_KEY=my-provided-key
 
     def test_get_settings_singleton(self):
         """Test get_settings returns same instance."""
-        reset_settings()
-        s1 = get_settings()
-        s2 = get_settings()
-        assert s1 is s2
+        with clean_winebox_env():
+            reset_settings()
+            s1 = get_settings()
+            s2 = get_settings()
+            assert s1 is s2
+            reset_settings()
 
     def test_reset_settings_clears_cache(self):
         """Test reset_settings clears the cached instance."""
-        reset_settings()
-        s1 = get_settings()
-        reset_settings()
-        s2 = get_settings()
-        assert s1 is not s2
+        with clean_winebox_env():
+            reset_settings()
+            s1 = get_settings()
+            reset_settings()
+            s2 = get_settings()
+            assert s1 is not s2
+            reset_settings()
 
 
 class TestFindConfigFile:
@@ -493,3 +498,35 @@ class TestConfigEdgeCases:
         with patch.dict(os.environ, {"WINEBOX_SECRET_KEY": "env-only-key"}):
             secrets = load_secrets(tmp_path / "nonexistent.env")
         assert secrets.secret_key == "env-only-key"
+
+
+class TestDatabaseSafetyCheck:
+    """Test production database safety guard."""
+
+    def test_allows_non_production_database(self):
+        """Non-production database name is always allowed."""
+        from winebox.config.settings import _check_database_safety
+        # Should not raise
+        _check_database_safety("winebox-oat", "mongodb+srv://atlas.example.com")
+        _check_database_safety("winebox-dev", "mongodb+srv://atlas.example.com")
+        _check_database_safety("test_winebox_123", "mongodb://localhost:27017")
+
+    def test_allows_production_db_on_localhost(self):
+        """Production database name is allowed on localhost MongoDB."""
+        from winebox.config.settings import _check_database_safety
+        _check_database_safety("winebox", "mongodb://localhost:27017")
+        _check_database_safety("winebox", "mongodb://127.0.0.1:27017")
+
+    def test_blocks_production_db_on_remote(self):
+        """Production database name is blocked on remote MongoDB."""
+        from winebox.config.settings import _check_database_safety
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("WINEBOX_ALLOW_PRODUCTION_DB", None)
+            with pytest.raises(RuntimeError, match="SAFETY CHECK FAILED"):
+                _check_database_safety("winebox", "mongodb+srv://atlas.example.com")
+
+    def test_allows_production_db_with_override_env(self):
+        """WINEBOX_ALLOW_PRODUCTION_DB=1 bypasses the check."""
+        from winebox.config.settings import _check_database_safety
+        with patch.dict(os.environ, {"WINEBOX_ALLOW_PRODUCTION_DB": "1"}):
+            _check_database_safety("winebox", "mongodb+srv://atlas.example.com")
