@@ -96,18 +96,49 @@ INDEXES: dict[str, list[IndexModel]] = {
 
 
 async def ensure_indexes(db: AsyncDatabase) -> None:
-    """Create all indexes if they don't already exist.
+    """Create all indexes, handling conflicts with existing indexes.
 
-    Uses create_indexes() which is idempotent — existing indexes are
-    silently skipped.
+    If an index exists with the same name but different options (e.g. a
+    non-unique index that should now be unique), the old index is dropped
+    and recreated.
 
     Args:
-        db: The motor database instance.
+        db: The async pymongo database instance.
     """
+    from pymongo.errors import OperationFailure
+
     for collection_name, index_models in INDEXES.items():
+        collection = db[collection_name]
         try:
-            collection = db[collection_name]
             await collection.create_indexes(index_models)
             logger.debug("Indexes ensured for %s", collection_name)
+        except OperationFailure as e:
+            if e.code == 86:  # IndexKeySpecsConflict
+                logger.warning(
+                    "Index conflict in %s, dropping and recreating: %s",
+                    collection_name, e.details.get("errmsg", ""),
+                )
+                # Drop conflicting indexes and retry
+                for model in index_models:
+                    index_name = model.document.get("name")
+                    if not index_name:
+                        # Auto-generated name from key spec
+                        parts = []
+                        for field, direction in model.document["key"].items():
+                            parts.append(f"{field}_{direction}")
+                        index_name = "_".join(parts)
+                    try:
+                        await collection.drop_index(index_name)
+                        logger.info("Dropped conflicting index %s.%s", collection_name, index_name)
+                    except OperationFailure:
+                        pass  # Index may not exist or already dropped
+                # Retry creation
+                try:
+                    await collection.create_indexes(index_models)
+                    logger.info("Indexes recreated for %s", collection_name)
+                except Exception:
+                    logger.exception("Failed to recreate indexes for %s", collection_name)
+            else:
+                logger.exception("Failed to create indexes for %s", collection_name)
         except Exception:
             logger.exception("Failed to create indexes for %s", collection_name)
