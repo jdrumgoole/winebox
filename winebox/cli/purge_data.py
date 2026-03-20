@@ -17,10 +17,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
-
-from winebox.config import settings
+from winebox.database import init_db as _init_db
 from winebox.models.user import User
 from winebox.models.wine import Wine
 from winebox.models.transaction import Transaction
@@ -34,9 +31,7 @@ async def init_db() -> None:
     global _db_initialized
     if _db_initialized:
         return
-    client = AsyncIOMotorClient(settings.mongodb_url)
-    db = client[settings.mongodb_database]
-    await init_beanie(database=db, document_models=[User, Wine, Transaction])
+    await _init_db()
     _db_initialized = True
 
 
@@ -80,7 +75,7 @@ async def remove_user(email: str, skip_db_init: bool = False) -> dict:
     if not skip_db_init:
         await init_db()
 
-    user = await User.find_one(User.email == email)
+    user = await User.find_one({"email": email})
     if not user:
         return {"error": f"User '{email}' not found."}
 

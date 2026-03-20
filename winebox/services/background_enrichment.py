@@ -11,8 +11,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from beanie import PydanticObjectId
-
+from winebox.db import PyObjectId
 from winebox.models.wine import Wine
 from winebox.services.xwines_enrichment import (
     _FIELD_MAP,
@@ -52,7 +51,7 @@ def clear_enrichment_progress(owner_id: str) -> None:
 
 
 async def enrich_unenriched_wines(
-    owner_id: PydanticObjectId,
+    owner_id: PyObjectId,
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> dict[str, int]:
     """Enrich wines that have no xwines_id set.
@@ -72,8 +71,7 @@ async def enrich_unenriched_wines(
 
     # Find all unenriched wines for this owner
     unenriched = await Wine.find(
-        Wine.owner_id == owner_id,
-        Wine.xwines_id == None,  # noqa: E711
+        {"owner_id": owner_id, "xwines_id": None},
     ).to_list()
 
     total = len(unenriched)

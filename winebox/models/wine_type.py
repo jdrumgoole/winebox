@@ -2,11 +2,12 @@
 
 from typing import Optional
 
-from beanie import Document
 from pydantic import Field
 
+from winebox.db import MongoDocument
 
-class WineType(Document):
+
+class WineType(MongoDocument):
     """Wine type document model representing wine categories (red, white, rosé, etc.)."""
 
     # Use string ID for simplicity ('red', 'white', etc.)
@@ -16,9 +17,6 @@ class WineType(Document):
 
     class Settings:
         name = "wine_types"
-        indexes = [
-            "type_id",
-        ]
 
     def __repr__(self) -> str:
         return f"<WineType(type_id={self.type_id}, name={self.name})>"

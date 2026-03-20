@@ -385,22 +385,6 @@ wheels = [
 ]
 
 [[package]]
-name = "beanie"
-version = "2.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-    { name = "lazy-model" },
-    { name = "pydantic" },
-    { name = "pymongo" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/af/c0/85857d44d1c59d8bb546bd01e7d128ae08fc9e84e3f3c5c84b365b55ea48/beanie-2.0.1.tar.gz", hash = "sha256:aad0365cba578f5686446ed0960ead140a2231cbbfa8d492220f712c5e0c06b4", size = 171502, upload-time = "2025-11-20T18:45:51.518Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/29/54/8c9a4ab2d82242074671cc35b1dd2a906c3c36b3a5c80e914c76fa9f45b7/beanie-2.0.1-py3-none-any.whl", hash = "sha256:3aad6cc0e40fb8d256a0a3fdeca92a7b3d3c1f9f47ff377c9ecd2221285e1009", size = 87693, upload-time = "2025-11-20T18:45:50.321Z" },
-]
-
-[[package]]
 name = "boto3"
 version = "1.40.61"
 source = { registry = "https://pypi.org/simple" }
@@ -887,24 +871,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/71/48/5fb2a18227ccbd5138515f21fc4fa8abcd9982238de43511d7f941e708db/fastapi_users-15.0.4-py3-none-any.whl", hash = "sha256:30940894825e1dd7b86f6013e4bc75eccc25ae8ce5261d1b180f6411bb28aff4", size = 39037, upload-time = "2026-02-05T09:36:42.195Z" },
 ]
 
-[package.optional-dependencies]
-beanie = [
-    { name = "fastapi-users-db-beanie" },
-]
-
-[[package]]
-name = "fastapi-users-db-beanie"
-version = "5.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "beanie" },
-    { name = "fastapi-users" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9f/64/98da41f81bb91a7b4e926c7377849814361dacd41cad50b294f91c37119b/fastapi_users_db_beanie-5.0.0.tar.gz", hash = "sha256:0d51e096174638c662d924126c68f4f38b6e526c594c56f4e05a245be2d322ef", size = 10000, upload-time = "2025-11-23T13:23:42.7Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/85/50bc9b6f789b6b6bc6fbd838b1b1f877ed7b87fd5a80e2c9f53ab929895a/fastapi_users_db_beanie-5.0.0-py3-none-any.whl", hash = "sha256:321ab86fabcce1b893f16d6fd37cf8dd9f8b9d994639a87a27853f22fbfb51f0", size = 5568, upload-time = "2025-11-23T13:23:44.099Z" },
-]
-
 [[package]]
 name = "frozenlist"
 version = "1.8.0"
@@ -1278,18 +1244,6 @@ wheels = [
 ]
 
 [[package]]
-name = "lazy-model"
-version = "0.4.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/72/85/e25dc36dee49cf0726c03a1558b5c311a17095bc9361bcbf47226cb3075a/lazy-model-0.4.0.tar.gz", hash = "sha256:a851d85d0b518b0b9c8e626bbee0feb0494c0e0cb5636550637f032dbbf9c55f", size = 8256, upload-time = "2025-08-07T20:05:34.737Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/54/653ea0d7c578741e9867ccf0cbf47b7eac09ff22e4238f311ac20671a911/lazy_model-0.4.0-py3-none-any.whl", hash = "sha256:95ea59551c1ac557a2c299f75803c56cc973923ef78c67ea4839a238142f7927", size = 13749, upload-time = "2025-08-07T20:05:36.303Z" },
-]
-
-[[package]]
 name = "limits"
 version = "5.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1417,18 +1371,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
-]
-
-[[package]]
-name = "motor"
-version = "3.7.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pymongo" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/93/ae/96b88362d6a84cb372f7977750ac2a8aed7b2053eed260615df08d5c84f4/motor-3.7.1.tar.gz", hash = "sha256:27b4d46625c87928f331a6ca9d7c51c2f518ba0e270939d395bc1ddc89d64526", size = 280997, upload-time = "2025-05-14T18:56:33.653Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/9a/35e053d4f442addf751ed20e0e922476508ee580786546d699b0567c4c67/motor-3.7.1-py3-none-any.whl", hash = "sha256:8a63b9049e38eeeb56b4fdd57c3312a6d1f25d01db717fe7d82222393c410298", size = 74996, upload-time = "2025-05-14T18:56:31.665Z" },
 ]
 
 [[package]]
@@ -2843,17 +2785,16 @@ dependencies = [
     { name = "aiofiles" },
     { name = "anthropic" },
     { name = "bcrypt" },
-    { name = "beanie" },
     { name = "cryptography" },
     { name = "fastapi" },
-    { name = "fastapi-users", extra = ["beanie"] },
+    { name = "fastapi-users" },
     { name = "jinja2" },
-    { name = "motor" },
     { name = "openpyxl" },
     { name = "pillow" },
     { name = "posthog" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pymongo" },
     { name = "pytesseract" },
     { name = "python-jose", extra = ["cryptography"] },
     { name = "python-multipart" },
@@ -2883,20 +2824,19 @@ requires-dist = [
     { name = "aiofiles", specifier = ">=23.0.0" },
     { name = "anthropic", specifier = ">=0.40.0" },
     { name = "bcrypt", specifier = ">=4.1.2" },
-    { name = "beanie", specifier = ">=1.25.0" },
     { name = "cryptography", specifier = ">=46.0.5" },
     { name = "fastapi", specifier = ">=0.109.0" },
-    { name = "fastapi-users", extras = ["beanie"], specifier = ">=14.0.0" },
+    { name = "fastapi-users", specifier = ">=14.0.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.26.0" },
     { name = "invoke", marker = "extra == 'dev'", specifier = ">=2.2.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
-    { name = "motor", specifier = ">=3.3.0" },
     { name = "myst-parser", marker = "extra == 'dev'", specifier = ">=2.0.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pillow", specifier = ">=12.1.1" },
     { name = "posthog", specifier = ">=3.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "pymongo", specifier = ">=4.10.0" },
     { name = "pytesseract", specifier = ">=0.3.10" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },

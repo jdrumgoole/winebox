@@ -4,7 +4,6 @@ import re
 from datetime import datetime
 from typing import Annotated
 
-from beanie import PydanticObjectId
 from fastapi import APIRouter, Query
 
 from winebox.models import Transaction, TransactionType, Wine
@@ -155,6 +154,6 @@ async def search_wines(
     else:
         wines = await Wine.find(
             conditions
-        ).skip(skip).limit(limit).sort(-Wine.created_at).to_list()
+        ).skip(skip).limit(limit).sort([("created_at", -1)]).to_list()
 
     return [WineWithInventory.model_validate(wine) for wine in wines]

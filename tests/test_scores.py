@@ -11,7 +11,7 @@ from winebox.models.wine import ScoreEntry
 @pytest_asyncio.fixture
 async def wine_with_scores(client, init_test_db, test_user_email):
     """Create a wine with scores for testing."""
-    user = await User.find_one(User.email == test_user_email)
+    user = await User.find_one({"email": test_user_email})
     wine = Wine(
         name="Château Margaux",
         vintage=2015,
@@ -48,7 +48,7 @@ async def wine_with_scores(client, init_test_db, test_user_email):
 @pytest_asyncio.fixture
 async def wine_no_scores(client, init_test_db, test_user_email):
     """Create a wine without scores."""
-    user = await User.find_one(User.email == test_user_email)
+    user = await User.find_one({"email": test_user_email})
     wine = Wine(
         name="Test Wine",
         vintage=2020,

@@ -223,7 +223,8 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
             },
             {"$limit": 1},
         ]
-        docs = await collection.aggregate(pipeline).to_list(length=1)
+        cursor = await collection.aggregate(pipeline)
+        docs = await cursor.to_list(length=1)
         if docs:
             doc = docs[0]
             return XWinesWine(**{k: v for k, v in doc.items() if k != "_id"})
@@ -523,7 +524,8 @@ async def _find_best_xwines_matches_batch(
                 }
             },
         ]
-        docs = await collection.aggregate(pipeline).to_list(length=candidate_limit)
+        cursor = await collection.aggregate(pipeline)
+        docs = await cursor.to_list(length=candidate_limit)
 
         if docs:
             candidates: list[XWinesWine] = []

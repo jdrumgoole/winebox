@@ -45,16 +45,17 @@ async def list_users(
     - Cellar size (total bottles)
     """
     # Get all users
-    users = await User.find_all().sort(-User.created_at).to_list()
+    users = await User.find_all().sort([("created_at", -1)]).to_list()
 
     # Get cellar sizes via aggregation
     cellar_sizes_pipeline = [
         {"$match": {"inventory.quantity": {"$gt": 0}}},
         {"$group": {"_id": "$owner_id", "total": {"$sum": "$inventory.quantity"}}},
     ]
-    cellar_sizes_result = await Wine.get_pymongo_collection().aggregate(
+    cursor = await Wine.get_pymongo_collection().aggregate(
         cellar_sizes_pipeline
-    ).to_list(length=None)
+    )
+    cellar_sizes_result = await cursor.to_list(length=None)
 
     # Create a lookup dict for cellar sizes
     cellar_size_by_user = {
@@ -99,22 +100,23 @@ async def get_admin_stats(
     """
     # User counts
     total_users = await User.count()
-    active_users = await User.find(User.is_active == True).count()
-    verified_users = await User.find(User.is_verified == True).count()
-    admin_users = await User.find(User.is_superuser == True).count()
+    active_users = await User.find({"is_active": True}).count()
+    verified_users = await User.find({"is_verified": True}).count()
+    admin_users = await User.find({"is_superuser": True}).count()
 
     # Wine counts
     total_wines = await Wine.count()
-    wines_in_stock = await Wine.find(Wine.inventory.quantity > 0).count()
+    wines_in_stock = await Wine.find({"inventory.quantity": {"$gt": 0}}).count()
 
     # Total bottles via aggregation
     total_bottles_pipeline = [
         {"$match": {"inventory.quantity": {"$gt": 0}}},
         {"$group": {"_id": None, "total": {"$sum": "$inventory.quantity"}}},
     ]
-    total_bottles_result = await Wine.get_pymongo_collection().aggregate(
+    cursor = await Wine.get_pymongo_collection().aggregate(
         total_bottles_pipeline
-    ).to_list(length=None)
+    )
+    total_bottles_result = await cursor.to_list(length=None)
     total_bottles = total_bottles_result[0]["total"] if total_bottles_result else 0
 
     return {

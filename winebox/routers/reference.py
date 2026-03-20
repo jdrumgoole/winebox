@@ -2,7 +2,7 @@
 
 import re
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from fastapi import APIRouter, HTTPException, Query
 
 from winebox.models import Classification, GrapeVariety, Region, WineType
@@ -28,7 +28,7 @@ router = APIRouter()
 @router.get("/wine-types", response_model=list[WineTypeResponse])
 async def list_wine_types() -> list[WineTypeResponse]:
     """List all wine types."""
-    wine_types = await WineType.find().sort(WineType.name).to_list()
+    wine_types = await WineType.find().sort([("name", 1)]).to_list()
     return [
         WineTypeResponse(
             id=wt.type_id,
@@ -42,7 +42,7 @@ async def list_wine_types() -> list[WineTypeResponse]:
 @router.get("/wine-types/{type_id}", response_model=WineTypeResponse)
 async def get_wine_type(type_id: str) -> WineTypeResponse:
     """Get a specific wine type by ID."""
-    wine_type = await WineType.find_one(WineType.type_id == type_id)
+    wine_type = await WineType.find_one({"type_id": type_id})
     if not wine_type:
         raise HTTPException(status_code=404, detail="Wine type not found")
     return WineTypeResponse(
@@ -73,7 +73,7 @@ async def list_grape_varieties(
     if search:
         conditions["name"] = {"$regex": re.compile(re.escape(search), re.IGNORECASE)}
 
-    varieties = await GrapeVariety.find(conditions).sort(GrapeVariety.name).to_list()
+    varieties = await GrapeVariety.find(conditions).sort([("name", 1)]).to_list()
     return [
         GrapeVarietyResponse(
             id=str(v.id),
@@ -90,7 +90,7 @@ async def list_grape_varieties(
 async def get_grape_variety(variety_id: str) -> GrapeVarietyResponse:
     """Get a specific grape variety by ID."""
     try:
-        variety = await GrapeVariety.get(PydanticObjectId(variety_id))
+        variety = await GrapeVariety.get(ObjectId(variety_id))
     except Exception:
         variety = None
 
@@ -127,14 +127,14 @@ async def list_regions(
         conditions["level"] = level
     if parent_id:
         try:
-            conditions["parent_id"] = PydanticObjectId(parent_id)
+            conditions["parent_id"] = ObjectId(parent_id)
         except Exception:
             pass
     if search:
         conditions["display_name"] = {"$regex": re.compile(re.escape(search), re.IGNORECASE)}
 
     regions = await Region.find(conditions).sort(
-        [(Region.level, 1), (Region.display_name, 1)]
+        [("level", 1), ("display_name", 1)]
     ).to_list()
 
     return [
@@ -160,7 +160,7 @@ async def get_region_tree(
         conditions["country"] = country
 
     all_regions = await Region.find(conditions).sort(
-        [(Region.level, 1), (Region.display_name, 1)]
+        [("level", 1), ("display_name", 1)]
     ).to_list()
 
     # Build tree structure
@@ -195,7 +195,7 @@ async def get_region_tree(
 async def get_region(region_id: str) -> RegionResponse:
     """Get a specific region by ID."""
     try:
-        region = await Region.get(PydanticObjectId(region_id))
+        region = await Region.get(ObjectId(region_id))
     except Exception:
         region = None
 
@@ -217,7 +217,7 @@ async def get_region_children(region_id: str) -> list[RegionResponse]:
     """Get child regions of a specific region."""
     # Verify parent exists
     try:
-        parent = await Region.get(PydanticObjectId(region_id))
+        parent = await Region.get(ObjectId(region_id))
     except Exception:
         parent = None
 
@@ -226,8 +226,8 @@ async def get_region_children(region_id: str) -> list[RegionResponse]:
 
     # Get children
     children = await Region.find(
-        Region.parent_id == parent.id
-    ).sort(Region.display_name).to_list()
+        {"parent_id": parent.id}
+    ).sort([("display_name", 1)]).to_list()
 
     return [
         RegionResponse(
@@ -246,7 +246,7 @@ async def get_region_children(region_id: str) -> list[RegionResponse]:
 async def get_region_path(region_id: str) -> list[RegionResponse]:
     """Get full path from country to this region."""
     try:
-        region = await Region.get(PydanticObjectId(region_id))
+        region = await Region.get(ObjectId(region_id))
     except Exception:
         region = None
 
@@ -292,7 +292,7 @@ async def list_classifications(
         conditions["system"] = system
 
     classifications = await Classification.find(conditions).sort(
-        [(Classification.country, 1), (Classification.system, 1), (Classification.level, 1)]
+        [("country", 1), ("system", 1), ("level", 1)]
     ).to_list()
 
     return [
@@ -319,7 +319,7 @@ async def list_classifications_by_system(
         conditions["country"] = country
 
     classifications = await Classification.find(conditions).sort(
-        [(Classification.country, 1), (Classification.system, 1), (Classification.level, 1)]
+        [("country", 1), ("system", 1), ("level", 1)]
     ).to_list()
 
     # Group by system
@@ -348,7 +348,7 @@ async def list_classifications_by_system(
 async def get_classification(classification_id: str) -> ClassificationResponse:
     """Get a specific classification by ID."""
     try:
-        classification = await Classification.get(PydanticObjectId(classification_id))
+        classification = await Classification.get(ObjectId(classification_id))
     except Exception:
         classification = None
 

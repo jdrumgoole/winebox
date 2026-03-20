@@ -18,9 +18,8 @@ async def get_met_wines(
 ) -> list[WineWithInventory]:
     """List wines the current user has encountered."""
     wines = await Wine.find(
-        Wine.owner_id == current_user.id,
-        Wine.collection == WineCollection.MET,
-    ).skip(skip).limit(limit).sort(-Wine.created_at).to_list()
+        {"owner_id": current_user.id, "collection": WineCollection.MET}
+    ).skip(skip).limit(limit).sort([("created_at", -1)]).to_list()
 
     return [WineWithInventory.model_validate(wine) for wine in wines]
 
@@ -36,15 +35,12 @@ async def get_met_summary(
 
     # Total met wines
     total_met = await Wine.find(
-        Wine.owner_id == current_user.id,
-        Wine.collection == WineCollection.MET,
+        {"owner_id": current_user.id, "collection": WineCollection.MET}
     ).count()
 
     # Added to cellar count
     added_to_cellar = await Wine.find(
-        Wine.owner_id == current_user.id,
-        Wine.collection == WineCollection.MET,
-        Wine.added_to_cellar == True,  # noqa: E712
+        {"owner_id": current_user.id, "collection": WineCollection.MET, "added_to_cellar": True}
     ).count()
 
     # By country
@@ -53,7 +49,7 @@ async def get_met_summary(
         {"$group": {"_id": "$country", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
     ]
-    cursor = collection.aggregate(by_country_pipeline)
+    cursor = await collection.aggregate(by_country_pipeline)
     by_country_result = await cursor.to_list(length=None)
     by_country = {row["_id"]: row["count"] for row in by_country_result}
 
@@ -63,7 +59,7 @@ async def get_met_summary(
         {"$group": {"_id": "$grape_variety", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
     ]
-    cursor = collection.aggregate(by_grape_pipeline)
+    cursor = await collection.aggregate(by_grape_pipeline)
     by_grape_result = await cursor.to_list(length=None)
     by_grape = {row["_id"]: row["count"] for row in by_grape_result}
 

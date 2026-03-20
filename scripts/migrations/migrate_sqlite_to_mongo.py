@@ -35,8 +35,10 @@ async def migrate():
     """Run the migration from SQLite to MongoDB."""
     import uuid as uuid_module
 
-    from beanie import PydanticObjectId, init_beanie
-    from motor.motor_asyncio import AsyncIOMotorClient
+    from bson import ObjectId
+    from winebox.db import PyObjectId
+    from winebox.database import init_db
+    from pymongo import AsyncMongoClient
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
     from sqlalchemy.orm import selectinload
@@ -227,24 +229,18 @@ async def migrate():
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     # Connect to MongoDB
-    mongo_client = AsyncIOMotorClient(mongodb_url)
+    mongo_client = AsyncMongoClient(mongodb_url)
     mongo_db = mongo_client[mongodb_database]
 
-    # Initialize Beanie
-    await init_beanie(
-        database=mongo_db,
-        document_models=[
-            User, Wine, Transaction, WineType, GrapeVariety, Region,
-            Classification, XWinesWine, XWinesMetadata
-        ]
-    )
+    # Initialize database
+    await init_db(mongo_client=mongo_client, mongodb_database=mongodb_database)
 
     # Tracking for ID mapping
-    user_id_map: dict[str, PydanticObjectId] = {}
-    wine_id_map: dict[str, PydanticObjectId] = {}
-    grape_id_map: dict[str, PydanticObjectId] = {}
-    region_id_map: dict[str, PydanticObjectId] = {}
-    classification_id_map: dict[str, PydanticObjectId] = {}
+    user_id_map: dict[str, PyObjectId] = {}
+    wine_id_map: dict[str, PyObjectId] = {}
+    grape_id_map: dict[str, PyObjectId] = {}
+    region_id_map: dict[str, PyObjectId] = {}
+    classification_id_map: dict[str, PyObjectId] = {}
 
     async with async_session() as session:
         # =========================================================================

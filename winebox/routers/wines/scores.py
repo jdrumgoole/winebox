@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 from pydantic import ValidationError
@@ -29,8 +29,7 @@ async def get_wine_scores(
     # Verify wine exists and belongs to current user
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
@@ -80,8 +79,7 @@ async def add_wine_score(
     # Verify wine exists and belongs to current user
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
@@ -142,8 +140,7 @@ async def update_wine_score(
     # Get wine - must belong to current user
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
@@ -210,8 +207,7 @@ async def delete_wine_score(
     """Delete a score from a wine."""
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)

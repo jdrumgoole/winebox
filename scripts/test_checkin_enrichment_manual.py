@@ -13,7 +13,7 @@ import random
 import string
 
 import httpx
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from playwright.async_api import async_playwright
 
 BASE_URL = os.environ.get("WINEBOX_URL", "http://localhost:8000")
@@ -46,7 +46,7 @@ async def get_auth_token() -> str:
         print(f"Registration response: {reg_resp.status_code}")
 
         # Verify user directly in MongoDB
-        mongo_client = AsyncIOMotorClient(mongodb_url)
+        mongo_client = AsyncMongoClient(mongodb_url)
         db = mongo_client[db_name]
         await db.users.update_one(
             {"email": TEST_EMAIL},

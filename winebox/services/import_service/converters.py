@@ -4,8 +4,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from beanie import PydanticObjectId
-
+from winebox.db import PyObjectId
 from winebox.models.wine import InventoryInfo
 
 from .constants import NON_WINE_KEYWORDS, VALID_WINE_FIELDS
@@ -90,7 +89,7 @@ def _compute_custom_fields_text(custom_fields: dict[str, str] | None) -> str | N
 def row_to_wine_data(
     row: dict[str, Any],
     mapping: dict[str, str],
-    owner_id: PydanticObjectId,
+    owner_id: PyObjectId,
     default_quantity: int = 1,
 ) -> dict[str, Any] | None:
     """Convert a spreadsheet row to Wine constructor kwargs.

@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, Response
@@ -54,7 +54,7 @@ async def export_wines(
         conditions["country"] = country
 
     # Fetch wines (filtered by owner)
-    wines = await Wine.find(conditions).sort(Wine.name).to_list()
+    wines = await Wine.find(conditions).sort([("name", 1)]).to_list()
 
     # Track applied filters
     filters_applied: dict[str, Any] = {}
@@ -141,7 +141,7 @@ async def export_transactions(
 
     if wine_id:
         try:
-            conditions["wine_id"] = PydanticObjectId(wine_id)
+            conditions["wine_id"] = ObjectId(wine_id)
         except (InvalidId, ValidationError):
             pass  # Ignore invalid wine_id
 
@@ -154,7 +154,7 @@ async def export_transactions(
         conditions["transaction_date"]["$lte"] = to_date
 
     # Fetch transactions
-    transactions = await Transaction.find(conditions).sort(-Transaction.transaction_date).to_list()
+    transactions = await Transaction.find(conditions).sort([("transaction_date", -1)]).to_list()
 
     # Track applied filters
     filters_applied: dict[str, Any] = {}

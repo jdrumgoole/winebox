@@ -4,10 +4,12 @@ import asyncio
 import json
 import logging
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from pydantic import ValidationError
+
+from winebox.db import PyObjectId
 from starlette.responses import StreamingResponse
 
 from winebox.models.import_batch import ImportBatch, ImportStatus
@@ -152,7 +154,7 @@ async def upload_spreadsheet(
 
 
 async def _insert_raw_upload_rows(
-    batch_id: PydanticObjectId, rows: list[dict],
+    batch_id: PyObjectId, rows: list[dict],
 ) -> None:
     """Insert rows into raw_uploads collection for audit trail (background task)."""
     try:
@@ -245,8 +247,8 @@ async def append_rows(
     else:
         # Append rows (subsequent chunks) - find current max index
         last = await RawUploadRow.find(
-            RawUploadRow.batch_id == batch.id
-        ).sort("-index").first_or_none()
+            {"batch_id": batch.id}
+        ).sort([("index", -1)]).first_or_none()
         start_index = (last.index + 1) if last is not None else 0
 
     docs = [
@@ -396,8 +398,8 @@ async def list_batches(
 ) -> list[ImportBatchSummary]:
     """List the current user's import batches."""
     batches = await ImportBatch.find(
-        ImportBatch.owner_id == current_user.id,
-    ).sort(-ImportBatch.imported_at).to_list()
+        {"owner_id": current_user.id}
+    ).sort([("imported_at", -1)]).to_list()
 
     return [
         ImportBatchSummary(
@@ -441,7 +443,7 @@ async def delete_batch(
     await batch.delete()
 
 
-async def _get_user_batch(batch_id: str, owner_id: PydanticObjectId) -> ImportBatch:
+async def _get_user_batch(batch_id: str, owner_id: PyObjectId) -> ImportBatch:
     """Get an import batch by ID, verifying ownership.
 
     Args:
@@ -456,8 +458,7 @@ async def _get_user_batch(batch_id: str, owner_id: PydanticObjectId) -> ImportBa
     """
     try:
         batch = await ImportBatch.find_one(
-            ImportBatch.id == PydanticObjectId(batch_id),
-            ImportBatch.owner_id == owner_id,
+            {"_id": ObjectId(batch_id), "owner_id": owner_id}
         )
     except (InvalidId, ValidationError):
         batch = None

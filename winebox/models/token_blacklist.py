@@ -2,8 +2,9 @@
 
 from datetime import datetime, timezone
 
-from beanie import Document, Indexed
 from pydantic import Field
+
+from winebox.db import MongoDocument
 
 
 def _utc_now() -> datetime:
@@ -11,20 +12,20 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class RevokedToken(Document):
+class RevokedToken(MongoDocument):
     """Stores revoked JWT tokens until they expire.
 
     Tokens are stored with their expiration time to allow automatic cleanup.
     """
 
     # JWT ID (jti claim) - unique identifier for the token
-    jti: Indexed(str, unique=True)
+    jti: str
 
     # When the token was revoked
     revoked_at: datetime = Field(default_factory=_utc_now)
 
     # When the token expires (for automatic cleanup)
-    expires_at: Indexed(datetime)
+    expires_at: datetime
 
     # User ID who owns the token (for audit purposes)
     user_id: str | None = None
@@ -34,22 +35,11 @@ class RevokedToken(Document):
 
     class Settings:
         name = "revoked_tokens"
-        indexes = [
-            "jti",
-            "expires_at",
-        ]
 
     @classmethod
     async def is_revoked(cls, jti: str) -> bool:
-        """Check if a token is revoked.
-
-        Args:
-            jti: The JWT ID to check.
-
-        Returns:
-            True if the token is revoked, False otherwise.
-        """
-        token = await cls.find_one(cls.jti == jti)
+        """Check if a token is revoked."""
+        token = await cls.find_one({"jti": jti})
         return token is not None
 
     @classmethod
@@ -60,17 +50,7 @@ class RevokedToken(Document):
         user_id: str | None = None,
         reason: str = "logout",
     ) -> "RevokedToken":
-        """Revoke a token by adding it to the blacklist.
-
-        Args:
-            jti: The JWT ID to revoke.
-            expires_at: When the token expires.
-            user_id: Optional user ID who owns the token.
-            reason: Reason for revocation.
-
-        Returns:
-            The created RevokedToken document.
-        """
+        """Revoke a token by adding it to the blacklist."""
         token = cls(
             jti=jti,
             expires_at=expires_at,
@@ -82,10 +62,6 @@ class RevokedToken(Document):
 
     @classmethod
     async def cleanup_expired(cls) -> int:
-        """Remove expired tokens from the blacklist.
-
-        Returns:
-            Number of tokens removed.
-        """
-        result = await cls.find(cls.expires_at < _utc_now()).delete()
+        """Remove expired tokens from the blacklist."""
+        result = await cls.find({"expires_at": {"$lt": _utc_now()}}).delete()
         return result.deleted_count if result else 0

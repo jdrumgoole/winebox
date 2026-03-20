@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import File, Form, HTTPException, UploadFile, status
 from pydantic import ValidationError
@@ -238,8 +238,7 @@ async def checkout_wine(
     # Get wine - must belong to current user
     try:
         wine = await Wine.find_one(
-            Wine.id == PydanticObjectId(wine_id),
-            Wine.owner_id == current_user.id,
+            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
         )
     except (InvalidId, ValidationError) as e:
         logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
@@ -276,8 +275,7 @@ async def checkout_wine(
     # If quantity hit 0, clear added_to_cellar flag on any linked met wine
     if wine.inventory.quantity == 0:
         met_wine = await Wine.find_one(
-            Wine.cellar_wine_id == wine.id,
-            Wine.owner_id == current_user.id,
+            {"cellar_wine_id": wine.id, "owner_id": current_user.id}
         )
         if met_wine:
             met_wine.added_to_cellar = False

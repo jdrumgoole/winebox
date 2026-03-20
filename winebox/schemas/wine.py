@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from winebox.schemas.transaction import TransactionResponse
@@ -100,7 +100,7 @@ class WineWithInventory(WineBase):
         """Convert ObjectId to string."""
         if v is None:
             return None
-        if isinstance(v, PydanticObjectId):
+        if isinstance(v, ObjectId):
             return str(v)
         return v
 

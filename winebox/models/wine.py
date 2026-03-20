@@ -4,8 +4,9 @@ import enum
 from datetime import datetime, timezone
 from typing import Optional
 
-from beanie import Document, Indexed, PydanticObjectId
 from pydantic import BaseModel, Field
+
+from winebox.db import MongoDocument, PyObjectId
 
 
 class WineCollection(str, enum.Enum):
@@ -55,26 +56,26 @@ class ScoreEntry(BaseModel):
         return float(self.score)
 
 
-class Wine(Document):
+class Wine(MongoDocument):
     """Wine document model representing a wine in the cellar or a wine the user has met."""
 
     # Owner reference for data isolation
-    owner_id: Indexed(PydanticObjectId)
+    owner_id: PyObjectId
 
     # Collection: "cellar" (owned bottles) or "met" (wines encountered)
     collection: WineCollection = WineCollection.CELLAR
     added_to_cellar: bool = False  # Only meaningful when collection="met"
-    cellar_wine_id: Optional[PydanticObjectId] = None  # Links met wine → cellar wine
+    cellar_wine_id: Optional[PyObjectId] = None  # Links met wine → cellar wine
 
     # Basic wine information
-    name: Indexed(str)
-    winery: Optional[Indexed(str)] = None
-    vintage: Optional[Indexed(int)] = None
-    grape_variety: Optional[Indexed(str)] = None  # Primary grape (backward compat)
+    name: str
+    winery: Optional[str] = None
+    vintage: Optional[int] = None
+    grape_variety: Optional[str] = None  # Primary grape (backward compat)
     region: Optional[str] = None
     sub_region: Optional[str] = None
     appellation: Optional[str] = None
-    country: Optional[Indexed(str)] = None
+    country: Optional[str] = None
     alcohol_percentage: Optional[float] = None
 
     # Label text and images
@@ -84,7 +85,7 @@ class Wine(Document):
     back_label_image_path: Optional[str] = None
 
     # Taxonomy fields
-    wine_type_id: Optional[Indexed(str)] = None  # Reference to WineType
+    wine_type_id: Optional[str] = None  # Reference to WineType
     wine_subtype: Optional[str] = None  # e.g., 'full_bodied', 'champagne'
     classification: Optional[str] = None  # e.g., Grand Cru, DOCG, Reserve
     price_tier: Optional[str] = None  # 'budget', 'value', etc.
@@ -113,26 +114,6 @@ class Wine(Document):
 
     class Settings:
         name = "wines"
-        indexes = [
-            "owner_id",
-            "name",
-            "winery",
-            "vintage",
-            "country",
-            "wine_type_id",
-            [("owner_id", 1), ("inventory.quantity", 1)],  # Compound index for cellar queries
-            [("owner_id", 1), ("collection", 1)],  # Compound index for met/cellar queries
-            [
-                ("name", "text"),
-                ("winery", "text"),
-                ("region", "text"),
-                ("sub_region", "text"),
-                ("appellation", "text"),
-                ("country", "text"),
-                ("front_label_text", "text"),
-                ("custom_fields_text", "text"),
-            ],
-        ]
 
     def __repr__(self) -> str:
         return f"<Wine(id={self.id}, name={self.name}, vintage={self.vintage})>"

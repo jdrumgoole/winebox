@@ -16,7 +16,7 @@ import random
 import sys
 from pathlib import Path
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 # Production MongoDB URL - must be set via environment variable
 # Example: export XWINES_MONGODB_URL="mongodb+srv://user:pass@host"
@@ -217,7 +217,7 @@ def wine_to_rows(wine: dict, rng: random.Random) -> list[dict]:
 
 async def fetch_wines(limit: int = 2000) -> list[dict]:
     """Fetch wines from production X-Wines collection."""
-    client = AsyncIOMotorClient(PROD_MONGODB_URL)
+    client = AsyncMongoClient(PROD_MONGODB_URL)
     db = client[DB_NAME]
     collection = db[COLLECTION]
 

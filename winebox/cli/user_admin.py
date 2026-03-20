@@ -15,10 +15,7 @@ import sys
 from datetime import datetime, timezone
 from getpass import getpass
 
-from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
-
-from winebox.config import settings
+from winebox.database import init_db as _init_db
 from winebox.models.user import User
 from winebox.services.auth import get_password_hash
 
@@ -31,9 +28,7 @@ async def init_db() -> None:
     global _db_initialized
     if _db_initialized:
         return
-    client = AsyncIOMotorClient(settings.mongodb_url)
-    db = client[settings.mongodb_database]
-    await init_beanie(database=db, document_models=[User])
+    await _init_db()
     _db_initialized = True
 
 
@@ -48,7 +43,7 @@ async def add_user(
         await init_db()
 
     # Check if email already exists
-    existing = await User.find_one(User.email == email)
+    existing = await User.find_one({"email": email})
     if existing:
         print(f"Error: Email '{email}' already in use.")
         sys.exit(1)
@@ -75,7 +70,7 @@ async def list_users(skip_db_init: bool = False) -> None:
     if not skip_db_init:
         await init_db()
 
-    users = await User.find_all().sort("+email").to_list()
+    users = await User.find({}).sort([("email", 1)]).to_list()
 
     if not users:
         print("No users found.")
@@ -97,7 +92,7 @@ async def disable_user(email: str, skip_db_init: bool = False) -> None:
     if not skip_db_init:
         await init_db()
 
-    user = await User.find_one(User.email == email)
+    user = await User.find_one({"email": email})
     if not user:
         print(f"Error: User '{email}' not found.")
         sys.exit(1)
@@ -117,7 +112,7 @@ async def verify_user(email: str, skip_db_init: bool = False) -> None:
     if not skip_db_init:
         await init_db()
 
-    user = await User.find_one(User.email == email)
+    user = await User.find_one({"email": email})
     if not user:
         print(f"Error: User '{email}' not found.")
         sys.exit(1)
@@ -137,7 +132,7 @@ async def enable_user(email: str, skip_db_init: bool = False) -> None:
     if not skip_db_init:
         await init_db()
 
-    user = await User.find_one(User.email == email)
+    user = await User.find_one({"email": email})
     if not user:
         print(f"Error: User '{email}' not found.")
         sys.exit(1)
@@ -157,7 +152,7 @@ async def remove_user(email: str, force: bool = False, skip_db_init: bool = Fals
     if not skip_db_init:
         await init_db()
 
-    user = await User.find_one(User.email == email)
+    user = await User.find_one({"email": email})
     if not user:
         print(f"Error: User '{email}' not found.")
         sys.exit(1)
@@ -177,7 +172,7 @@ async def change_password(email: str, password: str, skip_db_init: bool = False)
     if not skip_db_init:
         await init_db()
 
-    user = await User.find_one(User.email == email)
+    user = await User.find_one({"email": email})
     if not user:
         print(f"Error: User '{email}' not found.")
         sys.exit(1)

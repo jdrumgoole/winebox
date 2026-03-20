@@ -451,10 +451,10 @@ def _drop_e2e_database(ctx: Context, db_name: str) -> None:
     script = Path("data/_drop_e2e_db.py")
     script.write_text(
         "import asyncio\n"
-        "from motor.motor_asyncio import AsyncIOMotorClient\n"
+        "from pymongo import AsyncMongoClient\n"
         "from winebox.config import settings\n"
         "async def drop():\n"
-        f"    client = AsyncIOMotorClient(settings.mongodb_url)\n"
+        f"    client = AsyncMongoClient(settings.mongodb_url)\n"
         f"    await client.drop_database('{db_name}')\n"
         "    client.close()\n"
         f"    print('  Dropped database: {db_name}')\n"

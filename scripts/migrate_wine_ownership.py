@@ -18,10 +18,12 @@ import logging
 import sys
 from typing import Any
 
-from beanie import PydanticObjectId, init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
+from pymongo import AsyncMongoClient
 
 from winebox.config import settings
+from winebox.database import init_db
+from winebox.db import PyObjectId
 from winebox.models import Transaction, User, Wine
 
 logging.basicConfig(
@@ -33,10 +35,10 @@ logger = logging.getLogger(__name__)
 
 async def get_admin_user() -> User | None:
     """Find the first superuser (admin) in the database."""
-    return await User.find_one(User.is_superuser == True)
+    return await User.find_one({"is_superuser": True})
 
 
-async def migrate_wines(admin_id: PydanticObjectId, dry_run: bool = False) -> int:
+async def migrate_wines(admin_id: PyObjectId, dry_run: bool = False) -> int:
     """Migrate all Wine documents to have owner_id set to admin's ID.
 
     Args:
@@ -72,7 +74,7 @@ async def migrate_wines(admin_id: PydanticObjectId, dry_run: bool = False) -> in
     return result.modified_count
 
 
-async def migrate_transactions(admin_id: PydanticObjectId, dry_run: bool = False) -> int:
+async def migrate_transactions(admin_id: PyObjectId, dry_run: bool = False) -> int:
     """Migrate all Transaction documents to have owner_id set to admin's ID.
 
     Args:
@@ -178,13 +180,10 @@ async def run_migration(dry_run: bool = False) -> int:
     """
     # Initialize database connection
     logger.info("Connecting to MongoDB at %s", settings.mongodb_url)
-    client = AsyncIOMotorClient(settings.mongodb_url)
+    client = AsyncMongoClient(settings.mongodb_url)
 
-    # Initialize Beanie
-    await init_beanie(
-        database=client[settings.mongodb_database],
-        document_models=[User, Wine, Transaction],
-    )
+    # Initialize database
+    await init_db(mongo_client=client)
 
     logger.info("Connected to database: %s", settings.mongodb_database)
 

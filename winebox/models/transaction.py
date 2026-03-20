@@ -4,8 +4,9 @@ import enum
 from datetime import datetime, timezone
 from typing import Optional
 
-from beanie import Document, Indexed, PydanticObjectId
 from pydantic import Field
+
+from winebox.db import MongoDocument, PyObjectId
 
 
 class TransactionType(str, enum.Enum):
@@ -15,26 +16,19 @@ class TransactionType(str, enum.Enum):
     CHECK_OUT = "CHECK_OUT"
 
 
-class Transaction(Document):
+class Transaction(MongoDocument):
     """Transaction document model for tracking wine movements."""
 
-    owner_id: Indexed(PydanticObjectId)  # Denormalized for efficient user queries
-    wine_id: Indexed(PydanticObjectId)
+    owner_id: PyObjectId  # Denormalized for efficient user queries
+    wine_id: PyObjectId
     transaction_type: TransactionType
     quantity: int = Field(..., ge=1)
     notes: Optional[str] = None
-    transaction_date: Indexed(datetime) = Field(default_factory=lambda: datetime.now(timezone.utc))
+    transaction_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
         name = "transactions"
-        indexes = [
-            "owner_id",
-            "wine_id",
-            "transaction_type",
-            "transaction_date",
-            [("owner_id", 1), ("transaction_date", -1)],  # Compound index for user transaction queries
-        ]
 
     def __repr__(self) -> str:
         return f"<Transaction(id={self.id}, type={self.transaction_type}, quantity={self.quantity})>"

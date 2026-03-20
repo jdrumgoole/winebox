@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from beanie import PydanticObjectId
+from bson import ObjectId
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -59,7 +59,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 async def get_user_by_email(email: str) -> User | None:
     """Get a user by email."""
-    return await User.find_one(User.email == email)
+    return await User.find_one({"email": email})
 
 
 async def authenticate_user(
@@ -186,7 +186,7 @@ async def get_current_user(
     # If not found by email, try as user_id (ObjectId)
     if user is None:
         try:
-            user_id = PydanticObjectId(subject)
+            user_id = ObjectId(subject)
             user = await User.get(user_id)
         except Exception:
             pass  # Not a valid ObjectId

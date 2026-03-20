@@ -7,11 +7,12 @@ Source: https://github.com/rogerioxavier/X-Wines
 from datetime import datetime, timezone
 from typing import Optional
 
-from beanie import Document, Indexed
 from pydantic import Field
 
+from winebox.db import MongoDocument
 
-class XWinesWine(Document):
+
+class XWinesWine(MongoDocument):
     """X-Wines wine reference data.
 
     External wine data from the X-Wines dataset for autocomplete and auto-fill.
@@ -19,21 +20,21 @@ class XWinesWine(Document):
     """
 
     # Use the original X-Wines integer ID
-    xwines_id: Indexed(int, unique=True)
-    name: Indexed(str)
-    wine_type: Indexed(str)
+    xwines_id: int
+    name: str
+    wine_type: str
     elaborate: Optional[str] = None
     grapes: Optional[str] = None
     harmonize: Optional[str] = None
     abv: Optional[float] = None
     body: Optional[str] = None
     acidity: Optional[str] = None
-    country_code: Optional[Indexed(str)] = None
+    country_code: Optional[str] = None
     country: Optional[str] = None
     region_id: Optional[int] = None
     region_name: Optional[str] = None
     winery_id: Optional[int] = None
-    winery_name: Optional[Indexed(str)] = None
+    winery_name: Optional[str] = None
     website: Optional[str] = None
     vintages: Optional[str] = None
     avg_rating: Optional[float] = None
@@ -41,43 +42,23 @@ class XWinesWine(Document):
 
     class Settings:
         name = "xwines_wines"
-        indexes = [
-            "name",
-            "wine_type",
-            "country_code",
-            "winery_name",
-            "rating_count",
-            [
-                ("name", "text"),
-                ("winery_name", "text"),
-            ],
-            # Compound index: lets Tier 1 anchored regex (^name) use the
-            # index for both the match and the rating_count sort
-            [
-                ("name", 1),
-                ("rating_count", -1),
-            ],
-        ]
 
     def __repr__(self) -> str:
         return f"<XWinesWine(xwines_id={self.xwines_id}, name={self.name}, winery={self.winery_name})>"
 
 
-class XWinesMetadata(Document):
+class XWinesMetadata(MongoDocument):
     """X-Wines dataset metadata for version tracking.
 
     Stores information about the imported X-Wines dataset version.
     """
 
-    key: Indexed(str, unique=True)
+    key: str
     value: str
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
         name = "xwines_metadata"
-        indexes = [
-            "key",
-        ]
 
     def __repr__(self) -> str:
         return f"<XWinesMetadata(key={self.key}, value={self.value})>"

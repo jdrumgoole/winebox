@@ -149,13 +149,13 @@ class TestCleanupOldAttempts:
         await recent.insert()
 
         # Count before cleanup
-        count_before = await LoginAttempt.find(LoginAttempt.email == email).count()
+        count_before = await LoginAttempt.find({"email": email}).count()
 
         removed = await LoginAttempt.cleanup_old_attempts(older_than_hours=24)
         assert removed >= 1
 
         # Recent attempt should still exist
         remaining = await LoginAttempt.find(
-            LoginAttempt.email == email
+            {"email": email}
         ).count()
         assert remaining == count_before - 1
