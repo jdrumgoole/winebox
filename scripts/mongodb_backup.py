@@ -4,30 +4,35 @@
 Backs up an entire database as a gzipped mongodump archive. The MongoDB
 connection URL specifies both the server and database name.
 
-Credentials are read from environment variables or .env file:
-  - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY: AWS credentials
+AWS authentication uses boto3's credential chain — supports:
+  - AWS SSO: run `aws sso login --profile winebox_backup` first
+  - Named profiles in ~/.aws/credentials (use --profile)
+  - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN)
+  - IAM instance roles (on EC2/ECS)
+
+Environment variables (.env or shell):
   - WINEBOX_S3_BUCKET: S3 bucket name (required)
   - WINEBOX_S3_PREFIX: Key prefix (default: "backups")
   - AWS_REGION: AWS region (default: "eu-west-1")
 
 Usage:
-    # Backup
-    uv run python scripts/backup_xwines_to_s3.py backup "mongodb+srv://user:pass@host/winebox-oat"
-    uv run python scripts/backup_xwines_to_s3.py backup "mongodb://localhost:27017/winebox-oat"
-    uv run python scripts/backup_xwines_to_s3.py backup "mongodb://localhost/mydb" --retain 5
+    # Backup (uses default AWS credentials)
+    uv run python scripts/mongodb_backup.py backup "mongodb+srv://user:pass@host/winebox-oat"
 
-    # Restore (to same database)
-    uv run python scripts/backup_xwines_to_s3.py restore "mongodb+srv://user:pass@host/winebox-oat" --latest
-    uv run python scripts/backup_xwines_to_s3.py restore "mongodb+srv://user:pass@host/winebox-oat" --timestamp 2026-03-21_014500
+    # Backup with a named AWS profile
+    uv run python scripts/mongodb_backup.py backup "mongodb+srv://user:pass@host/winebox-oat" --profile winebox_backup
+
+    # Restore latest backup
+    uv run python scripts/mongodb_backup.py restore "mongodb+srv://user:pass@host/winebox-oat" --latest
 
     # Restore to a different database
-    uv run python scripts/backup_xwines_to_s3.py restore "mongodb+srv://user:pass@host/winebox-staging" --latest --source-db winebox-oat
+    uv run python scripts/mongodb_backup.py restore "mongodb+srv://user:pass@host/winebox-staging" --latest
 
     # List existing backups
-    uv run python scripts/backup_xwines_to_s3.py list
+    uv run python scripts/mongodb_backup.py list
 
     # Dry run
-    uv run python scripts/backup_xwines_to_s3.py backup "mongodb://localhost/mydb" --dry-run
+    uv run python scripts/mongodb_backup.py backup "mongodb://localhost/mydb" --dry-run
 """
 
 import argparse
@@ -45,6 +50,9 @@ from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+# Module-level AWS profile — set from CLI args before any S3 calls
+_aws_profile: str | None = None
 
 
 def load_env() -> None:
@@ -88,11 +96,18 @@ def parse_mongodb_url(url: str) -> tuple[str, str]:
 
 
 def get_s3_client() -> Any:
-    """Create a boto3 S3 client."""
+    """Create a boto3 S3 client using the credential chain.
+
+    Supports named profiles (--profile), SSO, env vars, and instance roles.
+    """
     import boto3
 
     region = os.environ.get("AWS_REGION", "eu-west-1")
-    return boto3.client("s3", region_name=region)
+    if _aws_profile:
+        session = boto3.Session(profile_name=_aws_profile, region_name=region)
+    else:
+        session = boto3.Session(region_name=region)
+    return session.client("s3")
 
 
 def get_s3_bucket() -> str:
@@ -416,6 +431,10 @@ def parse_args() -> argparse.Namespace:
         description="Backup and restore MongoDB databases to/from S3",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Debug logging")
+    parser.add_argument(
+        "--profile", default=None,
+        help="AWS profile name (e.g. winebox_backup). Uses default credential chain if omitted.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # backup
@@ -440,6 +459,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    global _aws_profile
     args = parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -447,6 +467,7 @@ def main() -> int:
         datefmt="%H:%M:%S",
     )
     load_env()
+    _aws_profile = args.profile
 
     try:
         if args.command == "backup":
