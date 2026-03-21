@@ -49,6 +49,7 @@ def test_expected_collections_present() -> None:
         "classifications",
         "xwines_wines",
         "xwines_metadata",
+        "xwines_prices",
         "revoked_tokens",
         "login_attempts",
         "import_batches",

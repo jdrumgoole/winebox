@@ -249,6 +249,7 @@ user-guide
 configuration
 deployment
 api-reference
+pricing-data-architecture
 ```
 
 ## License

@@ -410,13 +410,17 @@ async def _regex_search(
 
 
 async def _batch_lookup_prices(xwines_ids: list[int]) -> dict[int, dict]:
-    """Batch lookup price data for X-Wines IDs from the xwines_prices collection."""
+    """Batch lookup base price data for X-Wines IDs from the xwines_prices collection.
+
+    Returns base prices (vintage=null) for search results where no vintage context
+    is available. For vintage-specific prices, use the enrichment service.
+    """
     if not xwines_ids:
         return {}
     try:
         db = get_database()
         cursor = db["xwines_prices"].find(
-            {"xwines_id": {"$in": xwines_ids}},
+            {"xwines_id": {"$in": xwines_ids}, "vintage": None},
             {"_id": 0, "xwines_id": 1, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
         )
         return {doc["xwines_id"]: doc async for doc in cursor}

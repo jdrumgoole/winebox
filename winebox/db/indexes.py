@@ -92,6 +92,10 @@ INDEXES: dict[str, list[IndexModel]] = {
     "raw_uploads": [
         IndexModel([("batch_id", ASCENDING), ("index", ASCENDING)]),
     ],
+    "xwines_prices": [
+        IndexModel([("xwines_id", ASCENDING), ("vintage", ASCENDING)], unique=True),
+        IndexModel([("xwines_id", ASCENDING)]),  # For lookups without vintage
+    ],
 }
 
 

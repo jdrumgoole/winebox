@@ -50,15 +50,24 @@ VALID_CONFIDENCES = {"high", "medium", "low"}
 
 SYSTEM_PROMPT = """You are a wine pricing expert. Your task is to estimate typical \
 US retail prices (not auction, not wholesale) for wines based on their name, producer, \
-region, grape variety, and other attributes.
+region, grape variety, vintage, and other attributes.
 
 Guidelines:
 - Prices should reflect current US retail market (wine shop / online retailer)
-- Consider the producer's reputation, region prestige, and classification
+- Base your estimates on known retail prices from sources like Wine-Searcher, \
+Wine.com, Total Wine, and other major US retailers
+- Consider the producer's reputation, region prestige, classification, and vintage quality
+- Vintage matters significantly: older vintages of prestigious wines cost more; \
+great vintage years command premiums (e.g. 2005, 2009, 2010 Bordeaux); \
+very recent vintages of age-worthy wines may be cheaper on release
 - For unknown or obscure wines, use regional averages as a baseline
-- Be conservative with confidence ratings — use "high" only for well-known wines
+- Be conservative with confidence ratings — use "high" only for well-known wines \
+where you are certain of the typical retail price
 - price_tier definitions: budget (<$15), value ($15-25), mid_range ($25-50), \
-premium ($50-100), luxury ($100-250), ultra_premium (>$250)"""
+premium ($50-100), luxury ($100-250), ultra_premium (>$250)
+
+Each item in the batch specifies a wine AND a vintage year. Price each wine-vintage \
+combination individually — the same wine in different vintages should have different prices."""
 
 
 def get_mongodb_url() -> str:
@@ -114,59 +123,70 @@ def get_anthropic_api_key() -> str | None:
     return None
 
 
-def build_batch_prompt(wines: list[dict[str, Any]]) -> str:
-    """Build the user prompt for a batch of wines.
+def build_batch_prompt(items: list[dict[str, Any]]) -> str:
+    """Build the user prompt for a batch of wine-vintage items.
 
     Args:
-        wines: List of wine documents from xwines_wines collection.
+        items: List of dicts with wine data + "vintage" key (int or None).
 
     Returns:
         Formatted prompt string.
     """
     lines = [
-        "Estimate retail prices for these wines. For each, provide:",
+        "Estimate retail prices for these wine-vintage combinations. For each, provide:",
         '- price_low / price_high (USD, numbers only)',
         '- confidence: "high" | "medium" | "low"',
         '- price_tier: "budget" (<$15) | "value" ($15-25) | "mid_range" ($25-50) '
         '| "premium" ($50-100) | "luxury" ($100-250) | "ultra_premium" (>$250)',
-        "- note: 1-sentence justification",
+        "- note: 1-sentence justification mentioning vintage quality if relevant",
         "",
-        "Return ONLY a JSON array, one object per wine, same order as listed.",
+        "Return ONLY a JSON array, one object per item, same order as listed.",
         "Each object: {\"price_low\": N, \"price_high\": N, \"confidence\": \"...\", "
         "\"price_tier\": \"...\", \"note\": \"...\"}",
         "",
         "Wines:",
     ]
 
-    for i, wine in enumerate(wines, 1):
-        parts = [wine.get("name", "Unknown")]
+    for i, item in enumerate(items, 1):
+        parts = [item.get("name", "Unknown")]
 
-        winery = wine.get("winery_name")
+        vintage = item.get("vintage")
+        if vintage is not None:
+            parts.append(f"| Vintage: {vintage}")
+
+        winery = item.get("winery_name")
         if winery:
             parts.append(f"| {winery}")
 
-        wine_type = wine.get("wine_type")
+        wine_type = item.get("wine_type")
         if wine_type:
             parts.append(f"| {wine_type}")
 
-        region = wine.get("region_name")
-        country = wine.get("country")
+        region = item.get("region_name")
+        country = item.get("country")
         location = ", ".join(filter(None, [region, country]))
         if location:
             parts.append(f"| {location}")
 
-        grapes = wine.get("grapes")
+        grapes = item.get("grapes")
         if grapes:
             parts.append(f"| {grapes}")
 
-        abv = wine.get("abv")
+        abv = item.get("abv")
         if abv:
             parts.append(f"| {abv}%")
 
-        avg_rating = wine.get("avg_rating")
-        rating_count = wine.get("rating_count", 0)
+        avg_rating = item.get("avg_rating")
+        rating_count = item.get("rating_count", 0)
         if avg_rating is not None:
             parts.append(f"| Rating: {avg_rating} ({rating_count})")
+
+        # Include Kaggle price context if available
+        kaggle_ctx = item.get("_kaggle_context")
+        if kaggle_ctx:
+            ctx_prices = [f"${c['price_usd']:.0f}" for c in kaggle_ctx if c.get("price_usd")]
+            if ctx_prices:
+                parts.append(f"| Reference prices from same winery/region: {', '.join(ctx_prices)}")
 
         lines.append(f"{i}. {' '.join(parts)}")
 
@@ -220,7 +240,10 @@ def validate_price_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
     """
     try:
         price_low = float(entry.get("price_low", 0))
-        price_high = float(entry.get("price_high", 0))
+        # Handle common LLM typo: "price_height" instead of "price_high"
+        price_high = float(
+            entry.get("price_high") or entry.get("price_height") or 0
+        )
     except (TypeError, ValueError):
         return None
 
@@ -285,6 +308,7 @@ class PriceAnnotator:
         self.db = self.client[self.db_name]
         self.wines_col = self.db["xwines_wines"]
         self.prices_col = self.db["xwines_prices"]
+        self.kaggle_col = self.db["kaggle_wine_prices"]
 
         # Anthropic client (lazy)
         self._anthropic_client = None
@@ -301,6 +325,7 @@ class PriceAnnotator:
         self.succeeded = 0
         self.failed = 0
         self.skipped = 0
+        self.kaggle_matched = 0
 
         # Shutdown flag
         self._shutdown = False
@@ -320,22 +345,68 @@ class PriceAnnotator:
         return self._anthropic_client
 
     def ensure_indexes(self) -> None:
-        """Create indexes on xwines_prices collection."""
-        self.prices_col.create_index("xwines_id", unique=True)
-        logger.debug("Ensured unique index on xwines_prices.xwines_id")
+        """Create indexes on xwines_prices collection.
 
-    def get_remaining_wine_ids(self) -> list[int]:
-        """Get xwines_ids that don't have price documents yet.
+        Handles migration from old single-field unique index to new
+        compound (xwines_id, vintage) unique index.
+        """
+        from pymongo.errors import OperationFailure
+
+        # Drop old unique index on xwines_id if it conflicts
+        try:
+            self.prices_col.create_index("xwines_id")
+        except OperationFailure as e:
+            if e.code == 86:  # IndexKeySpecsConflict
+                logger.info("Dropping old unique index on xwines_id")
+                try:
+                    self.prices_col.drop_index("xwines_id_1")
+                except OperationFailure:
+                    pass
+                self.prices_col.create_index("xwines_id")
+
+        self.prices_col.create_index(
+            [("xwines_id", 1), ("vintage", 1)], unique=True
+        )
+        logger.debug("Ensured indexes on xwines_prices (xwines_id, vintage)")
+
+    @staticmethod
+    def parse_vintages(vintages_str: str | None) -> list[int]:
+        """Parse the vintages field from xwines_wines into a list of ints.
+
+        The field is stored as a string like "[2020, 2019, 2018]" or
+        "['2020', '2019']".
+
+        Args:
+            vintages_str: Raw vintages string from the database.
 
         Returns:
-            List of xwines_id values to process, ordered by priority.
+            List of vintage years as ints, or empty list.
         """
-        # Get all priced wine IDs
-        priced_ids = set(
-            doc["xwines_id"] for doc in self.prices_col.find({}, {"xwines_id": 1})
-        )
+        if not vintages_str or not isinstance(vintages_str, str):
+            return []
+        import ast
 
-        # Build query for unpriced wines
+        try:
+            parsed = ast.literal_eval(vintages_str)
+            if isinstance(parsed, list):
+                return [int(v) for v in parsed if v]
+        except (ValueError, SyntaxError):
+            pass
+        return []
+
+    def get_remaining_items(self) -> list[tuple[int, int | None]]:
+        """Get (xwines_id, vintage) pairs that don't have price documents yet.
+
+        Returns:
+            List of (xwines_id, vintage) tuples to process, ordered by priority.
+            vintage is int for vintage-specific prices, None for base prices.
+        """
+        # Get all priced (xwines_id, vintage) pairs
+        priced_pairs: set[tuple[int, int | None]] = set()
+        for doc in self.prices_col.find({}, {"xwines_id": 1, "vintage": 1}):
+            priced_pairs.add((doc["xwines_id"], doc.get("vintage")))
+
+        # Build query for wines
         query: dict[str, Any] = {}
         if self.grape:
             query["$or"] = [
@@ -350,19 +421,25 @@ class PriceAnnotator:
             sort = [("rating_count", -1)]
         elif self.priority == "alphabetical":
             sort = [("name", 1)]
-        else:  # random — fetch all and shuffle
+        else:  # random
             sort = []
 
-        projection = {"xwines_id": 1}
+        projection = {"xwines_id": 1, "vintages": 1}
         cursor = self.wines_col.find(query, projection)
         if sort:
             cursor = cursor.sort(sort)
 
-        remaining = []
+        remaining: list[tuple[int, int | None]] = []
         for doc in cursor:
             xid = doc["xwines_id"]
-            if xid not in priced_ids:
-                remaining.append(xid)
+            # Base price (vintage=None)
+            if (xid, None) not in priced_pairs:
+                remaining.append((xid, None))
+            # Per-vintage prices
+            vintages = self.parse_vintages(doc.get("vintages"))
+            for v in vintages:
+                if (xid, v) not in priced_pairs:
+                    remaining.append((xid, v))
 
         if self.priority == "random":
             import random
@@ -374,8 +451,12 @@ class PriceAnnotator:
 
         return remaining
 
-    def get_wines_by_ids(self, xwines_ids: list[int]) -> list[dict[str, Any]]:
-        """Fetch wine documents by xwines_id list."""
+    def get_wines_by_ids(self, xwines_ids: list[int]) -> dict[int, dict[str, Any]]:
+        """Fetch wine documents by xwines_id list.
+
+        Returns:
+            Dict mapping xwines_id to wine document.
+        """
         wines = list(
             self.wines_col.find(
                 {"xwines_id": {"$in": xwines_ids}},
@@ -393,66 +474,281 @@ class PriceAnnotator:
                 },
             )
         )
-        # Maintain requested order
-        id_to_wine = {w["xwines_id"]: w for w in wines}
-        return [id_to_wine[xid] for xid in xwines_ids if xid in id_to_wine]
+        return {w["xwines_id"]: w for w in wines}
 
-    def process_batch(self, wines: list[dict[str, Any]]) -> int:
-        """Process a single batch of wines through the API.
+    def build_batch_items(
+        self,
+        pairs: list[tuple[int, int | None]],
+        wine_lookup: dict[int, dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Build batch items from (xwines_id, vintage) pairs and wine data.
+
+        Each item is a wine dict augmented with a "vintage" key.
 
         Args:
-            wines: List of wine documents to price.
+            pairs: List of (xwines_id, vintage) tuples.
+            wine_lookup: Dict mapping xwines_id to wine document.
 
         Returns:
-            Number of successfully priced wines.
+            List of item dicts ready for build_batch_prompt().
+        """
+        items: list[dict[str, Any]] = []
+        for xid, vintage in pairs:
+            wine = wine_lookup.get(xid)
+            if not wine:
+                continue
+            item = {k: v for k, v in wine.items() if k != "_id"}
+            item["vintage"] = vintage
+            items.append(item)
+        return items
+
+    def lookup_kaggle_price(
+        self,
+        winery: str,
+        wine_name: str,
+        vintage: int | None,
+    ) -> dict[str, Any] | None:
+        """Look up a wine in the kaggle_wine_prices collection.
+
+        Tries exact winery match first, then looks for name overlap.
+        Returns the best matching Kaggle price doc or None.
+
+        Args:
+            winery: Winery name from X-Wines.
+            wine_name: Wine name from X-Wines.
+            vintage: Vintage year or None.
+
+        Returns:
+            Kaggle price doc dict, or None if no match.
+        """
+        if not winery:
+            return None
+
+        winery_lower = winery.strip().lower()
+
+        # Find Kaggle wines from the same winery
+        query: dict[str, Any] = {"winery_lower": winery_lower}
+        if vintage is not None:
+            # Try exact vintage first
+            query["vintage"] = vintage
+            match = self.kaggle_col.find_one(query)
+            if match:
+                return match
+            # Fall back to any vintage from same winery
+            del query["vintage"]
+
+        candidates = list(self.kaggle_col.find(query).limit(20))
+        if not candidates:
+            return None
+
+        # Score candidates by name similarity
+        name_lower = wine_name.strip().lower()
+        name_tokens = set(name_lower.split())
+
+        best: dict[str, Any] | None = None
+        best_score = 0.0
+        for c in candidates:
+            c_name = c.get("name_lower", "")
+            c_tokens = set(c_name.split())
+            # Token overlap score
+            overlap = len(name_tokens & c_tokens)
+            if overlap > 0:
+                score = overlap / max(len(name_tokens), len(c_tokens))
+            elif name_lower in c_name or c_name in name_lower:
+                score = 0.3
+            else:
+                score = 0.0
+            # Prefer same vintage
+            if vintage and c.get("vintage") == vintage:
+                score += 0.5
+            if score > best_score:
+                best_score = score
+                best = c
+
+        # Require minimum name similarity
+        return best if best_score >= 0.2 else None
+
+    def lookup_kaggle_context(
+        self,
+        winery: str | None,
+        country: str | None,
+        region: str | None,
+    ) -> list[dict[str, Any]]:
+        """Get Kaggle price context for a wine's winery/region.
+
+        Returns nearby Kaggle prices to use as anchors in the LLM prompt.
+
+        Args:
+            winery: Winery name.
+            country: Country name.
+            region: Region name.
+
+        Returns:
+            List of Kaggle price docs (up to 5) as context.
+        """
+        # Try winery first
+        if winery:
+            winery_lower = winery.strip().lower()
+            docs = list(self.kaggle_col.find(
+                {"winery_lower": winery_lower},
+                {"name": 1, "price_usd": 1, "vintage": 1, "_id": 0},
+            ).limit(3))
+            if docs:
+                return docs
+
+        # Fall back to region + country
+        if country and region:
+            docs = list(self.kaggle_col.find(
+                {"country": {"$regex": f"^{country}$", "$options": "i"},
+                 "region": {"$regex": region, "$options": "i"}},
+                {"name": 1, "winery": 1, "price_usd": 1, "vintage": 1, "_id": 0},
+            ).limit(5))
+            if docs:
+                return docs
+
+        # Fall back to country only
+        if country:
+            docs = list(self.kaggle_col.find(
+                {"country": {"$regex": f"^{country}$", "$options": "i"}},
+                {"name": 1, "winery": 1, "price_usd": 1, "vintage": 1, "_id": 0},
+            ).sort([("rating", -1)]).limit(5))
+            return docs
+
+        return []
+
+    def process_kaggle_matches(
+        self,
+        items: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Process items that have direct Kaggle price matches.
+
+        For items with a Kaggle match, writes the price directly without LLM.
+        Returns the remaining items that need LLM pricing and the count of
+        successfully matched items.
+
+        Args:
+            items: All wine-vintage items to process.
+
+        Returns:
+            Tuple of (items_needing_llm, kaggle_match_count).
+        """
+        needs_llm: list[dict[str, Any]] = []
+        matched = 0
+        now = datetime.now(timezone.utc)
+
+        for item in items:
+            winery = item.get("winery_name", "")
+            name = item.get("name", "")
+            vintage = item.get("vintage")
+
+            kaggle = self.lookup_kaggle_price(winery, name, vintage)
+            if kaggle and kaggle.get("price_usd"):
+                price = kaggle["price_usd"]
+                # Build a price range: ±15% of the Kaggle price
+                price_low = round(price * 0.85, 2)
+                price_high = round(price * 1.15, 2)
+
+                # Determine tier
+                midpoint = price
+                price_tier = "mid_range"
+                for tier, (lo, hi) in PRICE_TIERS.items():
+                    if lo <= midpoint < hi:
+                        price_tier = tier
+                        break
+
+                doc = {
+                    "xwines_id": item["xwines_id"],
+                    "vintage": vintage,
+                    "price_low_usd": price_low,
+                    "price_high_usd": price_high,
+                    "price_tier": price_tier,
+                    "confidence": "high",
+                    "note": f"Based on Vivino market price ${price:.2f}",
+                    "model": "kaggle-vivino",
+                    "created_at": now,
+                }
+
+                try:
+                    self.prices_col.update_one(
+                        {"xwines_id": item["xwines_id"], "vintage": vintage},
+                        {"$set": doc},
+                        upsert=True,
+                    )
+                    matched += 1
+                except Exception as e:
+                    logger.warning(
+                        "Failed to insert Kaggle price for wine %d: %s",
+                        item["xwines_id"], e,
+                    )
+                    needs_llm.append(item)
+            else:
+                # Add Kaggle context for the LLM prompt
+                context = self.lookup_kaggle_context(
+                    winery, item.get("country"), item.get("region_name"),
+                )
+                if context:
+                    item["_kaggle_context"] = context
+                needs_llm.append(item)
+
+        return needs_llm, matched
+
+    def process_batch(self, items: list[dict[str, Any]]) -> int:
+        """Process a single batch of wine-vintage items through the API.
+
+        Args:
+            items: List of wine-vintage dicts (wine data + "vintage" key).
+
+        Returns:
+            Number of successfully priced items.
         """
         if self._shutdown:
             return 0
 
-        prompt = build_batch_prompt(wines)
+        prompt = build_batch_prompt(items)
 
         if self.verbose:
-            logger.debug("Batch prompt (%d wines):\n%s", len(wines), prompt)
+            logger.debug("Batch prompt (%d items):\n%s", len(items), prompt)
 
         # Call Claude API with retries
         response_text = self._call_api_with_retries(prompt)
         if response_text is None:
             with self._lock:
-                self.failed += len(wines)
+                self.failed += len(items)
             return 0
 
         # Parse response
         entries = parse_response(response_text)
         if entries is None:
             logger.warning(
-                "Failed to parse JSON response for batch of %d wines. "
+                "Failed to parse JSON response for batch of %d items. "
                 "Raw response: %s",
-                len(wines),
+                len(items),
                 response_text[:500],
             )
             with self._lock:
-                self.failed += len(wines)
+                self.failed += len(items)
             return 0
 
-        if len(entries) != len(wines):
+        if len(entries) != len(items):
             logger.warning(
-                "Response has %d entries but batch had %d wines — "
+                "Response has %d entries but batch had %d items — "
                 "processing available entries",
                 len(entries),
-                len(wines),
+                len(items),
             )
 
         # Validate and insert each entry
         success_count = 0
         now = datetime.now(timezone.utc)
 
-        for idx, (wine, entry) in enumerate(zip(wines, entries)):
+        for idx, (item, entry) in enumerate(zip(items, entries)):
             validated = validate_price_entry(entry)
             if validated is None:
                 logger.warning(
-                    "Invalid price entry for wine %d (%s): %s",
-                    wine["xwines_id"],
-                    wine.get("name", "?"),
+                    "Invalid price entry for wine %d vintage %s (%s): %s",
+                    item["xwines_id"],
+                    item.get("vintage"),
+                    item.get("name", "?"),
                     entry,
                 )
                 with self._lock:
@@ -460,7 +756,8 @@ class PriceAnnotator:
                 continue
 
             doc = {
-                "xwines_id": wine["xwines_id"],
+                "xwines_id": item["xwines_id"],
+                "vintage": item.get("vintage"),
                 **validated,
                 "model": self.model,
                 "created_at": now,
@@ -468,7 +765,10 @@ class PriceAnnotator:
 
             try:
                 self.prices_col.update_one(
-                    {"xwines_id": wine["xwines_id"]},
+                    {
+                        "xwines_id": item["xwines_id"],
+                        "vintage": item.get("vintage"),
+                    },
                     {"$set": doc},
                     upsert=True,
                 )
@@ -477,21 +777,22 @@ class PriceAnnotator:
                     self.succeeded += 1
             except Exception as e:
                 logger.warning(
-                    "Failed to insert price for wine %d: %s",
-                    wine["xwines_id"],
+                    "Failed to insert price for wine %d vintage %s: %s",
+                    item["xwines_id"],
+                    item.get("vintage"),
                     e,
                 )
                 with self._lock:
                     self.failed += 1
 
-        # Count wines that didn't get entries (response was too short)
-        unmatched = len(wines) - len(entries)
+        # Count items that didn't get entries (response was too short)
+        unmatched = len(items) - len(entries)
         if unmatched > 0:
             with self._lock:
                 self.failed += unmatched
 
         with self._lock:
-            self.processed += len(wines)
+            self.processed += len(items)
         return success_count
 
     def _call_api_with_retries(
@@ -575,20 +876,24 @@ class PriceAnnotator:
         """Run the annotation process."""
         self.ensure_indexes()
 
-        remaining_ids = self.get_remaining_wine_ids()
-        total_remaining = len(remaining_ids)
+        remaining_pairs = self.get_remaining_items()
+        total_remaining = len(remaining_pairs)
 
         if total_remaining == 0:
-            print("All wines already priced. Nothing to do.")
+            print("All wine-vintage pairs already priced. Nothing to do.")
             return
 
         total_batches = (total_remaining + self.batch_size - 1) // self.batch_size
 
-        print(f"\nX-Wines Price Annotation")
+        # Count unique wines
+        unique_wines = len({xid for xid, _ in remaining_pairs})
+
+        print(f"\nX-Wines Vintage Price Annotation")
         print("=" * 50)
         print(f"Database: {self.db_name}")
         print(f"Model: {self.model}")
-        print(f"Wines to process: {total_remaining:,}")
+        print(f"Wine-vintage pairs to process: {total_remaining:,}")
+        print(f"Unique wines: {unique_wines:,}")
         print(f"Batch size: {self.batch_size}")
         print(f"Total batches: {total_batches:,}")
         print(f"Concurrency: {self.concurrency} threads")
@@ -599,17 +904,54 @@ class PriceAnnotator:
             print(f"Min ratings filter: {self.min_ratings}")
         print()
 
+        # Check Kaggle data availability
+        kaggle_count = self.kaggle_col.count_documents({})
+        if kaggle_count > 0:
+            print(f"Kaggle price data: {kaggle_count:,} reference wines available")
+        else:
+            print("Kaggle price data: none (run import_kaggle_prices.py first for better accuracy)")
+        print()
+
         if self.dry_run:
             print("[DRY RUN] Would process the above. No API calls made.")
             return
 
-        # Build all batches upfront
+        # Collect all unique wine IDs and fetch their data
+        all_wine_ids = list({xid for xid, _ in remaining_pairs})
+        wine_lookup = self.get_wines_by_ids(all_wine_ids)
+
+        # Build all items
+        all_items = self.build_batch_items(remaining_pairs, wine_lookup)
+
+        # Phase 1: Direct Kaggle price matches (no LLM needed)
+        if kaggle_count > 0:
+            print("Phase 1: Matching against Kaggle/Vivino prices...")
+            needs_llm, kaggle_matched = self.process_kaggle_matches(all_items)
+            self.kaggle_matched = kaggle_matched
+            with self._lock:
+                self.succeeded += kaggle_matched
+                self.processed += kaggle_matched
+            print(f"  Kaggle direct matches: {kaggle_matched:,}")
+            print(f"  Remaining for LLM: {len(needs_llm):,}")
+            print()
+        else:
+            needs_llm = all_items
+
+        if not needs_llm:
+            print("All items matched via Kaggle. No LLM calls needed.")
+            self._print_summary()
+            return
+
+        # Phase 2: LLM pricing for remaining items (with Kaggle context where available)
+        total_llm = len(needs_llm)
+        print(f"Phase 2: LLM pricing for {total_llm:,} items...")
+
+        # Build batches from remaining items
         batches: list[list[dict[str, Any]]] = []
-        for i in range(0, total_remaining, self.batch_size):
-            batch_ids = remaining_ids[i : i + self.batch_size]
-            wines = self.get_wines_by_ids(batch_ids)
-            if wines:
-                batches.append(wines)
+        for i in range(0, total_llm, self.batch_size):
+            batch = needs_llm[i : i + self.batch_size]
+            if batch:
+                batches.append(batch)
 
         # Process with thread pool
         with ThreadPoolExecutor(max_workers=self.concurrency) as executor:
@@ -628,13 +970,15 @@ class PriceAnnotator:
                 except Exception as e:
                     logger.error("Batch failed with exception: %s", e)
 
-                # Progress update
-                pct = (self.processed / total_remaining) * 100
+                # Progress update (LLM phase only)
+                llm_processed = self.processed - self.kaggle_matched
+                pct = (llm_processed / total_llm) * 100 if total_llm else 100
                 print(
-                    f"\rProgress: {self.processed:,}/{total_remaining:,} "
+                    f"\rLLM Progress: {llm_processed:,}/{total_llm:,} "
                     f"({pct:.1f}%) | "
                     f"OK: {self.succeeded:,} | "
-                    f"Failed: {self.failed:,}",
+                    f"Failed: {self.failed:,} | "
+                    f"Kaggle: {self.kaggle_matched:,}",
                     end="",
                     flush=True,
                 )
@@ -646,27 +990,38 @@ class PriceAnnotator:
         """Print final summary of the annotation run."""
         print(f"\nAnnotation complete!")
         print(f"  Processed: {self.processed:,}")
+        print(f"  Kaggle matched: {self.kaggle_matched:,}")
+        print(f"  LLM priced: {self.succeeded - self.kaggle_matched:,}")
         print(f"  Succeeded: {self.succeeded:,}")
         print(f"  Failed: {self.failed:,}")
         total_priced = self.prices_col.count_documents({})
+        base_priced = self.prices_col.count_documents({"vintage": None})
+        vintage_priced = total_priced - base_priced
+        kaggle_sourced = self.prices_col.count_documents({"model": "kaggle-vivino"})
         total_wines = self.wines_col.count_documents({})
-        print(f"  Total priced: {total_priced:,}/{total_wines:,}")
+        print(f"  Total price docs: {total_priced:,}")
+        print(f"  Base prices: {base_priced:,}/{total_wines:,} wines")
+        print(f"  Vintage prices: {vintage_priced:,}")
+        print(f"  Kaggle-sourced: {kaggle_sourced:,}")
 
     def show_status(self) -> None:
         """Show current progress and exit."""
         total_wines = self.wines_col.count_documents({})
         total_priced = self.prices_col.count_documents({})
-        remaining = total_wines - total_priced
+        base_priced = self.prices_col.count_documents({"vintage": None})
+        vintage_priced = total_priced - base_priced
+        wines_with_base = base_priced  # 1:1 with wines
 
-        print(f"\nX-Wines Price Annotation Status")
+        print(f"\nX-Wines Vintage Price Annotation Status")
         print("=" * 50)
         print(f"Database: {self.db_name}")
         print(f"Total wines: {total_wines:,}")
-        print(f"Priced: {total_priced:,}")
-        print(f"Remaining: {remaining:,}")
+        print(f"Wines with base price: {wines_with_base:,}")
+        print(f"Vintage-specific prices: {vintage_priced:,}")
+        print(f"Total price documents: {total_priced:,}")
         if total_wines > 0:
-            pct = (total_priced / total_wines) * 100
-            print(f"Progress: {pct:.1f}%")
+            pct = (wines_with_base / total_wines) * 100
+            print(f"Base price coverage: {pct:.1f}%")
 
         # Show tier breakdown
         if total_priced > 0:
@@ -693,18 +1048,19 @@ class PriceAnnotator:
 
     def estimate_cost(self) -> None:
         """Estimate remaining API cost and exit."""
-        remaining_ids = self.get_remaining_wine_ids()
-        remaining = len(remaining_ids)
+        remaining_pairs = self.get_remaining_items()
+        remaining = len(remaining_pairs)
 
         if remaining == 0:
-            print("All wines already priced. No cost remaining.")
+            print("All wine-vintage pairs already priced. No cost remaining.")
             return
 
+        unique_wines = len({xid for xid, _ in remaining_pairs})
         batches = (remaining + self.batch_size - 1) // self.batch_size
 
         # Haiku pricing: $0.80/M input, $4/M output tokens
-        # Estimate ~140 input tokens per wine, ~50 output tokens per wine
-        input_tokens_per_batch = 200 + (140 * self.batch_size)  # system + wines
+        # Estimate ~150 input tokens per item (wine + vintage), ~50 output tokens
+        input_tokens_per_batch = 200 + (150 * self.batch_size)  # system + items
         output_tokens_per_batch = 50 * self.batch_size
 
         total_input = batches * input_tokens_per_batch
@@ -714,10 +1070,11 @@ class PriceAnnotator:
         output_cost = (total_output / 1_000_000) * 4.00
         total_cost = input_cost + output_cost
 
-        print(f"\nX-Wines Price Annotation Cost Estimate")
+        print(f"\nX-Wines Vintage Price Annotation Cost Estimate")
         print("=" * 50)
         print(f"Model: {self.model}")
-        print(f"Remaining wines: {remaining:,}")
+        print(f"Remaining wine-vintage pairs: {remaining:,}")
+        print(f"Unique wines: {unique_wines:,}")
         print(f"Batch size: {self.batch_size}")
         print(f"Batches needed: {batches:,}")
         print(f"\nEstimated tokens:")

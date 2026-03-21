@@ -129,13 +129,30 @@ async def enrich_parsed_with_xwines(parsed: dict) -> dict:
     if enriched_fields:
         parsed["enriched_fields"] = enriched_fields
 
-    # Look up estimated price data
+    # Look up estimated price data — prefer vintage-specific, fall back to base
     try:
         db = get_database()
-        price_doc = await db["xwines_prices"].find_one(
-            {"xwines_id": match.xwines_id},
-            {"_id": 0, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
-        )
+        price_doc = None
+
+        # Try vintage-specific price first
+        vintage = parsed.get("vintage")
+        if vintage is not None:
+            try:
+                vintage_int = int(vintage)
+                price_doc = await db["xwines_prices"].find_one(
+                    {"xwines_id": match.xwines_id, "vintage": vintage_int},
+                    {"_id": 0, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
+                )
+            except (TypeError, ValueError):
+                pass
+
+        # Fall back to base price (vintage=null)
+        if not price_doc:
+            price_doc = await db["xwines_prices"].find_one(
+                {"xwines_id": match.xwines_id, "vintage": None},
+                {"_id": 0, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
+            )
+
         if price_doc:
             if not parsed.get("estimated_price_low") and price_doc.get("price_low_usd"):
                 parsed["estimated_price_low"] = price_doc["price_low_usd"]
@@ -626,22 +643,50 @@ async def enrich_batch_with_xwines(parsed_list: list[dict]) -> None:
             parsed["enriched_fields"] = enriched_fields
 
     # Batch price lookup for all matched wines
+    # Try vintage-specific prices first, then fall back to base prices
     try:
         matched_ids = [
             p["xwines_id"] for p in parsed_list if p.get("xwines_id")
         ]
         if matched_ids:
             db = get_database()
+
+            # Build vintage-specific queries for wines that have a vintage
+            vintage_queries: list[dict] = []
+            for p in parsed_list:
+                xid = p.get("xwines_id")
+                vintage = p.get("vintage")
+                if xid and vintage is not None:
+                    try:
+                        vintage_queries.append(
+                            {"xwines_id": xid, "vintage": int(vintage)}
+                        )
+                    except (TypeError, ValueError):
+                        pass
+
+            # Fetch vintage-specific prices
+            vintage_price_map: dict[int, dict] = {}
+            if vintage_queries:
+                cursor = db["xwines_prices"].find(
+                    {"$or": vintage_queries},
+                    {"_id": 0, "xwines_id": 1, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
+                )
+                vintage_price_map = {doc["xwines_id"]: doc async for doc in cursor}
+
+            # Fetch base prices (vintage=null) as fallback
             cursor = db["xwines_prices"].find(
-                {"xwines_id": {"$in": matched_ids}},
+                {"xwines_id": {"$in": matched_ids}, "vintage": None},
                 {"_id": 0, "xwines_id": 1, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
             )
-            price_map: dict[int, dict] = {doc["xwines_id"]: doc async for doc in cursor}
+            base_price_map: dict[int, dict] = {doc["xwines_id"]: doc async for doc in cursor}
 
             for parsed in parsed_list:
                 xid = parsed.get("xwines_id")
-                if xid and xid in price_map:
-                    price_doc = price_map[xid]
+                if not xid:
+                    continue
+                # Prefer vintage-specific, fall back to base
+                price_doc = vintage_price_map.get(xid) or base_price_map.get(xid)
+                if price_doc:
                     if not parsed.get("estimated_price_low") and price_doc.get("price_low_usd"):
                         parsed["estimated_price_low"] = price_doc["price_low_usd"]
                     if not parsed.get("estimated_price_high") and price_doc.get("price_high_usd"):
