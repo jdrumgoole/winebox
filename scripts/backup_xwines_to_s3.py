@@ -1,33 +1,33 @@
 #!/usr/bin/env python3
-"""Backup and restore X-Wines collections to/from S3 using mongodump/mongorestore.
+"""Backup and restore MongoDB databases to/from S3 using mongodump/mongorestore.
 
-Uses native MongoDB tools (mongodump/mongorestore) for fast, reliable
-binary backups. Each backup is a gzipped archive of the BSON dump,
-uploaded to S3 with a manifest.
+Backs up an entire database as a gzipped mongodump archive. The MongoDB
+connection URL specifies both the server and database name.
 
 Credentials are read from environment variables or .env file:
-  - WINEBOX_MONGODB_URL: MongoDB connection string
   - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY: AWS credentials
   - WINEBOX_S3_BUCKET: S3 bucket name (required)
-  - WINEBOX_S3_PREFIX: Key prefix (default: "backups/xwines")
+  - WINEBOX_S3_PREFIX: Key prefix (default: "backups")
   - AWS_REGION: AWS region (default: "eu-west-1")
 
 Usage:
     # Backup
-    uv run python scripts/backup_xwines_to_s3.py backup
-    uv run python scripts/backup_xwines_to_s3.py backup --collections xwines_prices
-    uv run python scripts/backup_xwines_to_s3.py backup --database winebox-oat --retain 5
+    uv run python scripts/backup_xwines_to_s3.py backup "mongodb+srv://user:pass@host/winebox-oat"
+    uv run python scripts/backup_xwines_to_s3.py backup "mongodb://localhost:27017/winebox-oat"
+    uv run python scripts/backup_xwines_to_s3.py backup "mongodb://localhost/mydb" --retain 5
 
-    # Restore
-    uv run python scripts/backup_xwines_to_s3.py restore --timestamp 2026-03-21_014500
-    uv run python scripts/backup_xwines_to_s3.py restore --latest
-    uv run python scripts/backup_xwines_to_s3.py restore --latest --database winebox-oat-staging
+    # Restore (to same database)
+    uv run python scripts/backup_xwines_to_s3.py restore "mongodb+srv://user:pass@host/winebox-oat" --latest
+    uv run python scripts/backup_xwines_to_s3.py restore "mongodb+srv://user:pass@host/winebox-oat" --timestamp 2026-03-21_014500
+
+    # Restore to a different database
+    uv run python scripts/backup_xwines_to_s3.py restore "mongodb+srv://user:pass@host/winebox-staging" --latest --source-db winebox-oat
 
     # List existing backups
     uv run python scripts/backup_xwines_to_s3.py list
 
     # Dry run
-    uv run python scripts/backup_xwines_to_s3.py backup --dry-run
+    uv run python scripts/backup_xwines_to_s3.py backup "mongodb://localhost/mydb" --dry-run
 """
 
 import argparse
@@ -42,10 +42,9 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
-
-XWINES_COLLECTIONS = ["xwines_wines", "xwines_prices", "xwines_metadata"]
 
 
 def load_env() -> None:
@@ -67,14 +66,25 @@ def load_env() -> None:
                         os.environ[key] = value
 
 
-def get_mongodb_url() -> str:
-    """Get MongoDB connection URL from environment."""
-    url = os.environ.get("WINEBOX_MONGODB_URL")
-    if not url:
+def parse_mongodb_url(url: str) -> tuple[str, str]:
+    """Extract the database name and base URL from a MongoDB connection string.
+
+    Args:
+        url: Full MongoDB URL like "mongodb+srv://user:pass@host/dbname"
+
+    Returns:
+        Tuple of (base_url_without_db, database_name).
+
+    Raises:
+        ValueError: If no database name is found in the URL.
+    """
+    parsed = urlparse(url)
+    db_name = parsed.path.lstrip("/").split("?")[0]
+    if not db_name:
         raise ValueError(
-            "WINEBOX_MONGODB_URL not set. Add it to .env or set as environment variable."
+            f"No database name in URL. Use a URL like: mongodb://host:port/DATABASE_NAME"
         )
-    return url
+    return url, db_name
 
 
 def get_s3_client() -> Any:
@@ -97,7 +107,7 @@ def get_s3_bucket() -> str:
 
 def get_s3_prefix() -> str:
     """Get the S3 key prefix from environment."""
-    return os.environ.get("WINEBOX_S3_PREFIX", "backups/xwines")
+    return os.environ.get("WINEBOX_S3_PREFIX", "backups")
 
 
 def check_tool(name: str) -> str:
@@ -110,325 +120,81 @@ def check_tool(name: str) -> str:
     return path
 
 
-def run_mongodump(
-    mongodb_url: str,
-    database: str,
-    collections: list[str],
-    output_dir: Path,
-) -> None:
-    """Run mongodump for the specified collections.
-
-    Args:
-        mongodb_url: MongoDB connection string.
-        database: Database name.
-        collections: List of collection names to dump.
-        output_dir: Directory to write dump files to.
-    """
+def run_mongodump(url: str, database: str, output_dir: Path) -> None:
+    """Run mongodump for an entire database."""
     mongodump = check_tool("mongodump")
+    cmd = [
+        mongodump,
+        f"--uri={url}",
+        f"--db={database}",
+        f"--out={output_dir}",
+        "--gzip",
+    ]
+    print(f"  Running mongodump for '{database}'...")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"mongodump failed:\n{result.stderr}")
 
-    for col_name in collections:
-        logger.info("Dumping %s.%s ...", database, col_name)
-        cmd = [
-            mongodump,
-            f"--uri={mongodb_url}",
-            f"--db={database}",
-            f"--collection={col_name}",
-            f"--out={output_dir}",
-            "--gzip",
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"mongodump failed for {col_name}:\n{result.stderr}"
-            )
-        # Count documents from dump metadata
-        bson_file = output_dir / database / f"{col_name}.bson.gz"
-        if bson_file.exists():
-            size_mb = bson_file.stat().st_size / (1024 * 1024)
-            print(f"  {col_name}: dumped ({size_mb:.1f} MB)")
-        else:
-            print(f"  {col_name}: dumped")
+    # Show what was dumped
+    db_dir = output_dir / database
+    if db_dir.exists():
+        for f in sorted(db_dir.iterdir()):
+            if f.name.endswith(".bson.gz"):
+                col_name = f.name.replace(".bson.gz", "")
+                size_mb = f.stat().st_size / (1024 * 1024)
+                print(f"    {col_name}: {size_mb:.1f} MB")
 
 
-def run_mongorestore(
-    mongodb_url: str,
-    database: str,
-    dump_dir: Path,
-    drop: bool = True,
-) -> None:
-    """Run mongorestore from a dump directory.
-
-    Args:
-        mongodb_url: MongoDB connection string.
-        database: Target database name.
-        dump_dir: Directory containing the dump files (parent of db-named dir).
-        drop: If True, drop existing collections before restoring.
-    """
+def run_mongorestore(url: str, database: str, dump_dir: Path, drop: bool = True) -> None:
+    """Run mongorestore from a dump directory."""
     mongorestore = check_tool("mongorestore")
+
+    # Find the database directory inside the dump
+    db_dirs = [d for d in dump_dir.iterdir() if d.is_dir()]
+    if not db_dirs:
+        raise RuntimeError(f"No database directory found in dump at {dump_dir}")
+    source_db_dir = db_dirs[0]
 
     cmd = [
         mongorestore,
-        f"--uri={mongodb_url}",
+        f"--uri={url}",
         f"--db={database}",
         "--gzip",
         "--nsInclude=*",
     ]
     if drop:
         cmd.append("--drop")
-
-    # Find the database directory inside the dump
-    # mongodump creates: dump_dir/<original_db_name>/<collection>.bson.gz
-    db_dirs = [d for d in dump_dir.iterdir() if d.is_dir()]
-    if not db_dirs:
-        raise RuntimeError(f"No database directory found in dump at {dump_dir}")
-
-    source_db_dir = db_dirs[0]
-    # mongorestore needs the path to the db directory
     cmd.append(str(source_db_dir))
 
-    logger.info("Restoring to %s from %s ...", database, source_db_dir.name)
+    print(f"  Restoring to '{database}' from dump of '{source_db_dir.name}'...")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"mongorestore failed:\n{result.stderr}")
 
-    # List restored collections
     for f in sorted(source_db_dir.iterdir()):
-        if f.suffix == ".gz" and f.stem.endswith(".bson"):
-            col_name = f.stem.replace(".bson", "")
+        if f.name.endswith(".bson.gz"):
+            col_name = f.name.replace(".bson.gz", "")
             size_mb = f.stat().st_size / (1024 * 1024)
-            print(f"  Restored {col_name} ({size_mb:.1f} MB)")
+            print(f"    {col_name}: {size_mb:.1f} MB")
 
 
-def create_archive(dump_dir: Path, archive_path: Path) -> None:
-    """Create a tar.gz archive from the dump directory.
-
-    Args:
-        dump_dir: Directory containing mongodump output.
-        archive_path: Path for the output .tar.gz file.
-    """
-    with tarfile.open(archive_path, "w:gz") as tar:
-        for item in dump_dir.iterdir():
-            tar.add(item, arcname=item.name)
-
-
-def extract_archive(archive_path: Path, output_dir: Path) -> None:
-    """Extract a tar.gz archive.
-
-    Args:
-        archive_path: Path to the .tar.gz file.
-        output_dir: Directory to extract to.
-    """
-    with tarfile.open(archive_path, "r:gz") as tar:
-        tar.extractall(path=output_dir)
-
-
-def get_collection_counts(mongodb_url: str, database: str, collections: list[str]) -> dict[str, int]:
-    """Get document counts for collections."""
+def get_collection_counts(url: str, database: str) -> dict[str, int]:
+    """Get document counts for all collections in a database."""
     from pymongo import MongoClient
 
-    client = MongoClient(mongodb_url)
+    client = MongoClient(url)
     db = client[database]
     counts = {}
-    for col_name in collections:
+    for col_name in db.list_collection_names():
         counts[col_name] = db[col_name].count_documents({})
     client.close()
     return counts
 
 
-# --- Backup ---
-
-def cmd_backup(args: argparse.Namespace) -> int:
-    """Run the backup command."""
-    mongodb_url = get_mongodb_url()
-    bucket = get_s3_bucket()
-    prefix = get_s3_prefix()
-    database = args.database
-    collections = args.collections
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
-
-    counts = get_collection_counts(mongodb_url, database, collections)
-
-    print(f"\nX-Wines S3 Backup (mongodump)")
-    print("=" * 50)
-    print(f"Database:    {database}")
-    print(f"Collections: {', '.join(collections)}")
-    print(f"S3 target:   s3://{bucket}/{prefix}/{timestamp}/")
-    print()
-    for col_name in collections:
-        print(f"  {col_name}: {counts.get(col_name, 0):,} documents")
-
-    if args.dry_run:
-        print("\n[DRY RUN] Would dump and upload the above. No changes made.")
-        return 0
-
-    print()
-
-    s3_client = get_s3_client()
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir_path = Path(tmpdir)
-        dump_dir = tmpdir_path / "dump"
-        dump_dir.mkdir()
-
-        # Run mongodump
-        run_mongodump(mongodb_url, database, collections, dump_dir)
-
-        # Create archive
-        archive_name = f"{database}_xwines_{timestamp}.tar.gz"
-        archive_path = tmpdir_path / archive_name
-        print(f"\n  Creating archive: {archive_name}")
-        create_archive(dump_dir, archive_path)
-        archive_size_mb = archive_path.stat().st_size / (1024 * 1024)
-        print(f"  Archive size: {archive_size_mb:.1f} MB")
-
-        # Upload archive
-        s3_key = f"{prefix}/{timestamp}/{archive_name}"
-        print(f"  Uploading to s3://{bucket}/{s3_key}")
-        s3_client.upload_file(
-            str(archive_path),
-            bucket,
-            s3_key,
-            ExtraArgs={"ContentType": "application/gzip"},
-        )
-
-    # Write manifest
-    manifest = {
-        "timestamp": timestamp,
-        "database": database,
-        "collections": {col: {"document_count": counts.get(col, 0)} for col in collections},
-        "archive": archive_name,
-        "tool": "mongodump",
-    }
-    manifest_key = f"{prefix}/{timestamp}/manifest.json"
-    s3_client.put_object(
-        Bucket=bucket,
-        Key=manifest_key,
-        Body=json.dumps(manifest, indent=2),
-        ContentType="application/json",
-    )
-    print(f"  Wrote manifest to s3://{bucket}/{manifest_key}")
-
-    # Cleanup old backups
-    if args.retain is not None:
-        print(f"\nCleaning up old backups (keeping {args.retain} most recent)...")
-        deleted = cleanup_old_backups(s3_client, bucket, prefix, args.retain)
-        if deleted:
-            print(f"  Deleted {deleted} old backup files")
-        else:
-            print("  No old backups to delete")
-
-    print(f"\nBackup complete!")
-    return 0
-
-
-# --- Restore ---
-
-def cmd_restore(args: argparse.Namespace) -> int:
-    """Run the restore command."""
-    mongodb_url = get_mongodb_url()
-    bucket = get_s3_bucket()
-    prefix = get_s3_prefix()
-    database = args.database
-
-    s3_client = get_s3_client()
-
-    # Determine which backup to restore
-    if args.latest:
-        timestamps = get_backup_timestamps(s3_client, bucket, prefix)
-        if not timestamps:
-            print("No backups found.", file=sys.stderr)
-            return 1
-        timestamp = timestamps[0]
-        print(f"Using latest backup: {timestamp}")
-    elif args.timestamp:
-        timestamp = args.timestamp
-    else:
-        print("Error: specify --latest or --timestamp TIMESTAMP", file=sys.stderr)
-        return 1
-
-    # Download manifest
-    manifest_key = f"{prefix}/{timestamp}/manifest.json"
-    try:
-        resp = s3_client.get_object(Bucket=bucket, Key=manifest_key)
-        manifest = json.loads(resp["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
-        print(f"No manifest found for timestamp {timestamp}", file=sys.stderr)
-        return 1
-
-    archive_name = manifest.get("archive")
-    source_db = manifest.get("database", "unknown")
-    collections = manifest.get("collections", {})
-
-    print(f"\nX-Wines S3 Restore (mongorestore)")
-    print("=" * 50)
-    print(f"Backup:      {timestamp}")
-    print(f"Source DB:   {source_db}")
-    print(f"Target DB:   {database}")
-    print(f"Archive:     {archive_name}")
-    print(f"Collections:")
-    for col_name, info in collections.items():
-        print(f"  {col_name}: {info.get('document_count', '?'):,} documents")
-
-    if args.dry_run:
-        print("\n[DRY RUN] Would download and restore the above. No changes made.")
-        return 0
-
-    if not args.force:
-        confirm = input(f"\nThis will DROP and replace collections in '{database}'. Continue? [y/N] ")
-        if confirm.lower() != "y":
-            print("Aborted.")
-            return 0
-
-    print()
-
-    s3_key = f"{prefix}/{timestamp}/{archive_name}"
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir_path = Path(tmpdir)
-
-        # Download archive
-        archive_path = tmpdir_path / archive_name
-        print(f"  Downloading s3://{bucket}/{s3_key} ...")
-        s3_client.download_file(bucket, s3_key, str(archive_path))
-        archive_size_mb = archive_path.stat().st_size / (1024 * 1024)
-        print(f"  Downloaded: {archive_size_mb:.1f} MB")
-
-        # Extract
-        dump_dir = tmpdir_path / "dump"
-        dump_dir.mkdir()
-        print(f"  Extracting archive...")
-        extract_archive(archive_path, dump_dir)
-
-        # Restore
-        run_mongorestore(mongodb_url, database, dump_dir, drop=True)
-
-    # Verify counts
-    print(f"\nVerifying restore...")
-    actual_counts = get_collection_counts(mongodb_url, database, list(collections.keys()))
-    all_ok = True
-    for col_name, info in collections.items():
-        expected = info.get("document_count", 0)
-        actual = actual_counts.get(col_name, 0)
-        status = "OK" if actual == expected else "MISMATCH"
-        if status == "MISMATCH":
-            all_ok = False
-        print(f"  {col_name}: {actual:,} documents (expected {expected:,}) [{status}]")
-
-    if all_ok:
-        print(f"\nRestore complete! All document counts match.")
-    else:
-        print(f"\nRestore completed with count mismatches — verify data manually.")
-
-    return 0
-
-
-# --- List ---
-
 def get_backup_timestamps(s3_client: Any, bucket: str, prefix: str) -> list[str]:
     """Get sorted list of backup timestamps (newest first)."""
     timestamps = set()
     paginator = s3_client.get_paginator("list_objects_v2")
-
     for page in paginator.paginate(Bucket=bucket, Prefix=prefix + "/"):
         for obj in page.get("Contents", []):
             parts = obj["Key"].split("/")
@@ -436,8 +202,182 @@ def get_backup_timestamps(s3_client: Any, bucket: str, prefix: str) -> list[str]
                 if len(part) >= 15 and part[4:5] == "-" and part[7:8] == "-" and part[10:11] == "_":
                     timestamps.add(part)
                     break
-
     return sorted(timestamps, reverse=True)
+
+
+def cleanup_old_backups(s3_client: Any, bucket: str, prefix: str, retain: int) -> int:
+    """Delete old backup sets, keeping the most recent N."""
+    timestamps = get_backup_timestamps(s3_client, bucket, prefix)
+    if len(timestamps) <= retain:
+        return 0
+
+    deleted = 0
+    for ts in timestamps[retain:]:
+        ts_prefix = f"{prefix}/{ts}/"
+        paginator = s3_client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket, Prefix=ts_prefix):
+            for obj in page.get("Contents", []):
+                s3_client.delete_object(Bucket=bucket, Key=obj["Key"])
+                deleted += 1
+    return deleted
+
+
+# --- Commands ---
+
+def cmd_backup(args: argparse.Namespace) -> int:
+    """Backup an entire database to S3."""
+    url, database = parse_mongodb_url(args.url)
+    bucket = get_s3_bucket()
+    prefix = get_s3_prefix()
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
+
+    counts = get_collection_counts(url, database)
+
+    print(f"\nMongoDB S3 Backup")
+    print("=" * 50)
+    print(f"Database:  {database}")
+    print(f"S3 target: s3://{bucket}/{prefix}/{timestamp}/")
+    print(f"Collections ({len(counts)}):")
+    for col_name in sorted(counts):
+        print(f"  {col_name}: {counts[col_name]:,} documents")
+
+    if args.dry_run:
+        print("\n[DRY RUN] No changes made.")
+        return 0
+
+    print()
+    s3_client = get_s3_client()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        dump_dir = tmpdir_path / "dump"
+        dump_dir.mkdir()
+
+        run_mongodump(url, database, dump_dir)
+
+        archive_name = f"{database}_{timestamp}.tar.gz"
+        archive_path = tmpdir_path / archive_name
+        print(f"\n  Creating archive: {archive_name}")
+        with tarfile.open(archive_path, "w:gz") as tar:
+            for item in (dump_dir).iterdir():
+                tar.add(item, arcname=item.name)
+        archive_size_mb = archive_path.stat().st_size / (1024 * 1024)
+        print(f"  Archive size: {archive_size_mb:.1f} MB")
+
+        s3_key = f"{prefix}/{timestamp}/{archive_name}"
+        print(f"  Uploading to s3://{bucket}/{s3_key}")
+        s3_client.upload_file(
+            str(archive_path), bucket, s3_key,
+            ExtraArgs={"ContentType": "application/gzip"},
+        )
+
+    manifest = {
+        "timestamp": timestamp,
+        "database": database,
+        "collections": {col: {"document_count": n} for col, n in counts.items()},
+        "archive": archive_name,
+    }
+    manifest_key = f"{prefix}/{timestamp}/manifest.json"
+    s3_client.put_object(
+        Bucket=bucket, Key=manifest_key,
+        Body=json.dumps(manifest, indent=2),
+        ContentType="application/json",
+    )
+    print(f"  Wrote manifest to s3://{bucket}/{manifest_key}")
+
+    if args.retain is not None:
+        print(f"\nCleaning up (keeping {args.retain} most recent)...")
+        deleted = cleanup_old_backups(s3_client, bucket, prefix, args.retain)
+        print(f"  Deleted {deleted} old files" if deleted else "  Nothing to delete")
+
+    print(f"\nBackup complete!")
+    return 0
+
+
+def cmd_restore(args: argparse.Namespace) -> int:
+    """Restore a database from S3."""
+    url, database = parse_mongodb_url(args.url)
+    bucket = get_s3_bucket()
+    prefix = get_s3_prefix()
+    s3_client = get_s3_client()
+
+    # Determine which backup
+    if args.latest:
+        timestamps = get_backup_timestamps(s3_client, bucket, prefix)
+        if not timestamps:
+            print("No backups found.", file=sys.stderr)
+            return 1
+        timestamp = timestamps[0]
+        print(f"Using latest backup: {timestamp}")
+    else:
+        timestamp = args.timestamp
+
+    # Read manifest
+    manifest_key = f"{prefix}/{timestamp}/manifest.json"
+    try:
+        resp = s3_client.get_object(Bucket=bucket, Key=manifest_key)
+        manifest = json.loads(resp["Body"].read())
+    except Exception:
+        print(f"No manifest found for backup '{timestamp}'", file=sys.stderr)
+        return 1
+
+    archive_name = manifest["archive"]
+    source_db = manifest.get("database", "?")
+    collections = manifest.get("collections", {})
+
+    print(f"\nMongoDB S3 Restore")
+    print("=" * 50)
+    print(f"Backup:    {timestamp}")
+    print(f"Source DB: {source_db}")
+    print(f"Target DB: {database}")
+    print(f"Collections ({len(collections)}):")
+    for col_name, info in sorted(collections.items()):
+        print(f"  {col_name}: {info.get('document_count', '?'):,} documents")
+
+    if args.dry_run:
+        print("\n[DRY RUN] No changes made.")
+        return 0
+
+    if not args.force:
+        confirm = input(f"\nThis will DROP and replace data in '{database}'. Continue? [y/N] ")
+        if confirm.lower() != "y":
+            print("Aborted.")
+            return 0
+
+    print()
+    s3_key = f"{prefix}/{timestamp}/{archive_name}"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        archive_path = tmpdir_path / archive_name
+
+        print(f"  Downloading s3://{bucket}/{s3_key} ...")
+        s3_client.download_file(bucket, s3_key, str(archive_path))
+        archive_size_mb = archive_path.stat().st_size / (1024 * 1024)
+        print(f"  Downloaded: {archive_size_mb:.1f} MB")
+
+        dump_dir = tmpdir_path / "dump"
+        dump_dir.mkdir()
+        print(f"  Extracting archive...")
+        with tarfile.open(archive_path, "r:gz") as tar:
+            tar.extractall(path=dump_dir)
+
+        run_mongorestore(url, database, dump_dir, drop=True)
+
+    # Verify
+    print(f"\nVerifying...")
+    actual = get_collection_counts(url, database)
+    all_ok = True
+    for col_name, info in sorted(collections.items()):
+        expected = info.get("document_count", 0)
+        got = actual.get(col_name, 0)
+        status = "OK" if got == expected else "MISMATCH"
+        if status != "OK":
+            all_ok = False
+        print(f"  {col_name}: {got:,} (expected {expected:,}) [{status}]")
+
+    print(f"\nRestore {'complete!' if all_ok else 'completed with mismatches.'}")
+    return 0
 
 
 def cmd_list(args: argparse.Namespace) -> int:
@@ -445,7 +385,6 @@ def cmd_list(args: argparse.Namespace) -> int:
     bucket = get_s3_bucket()
     prefix = get_s3_prefix()
     s3_client = get_s3_client()
-
     timestamps = get_backup_timestamps(s3_client, bucket, prefix)
 
     if not timestamps:
@@ -454,9 +393,7 @@ def cmd_list(args: argparse.Namespace) -> int:
 
     print(f"\nBackups in s3://{bucket}/{prefix}/")
     print("=" * 60)
-
     for ts in timestamps:
-        # Try to read manifest
         manifest_key = f"{prefix}/{ts}/manifest.json"
         try:
             resp = s3_client.get_object(Bucket=bucket, Key=manifest_key)
@@ -464,40 +401,11 @@ def cmd_list(args: argparse.Namespace) -> int:
             db_name = manifest.get("database", "?")
             collections = manifest.get("collections", {})
             total_docs = sum(c.get("document_count", 0) for c in collections.values())
-            cols = ", ".join(collections.keys())
-            print(f"\n  {ts}  [{db_name}]")
-            print(f"    {total_docs:,} documents across {len(collections)} collections ({cols})")
+            print(f"\n  {ts}  [{db_name}]  {len(collections)} collections, {total_docs:,} documents")
         except Exception:
             print(f"\n  {ts}  (no manifest)")
 
     return 0
-
-
-# --- Cleanup ---
-
-def cleanup_old_backups(
-    s3_client: Any, bucket: str, prefix: str, retain: int
-) -> int:
-    """Delete old backup sets, keeping the most recent N."""
-    timestamps = get_backup_timestamps(s3_client, bucket, prefix)
-
-    if len(timestamps) <= retain:
-        return 0
-
-    to_delete = timestamps[retain:]
-    deleted = 0
-
-    for ts in to_delete:
-        # List all objects under this timestamp
-        ts_prefix = f"{prefix}/{ts}/"
-        paginator = s3_client.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=bucket, Prefix=ts_prefix):
-            for obj in page.get("Contents", []):
-                logger.info("  Deleting s3://%s/%s", bucket, obj["Key"])
-                s3_client.delete_object(Bucket=bucket, Key=obj["Key"])
-                deleted += 1
-
-    return deleted
 
 
 # --- CLI ---
@@ -505,65 +413,39 @@ def cleanup_old_backups(
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Backup and restore X-Wines collections to/from S3 using mongodump",
+        description="Backup and restore MongoDB databases to/from S3",
     )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Debug logging")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # Backup command
-    backup_parser = subparsers.add_parser("backup", help="Backup collections to S3")
-    backup_parser.add_argument(
-        "--database",
-        default=os.environ.get("WINEBOX_DATABASE", "winebox-oat"),
-        help="MongoDB database name (default: winebox-oat)",
-    )
-    backup_parser.add_argument(
-        "--collections",
-        nargs="+",
-        default=XWINES_COLLECTIONS,
-        choices=XWINES_COLLECTIONS,
-        help=f"Collections to backup (default: all)",
-    )
-    backup_parser.add_argument("--dry-run", action="store_true", help="Show plan only")
-    backup_parser.add_argument(
-        "--retain", type=int, default=None,
-        help="Keep only N most recent backup sets",
-    )
+    # backup
+    bp = subparsers.add_parser("backup", help="Backup a database to S3")
+    bp.add_argument("url", help="MongoDB URL including database name (e.g. mongodb://host/dbname)")
+    bp.add_argument("--dry-run", action="store_true", help="Show plan only")
+    bp.add_argument("--retain", type=int, help="Keep only N most recent backups")
 
-    # Restore command
-    restore_parser = subparsers.add_parser("restore", help="Restore collections from S3")
-    restore_parser.add_argument(
-        "--database",
-        default=os.environ.get("WINEBOX_DATABASE", "winebox-oat"),
-        help="Target MongoDB database name (default: winebox-oat)",
-    )
-    restore_group = restore_parser.add_mutually_exclusive_group(required=True)
-    restore_group.add_argument("--latest", action="store_true", help="Restore the most recent backup")
-    restore_group.add_argument("--timestamp", help="Restore a specific backup (e.g. 2026-03-21_014500)")
-    restore_parser.add_argument("--dry-run", action="store_true", help="Show plan only")
-    restore_parser.add_argument(
-        "--force", action="store_true",
-        help="Skip confirmation prompt",
-    )
+    # restore
+    rp = subparsers.add_parser("restore", help="Restore a database from S3")
+    rp.add_argument("url", help="MongoDB URL for target database (e.g. mongodb://host/dbname)")
+    rg = rp.add_mutually_exclusive_group(required=True)
+    rg.add_argument("--latest", action="store_true", help="Restore most recent backup")
+    rg.add_argument("--timestamp", help="Restore specific backup (e.g. 2026-03-21_014500)")
+    rp.add_argument("--dry-run", action="store_true", help="Show plan only")
+    rp.add_argument("--force", action="store_true", help="Skip confirmation prompt")
 
-    # List command
-    subparsers.add_parser("list", help="List existing backups")
-
-    parser.add_argument("-v", "--verbose", action="store_true", help="Debug logging")
+    # list
+    subparsers.add_parser("list", help="List existing backups in S3")
 
     return parser.parse_args()
 
 
 def main() -> int:
-    """Main entry point."""
     args = parse_args()
-
-    log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
-
     load_env()
 
     try:
@@ -573,10 +455,6 @@ def main() -> int:
             return cmd_restore(args)
         elif args.command == "list":
             return cmd_list(args)
-        else:
-            print(f"Unknown command: {args.command}", file=sys.stderr)
-            return 1
-
     except ValueError as e:
         print(f"\nError: {e}", file=sys.stderr)
         return 1
@@ -586,6 +464,7 @@ def main() -> int:
     except Exception as e:
         logger.error("Fatal error: %s", e, exc_info=args.verbose)
         return 1
+    return 0
 
 
 if __name__ == "__main__":
