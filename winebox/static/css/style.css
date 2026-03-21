@@ -2118,6 +2118,26 @@ body.logged-out #user-info {
     padding-bottom: 0.5rem;
 }
 
+/* Price range inputs */
+.price-range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.price-range-inputs input {
+    width: 80px;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+}
+
+.price-range-separator {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
 /* X-Wines Cards */
 .xwines-card {
     background: var(--card-background);

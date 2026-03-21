@@ -101,12 +101,43 @@ async def _refresh_filter_cache() -> None:
 router = APIRouter()
 
 
+async def _get_price_filtered_ids(
+    price_min: float | None,
+    price_max: float | None,
+) -> set[int] | None:
+    """Get xwines_ids that match the price range filter.
+
+    Returns None if no price filter is active (meaning no filtering needed).
+    Returns a set of matching IDs if a filter is active.
+
+    Uses price_low_usd for lower bound and price_high_usd for upper bound,
+    so a wine matches if its price range overlaps with the requested range.
+    """
+    if price_min is None and price_max is None:
+        return None
+
+    db = get_database()
+    query: dict = {}
+    if price_min is not None:
+        # Wine's high price must be >= our min (wine's range overlaps from above)
+        query["price_high_usd"] = {"$gte": price_min}
+    if price_max is not None:
+        # Wine's low price must be <= our max (wine's range overlaps from below)
+        query.setdefault("price_low_usd", {})
+        query["price_low_usd"]["$lte"] = price_max
+
+    cursor = db["xwines_prices"].find(query, {"xwines_id": 1, "_id": 0})
+    docs = await cursor.to_list(length=50000)
+    return {doc["xwines_id"] for doc in docs}
+
+
 async def _atlas_search(
     q: str,
     limit: int,
     wine_type: str | None,
     country: str | None,
     skip: int = 0,
+    allowed_ids: set[int] | None = None,
 ) -> tuple[list[dict], int, SearchFacets | None]:
     """Attempt Atlas Search with facets.
 
@@ -191,8 +222,14 @@ async def _atlas_search(
     # pagination.  $sort + $limit coalesces into a top-k heap internally,
     # so MongoDB only maintains (skip + limit) entries — not a full sort.
     # No $addFields needed: $meta works directly in $sort after $search.
+    # Optional price filter: restrict to allowed xwines_ids
+    price_match: list[dict] = []
+    if allowed_ids is not None:
+        price_match = [{"$match": {"xwines_id": {"$in": list(allowed_ids)}}}]
+
     pipeline: list[dict] = [
         search_stage,
+        *price_match,
         {"$sort": {"score": {"$meta": "searchScore"}, "rating_count": -1}},
         {"$skip": skip},
         {"$limit": limit},
@@ -203,6 +240,7 @@ async def _atlas_search(
     # Run count pipeline
     count_pipeline: list[dict] = [
         search_stage,
+        *price_match,
         {"$count": "total"},
     ]
     count_cursor = await collection.aggregate(count_pipeline)
@@ -282,6 +320,7 @@ async def _regex_search(
     wine_type: str | None,
     country: str | None,
     skip: int = 0,
+    allowed_ids: set[int] | None = None,
 ) -> tuple[list[XWinesWine], int]:
     """Fallback regex-based search for local MongoDB (no Atlas Search).
 
@@ -304,6 +343,8 @@ async def _regex_search(
         }
     if country:
         filter_conditions["country_code"] = country.upper()
+    if allowed_ids is not None:
+        filter_conditions["xwines_id"] = {"$in": list(allowed_ids)}
 
     # Helper to build AND condition requiring all terms to appear
     def build_all_terms_condition() -> dict:
@@ -429,17 +470,42 @@ async def search_wines(
     skip: int = Query(0, ge=0, description="Number of results to skip"),
     wine_type: str | None = Query(None, description="Filter by wine type"),
     country: str | None = Query(None, description="Filter by country code"),
+    price_min: float | None = Query(None, ge=0, description="Minimum price (USD)"),
+    price_max: float | None = Query(None, ge=0, description="Maximum price (USD)"),
 ) -> XWinesSearchResponse:
     """Search X-Wines dataset for autocomplete.
 
     Uses Atlas Search when available (fuzzy matching, relevance scoring, facets).
     Falls back to regex search on local MongoDB instances.
+
+    Price filtering: specify price_min and/or price_max to filter by estimated
+    retail price range. Only wines with price data will be returned when a
+    price filter is active.
     """
+    # Validate price range
+    if price_min is not None and price_max is not None and price_min > price_max:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum price (${price_min:.0f}) cannot exceed maximum price (${price_max:.0f})",
+        )
+
+    # Pre-filter by price if requested
+    allowed_ids = await _get_price_filtered_ids(price_min, price_max)
+
+    # If price filter is active but no wines match, return empty immediately
+    if allowed_ids is not None and len(allowed_ids) == 0:
+        return XWinesSearchResponse(
+            results=[], total=0, skip=skip, limit=limit, facets=None
+        )
+
     # Try Atlas Search first — fall back to regex if it fails or returns
     # empty (Atlas Search silently returns 0 results when no search index
     # exists for the database, rather than raising an exception).
     try:
-        docs, total, facets = await _atlas_search(q, limit, wine_type, country, skip)
+        docs, total, facets = await _atlas_search(
+            q, limit, wine_type, country, skip, allowed_ids
+        )
         if total > 0:
             xwines_ids = [doc.get("xwines_id") for doc in docs if doc.get("xwines_id")]
             price_map = await _batch_lookup_prices(xwines_ids)
@@ -455,7 +521,9 @@ async def search_wines(
         logger.debug("Atlas Search unavailable, falling back to regex: %s", e)
 
     # Fallback to regex search
-    wines, total = await _regex_search(q, limit, wine_type, country, skip)
+    wines, total = await _regex_search(
+        q, limit, wine_type, country, skip, allowed_ids
+    )
     xwines_ids = [wine.xwines_id for wine in wines if wine.xwines_id]
     price_map = await _batch_lookup_prices(xwines_ids)
     results = [

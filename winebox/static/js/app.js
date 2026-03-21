@@ -2411,6 +2411,18 @@ async function performXWinesSearch() {
     const country = document.getElementById('xwines-country').value;
     if (country) params.append('country', country);
 
+    const priceMin = document.getElementById('xwines-price-min').value;
+    const priceMax = document.getElementById('xwines-price-max').value;
+
+    // Validate price range
+    if (priceMin && priceMax && parseFloat(priceMin) > parseFloat(priceMax)) {
+        showToast('Minimum price cannot exceed maximum price', 'error');
+        return;
+    }
+
+    if (priceMin) params.append('price_min', priceMin);
+    if (priceMax) params.append('price_max', priceMax);
+
     const limit = parseInt(document.getElementById('xwines-limit').value);
     params.append('limit', limit);
 
@@ -2423,6 +2435,8 @@ async function performXWinesSearch() {
         q: q,
         wine_type: wineType || null,
         country: country || null,
+        price_min: priceMin || null,
+        price_max: priceMax || null,
         limit: limit
     };
 
