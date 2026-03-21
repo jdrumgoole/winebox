@@ -2702,7 +2702,19 @@ body.logged-out #user-info {
     color: var(--text-color);
     white-space: nowrap;
     position: sticky;
+    cursor: pointer;
+    user-select: none;
     top: 0;
+}
+
+.xwines-table th:hover,
+.wine-table th:hover {
+    background: var(--hover-background, #f0ebe5);
+}
+
+.sort-indicator {
+    font-size: 0.7rem;
+    color: var(--primary-color);
 }
 
 .xwines-table tbody tr {
@@ -2760,6 +2772,8 @@ body.logged-out #user-info {
     color: var(--text-color);
     white-space: nowrap;
     position: sticky;
+    cursor: pointer;
+    user-select: none;
     top: 0;
 }
 

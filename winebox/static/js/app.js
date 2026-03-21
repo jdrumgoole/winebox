@@ -1680,6 +1680,10 @@ function renderCellarTable(containerId, wines) {
             openCheckoutModal(btn.dataset.wineId, btn.dataset.quantity);
         });
     });
+
+    // Make table sortable by column headers
+    const cellarTable = container.querySelector('.wine-table');
+    if (cellarTable) makeTableSortable(cellarTable);
 }
 
 function renderWineGrid(containerId, wines) {
@@ -2030,6 +2034,111 @@ function formatXWinesPrice(wine) {
         return `$${Math.round(wine.price_low_usd)}\u2013$${Math.round(wine.price_high_usd)}`;
     if (wine.price_tier) return wine.price_tier.replace(/_/g, ' ');
     return '';
+}
+
+// ---- Sortable tables ----
+// Tracks current sort state per table: { tableId: { column: index, direction: 'asc'|'desc' } }
+const _tableSortState = {};
+
+function makeTableSortable(table) {
+    /**
+     * Make an HTML table sortable by clicking column headers.
+     * Sorts the visible tbody rows client-side. Handles text, numbers, and
+     * dash-as-empty. Clicking the same column toggles direction; clicking a
+     * different column sorts ascending.
+     */
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    if (!thead || !tbody) return;
+
+    const headers = thead.querySelectorAll('th');
+    const tableId = table.className || 'table';
+
+    headers.forEach((th, colIndex) => {
+        // Skip "Actions" columns — not meaningful to sort
+        if (th.textContent.trim() === 'Actions') return;
+
+        th.style.cursor = 'pointer';
+        th.style.userSelect = 'none';
+        th.title = `Sort by ${th.textContent.trim()}`;
+
+        // Add sort indicator span if not present
+        if (!th.querySelector('.sort-indicator')) {
+            th.insertAdjacentHTML('beforeend', ' <span class="sort-indicator"></span>');
+        }
+
+        th.addEventListener('click', () => {
+            const state = _tableSortState[tableId] || {};
+            let direction = 'asc';
+            if (state.column === colIndex) {
+                direction = state.direction === 'asc' ? 'desc' : 'asc';
+            }
+            _tableSortState[tableId] = { column: colIndex, direction };
+
+            // Update indicators
+            headers.forEach(h => {
+                const ind = h.querySelector('.sort-indicator');
+                if (ind) ind.textContent = '';
+            });
+            const indicator = th.querySelector('.sort-indicator');
+            if (indicator) indicator.textContent = direction === 'asc' ? ' ▲' : ' ▼';
+
+            // Collect rows (skip detail/expand rows)
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const dataRows = [];
+            const detailRows = {};
+
+            rows.forEach(row => {
+                if (row.classList.contains('wine-table-detail-row')) {
+                    // Attach detail row to its parent data row
+                    const forId = row.getAttribute('data-detail-for');
+                    if (forId) detailRows[forId] = row;
+                } else {
+                    dataRows.push(row);
+                }
+            });
+
+            dataRows.sort((a, b) => {
+                const cellA = a.cells[colIndex];
+                const cellB = b.cells[colIndex];
+                if (!cellA || !cellB) return 0;
+
+                let valA = cellA.textContent.trim();
+                let valB = cellB.textContent.trim();
+
+                // Treat '-' and empty as last
+                const emptyA = valA === '-' || valA === '';
+                const emptyB = valB === '-' || valB === '';
+                if (emptyA && emptyB) return 0;
+                if (emptyA) return 1;
+                if (emptyB) return -1;
+
+                // Strip non-numeric prefixes for price/percentage columns
+                const numA = parseFloat(valA.replace(/[^0-9.\-]/g, ''));
+                const numB = parseFloat(valB.replace(/[^0-9.\-]/g, ''));
+
+                let cmp;
+                if (!isNaN(numA) && !isNaN(numB)) {
+                    cmp = numA - numB;
+                } else {
+                    cmp = valA.localeCompare(valB, undefined, { sensitivity: 'base' });
+                }
+
+                return direction === 'asc' ? cmp : -cmp;
+            });
+
+            // Re-append rows in sorted order
+            tbody.innerHTML = '';
+            dataRows.forEach(row => {
+                tbody.appendChild(row);
+                // Re-attach detail row if it exists
+                const wineId = row.getAttribute('data-wine-id');
+                if (wineId && detailRows[wineId]) {
+                    tbody.appendChild(detailRows[wineId]);
+                }
+            });
+        });
+    });
 }
 
 function trimOverflowingTags(container) {
@@ -2597,6 +2706,10 @@ function renderXWinesTable(containerId, results, total) {
             showXWinesDetail(row.dataset.xwineId);
         });
     });
+
+    // Make table sortable by column headers
+    const xwinesTable = container.querySelector('.xwines-table');
+    if (xwinesTable) makeTableSortable(xwinesTable);
 }
 
 function updateFilterCounts(facets) {
@@ -3668,6 +3781,10 @@ function renderMetTable(containerId, wines) {
             goToAddFromMet(btn.dataset.wineId);
         });
     });
+
+    // Make table sortable by column headers
+    const metTable = container.querySelector('.wine-table');
+    if (metTable) makeTableSortable(metTable);
 }
 
 function goToAddFromMet(wineId) {
