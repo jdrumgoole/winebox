@@ -2064,7 +2064,7 @@ function makeTableSortable(table) {
 
         // Add sort indicator span if not present
         if (!th.querySelector('.sort-indicator')) {
-            th.insertAdjacentHTML('beforeend', ' <span class="sort-indicator"></span>');
+            th.insertAdjacentHTML('beforeend', ' <span class="sort-indicator">⇅</span>');
         }
 
         th.addEventListener('click', () => {
@@ -2075,13 +2075,19 @@ function makeTableSortable(table) {
             }
             _tableSortState[tableId] = { column: colIndex, direction };
 
-            // Update indicators
+            // Update indicators: active column shows ▲/▼, others revert to ⇅
             headers.forEach(h => {
                 const ind = h.querySelector('.sort-indicator');
-                if (ind) ind.textContent = '';
+                if (ind) {
+                    ind.textContent = '⇅';
+                    ind.classList.remove('sort-active');
+                }
             });
             const indicator = th.querySelector('.sort-indicator');
-            if (indicator) indicator.textContent = direction === 'asc' ? ' ▲' : ' ▼';
+            if (indicator) {
+                indicator.textContent = direction === 'asc' ? '▲' : '▼';
+                indicator.classList.add('sort-active');
+            }
 
             // Collect rows (skip detail/expand rows)
             const rows = Array.from(tbody.querySelectorAll('tr'));

@@ -2714,7 +2714,13 @@ body.logged-out #user-info {
 
 .sort-indicator {
     font-size: 0.7rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.sort-indicator.sort-active {
     color: var(--primary-color);
+    opacity: 1;
 }
 
 .xwines-table tbody tr {
