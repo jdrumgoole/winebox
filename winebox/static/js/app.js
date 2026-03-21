@@ -2032,6 +2032,22 @@ function formatXWinesPrice(wine) {
     return '';
 }
 
+function trimOverflowingTags(container) {
+    // Remove tags that extend beyond their parent card's visible area
+    container.querySelectorAll('.xwines-card').forEach(card => {
+        const cardBottom = card.getBoundingClientRect().bottom;
+        const footer = card.querySelector('.xwines-card-footer');
+        // Tags must fit above the footer
+        const cutoff = footer ? footer.getBoundingClientRect().top : cardBottom;
+        const tags = card.querySelectorAll('.xwines-card-details .wine-tag');
+        tags.forEach(tag => {
+            if (tag.getBoundingClientRect().bottom > cutoff) {
+                tag.remove();
+            }
+        });
+    });
+}
+
 function parsePythonList(str) {
     if (!str) return '';
     try {
@@ -2638,6 +2654,10 @@ function renderXWinesGrid(containerId, results, total) {
             showXWinesDetail(card.dataset.xwineId);
         });
     });
+
+    // Remove tags that overflow beyond 2 rows
+    // Defer until browser has fully laid out the new elements (double-rAF)
+    requestAnimationFrame(() => requestAnimationFrame(() => trimOverflowingTags(container)));
 }
 
 async function showXWinesDetail(wineId) {

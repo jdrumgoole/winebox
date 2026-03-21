@@ -2129,6 +2129,7 @@ body.logged-out #user-info {
     cursor: pointer;
     display: flex;
     flex-direction: column;
+    height: 260px;
 }
 
 .xwines-card:hover {
@@ -2146,6 +2147,7 @@ body.logged-out #user-info {
 .xwines-card-content {
     padding: 0.5rem 1.25rem 1rem;
     flex: 1;
+    overflow: hidden;
 }
 
 .xwines-card-title {
@@ -2153,18 +2155,28 @@ body.logged-out #user-info {
     font-weight: 600;
     color: var(--text-color);
     margin-bottom: 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
 .xwines-card-subtitle {
     color: var(--text-muted);
     font-size: 0.9rem;
     margin-bottom: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .xwines-card-details {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    /* JS trims tags that overflow — see trimOverflowingTags() */
+    overflow: hidden;
 }
 
 .xwines-card-footer {
