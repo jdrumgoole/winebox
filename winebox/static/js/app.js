@@ -2623,9 +2623,9 @@ function renderXWinesGrid(containerId, results, total) {
         : `<div class="xwines-results-header">${results.length} result${results.length !== 1 ? 's' : ''}</div>`;
 
     container.innerHTML = header + results.map(wine => {
-        const ratingDisplay = wine.avg_rating
-            ? `<span class="xwines-rating">${'★'.repeat(Math.round(wine.avg_rating))}${'☆'.repeat(5 - Math.round(wine.avg_rating))} ${wine.avg_rating.toFixed(1)}</span><span class="xwines-rating-count">(${wine.rating_count.toLocaleString()} ratings)</span>`
-            : '<span class="xwines-rating xwines-no-rating">No ratings</span>';
+        const starsDisplay = wine.avg_rating
+            ? `<span class="xwines-rating">${'★'.repeat(Math.round(wine.avg_rating))}${'☆'.repeat(5 - Math.round(wine.avg_rating))} ${wine.avg_rating.toFixed(1)}</span>`
+            : '';
 
         return `
             <div class="xwines-card" data-xwine-id="${wine.id}">
@@ -2642,7 +2642,7 @@ function renderXWinesGrid(containerId, results, total) {
                     </div>
                 </div>
                 <div class="xwines-card-footer">
-                    ${ratingDisplay}
+                    ${starsDisplay}
                     ${formatXWinesPrice(wine) ? `<span class="xwines-price-tag">${formatXWinesPrice(wine)}</span>` : ''}
                 </div>
             </div>
