@@ -465,7 +465,7 @@ def _wine_model_to_result(wine: XWinesWine, price_data: dict | None = None) -> X
 
 @router.get("/search", response_model=XWinesSearchResponse)
 async def search_wines(
-    q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),
+    q: str | None = Query(None, min_length=2, description="Search query (min 2 characters)"),
     limit: int = Query(10, ge=1, le=50, description="Maximum results to return"),
     skip: int = Query(0, ge=0, description="Number of results to skip"),
     wine_type: str | None = Query(None, description="Filter by wine type"),
@@ -497,6 +497,31 @@ async def search_wines(
     if allowed_ids is not None and len(allowed_ids) == 0:
         return XWinesSearchResponse(
             results=[], total=0, skip=skip, limit=limit, facets=None
+        )
+
+    # No text query — filter-only search (by type, country, price)
+    if not q:
+        conditions: dict = {}
+        if wine_type:
+            conditions["wine_type"] = {
+                "$regex": re.compile(f"^{re.escape(wine_type)}$", re.IGNORECASE)
+            }
+        if country:
+            conditions["country_code"] = country.upper()
+        if allowed_ids is not None:
+            conditions["xwines_id"] = {"$in": list(allowed_ids)}
+
+        sort_order = [("rating_count", -1), ("avg_rating", -1), ("name", 1)]
+        wines = await XWinesWine.find(conditions).sort(sort_order).skip(skip).limit(limit).to_list()
+        total = await XWinesWine.find(conditions).count()
+        xwines_ids = [wine.xwines_id for wine in wines if wine.xwines_id]
+        price_map = await _batch_lookup_prices(xwines_ids)
+        results = [
+            _wine_model_to_result(wine, price_map.get(wine.xwines_id))
+            for wine in wines
+        ]
+        return XWinesSearchResponse(
+            results=results, total=total, skip=skip, limit=limit, facets=None
         )
 
     # Try Atlas Search first — fall back to regex if it fails or returns
@@ -609,31 +634,52 @@ async def list_countries() -> list[dict]:
 
 @router.get("/export")
 async def export_xwines_search(
-    q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),
+    q: str | None = Query(None, min_length=2, description="Search query (min 2 characters)"),
     format: ExportFormat = Query(default=ExportFormat.JSON, description="Export format"),
     wine_type: str | None = Query(None, description="Filter by wine type"),
     country: str | None = Query(None, description="Filter by country code"),
+    price_min: float | None = Query(None, ge=0, description="Minimum price (USD)"),
+    price_max: float | None = Query(None, ge=0, description="Maximum price (USD)"),
     limit: int = Query(1000, ge=1, le=10000, description="Maximum results to export"),
 ) -> Response:
     """Export X-Wines search results in various formats.
 
     Supports CSV, XLSX, YAML, and JSON formats.
     """
+    # Pre-filter by price if requested
+    allowed_ids = await _get_price_filtered_ids(price_min, price_max)
+
     # Execute search without pagination (get all results up to limit)
-    try:
-        docs, total, _ = await _atlas_search(q, limit, wine_type, country, skip=0)
-        xwines_ids = [doc.get("xwines_id") for doc in docs if doc.get("xwines_id")]
-        price_map = await _batch_lookup_prices(xwines_ids)
-        results = [_wine_doc_to_result(doc, price_map.get(doc.get("xwines_id"))) for doc in docs]
-    except Exception as e:
-        logger.debug("Atlas Search unavailable, falling back to regex: %s", e)
-        wines, total = await _regex_search(q, limit, wine_type, country, skip=0)
+    if not q:
+        # Filter-only (no text search)
+        conditions: dict = {}
+        if wine_type:
+            conditions["wine_type"] = {"$regex": re.compile(f"^{re.escape(wine_type)}$", re.IGNORECASE)}
+        if country:
+            conditions["country_code"] = country.upper()
+        if allowed_ids is not None:
+            conditions["xwines_id"] = {"$in": list(allowed_ids)}
+        wines = await XWinesWine.find(conditions).sort([("rating_count", -1)]).limit(limit).to_list()
         xwines_ids = [wine.xwines_id for wine in wines if wine.xwines_id]
         price_map = await _batch_lookup_prices(xwines_ids)
         results = [_wine_model_to_result(wine, price_map.get(wine.xwines_id)) for wine in wines]
+    else:
+        try:
+            docs, total, _ = await _atlas_search(q, limit, wine_type, country, skip=0, allowed_ids=allowed_ids)
+            xwines_ids = [doc.get("xwines_id") for doc in docs if doc.get("xwines_id")]
+            price_map = await _batch_lookup_prices(xwines_ids)
+            results = [_wine_doc_to_result(doc, price_map.get(doc.get("xwines_id"))) for doc in docs]
+        except Exception as e:
+            logger.debug("Atlas Search unavailable, falling back to regex: %s", e)
+            wines, total = await _regex_search(q, limit, wine_type, country, skip=0, allowed_ids=allowed_ids)
+            xwines_ids = [wine.xwines_id for wine in wines if wine.xwines_id]
+            price_map = await _batch_lookup_prices(xwines_ids)
+            results = [_wine_model_to_result(wine, price_map.get(wine.xwines_id)) for wine in wines]
 
     # Build filters applied metadata
-    filters_applied = {"q": q}
+    filters_applied: dict = {}
+    if q:
+        filters_applied["q"] = q
     if wine_type:
         filters_applied["wine_type"] = wine_type
     if country:

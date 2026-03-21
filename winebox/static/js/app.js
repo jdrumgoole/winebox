@@ -2399,11 +2399,11 @@ async function handleXWinesSearch(e) {
 async function performXWinesSearch() {
     const params = new URLSearchParams();
     const q = document.getElementById('xwines-q').value.trim();
-    if (q.length < 2) {
+    if (q && q.length < 2) {
         showToast('Please enter at least 2 characters', 'error');
         return;
     }
-    params.append('q', q);
+    if (q) params.append('q', q);
 
     const wineType = document.getElementById('xwines-type').value;
     if (wineType) params.append('wine_type', wineType);
@@ -2422,6 +2422,12 @@ async function performXWinesSearch() {
 
     if (priceMin) params.append('price_min', priceMin);
     if (priceMax) params.append('price_max', priceMax);
+
+    // Require at least one search criterion
+    if (!q && !wineType && !country && !priceMin && !priceMax) {
+        showToast('Please enter a search term or select a filter', 'error');
+        return;
+    }
 
     const limit = parseInt(document.getElementById('xwines-limit').value);
     params.append('limit', limit);
