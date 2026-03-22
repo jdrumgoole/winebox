@@ -3255,6 +3255,30 @@ body.logged-out #user-info {
     font-size: 0.85rem;
 }
 
+.demo-progress-container {
+    width: 100%;
+    max-width: 400px;
+    height: 12px;
+    background: var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 1rem auto;
+}
+
+.demo-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-light));
+    border-radius: 6px;
+    transition: width 0.3s ease;
+}
+
+.demo-progress-text {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin: 0.5rem 0 0;
+}
+
 @media (prefers-color-scheme: dark) {
     .demo-banner {
         background: #332701;

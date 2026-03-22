@@ -4276,12 +4276,24 @@ function showDemoBanner(wineCount, bottleCount) {
 
 async function installDemoData() {
     try {
-        const btn = document.querySelector('.demo-welcome .btn-primary');
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = 'Loading...';
+        const btn = document.getElementById('demo-install-btn');
+        if (btn) btn.disabled = true;
+
+        // Replace the welcome content with a progress bar
+        const welcome = document.getElementById('demo-welcome');
+        if (welcome) {
+            welcome.innerHTML = `
+                <div class="demo-welcome-content">
+                    <h3>Loading sample wines...</h3>
+                    <div class="demo-progress-container">
+                        <div class="demo-progress-bar" id="demo-progress-bar"></div>
+                    </div>
+                    <p class="demo-progress-text" id="demo-progress-text">Preparing wines...</p>
+                </div>
+            `;
         }
 
+        // Start the install (returns immediately)
         const response = await fetchWithAuth(`${API_BASE}/demo/install`, {
             method: 'POST'
         });
@@ -4292,18 +4304,77 @@ async function installDemoData() {
         }
 
         const result = await response.json();
-        showToast(
-            `Loaded ${result.installed} sample wines (${result.bottles} bottles) from ${result.countries} countries`,
-            'success'
-        );
-        loadDashboard();
+        const total = result.total;
+
+        // Follow progress via SSE
+        const token = localStorage.getItem('winebox_token');
+        const progressResponse = await fetch(`${API_BASE}/demo/install/progress`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (!progressResponse.ok) {
+            // Fallback: just wait and reload
+            await new Promise(r => setTimeout(r, 5000));
+            loadDashboard();
+            return;
+        }
+
+        const reader = progressResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        function readProgress() {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    loadDashboard();
+                    return;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop();
+
+                for (const part of parts) {
+                    const trimmed = part.trim();
+                    if (!trimmed.startsWith('data: ')) continue;
+
+                    try {
+                        const data = JSON.parse(trimmed.slice(6));
+                        const bar = document.getElementById('demo-progress-bar');
+                        const text = document.getElementById('demo-progress-text');
+
+                        if (data.phase === 'done') {
+                            if (bar) bar.style.width = '100%';
+                            if (text) text.textContent = `Done! ${data.created} wines loaded.`;
+                            showToast(
+                                `Loaded ${data.created} sample wines (${data.bottles} bottles) from ${data.countries} countries`,
+                                'success'
+                            );
+                            setTimeout(() => loadDashboard(), 500);
+                            return;
+                        } else if (data.phase === 'loading' && data.total > 0) {
+                            const pct = Math.round((data.created / data.total) * 100);
+                            if (bar) bar.style.width = pct + '%';
+                            if (text) text.textContent = `Adding wines: ${data.created} of ${data.total}`;
+                        } else if (data.phase === 'idle') {
+                            loadDashboard();
+                            return;
+                        }
+                    } catch (e) {
+                        // Ignore parse errors
+                    }
+                }
+
+                readProgress();
+            }).catch(() => {
+                loadDashboard();
+            });
+        }
+
+        readProgress();
     } catch (error) {
         showToast(error.message, 'error');
-        const btn = document.querySelector('.demo-welcome .btn-primary');
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = 'Load sample wines';
-        }
+        loadDashboard();
     }
 }
 
