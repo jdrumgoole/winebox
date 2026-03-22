@@ -3,15 +3,21 @@
 Lets new users populate their cellar with curated sample wines to explore
 the app. Demo wines are tagged with custom_fields._demo = "true" so they
 can be removed without affecting the user's real wines.
+
+Pulls real wines from the X-Wines reference dataset (xwines_wines) so the
+demo cellar looks authentic, with actual wine names, regions, and ratings.
 """
 
+import ast
 import logging
+import random
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from winebox.database import get_database
 from winebox.models.transaction import Transaction, TransactionType
 from winebox.models.wine import InventoryInfo, Wine
 from winebox.services.auth import RequireAuth
@@ -21,6 +27,49 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 DEMO_TAG = {"_demo": "true"}
+
+# How many wines to load
+DEMO_WINE_COUNT = 500
+
+# Target distribution by wine type (approximate — actual depends on what's
+# available in xwines_wines)
+_TYPE_TARGETS = {
+    "Red": 250,
+    "White": 120,
+    "Rosé": 30,
+    "Sparkling": 50,
+    "Dessert": 25,
+    "Fortified": 25,
+}
+
+# Wine type mapping from X-Wines wine_type to our wine_type_id
+_TYPE_MAP = {
+    "Red": "red",
+    "White": "white",
+    "Rosé": "rose",
+    "Sparkling": "sparkling",
+    "Dessert": "dessert",
+    "Fortified": "fortified",
+}
+
+# Checkout notes for realistic transaction history
+_CHECKOUT_NOTES = [
+    "Tuesday night pasta dinner",
+    "Summer barbecue with friends",
+    "Picnic at the park",
+    "Birthday celebration",
+    "Date night",
+    "Holiday dinner",
+    "Book club meeting",
+    "Housewarming gift",
+    "Friday night in",
+    "Sunday roast",
+    "Dinner party",
+    "Cheese and wine evening",
+    "Celebration dinner",
+    "Weekend lunch",
+    "Just because",
+]
 
 
 # --- Response models ---
@@ -43,355 +92,111 @@ class DemoRemoveResponse(BaseModel):
     transactions_removed: int
 
 
-# --- Sample wine data ---
+def _parse_grapes(grapes_str: str | None) -> str | None:
+    """Parse X-Wines grapes field into a primary grape name."""
+    if not grapes_str:
+        return None
+    try:
+        parsed = ast.literal_eval(grapes_str)
+        if isinstance(parsed, list) and parsed:
+            return str(parsed[0])
+    except (ValueError, SyntaxError):
+        pass
+    stripped = grapes_str.strip()
+    if stripped and not stripped.startswith("["):
+        return stripped
+    return None
 
-SAMPLE_WINES: list[dict[str, Any]] = [
-    # Red wines
-    {
-        "name": "Chateau Margaux",
-        "winery": "Chateau Margaux",
-        "vintage": 2015,
-        "grape_variety": "Cabernet Sauvignon",
-        "region": "Margaux",
-        "sub_region": "Haut-Médoc",
-        "appellation": "Margaux AOC",
-        "country": "France",
-        "alcohol_percentage": 13.5,
-        "wine_type_id": "red",
-        "classification": "Premier Grand Cru Classé",
-        "price_tier": "ultra_premium",
-        "estimated_price_low": 450.0,
-        "estimated_price_high": 650.0,
-        "drink_window_start": 2025,
-        "drink_window_end": 2060,
-        "producer_type": "estate",
-        "quantity": 2,
-    },
-    {
-        "name": "Opus One",
-        "winery": "Opus One Winery",
-        "vintage": 2019,
-        "grape_variety": "Cabernet Sauvignon",
-        "region": "Napa Valley",
-        "sub_region": "Oakville",
-        "country": "United States",
-        "alcohol_percentage": 14.5,
-        "wine_type_id": "red",
-        "price_tier": "luxury",
-        "estimated_price_low": 350.0,
-        "estimated_price_high": 420.0,
-        "drink_window_start": 2024,
-        "drink_window_end": 2045,
-        "producer_type": "estate",
-        "quantity": 1,
-    },
-    {
-        "name": "Barolo Monfortino Riserva",
-        "winery": "Giacomo Conterno",
-        "vintage": 2014,
-        "grape_variety": "Nebbiolo",
-        "region": "Piedmont",
-        "sub_region": "Barolo",
-        "appellation": "Barolo DOCG",
-        "country": "Italy",
-        "alcohol_percentage": 14.0,
-        "wine_type_id": "red",
-        "classification": "DOCG Riserva",
-        "price_tier": "ultra_premium",
-        "estimated_price_low": 500.0,
-        "estimated_price_high": 800.0,
-        "drink_window_start": 2028,
-        "drink_window_end": 2060,
-        "producer_type": "estate",
-        "quantity": 3,
-    },
-    {
-        "name": "Penfolds Grange",
-        "winery": "Penfolds",
-        "vintage": 2018,
-        "grape_variety": "Shiraz",
-        "region": "South Australia",
-        "country": "Australia",
-        "alcohol_percentage": 14.5,
-        "wine_type_id": "red",
-        "price_tier": "luxury",
-        "estimated_price_low": 550.0,
-        "estimated_price_high": 750.0,
-        "drink_window_start": 2028,
-        "drink_window_end": 2055,
-        "producer_type": "estate",
-        "quantity": 1,
-    },
-    {
-        "name": "Fleur de Cruzeau",
-        "winery": "Chateau de Cruzeau",
-        "vintage": 2020,
-        "grape_variety": "Merlot",
-        "region": "Pessac-Léognan",
-        "appellation": "Pessac-Léognan AOC",
-        "country": "France",
-        "alcohol_percentage": 13.0,
-        "wine_type_id": "red",
-        "price_tier": "value",
-        "estimated_price_low": 12.0,
-        "estimated_price_high": 18.0,
-        "drink_window_start": 2022,
-        "drink_window_end": 2028,
-        "producer_type": "estate",
-        "quantity": 6,
-    },
-    {
-        "name": "Malbec Reserva",
-        "winery": "Catena Zapata",
-        "vintage": 2021,
-        "grape_variety": "Malbec",
-        "region": "Mendoza",
-        "country": "Argentina",
-        "alcohol_percentage": 13.5,
-        "wine_type_id": "red",
-        "price_tier": "mid_range",
-        "estimated_price_low": 25.0,
-        "estimated_price_high": 35.0,
-        "drink_window_start": 2023,
-        "drink_window_end": 2031,
-        "producer_type": "estate",
-        "quantity": 4,
-    },
-    {
-        "name": "Rioja Gran Reserva 904",
-        "winery": "La Rioja Alta",
-        "vintage": 2015,
-        "grape_variety": "Tempranillo",
-        "region": "Rioja",
-        "appellation": "Rioja DOCa",
-        "country": "Spain",
-        "alcohol_percentage": 13.5,
-        "wine_type_id": "red",
-        "classification": "Gran Reserva",
-        "price_tier": "premium",
-        "estimated_price_low": 55.0,
-        "estimated_price_high": 75.0,
-        "drink_window_start": 2025,
-        "drink_window_end": 2040,
-        "producer_type": "estate",
-        "quantity": 3,
-    },
-    {
-        "name": "Côtes du Rhône Rouge",
-        "winery": "E. Guigal",
-        "vintage": 2022,
-        "grape_variety": "Grenache",
-        "region": "Rhône Valley",
-        "appellation": "Côtes du Rhône AOC",
-        "country": "France",
-        "alcohol_percentage": 14.0,
-        "wine_type_id": "red",
-        "price_tier": "budget",
-        "estimated_price_low": 10.0,
-        "estimated_price_high": 14.0,
-        "drink_window_start": 2023,
-        "drink_window_end": 2027,
-        "producer_type": "negociant",
-        "quantity": 12,
-    },
-    {
-        "name": "Pinot Noir Willamette Valley",
-        "winery": "Domaine Drouhin Oregon",
-        "vintage": 2021,
-        "grape_variety": "Pinot Noir",
-        "region": "Willamette Valley",
-        "country": "United States",
-        "alcohol_percentage": 13.5,
-        "wine_type_id": "red",
-        "price_tier": "mid_range",
-        "estimated_price_low": 35.0,
-        "estimated_price_high": 45.0,
-        "drink_window_start": 2023,
-        "drink_window_end": 2032,
-        "producer_type": "estate",
-        "quantity": 2,
-    },
-    # White wines
-    {
-        "name": "Chablis Grand Cru Les Clos",
-        "winery": "William Fèvre",
-        "vintage": 2020,
-        "grape_variety": "Chardonnay",
-        "region": "Burgundy",
-        "sub_region": "Chablis",
-        "appellation": "Chablis Grand Cru AOC",
-        "country": "France",
-        "alcohol_percentage": 13.0,
-        "wine_type_id": "white",
-        "classification": "Grand Cru",
-        "price_tier": "premium",
-        "estimated_price_low": 75.0,
-        "estimated_price_high": 100.0,
-        "drink_window_start": 2024,
-        "drink_window_end": 2040,
-        "producer_type": "estate",
-        "quantity": 2,
-    },
-    {
-        "name": "Cloudy Bay Sauvignon Blanc",
-        "winery": "Cloudy Bay",
-        "vintage": 2023,
-        "grape_variety": "Sauvignon Blanc",
-        "region": "Marlborough",
-        "country": "New Zealand",
-        "alcohol_percentage": 13.0,
-        "wine_type_id": "white",
-        "price_tier": "value",
-        "estimated_price_low": 18.0,
-        "estimated_price_high": 24.0,
-        "drink_window_start": 2024,
-        "drink_window_end": 2026,
-        "producer_type": "estate",
-        "quantity": 6,
-    },
-    {
-        "name": "Riesling Spätlese Ürziger Würzgarten",
-        "winery": "Dr. Loosen",
-        "vintage": 2022,
-        "grape_variety": "Riesling",
-        "region": "Mosel",
-        "country": "Germany",
-        "alcohol_percentage": 8.0,
-        "wine_type_id": "white",
-        "price_tier": "mid_range",
-        "estimated_price_low": 25.0,
-        "estimated_price_high": 35.0,
-        "drink_window_start": 2024,
-        "drink_window_end": 2040,
-        "producer_type": "estate",
-        "quantity": 4,
-    },
-    {
-        "name": "Albariño Rias Baixas",
-        "winery": "Pazo de Señoráns",
-        "vintage": 2022,
-        "grape_variety": "Albariño",
-        "region": "Galicia",
-        "appellation": "Rías Baixas DO",
-        "country": "Spain",
-        "alcohol_percentage": 12.5,
-        "wine_type_id": "white",
-        "price_tier": "value",
-        "estimated_price_low": 18.0,
-        "estimated_price_high": 24.0,
-        "drink_window_start": 2023,
-        "drink_window_end": 2026,
-        "producer_type": "estate",
-        "quantity": 3,
-    },
-    # Rosé
-    {
-        "name": "Whispering Angel",
-        "winery": "Château d'Esclans",
-        "vintage": 2023,
-        "grape_variety": "Grenache",
-        "region": "Provence",
-        "appellation": "Côtes de Provence AOC",
-        "country": "France",
-        "alcohol_percentage": 13.0,
-        "wine_type_id": "rose",
-        "price_tier": "value",
-        "estimated_price_low": 20.0,
-        "estimated_price_high": 26.0,
-        "drink_window_start": 2024,
-        "drink_window_end": 2025,
-        "producer_type": "estate",
-        "quantity": 6,
-    },
-    # Sparkling
-    {
-        "name": "Dom Pérignon",
-        "winery": "Moët & Chandon",
-        "vintage": 2013,
-        "grape_variety": "Chardonnay",
-        "region": "Champagne",
-        "appellation": "Champagne AOC",
-        "country": "France",
-        "alcohol_percentage": 12.5,
-        "wine_type_id": "sparkling",
-        "wine_subtype": "champagne",
-        "classification": "Prestige Cuvée",
-        "price_tier": "luxury",
-        "estimated_price_low": 200.0,
-        "estimated_price_high": 280.0,
-        "drink_window_start": 2023,
-        "drink_window_end": 2040,
-        "producer_type": "estate",
-        "quantity": 2,
-    },
-    {
-        "name": "Prosecco Superiore Brut",
-        "winery": "Bisol",
-        "vintage": 2022,
-        "grape_variety": "Glera",
-        "region": "Veneto",
-        "appellation": "Prosecco Superiore DOCG",
-        "country": "Italy",
-        "alcohol_percentage": 11.5,
-        "wine_type_id": "sparkling",
-        "wine_subtype": "prosecco",
-        "price_tier": "value",
-        "estimated_price_low": 16.0,
-        "estimated_price_high": 22.0,
-        "drink_window_start": 2023,
-        "drink_window_end": 2025,
-        "producer_type": "cooperative",
-        "quantity": 4,
-    },
-    # Fortified
-    {
-        "name": "Vintage Port",
-        "winery": "Taylor's",
-        "vintage": 2017,
-        "grape_variety": "Touriga Nacional",
-        "region": "Douro Valley",
-        "appellation": "Porto DOC",
-        "country": "Portugal",
-        "alcohol_percentage": 20.0,
-        "wine_type_id": "fortified",
-        "price_tier": "premium",
-        "estimated_price_low": 65.0,
-        "estimated_price_high": 85.0,
-        "drink_window_start": 2030,
-        "drink_window_end": 2070,
-        "producer_type": "estate",
-        "quantity": 3,
-    },
-    # Dessert
-    {
-        "name": "Sauternes",
-        "winery": "Château d'Yquem",
-        "vintage": 2017,
-        "grape_variety": "Sémillon",
-        "region": "Bordeaux",
-        "sub_region": "Sauternes",
-        "appellation": "Sauternes AOC",
-        "country": "France",
-        "alcohol_percentage": 14.0,
-        "wine_type_id": "dessert",
-        "classification": "Premier Cru Supérieur",
-        "price_tier": "ultra_premium",
-        "estimated_price_low": 350.0,
-        "estimated_price_high": 500.0,
-        "drink_window_start": 2025,
-        "drink_window_end": 2070,
-        "producer_type": "estate",
-        "quantity": 1,
-    },
-]
 
-# Wines to check out for realistic transaction history
-_CHECKOUTS: dict[str, tuple[int, str]] = {
-    "Côtes du Rhône Rouge": (4, "Tuesday night pasta dinner"),
-    "Cloudy Bay Sauvignon Blanc": (2, "Summer barbecue with friends"),
-    "Whispering Angel": (3, "Picnic at the park"),
-    "Prosecco Superiore Brut": (2, "Birthday celebration"),
-}
+def _parse_vintages(vintages_str: str | None) -> list[int]:
+    """Parse X-Wines vintages field into a list of ints."""
+    if not vintages_str:
+        return []
+    try:
+        parsed = ast.literal_eval(vintages_str)
+        if isinstance(parsed, list):
+            return [int(v) for v in parsed if v]
+    except (ValueError, SyntaxError):
+        pass
+    return []
+
+
+async def _select_demo_wines() -> list[dict[str, Any]]:
+    """Select diverse wines from xwines_wines for the demo cellar.
+
+    Stratifies by wine type, prefers popular wines (high rating_count),
+    and picks a random vintage for each wine.
+
+    Returns:
+        List of dicts ready to create Wine documents.
+    """
+    db = get_database()
+    xwines_col = db["xwines_wines"]
+    prices_col = db["xwines_prices"]
+
+    selected: list[dict[str, Any]] = []
+
+    for wine_type, target in _TYPE_TARGETS.items():
+        # Fetch popular wines of this type
+        cursor = xwines_col.find(
+            {"wine_type": wine_type, "rating_count": {"$gte": 25}},
+            {
+                "xwines_id": 1, "name": 1, "wine_type": 1, "grapes": 1,
+                "abv": 1, "country": 1, "region_name": 1, "winery_name": 1,
+                "avg_rating": 1, "rating_count": 1, "vintages": 1,
+            },
+        ).sort([("rating_count", -1)]).limit(target * 3)
+
+        candidates = await cursor.to_list(length=target * 3)
+
+        # Shuffle to avoid always picking the same top-N
+        random.shuffle(candidates)
+        chosen = candidates[:target]
+
+        for doc in chosen:
+            # Pick a vintage
+            vintages = _parse_vintages(doc.get("vintages"))
+            vintage = random.choice(vintages) if vintages else None
+
+            # Random quantity (1-6 bottles, weighted toward small)
+            quantity = random.choices([1, 2, 3, 4, 6], weights=[30, 25, 20, 15, 10])[0]
+
+            wine_data: dict[str, Any] = {
+                "name": doc["name"],
+                "winery": doc.get("winery_name"),
+                "vintage": vintage,
+                "grape_variety": _parse_grapes(doc.get("grapes")),
+                "region": doc.get("region_name"),
+                "country": doc.get("country"),
+                "alcohol_percentage": doc.get("abv"),
+                "wine_type_id": _TYPE_MAP.get(wine_type, "red"),
+                "xwines_id": doc.get("xwines_id"),
+                "quantity": quantity,
+            }
+
+            selected.append(wine_data)
+
+    # Look up prices for all selected wines (batch)
+    xwines_ids = [w["xwines_id"] for w in selected if w.get("xwines_id")]
+    if xwines_ids:
+        price_cursor = prices_col.find(
+            {"xwines_id": {"$in": xwines_ids}, "vintage": None},
+            {"_id": 0, "xwines_id": 1, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
+        )
+        price_map: dict[int, dict] = {
+            doc["xwines_id"]: doc async for doc in price_cursor
+        }
+
+        for wine_data in selected:
+            xid = wine_data.get("xwines_id")
+            if xid and xid in price_map:
+                p = price_map[xid]
+                wine_data["estimated_price_low"] = p.get("price_low_usd")
+                wine_data["estimated_price_high"] = p.get("price_high_usd")
+                wine_data["price_tier"] = p.get("price_tier")
+
+    random.shuffle(selected)
+    return selected[:DEMO_WINE_COUNT]
 
 
 # --- Endpoints ---
@@ -416,10 +221,10 @@ async def demo_status(current_user: RequireAuth) -> DemoStatusResponse:
 async def install_demo(current_user: RequireAuth) -> DemoInstallResponse:
     """Load sample wines into the current user's cellar.
 
-    Creates 18 wines spanning 6 types, 8 countries, and all price tiers.
-    Includes some check-out transactions for realistic history.
-    Demo wines are tagged so they can be removed without affecting your
-    real wines.
+    Pulls 500 real wines from the X-Wines reference dataset, spanning
+    multiple types, countries, and price tiers. Includes some check-out
+    transactions for realistic history. Demo wines are tagged so they
+    can be removed without affecting your real wines.
     """
     # Check if already installed
     existing = await Wine.find_one(
@@ -431,28 +236,40 @@ async def install_demo(current_user: RequireAuth) -> DemoInstallResponse:
             detail="Sample wines are already loaded. Remove them first to reload.",
         )
 
+    # Select wines from X-Wines
+    sample_wines = await _select_demo_wines()
+    if not sample_wines:
+        raise HTTPException(
+            status_code=503,
+            detail="No reference wine data available. The X-Wines dataset may not be loaded.",
+        )
+
     now = datetime.now(timezone.utc)
     wines_created = 0
-    wine_name_to_id: dict[str, Any] = {}
+    total_bottles = 0
+    countries: set[str] = set()
+    wine_types: set[str] = set()
+    checkout_candidates: list[tuple[Any, int]] = []  # (wine_id, max_checkout)
 
-    for i, wine_data in enumerate(SAMPLE_WINES):
+    for i, wine_data in enumerate(sample_wines):
         data = dict(wine_data)
         quantity = data.pop("quantity", 1)
+        xwines_id = data.pop("xwines_id", None)
 
-        # Stagger creation dates for realistic history
-        days_ago = len(SAMPLE_WINES) * 3 - (i * 3)
+        # Stagger creation dates over the past year
+        days_ago = len(sample_wines) - i
         created_at = now - timedelta(days=days_ago)
 
         wine = Wine(
             owner_id=current_user.id,
             custom_fields=DEMO_TAG,
+            xwines_id=xwines_id,
             created_at=created_at,
             updated_at=created_at,
             inventory=InventoryInfo(quantity=quantity, updated_at=created_at),
             **data,
         )
         await wine.insert()
-        wine_name_to_id[wine.name] = wine.id
 
         # Create check-in transaction
         txn = Transaction(
@@ -464,15 +281,26 @@ async def install_demo(current_user: RequireAuth) -> DemoInstallResponse:
             created_at=created_at,
         )
         await txn.insert()
+
         wines_created += 1
+        total_bottles += quantity
+        if data.get("country"):
+            countries.add(data["country"])
+        if data.get("wine_type_id"):
+            wine_types.add(data["wine_type_id"])
 
-    # Create check-out transactions
-    for wine_name, (qty, notes) in _CHECKOUTS.items():
-        wine_id = wine_name_to_id.get(wine_name)
-        if not wine_id:
-            continue
+        # Wines with 3+ bottles are checkout candidates
+        if quantity >= 3:
+            checkout_candidates.append((wine.id, quantity))
 
-        checkout_date = now - timedelta(days=7 * list(_CHECKOUTS).index(wine_name) + 3)
+    # Create some check-out transactions (~10% of wines with enough stock)
+    checkout_count = min(len(checkout_candidates), max(20, len(sample_wines) // 10))
+    random.shuffle(checkout_candidates)
+
+    for wine_id, max_qty in checkout_candidates[:checkout_count]:
+        qty = random.randint(1, max(1, max_qty - 1))
+        notes = random.choice(_CHECKOUT_NOTES)
+        checkout_date = now - timedelta(days=random.randint(1, 60))
 
         txn = Transaction(
             owner_id=current_user.id,
@@ -485,20 +313,13 @@ async def install_demo(current_user: RequireAuth) -> DemoInstallResponse:
         )
         await txn.insert()
 
-        # Update inventory
         wine = await Wine.find_one({"_id": wine_id})
         if wine:
             wine.inventory.quantity -= qty
             wine.inventory.updated_at = checkout_date
             wine.updated_at = checkout_date
             await wine.save()
-
-    total_bottles = sum(
-        w.get("quantity", 1) - _CHECKOUTS.get(w["name"], (0,))[0]
-        for w in SAMPLE_WINES
-    )
-    countries = len(set(w["country"] for w in SAMPLE_WINES))
-    wine_types = len(set(w["wine_type_id"] for w in SAMPLE_WINES))
+            total_bottles -= qty
 
     logger.info(
         "Demo data installed for user %s: %d wines, %d bottles",
@@ -508,8 +329,8 @@ async def install_demo(current_user: RequireAuth) -> DemoInstallResponse:
     return DemoInstallResponse(
         installed=wines_created,
         bottles=total_bottles,
-        countries=countries,
-        wine_types=wine_types,
+        countries=len(countries),
+        wine_types=len(wine_types),
     )
 
 
