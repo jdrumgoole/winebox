@@ -146,43 +146,49 @@ h3 {
     color: var(--text-color);
 }
 
-/* Stats Grid */
+/* Dashboard Header */
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0;
+}
+
+.dashboard-header h2 {
+    margin-bottom: 0;
+}
+
+/* Stats Grid — compact */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
 }
 
 .stat-card {
     background: var(--card-background);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: 0.75rem 1rem;
     text-align: center;
     box-shadow: var(--shadow);
     border: 1px solid var(--border-color);
 }
 
 .stat-value {
-    font-size: 2.5rem;
+    font-size: 1.6rem;
     font-weight: 700;
     color: var(--primary-color);
-    margin-bottom: 0.5rem;
+    line-height: 1.2;
 }
 
 .stat-label {
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-}
-
-.stat-hint {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
-    font-style: italic;
-    opacity: 0.7;
 }
 
 /* Dashboard Sections */
@@ -1198,7 +1204,16 @@ details.advanced-fields .form-grid {
     }
 
     .stats-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+    }
+
+    .stat-value {
+        font-size: 1.3rem;
+    }
+
+    .stat-label {
+        font-size: 0.65rem;
     }
 
     /* Check-in page mobile improvements */
@@ -1319,16 +1334,16 @@ details.advanced-fields .form-grid {
     }
 
     .stats-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
     }
 
     .stat-card {
-        padding: 1rem;
+        padding: 0.5rem;
     }
 
     .stat-value {
-        font-size: 2rem;
+        font-size: 1.2rem;
     }
 
     .dashboard-sections {
@@ -3252,21 +3267,19 @@ body.logged-out #user-info {
 .demo-banner {
     background: #fef3cd;
     border: 1px solid #ffc107;
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
-    display: flex;
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
     gap: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: #664d03;
+    white-space: nowrap;
 }
 
 .demo-banner .btn-sm {
-    padding: 0.3rem 0.75rem;
-    font-size: 0.85rem;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
 }
 
 .demo-progress-container {

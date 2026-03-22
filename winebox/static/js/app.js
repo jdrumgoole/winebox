@@ -4470,18 +4470,17 @@ function showDemoWelcome() {
 }
 
 function showDemoBanner(wineCount, bottleCount) {
-    const dashboard = document.getElementById('page-dashboard');
-    const title = document.getElementById('page-dashboard-title');
+    const header = document.getElementById('dashboard-header');
 
     const banner = document.createElement('div');
     banner.id = 'demo-banner';
     banner.className = 'demo-banner';
     banner.innerHTML = `
-        <span>You're viewing sample wines (${wineCount} wines, ${bottleCount} bottles). </span>
-        <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove sample wines</button>
+        <span>Sample wines (${wineCount} wines, ${bottleCount} bottles)</span>
+        <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove</button>
     `;
 
-    dashboard.insertBefore(banner, title.nextSibling);
+    header.appendChild(banner);
     document.getElementById('demo-remove-btn').addEventListener('click', removeDemoData);
 }
 
