@@ -3194,3 +3194,71 @@ body.logged-out #user-info {
         min-width: auto;
     }
 }
+
+/* Demo / Sample Data */
+
+.demo-welcome {
+    background: var(--card-background);
+    border: 2px dashed var(--primary-light);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    text-align: center;
+}
+
+.demo-welcome h3 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+}
+
+.demo-welcome p {
+    color: var(--text-muted);
+    max-width: 500px;
+    margin: 0 auto 1rem;
+    line-height: 1.5;
+}
+
+.demo-welcome-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin: 1.5rem 0 1rem;
+    flex-wrap: wrap;
+}
+
+.demo-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+}
+
+.demo-banner {
+    background: #fef3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #664d03;
+}
+
+.demo-banner .btn-sm {
+    padding: 0.3rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    .demo-banner {
+        background: #332701;
+        border-color: #664d03;
+        color: #ffc107;
+    }
+}

@@ -1436,6 +1436,9 @@ async function loadDashboard() {
         document.getElementById('stat-unique-wines').textContent = summary.unique_wines;
         document.getElementById('stat-total-tracked').textContent = summary.total_wines_tracked;
 
+        // Check demo data status and show appropriate UI
+        await updateDemoBanner(summary.total_bottles);
+
         // Render breakdowns
         renderChartList('by-country', summary.by_country);
         renderChartList('by-grape', summary.by_grape_variety);
@@ -4197,5 +4200,136 @@ async function handleAddMetToCellar() {
         navigateTo('cellar');
     } catch (error) {
         showToast(error.message, 'error');
+    }
+}
+
+
+// =============================================================================
+// Demo / Sample Data
+// =============================================================================
+
+async function updateDemoBanner(totalBottles) {
+    const existingBanner = document.getElementById('demo-banner');
+    if (existingBanner) existingBanner.remove();
+
+    const existingWelcome = document.getElementById('demo-welcome');
+    if (existingWelcome) existingWelcome.remove();
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/demo/status`);
+        const status = await response.json();
+
+        if (totalBottles === 0 && !status.installed) {
+            // Empty cellar, no demo data — show welcome prompt
+            showDemoWelcome();
+        } else if (status.installed) {
+            // Demo data present — show removable banner
+            showDemoBanner(status.wine_count, status.bottle_count);
+        }
+    } catch {
+        // Demo endpoint not available — skip silently
+    }
+}
+
+function showDemoWelcome() {
+    const dashboard = document.getElementById('page-dashboard');
+    const statsGrid = document.getElementById('stats-grid');
+
+    const welcome = document.createElement('div');
+    welcome.id = 'demo-welcome';
+    welcome.className = 'demo-welcome';
+    welcome.innerHTML = `
+        <div class="demo-welcome-content">
+            <h3>Welcome to WineBox</h3>
+            <p>Your cellar is empty. Load some sample wines to explore what WineBox can do, or add your first wine by scanning a label.</p>
+            <div class="demo-welcome-actions">
+                <button class="btn btn-primary" onclick="installDemoData()">
+                    Load sample wines
+                </button>
+                <a href="#" data-page="checkin" class="btn btn-secondary">
+                    Add my own wine
+                </a>
+            </div>
+            <p class="demo-hint">Sample wines can be removed at any time without affecting your own wines.</p>
+        </div>
+    `;
+
+    dashboard.insertBefore(welcome, statsGrid.nextSibling);
+}
+
+function showDemoBanner(wineCount, bottleCount) {
+    const dashboard = document.getElementById('page-dashboard');
+    const title = document.getElementById('page-dashboard-title');
+
+    const banner = document.createElement('div');
+    banner.id = 'demo-banner';
+    banner.className = 'demo-banner';
+    banner.innerHTML = `
+        <span>You're viewing sample wines (${wineCount} wines, ${bottleCount} bottles). </span>
+        <button class="btn btn-sm btn-outline" onclick="removeDemoData()">Remove sample wines</button>
+    `;
+
+    dashboard.insertBefore(banner, title.nextSibling);
+}
+
+async function installDemoData() {
+    try {
+        const btn = document.querySelector('.demo-welcome .btn-primary');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+        }
+
+        const response = await fetchWithAuth(`${API_BASE}/demo/install`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to load sample wines');
+        }
+
+        const result = await response.json();
+        showToast(
+            `Loaded ${result.installed} sample wines (${result.bottles} bottles) from ${result.countries} countries`,
+            'success'
+        );
+        loadDashboard();
+    } catch (error) {
+        showToast(error.message, 'error');
+        const btn = document.querySelector('.demo-welcome .btn-primary');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Load sample wines';
+        }
+    }
+}
+
+async function removeDemoData() {
+    try {
+        const btn = document.querySelector('.demo-banner .btn-outline');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Removing...';
+        }
+
+        const response = await fetchWithAuth(`${API_BASE}/demo/remove`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to remove sample wines');
+        }
+
+        const result = await response.json();
+        showToast(`Removed ${result.wines_removed} sample wines`, 'success');
+        loadDashboard();
+    } catch (error) {
+        showToast(error.message, 'error');
+        const btn = document.querySelector('.demo-banner .btn-outline');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Remove sample wines';
+        }
     }
 }

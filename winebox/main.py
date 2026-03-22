@@ -300,7 +300,7 @@ async def get_analytics_config() -> JSONResponse:
 
 
 # Import and include routers
-from winebox.routers import admin, auth, cellar, export, import_router, met, reference, search, transactions, wines, xwines
+from winebox.routers import admin, auth, cellar, demo, export, import_router, met, reference, search, transactions, wines, xwines
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(wines.router, prefix="/api/wines", tags=["Wines"])
@@ -312,6 +312,7 @@ app.include_router(reference.router, prefix="/api/reference", tags=["Reference D
 app.include_router(xwines.router, prefix="/api/xwines", tags=["X-Wines Dataset"])
 app.include_router(export.router, prefix="/api/export", tags=["Export"])
 app.include_router(import_router.router, prefix="/api/import", tags=["Import"])
+app.include_router(demo.router, prefix="/api/demo", tags=["Demo Data"])
 app.include_router(admin.router, prefix="/admin", tags=["Admin"])
 
 # Serve static files - mounted after routes to avoid conflicts
