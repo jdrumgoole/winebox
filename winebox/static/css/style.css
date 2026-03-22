@@ -186,14 +186,15 @@ h3 {
 }
 
 /* Dashboard Sections */
-.dashboard-sections {
+/* Chart grid layout */
+.chart-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
     margin-bottom: 2rem;
 }
 
-.dashboard-section {
+.chart-card {
     background: var(--card-background);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
@@ -201,34 +202,47 @@ h3 {
     border: 1px solid var(--border-color);
 }
 
-.chart-list {
-    max-height: 200px;
-    overflow-y: auto;
+.chart-card h3 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+    color: var(--text-muted);
+    font-family: 'Playfair Display', serif;
 }
 
-.chart-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border-color);
+.chart-card-wide {
+    grid-column: span 1;
 }
 
-.chart-item:last-child {
-    border-bottom: none;
+.chart-card-full {
+    grid-column: 1 / -1;
 }
 
-.chart-item .label {
-    font-weight: 500;
+.chart-wrapper {
+    position: relative;
+    height: 250px;
 }
 
-.chart-item .value {
-    background: var(--primary-light);
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.85rem;
-    font-weight: 600;
+.chart-wrapper-sm {
+    height: 220px;
+}
+
+@media (max-width: 768px) {
+    .chart-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .chart-card-wide,
+    .chart-card-full {
+        grid-column: span 1;
+    }
+
+    .chart-wrapper {
+        height: 200px;
+    }
+
+    .chart-wrapper-sm {
+        height: 200px;
+    }
 }
 
 /* Activity List */

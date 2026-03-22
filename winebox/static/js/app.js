@@ -1439,10 +1439,8 @@ async function loadDashboard() {
         // Check demo data status and show appropriate UI
         await updateDemoBanner(summary.total_bottles);
 
-        // Render breakdowns
-        renderChartList('by-country', summary.by_country);
-        renderChartList('by-grape', summary.by_grape_variety);
-        renderChartList('by-vintage', summary.by_vintage);
+        // Render charts
+        renderDashboardCharts(summary);
 
         // Load met summary
         try {
@@ -1462,22 +1460,235 @@ async function loadDashboard() {
     }
 }
 
-function renderChartList(containerId, data) {
-    const container = document.getElementById(containerId);
-    if (!data || Object.keys(data).length === 0) {
-        container.innerHTML = '<div class="empty-state">No data yet</div>';
-        return;
+// Active Chart.js instances (destroy before re-creating)
+const _dashboardCharts = {};
+
+function _destroyChart(id) {
+    if (_dashboardCharts[id]) {
+        _dashboardCharts[id].destroy();
+        delete _dashboardCharts[id];
+    }
+}
+
+// Color palette derived from the app's wine theme
+const CHART_COLORS = [
+    '#8B1A4A', '#B82860', '#D4526E', '#5C0A2D', '#A0344F',
+    '#C76B8A', '#6B3A5A', '#E8A0B0', '#4A0E35', '#9E5070',
+    '#D98EA5', '#7C2952', '#BF5070', '#E0C0C8', '#3A0020',
+];
+
+const WINE_TYPE_COLORS = {
+    red: '#8B1A4A',
+    white: '#D4A84B',
+    rose: '#E8A0B0',
+    sparkling: '#C9B037',
+    fortified: '#5C0A2D',
+    dessert: '#D4956B',
+};
+
+const WINE_TYPE_LABELS = {
+    red: 'Red',
+    white: 'White',
+    rose: 'Rosé',
+    sparkling: 'Sparkling',
+    fortified: 'Fortified',
+    dessert: 'Dessert',
+};
+
+const PRICE_TIER_ORDER = ['budget', 'value', 'mid_range', 'premium', 'luxury', 'ultra_premium'];
+const PRICE_TIER_LABELS = {
+    budget: 'Budget (< $15)',
+    value: 'Value ($15-25)',
+    mid_range: 'Mid-Range ($25-50)',
+    premium: 'Premium ($50-100)',
+    luxury: 'Luxury ($100-250)',
+    ultra_premium: 'Ultra Premium (> $250)',
+};
+const PRICE_TIER_COLORS = {
+    budget: '#6DB65B',
+    value: '#A0C850',
+    mid_range: '#D4A84B',
+    premium: '#D4826B',
+    luxury: '#B82860',
+    ultra_premium: '#8B1A4A',
+};
+
+const CHART_DEFAULTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            labels: {
+                font: { family: "'Cormorant Garamond', serif", size: 13 },
+                color: '#444',
+            },
+        },
+        tooltip: {
+            bodyFont: { family: "'Cormorant Garamond', serif" },
+            titleFont: { family: "'Playfair Display', serif" },
+        },
+    },
+};
+
+function renderDashboardCharts(summary) {
+    // Wine Type — doughnut
+    _renderDoughnutChart('chart-wine-type', summary.by_wine_type, WINE_TYPE_LABELS, WINE_TYPE_COLORS);
+
+    // Price Tier — doughnut
+    _renderDoughnutChart('chart-price-tier', summary.by_price_tier, PRICE_TIER_LABELS, PRICE_TIER_COLORS, PRICE_TIER_ORDER);
+
+    // Country — horizontal bar (top 10)
+    _renderHorizontalBarChart('chart-country', summary.by_country, 10);
+
+    // Grape Variety — horizontal bar (top 10)
+    _renderHorizontalBarChart('chart-grape', summary.by_grape_variety, 10);
+
+    // Vintage — vertical bar (sorted chronologically)
+    _renderVintageChart('chart-vintage', summary.by_vintage);
+}
+
+function _renderDoughnutChart(canvasId, data, labelMap, colorMap, order) {
+    _destroyChart(canvasId);
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !data || Object.keys(data).length === 0) return;
+
+    let entries = Object.entries(data);
+    if (order) {
+        entries.sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+    } else {
+        entries.sort((a, b) => b[1] - a[1]);
     }
 
-    container.innerHTML = Object.entries(data)
+    const labels = entries.map(([k]) => (labelMap && labelMap[k]) || k);
+    const values = entries.map(([, v]) => v);
+    const colors = entries.map(([k], i) => (colorMap && colorMap[k]) || CHART_COLORS[i % CHART_COLORS.length]);
+
+    _dashboardCharts[canvasId] = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#fff',
+            }],
+        },
+        options: {
+            ...CHART_DEFAULTS,
+            cutout: '55%',
+            plugins: {
+                ...CHART_DEFAULTS.plugins,
+                legend: {
+                    ...CHART_DEFAULTS.plugins.legend,
+                    position: 'bottom',
+                },
+            },
+        },
+    });
+}
+
+function _renderHorizontalBarChart(canvasId, data, maxItems) {
+    _destroyChart(canvasId);
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !data || Object.keys(data).length === 0) return;
+
+    const entries = Object.entries(data)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([label, value]) => `
-            <div class="chart-item">
-                <span class="label">${label}</span>
-                <span class="value">${value}</span>
-            </div>
-        `).join('');
+        .slice(0, maxItems || 10);
+
+    const labels = entries.map(([k]) => k);
+    const values = entries.map(([, v]) => v);
+
+    _dashboardCharts[canvasId] = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: CHART_COLORS.slice(0, entries.length),
+                borderRadius: 4,
+            }],
+        },
+        options: {
+            ...CHART_DEFAULTS,
+            indexAxis: 'y',
+            plugins: {
+                ...CHART_DEFAULTS.plugins,
+                legend: { display: false },
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: { family: "'Cormorant Garamond', serif" },
+                        precision: 0,
+                    },
+                    grid: { display: false },
+                },
+                y: {
+                    ticks: {
+                        font: { family: "'Cormorant Garamond', serif", size: 12 },
+                        color: '#444',
+                    },
+                    grid: { display: false },
+                },
+            },
+        },
+    });
+}
+
+function _renderVintageChart(canvasId, data) {
+    _destroyChart(canvasId);
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !data || Object.keys(data).length === 0) return;
+
+    // Sort by year ascending
+    const entries = Object.entries(data)
+        .map(([k, v]) => [parseInt(k), v])
+        .filter(([k]) => !isNaN(k))
+        .sort((a, b) => a[0] - b[0]);
+
+    const labels = entries.map(([k]) => String(k));
+    const values = entries.map(([, v]) => v);
+
+    _dashboardCharts[canvasId] = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: '#8B1A4A',
+                borderRadius: 3,
+            }],
+        },
+        options: {
+            ...CHART_DEFAULTS,
+            plugins: {
+                ...CHART_DEFAULTS.plugins,
+                legend: { display: false },
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        font: { family: "'Cormorant Garamond', serif", size: 11 },
+                        maxRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 20,
+                    },
+                    grid: { display: false },
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: { family: "'Cormorant Garamond', serif" },
+                        precision: 0,
+                    },
+                    grid: { color: '#eee' },
+                },
+            },
+        },
+    });
 }
 
 function renderActivityList(transactions) {

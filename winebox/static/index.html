@@ -13,6 +13,7 @@
     <link rel="icon" type="image/png" href="/static/logos/favicon.png">
     <link rel="apple-touch-icon" href="/static/logos/favicon.png">
     <link rel="stylesheet" href="/static/css/style.css?v=0.6.28">
+    <script src="/static/js/chart.min.js"></script>
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
 </head>
@@ -243,18 +244,36 @@
                 </div>
             </div>
 
-            <div class="dashboard-sections">
-                <div class="dashboard-section">
-                    <h3>By Country</h3>
-                    <div id="by-country" class="chart-list"></div>
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <h3>Wine Types</h3>
+                    <div class="chart-wrapper chart-wrapper-sm">
+                        <canvas id="chart-wine-type"></canvas>
+                    </div>
                 </div>
-                <div class="dashboard-section">
-                    <h3>By Grape Variety</h3>
-                    <div id="by-grape" class="chart-list"></div>
+                <div class="chart-card">
+                    <h3>Price Range</h3>
+                    <div class="chart-wrapper chart-wrapper-sm">
+                        <canvas id="chart-price-tier"></canvas>
+                    </div>
                 </div>
-                <div class="dashboard-section">
-                    <h3>By Vintage</h3>
-                    <div id="by-vintage" class="chart-list"></div>
+                <div class="chart-card chart-card-wide">
+                    <h3>Top Countries</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-country"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card chart-card-wide">
+                    <h3>Top Grape Varieties</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-grape"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card chart-card-full">
+                    <h3>Vintages</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-vintage"></canvas>
+                    </div>
                 </div>
             </div>
 

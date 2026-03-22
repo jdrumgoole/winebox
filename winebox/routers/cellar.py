@@ -78,6 +78,26 @@ async def get_cellar_summary(
     by_grape_result = await cursor.to_list(length=None)
     by_grape = {row["_id"]: row["count"] for row in by_grape_result}
 
+    # Wines by type (in stock, filtered by owner)
+    by_type_pipeline = [
+        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "wine_type_id": {"$ne": None}}},
+        {"$group": {"_id": "$wine_type_id", "count": {"$sum": "$inventory.quantity"}}},
+        {"$sort": {"count": -1}},
+    ]
+    cursor = await Wine.get_pymongo_collection().aggregate(by_type_pipeline)
+    by_type_result = await cursor.to_list(length=None)
+    by_wine_type = {row["_id"]: row["count"] for row in by_type_result}
+
+    # Wines by price tier (in stock, filtered by owner)
+    by_tier_pipeline = [
+        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "price_tier": {"$ne": None}}},
+        {"$group": {"_id": "$price_tier", "count": {"$sum": "$inventory.quantity"}}},
+        {"$sort": {"count": -1}},
+    ]
+    cursor = await Wine.get_pymongo_collection().aggregate(by_tier_pipeline)
+    by_tier_result = await cursor.to_list(length=None)
+    by_price_tier = {row["_id"]: row["count"] for row in by_tier_result}
+
     return {
         "total_bottles": total_bottles,
         "unique_wines": unique_wines,
@@ -85,4 +105,6 @@ async def get_cellar_summary(
         "by_vintage": by_vintage,
         "by_country": by_country,
         "by_grape_variety": by_grape,
+        "by_wine_type": by_wine_type,
+        "by_price_tier": by_price_tier,
     }
