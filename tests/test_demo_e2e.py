@@ -218,7 +218,7 @@ class TestDemoDataE2E:
             assert status["installed"] is False
             assert status["wine_count"] == 0
 
-            # Install via API
+            # Install via API (async — returns immediately with total)
             install_result = page.evaluate("""
                 async () => {
                     const token = localStorage.getItem('winebox_token');
@@ -229,10 +229,25 @@ class TestDemoDataE2E:
                     return await resp.json();
                 }
             """)
-            assert install_result["installed"] > 0
-            assert install_result["bottles"] > 0
+            assert install_result["total"] > 0
 
-            # Check status again — should be installed
+            # Wait for background install to finish by polling status
+            page.evaluate("""
+                async () => {
+                    const token = localStorage.getItem('winebox_token');
+                    for (let i = 0; i < 60; i++) {
+                        await new Promise(r => setTimeout(r, 1000));
+                        const resp = await fetch('/api/demo/status', {
+                            headers: { 'Authorization': 'Bearer ' + token }
+                        });
+                        const status = await resp.json();
+                        if (status.installed && status.wine_count > 0) return status;
+                    }
+                    throw new Error('Install timed out');
+                }
+            """)
+
+            # Check status — should be installed
             status2 = page.evaluate("""
                 async () => {
                     const token = localStorage.getItem('winebox_token');
