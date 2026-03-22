@@ -1,0 +1,1238 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#8B1A4A">
+    <title>WineBox - Wine Cellar Management</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&amp;family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&amp;display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/static/logos/favicon.png">
+    <link rel="apple-touch-icon" href="/static/logos/favicon.png">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.6.28">
+    <!-- PostHog Analytics Configuration -->
+    <script src="/static/js/posthog-init.js"></script>
+</head>
+    <body class="">
+    <header>
+        <div class="header-content">
+            <div class="logo-wrapper">
+                <img src="/static/logos/logo-compact-dark.svg" alt="WineBox" class="header-logo" height="32">
+                <span class="beta-badge">BETA</span>
+            </div>
+            <button id="hamburger-btn" class="hamburger-btn" aria-label="Menu" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
+            <nav id="main-nav">
+                <a href="#" data-page="dashboard" class="nav-link active" aria-current="page">Dashboard</a>
+                <a href="#" data-page="checkin" class="nav-link">Add Wine</a>
+                <a href="#" data-page="add-to-cellar" class="nav-link">Add to Cellar</a>
+                <a href="#" data-page="cellar" class="nav-link">My Cellar</a>
+                <a href="#" data-page="met" class="nav-link">Wines I've Met</a>
+                <a href="#" data-page="history" class="nav-link">History</a>
+                <a href="#" data-page="search" class="nav-link">Search</a>
+                <a href="#" data-page="xwines" class="nav-link">Wine Reference</a>
+            </nav>
+            <div id="user-info" class="user-info" style="display: flex;">
+                <a href="/admin" id="admin-link" class="nav-link" style="display: none;">Admin</a>
+                <a href="#" id="username-display" data-page="settings" class="username-link" title="Settings">joe+test@joedrumgoole.com</a>
+                <a href="#" data-page="settings" class="nav-link settings-icon-link" title="Settings" aria-label="Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </a>
+                <button id="logout-btn" class="btn btn-small btn-secondary">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Login Page -->
+    <section id="page-login" class="login-page">
+        <div class="login-container">
+            <!-- Login Form -->
+            <div class="login-card" id="login-card">
+                <img src="/static/logos/icon-transparent.svg" alt="" class="login-icon" width="64" height="64">
+                <h2>Welcome to WineBox</h2>
+                <p class="login-subtitle">Sign in to manage your wine cellar</p>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" name="username" required="" autocomplete="email" style="">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="login-password" name="password" required="" autocomplete="current-password" style="">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="login-error" class="login-error" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                </form>
+                <div class="login-links">
+                    <a href="#" id="show-forgot-password">Forgot password?</a>
+                    <span class="link-separator">|</span>
+                    <a href="#" id="show-register">Create account</a>
+                </div>
+            </div>
+
+            <!-- Registration Form -->
+            <div class="login-card" id="register-card" style="display: none;">
+                <h2>Create Account</h2>
+                <p class="login-subtitle">Join WineBox to manage your wine cellar</p>
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" name="email" required="" autocomplete="email" title="Please enter a valid email address (e.g., name@example.com)" style="">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="register-password" name="password" required="" minlength="8" autocomplete="new-password" style="">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <span class="form-hint">At least 8 characters</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-confirm-password">Confirm Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="register-confirm-password" name="confirm_password" required="" autocomplete="new-password" style="">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="register-error" class="login-error" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                </form>
+                <div class="login-links">
+                    <a href="#" id="show-login-from-register">Already have an account? Sign in</a>
+                </div>
+            </div>
+
+            <!-- Forgot Password Form -->
+            <div class="login-card" id="forgot-password-card" style="display: none;">
+                <h2>Reset Password</h2>
+                <p class="login-subtitle">Enter your email to receive a password reset link</p>
+                <form id="forgot-password-form">
+                    <div class="form-group">
+                        <label for="forgot-email">Email</label>
+                        <input type="email" id="forgot-email" name="email" required="" autocomplete="email" style="">
+                    </div>
+                    <div id="forgot-error" class="login-error" style="display: none;"></div>
+                    <div id="forgot-success" class="login-success" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-full">Send Reset Link</button>
+                </form>
+                <div class="login-links" style="text-align: center;">
+                    <a href="#" id="show-login-from-forgot" class="btn btn-outline btn-full" style="margin-top: 0.5rem;">← Back to sign in</a>
+                </div>
+            </div>
+
+            <!-- Reset Password Form (accessed via email link) -->
+            <div class="login-card" id="reset-password-card" style="display: none;">
+                <h2>Set New Password</h2>
+                <p class="login-subtitle">Enter your new password</p>
+                <form id="reset-password-form">
+                    <input type="hidden" id="reset-token" name="token" style="">
+                    <div class="form-group">
+                        <label for="reset-password">New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="reset-password" name="password" required="" minlength="8" autocomplete="new-password" style="">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <span class="form-hint">At least 8 characters</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="reset-confirm-password">Confirm New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="reset-confirm-password" name="confirm_password" required="" autocomplete="new-password" style="">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="reset-error" class="login-error" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-full">Set New Password</button>
+                </form>
+            </div>
+
+            <!-- Email Verification Status -->
+            <div class="login-card" id="verify-card" style="display: none;">
+                <h2 id="verify-title">Verifying Email...</h2>
+                <p class="login-subtitle" id="verify-message">Please wait while we verify your email address.</p>
+                <div id="verify-spinner" class="spinner"></div>
+                <div id="verify-success" class="login-success" style="display: none;"></div>
+                <div id="verify-error" class="login-error" style="display: none;"></div>
+                <div class="login-links" id="verify-login-link" style="display: none;">
+                    <a href="#" id="show-login-from-verify">Continue to sign in</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <main id="main-content">
+        <!-- Dashboard Page -->
+        <section id="page-dashboard" class="page active" aria-labelledby="page-dashboard-title">
+            <h2 id="page-dashboard-title">Dashboard</h2>
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-total-bottles">0</div>
+                    <div class="stat-label">Total Bottles</div>
+                    <div class="stat-hint">bottles in your cellar</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-unique-wines">0</div>
+                    <div class="stat-label">Unique Wines</div>
+                    <div class="stat-hint">different wines</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-total-tracked">0</div>
+                    <div class="stat-label">Wines Tracked</div>
+                    <div class="stat-hint">including consumed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-wines-met">0</div>
+                    <div class="stat-label">Wines I've Met</div>
+                    <div class="stat-hint">wines you've tried</div>
+                </div>
+            </div><div id="demo-welcome" class="demo-welcome">
+        <div class="demo-welcome-content">
+            <h3>Welcome to WineBox</h3>
+            <p>Your cellar is empty. Load some sample wines to explore what WineBox can do, or add your first wine by scanning a label.</p>
+            <div class="demo-welcome-actions">
+                <button class="btn btn-primary" id="demo-install-btn">
+                    Load sample wines
+                </button>
+                <a href="#" data-page="checkin" class="btn btn-secondary">
+                    Add my own wine
+                </a>
+            </div>
+            <p class="demo-hint">Sample wines can be removed at any time without affecting your own wines.</p>
+        </div>
+    </div>
+
+            <div class="dashboard-sections">
+                <div class="dashboard-section">
+                    <h3>By Country</h3>
+                    <div id="by-country" class="chart-list"><div class="empty-state">No data yet</div></div>
+                </div>
+                <div class="dashboard-section">
+                    <h3>By Grape Variety</h3>
+                    <div id="by-grape" class="chart-list"><div class="empty-state">No data yet</div></div>
+                </div>
+                <div class="dashboard-section">
+                    <h3>By Vintage</h3>
+                    <div id="by-vintage" class="chart-list"><div class="empty-state">No data yet</div></div>
+                </div>
+            </div>
+
+            <h3>Recent Activity</h3>
+            <div id="recent-activity" class="activity-list"><div class="empty-state">No recent activity</div></div>
+        </section>
+
+        <!-- Check In Page -->
+        <section id="page-checkin" class="page" aria-labelledby="page-checkin-title">
+            <h2 id="page-checkin-title">Add Wine</h2>
+            <p class="page-subtitle">Scan a label to record a wine you've encountered</p>
+            <form id="checkin-form" enctype="multipart/form-data">
+                <div class="form-section">
+                    <h3>Label Images</h3>
+                    <div class="image-upload-grid">
+                        <div class="image-upload">
+                            <label for="front-label">Front Label (Required)</label>
+                            <input type="file" id="front-label" name="front_label" accept="image/*" capture="environment" required="" style="">
+                            <div id="front-preview" class="image-preview">Tap to take photo or select image</div>
+                        </div>
+                        <div class="image-upload">
+                            <label for="back-label">Back Label (Optional)</label>
+                            <input type="file" id="back-label" name="back_label" accept="image/*" capture="environment" style="">
+                            <div id="back-preview" class="image-preview">Tap to take photo or select image</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Wine Details</h3>
+                    <p class="form-note">Leave fields blank to use OCR-detected values</p>
+
+                    <div class="form-grid">
+                        <div class="form-group autocomplete-wrapper">
+                            <label for="wine-name">Wine Name</label>
+                            <input type="text" id="wine-name" name="name" placeholder="Start typing to search..." autocomplete="off" style="">
+                            <div id="wine-autocomplete" class="autocomplete-dropdown"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="winery">Winery</label>
+                            <input type="text" id="winery" name="winery" placeholder="e.g., Chateau Margaux" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="vintage">Vintage</label>
+                            <input type="number" id="vintage" name="vintage" min="1900" max="2100" placeholder="e.g., 2020" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="grape-variety">Grape Variety</label>
+                            <input type="text" id="grape-variety" name="grape_variety" placeholder="e.g., Cabernet Sauvignon" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="region">Region</label>
+                            <input type="text" id="region" name="region" placeholder="e.g., Bordeaux" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="country">Country</label>
+                            <input type="text" id="country" name="country" placeholder="e.g., France" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-type">Wine Type</label>
+                            <select id="wine-type" name="wine_type_id">
+                                <option value="">Select type</option>
+                                <option value="red">Red</option>
+                                <option value="white">White</option>
+                                <option value="rosé">Rosé</option>
+                                <option value="sparkling">Sparkling</option>
+                                <option value="fortified">Fortified</option>
+                                <option value="dessert">Dessert</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <details class="advanced-fields">
+                        <summary>More Details</summary>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="sub-region">Sub-Region</label>
+                                <input type="text" id="sub-region" name="sub_region" placeholder="e.g., Côte de Nuits" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="appellation">Appellation</label>
+                                <input type="text" id="appellation" name="appellation" placeholder="e.g., Nuits-St-Georges, Pomerol" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="alcohol">Alcohol %</label>
+                                <input type="number" id="alcohol" name="alcohol_percentage" min="0" max="100" step="0.1" placeholder="e.g., 13.5" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="classification">Classification</label>
+                                <input type="text" id="classification" name="classification" placeholder="e.g., Grand Cru, DOCG, Reserve" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="price-tier">Price Tier</label>
+                                <select id="price-tier" name="price_tier">
+                                    <option value="">Unknown</option>
+                                    <option value="budget">Budget (&lt; $15)</option>
+                                    <option value="value">Value ($15-25)</option>
+                                    <option value="mid_range">Mid-Range ($25-50)</option>
+                                    <option value="premium">Premium ($50-100)</option>
+                                    <option value="luxury">Luxury ($100-250)</option>
+                                    <option value="ultra_premium">Ultra Premium (&gt; $250)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="producer-type">Producer Type</label>
+                                <select id="producer-type" name="producer_type">
+                                    <option value="">Unknown</option>
+                                    <option value="estate">Estate</option>
+                                    <option value="negociant">Négociant</option>
+                                    <option value="cooperative">Cooperative</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="drink-window-start">Drink Window Start</label>
+                                <input type="number" id="drink-window-start" name="drink_window_start" min="1900" max="2200" placeholder="Year" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="drink-window-end">Drink Window End</label>
+                                <input type="number" id="drink-window-end" name="drink_window_end" min="1900" max="2200" placeholder="Year" style="">
+                            </div>
+                        </div>
+                    </details>
+
+                    <div class="form-group full-width">
+                        <label>Custom Fields</label>
+                        <div id="custom-fields-container"></div>
+                        <button type="button" class="btn btn-secondary btn-small" id="add-custom-field-btn" style="margin-top:0.5rem;">+ Add Custom Field</button>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" name="notes" rows="3" placeholder="Purchase notes, occasion, etc." style=""></textarea>
+                    </div>
+                </div>
+
+                <div class="form-section collapsible" id="label-text-section" style="display: none;">
+                    <div class="collapsible-header" id="label-text-toggle">
+                        <h3>Raw Label Text</h3>
+                        <span class="collapse-icon">+</span>
+                    </div>
+                    <div class="collapsible-content" id="label-text-content" style="display: none;">
+                        <div class="ocr-raw-text">
+                            <div class="ocr-raw-section">
+                                <label>Front Label OCR:</label>
+                                <pre id="raw-front-label-text"></pre>
+                            </div>
+                            <div class="ocr-raw-section" id="raw-back-label-section" style="display: none;">
+                                <label>Back Label OCR:</label>
+                                <pre id="raw-back-label-text"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Add Wine</button>
+                    <button type="reset" class="btn btn-secondary">Clear Form</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Cellar Page -->
+        <section id="page-cellar" class="page" aria-labelledby="page-cellar-title">
+            <h2 id="page-cellar-title">My Cellar</h2>
+            <div class="filter-bar">
+                <select id="cellar-filter">
+                    <option value="all">All Wines</option>
+                    <option value="in-stock">In Stock Only</option>
+                    <option value="out-of-stock">Out of Stock</option>
+                </select>
+                <input type="text" id="cellar-search" placeholder="Quick search..." style="">
+                <div class="export-dropdown" id="cellar-export-dropdown">
+                    <button class="btn btn-secondary export-dropdown-btn" id="cellar-export-btn">
+                        Export
+                        <span class="dropdown-arrow">▾</span>
+                    </button>
+                    <div class="export-dropdown-menu">
+                        <a href="#" data-format="csv" data-type="wines">CSV</a>
+                        <a href="#" data-format="xlsx" data-type="wines">Excel</a>
+                        <a href="#" data-format="yaml" data-type="wines">YAML</a>
+                        <a href="#" data-format="json" data-type="wines">JSON</a>
+                    </div>
+                </div>
+                <div class="view-toggle">
+                    <button id="cellar-view-cards" class="active" title="Card view">Cards</button>
+                    <button id="cellar-view-table" title="Table view">Table</button>
+                </div>
+            </div>
+            <div id="cellar-list" class="wine-grid"></div>
+        </section>
+
+        <!-- Wines I've Met Page -->
+        <section id="page-met" class="page" aria-labelledby="page-met-title">
+            <h2 id="page-met-title">Wines I've Met</h2>
+            <p class="page-subtitle">Wines you've encountered in shops, restaurants, and tastings</p>
+            <div class="filter-bar">
+                <input type="text" id="met-search" placeholder="Search wines I've met..." style="">
+                <div class="view-toggle">
+                    <button id="met-view-cards" class="active" title="Card view">Cards</button>
+                    <button id="met-view-table" title="Table view">Table</button>
+                </div>
+            </div>
+            <div id="met-list" class="wine-grid"></div>
+        </section>
+
+        <!-- Add to Cellar Wizard Page -->
+        <section id="page-add-to-cellar" class="page" aria-labelledby="page-add-to-cellar-title">
+            <h2 id="page-add-to-cellar-title">Add Wine to Your Cellar</h2>
+            <nav class="wizard-breadcrumb" id="add-cellar-breadcrumb" style="display:none;">
+                <a href="#" id="breadcrumb-root">Add to Cellar</a>
+                <span class="breadcrumb-sep">›</span>
+                <span id="breadcrumb-current"></span>
+            </nav>
+            <p class="page-subtitle" id="add-cellar-subtitle">Choose how you'd like to add a wine</p>
+
+            <div class="entry-path-cards" id="entry-path-cards">
+                <div class="entry-path-card" data-path="scan">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                    </div>
+                    <h3>Scan a Label</h3>
+                    <p>Take a photo to auto-detect wine details</p>
+                </div>
+                <div class="entry-path-card" data-path="manual">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </div>
+                    <h3>Enter Details Manually</h3>
+                    <p>Type in the wine details and quantity</p>
+                </div>
+                <div class="entry-path-card" data-path="from-met">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                    </div>
+                    <h3>From a Wine I've Met</h3>
+                    <p>Add a wine you previously recorded</p>
+                </div>
+                <div class="entry-path-card" data-path="import">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <h3>Import from File</h3>
+                    <p>Upload a CSV or Excel spreadsheet</p>
+                </div>
+            </div>
+
+            <!-- Scan a Label Sub-wizard -->
+            <div id="add-cellar-scan" class="add-cellar-subwizard" style="display:none;">
+                <div class="form-section">
+                    <h3>Scan Label</h3>
+                    <div class="image-upload-grid">
+                        <div class="image-upload">
+                            <label for="scan-front-label">Front Label (Required)</label>
+                            <input type="file" id="scan-front-label" accept="image/*" capture="environment" style="">
+                            <div id="scan-front-preview" class="image-preview">Tap to take photo or select image</div>
+                        </div>
+                        <div class="image-upload">
+                            <label for="scan-back-label">Back Label (Optional)</label>
+                            <input type="file" id="scan-back-label" accept="image/*" capture="environment" style="">
+                            <div id="scan-back-preview" class="image-preview">Tap to take photo or select image</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="scan-cellar-scanning" class="scanning-indicator" style="display:none;">
+                    <div class="spinner"></div>
+                    <span>Scanning label...</span>
+                </div>
+                <div id="scan-cellar-fields" style="display:none;">
+                    <div class="form-section">
+                        <h3>Wine Details</h3>
+                        <p class="form-note">Detected from label — edit as needed</p>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="scan-wine-name">Wine Name</label>
+                                <input type="text" id="scan-wine-name" required="" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-winery">Winery</label>
+                                <input type="text" id="scan-winery" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-vintage">Vintage</label>
+                                <input type="number" id="scan-vintage" min="1900" max="2100" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-grape-variety">Grape Variety</label>
+                                <input type="text" id="scan-grape-variety" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-region">Region</label>
+                                <input type="text" id="scan-region" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-country">Country</label>
+                                <input type="text" id="scan-country" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-wine-type">Wine Type</label>
+                                <select id="scan-wine-type">
+                                    <option value="">Unknown</option>
+                                    <option value="red">Red</option>
+                                    <option value="white">White</option>
+                                    <option value="rosé">Rosé</option>
+                                    <option value="sparkling">Sparkling</option>
+                                    <option value="fortified">Fortified</option>
+                                    <option value="dessert">Dessert</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="scan-quantity">Quantity (Bottles)</label>
+                                <input type="number" id="scan-quantity" min="1" value="1" required="" style="">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="scan-add-to-cellar-btn">Add to Cellar</button>
+                        <button type="button" class="btn btn-secondary" id="scan-back-btn">Back</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Entry Sub-wizard -->
+            <div id="add-cellar-manual" class="add-cellar-subwizard" style="display:none;">
+                <h3>Enter Wine Details</h3>
+                <form id="manual-cellar-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="manual-wine-name">Wine Name</label>
+                            <input type="text" id="manual-wine-name" name="name" required="" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-winery">Winery</label>
+                            <input type="text" id="manual-winery" name="winery" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-vintage">Vintage</label>
+                            <input type="number" id="manual-vintage" name="vintage" min="1900" max="2100" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-grape-variety">Grape Variety</label>
+                            <input type="text" id="manual-grape-variety" name="grape_variety" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-region">Region</label>
+                            <input type="text" id="manual-region" name="region" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-country">Country</label>
+                            <input type="text" id="manual-country" name="country" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-wine-type">Wine Type</label>
+                            <select id="manual-wine-type" name="wine_type_id">
+                                <option value="">Unknown</option>
+                                <option value="red">Red</option>
+                                <option value="white">White</option>
+                                <option value="rosé">Rosé</option>
+                                <option value="sparkling">Sparkling</option>
+                                <option value="fortified">Fortified</option>
+                                <option value="dessert">Dessert</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-quantity">Quantity (Bottles)</label>
+                            <input type="number" id="manual-quantity" name="quantity" min="1" value="1" required="" style="">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Add to Cellar</button>
+                        <button type="button" class="btn btn-secondary" id="manual-back-btn">Back</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- From Met Wine Sub-wizard -->
+            <div id="add-cellar-from-met" class="add-cellar-subwizard" style="display:none;">
+                <h3>Select a Wine You've Met</h3>
+                <input type="text" id="met-picker-search" placeholder="Search your met wines..." class="met-picker-search" style="">
+                <div id="met-picker-list" class="met-picker-list"></div>
+                <div id="met-picker-selected" class="met-picker-selected" style="display:none;">
+                    <h4 id="met-picker-wine-name"></h4>
+                    <p id="met-picker-wine-details"></p>
+                    <div class="quantity-selector">
+                        <label>How many bottles?</label>
+                        <div class="quantity-presets">
+                            <button type="button" class="qty-preset" data-qty="1">1 bottle</button>
+                            <button type="button" class="qty-preset" data-qty="6">6 (half case)</button>
+                            <button type="button" class="qty-preset" data-qty="12">12 (case)</button>
+                        </div>
+                        <input type="number" id="met-picker-quantity" min="1" value="1" style="">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="met-add-to-cellar-btn">Add to Cellar</button>
+                        <button type="button" class="btn btn-secondary" id="met-picker-back-btn">Back</button>
+                    </div>
+                </div>
+                <div class="form-actions" id="met-picker-back-container">
+                    <button type="button" class="btn btn-secondary" id="from-met-back-btn">Back</button>
+                </div>
+            </div>
+
+            <!-- Import Sub-wizard (full import UI embedded here) -->
+            <div id="add-cellar-import" class="add-cellar-subwizard" style="display:none;">
+                <!-- Step 1: Upload -->
+                <div id="import-step-upload" class="import-step">
+                    <div class="form-section">
+                        <h3>Upload Spreadsheet</h3>
+                        <div class="import-upload-area" id="import-drop-zone">
+                            <div class="import-upload-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <p>Drag and drop your file here, or</p>
+                            <label for="import-file-input" class="btn btn-primary" style="cursor:pointer;">Browse Files</label>
+                            <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display: none;">
+                            <p class="form-hint">Supported formats: CSV, Excel (.xlsx). Max 10,000 rows.</p>
+                        </div>
+                        <div class="form-group" style="margin-top:0.75rem;">
+                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                                <input type="checkbox" id="import-use-ai-mapping" checked="" style="">
+                                <span>Use AI to improve column mapping (slower)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Map Columns -->
+                <div id="import-step-map" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                            <h3>Map Columns</h3>
+                            <span id="import-file-info" class="form-hint"></span>
+                        </div>
+                        <p class="form-note">Match your spreadsheet columns to wine fields. Unmapped columns can be saved as custom fields.</p>
+                        <div id="import-mapping-table-container"></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Preview</h3>
+                        <div id="import-preview-container" style="overflow-x:auto;"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="import-confirm-mapping-btn">Confirm Mapping &amp; Import</button>
+                        <button type="button" class="btn btn-secondary" id="import-back-to-upload-btn">Back</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Processing Progress -->
+                <div id="import-step-progress" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3>Importing Wines...</h3>
+                        <div class="import-progress-container">
+                            <div class="import-progress-bar-track">
+                                <div class="import-progress-bar-fill" id="import-progress-fill" style="width:0%"></div>
+                            </div>
+                            <div class="import-progress-stats">
+                                <span id="import-progress-text">0 / 0 rows</span>
+                                <span id="import-progress-percent">0%</span>
+                            </div>
+                            <div class="import-progress-details" id="import-progress-details">
+                                <span id="import-progress-created">0 wines created</span>
+                                <span id="import-progress-skipped">0 rows skipped</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:0.75rem;">
+                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                                <input type="checkbox" id="import-skip-enrichment" style="">
+                                <span>Skip X-Wines enrichment (fast import, no automatic reference data fill)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Results -->
+                <div id="import-step-results" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3>Import Results</h3>
+                        <div id="import-results-content"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="import-new-btn">Import Another File</button>
+                        <button type="button" class="btn btn-secondary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Wine Detail Modal -->
+        <div id="wine-modal" class="modal">
+            <div class="modal-content">
+                <span class="modal-close">×</span>
+                <div id="wine-detail"></div>
+            </div>
+        </div>
+
+        <!-- History Page -->
+        <section id="page-history" class="page" aria-labelledby="page-history-title">
+            <h2 id="page-history-title">Transaction History</h2>
+            <div class="filter-bar">
+                <select id="history-filter">
+                    <option value="all">All Transactions</option>
+                    <option value="CHECK_IN">Check Ins Only</option>
+                    <option value="CHECK_OUT">Check Outs Only</option>
+                </select>
+                <div class="export-dropdown" id="history-export-dropdown">
+                    <button class="btn btn-secondary export-dropdown-btn" id="history-export-btn">
+                        Export
+                        <span class="dropdown-arrow">▾</span>
+                    </button>
+                    <div class="export-dropdown-menu">
+                        <a href="#" data-format="csv" data-type="transactions">CSV</a>
+                        <a href="#" data-format="xlsx" data-type="transactions">Excel</a>
+                        <a href="#" data-format="yaml" data-type="transactions">YAML</a>
+                        <a href="#" data-format="json" data-type="transactions">JSON</a>
+                    </div>
+                </div>
+            </div>
+            <div id="history-list" class="transaction-list"></div>
+        </section>
+
+        <!-- Search Page -->
+        <section id="page-search" class="page" aria-labelledby="page-search-title">
+            <h2 id="page-search-title">Search Wines</h2>
+            <form id="search-form">
+                <div class="form-group full-width">
+                    <label for="search-q">Search</label>
+                    <input type="text" id="search-q" name="q" placeholder="Search by name, winery, region, grape..." style="">
+                </div>
+                <details class="advanced-fields">
+                    <summary>Advanced Filters</summary>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="search-vintage">Vintage</label>
+                            <input type="number" id="search-vintage" name="vintage" min="1900" max="2100" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-grape">Grape Variety</label>
+                            <input type="text" id="search-grape" name="grape" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-winery">Winery</label>
+                            <input type="text" id="search-winery" name="winery" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-region">Region</label>
+                            <input type="text" id="search-region" name="region" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-country">Country</label>
+                            <input type="text" id="search-country" name="country" style="">
+                        </div>
+                        <div class="form-group">
+                            <label for="search-wine-type">Wine Type</label>
+                            <select id="search-wine-type" name="wine_type">
+                                <option value="">All Types</option>
+                                <option value="red">Red</option>
+                                <option value="white">White</option>
+                                <option value="rosé">Rosé</option>
+                                <option value="sparkling">Sparkling</option>
+                                <option value="fortified">Fortified</option>
+                                <option value="dessert">Dessert</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="search-price-tier">Price Tier</label>
+                            <select id="search-price-tier" name="price_tier">
+                                <option value="">All Tiers</option>
+                                <option value="budget">Budget</option>
+                                <option value="value">Value</option>
+                                <option value="mid_range">Mid-Range</option>
+                                <option value="premium">Premium</option>
+                                <option value="luxury">Luxury</option>
+                                <option value="ultra_premium">Ultra Premium</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="search-in-stock">
+                                <input type="checkbox" id="search-in-stock" name="in_stock" style="">
+                                In Stock Only
+                            </label>
+                        </div>
+                    </div>
+                </details>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                    <button type="reset" class="btn btn-secondary">Clear</button>
+                </div>
+            </form>
+            <div id="search-results" class="wine-grid"></div>
+        </section>
+
+        <!-- Import Page -->
+        <!-- Import page removed — import UI is now in the Add to Cellar wizard -->
+
+        <!-- X-Wines Search Page -->
+        <section id="page-xwines" class="page">
+            <h2>Wine Reference</h2>
+            <p class="page-subtitle">Search over 100,000 wines from around the world</p>
+            <form id="xwines-search-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="xwines-q">Search</label>
+                        <input type="text" id="xwines-q" name="q" placeholder="Wine name, winery..." style="">
+                    </div>
+                    <div class="form-group">
+                        <label for="xwines-type">Wine Type</label>
+                        <select id="xwines-type" name="wine_type">
+                            <option value="">All Types</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="xwines-country">Country</label>
+                        <select id="xwines-country" name="country">
+                            <option value="">All Countries</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="xwines-limit">Results</label>
+                        <select id="xwines-limit" name="limit">
+                            <option value="10">10</option>
+                            <option value="25" selected="">25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Price Range (USD)</label>
+                        <div class="price-range-inputs">
+                            <input type="number" id="xwines-price-min" name="price_min" placeholder="Min" min="0" step="1" style="">
+                            <span class="price-range-separator">to</span>
+                            <input type="number" id="xwines-price-max" name="price_max" placeholder="Max" min="0" step="1" style="">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                    <button type="reset" class="btn btn-secondary">Clear</button>
+                </div>
+            </form>
+            <div class="xwines-toolbar" id="xwines-toolbar" style="display: none;">
+                <div class="view-toggle">
+                    <button id="xwines-view-cards" class="active" title="Card view">Cards</button>
+                    <button id="xwines-view-table" title="Table view">Table</button>
+                </div>
+                <div class="export-dropdown" id="xwines-export-dropdown">
+                    <button class="btn btn-secondary export-dropdown-btn" id="xwines-export-btn">
+                        Export
+                        <span class="dropdown-arrow">▾</span>
+                    </button>
+                    <div class="export-dropdown-menu">
+                        <a href="#" data-format="csv" data-type="xwines">CSV</a>
+                        <a href="#" data-format="xlsx" data-type="xwines">Excel</a>
+                        <a href="#" data-format="yaml" data-type="xwines">YAML</a>
+                        <a href="#" data-format="json" data-type="xwines">JSON</a>
+                    </div>
+                </div>
+            </div>
+            <div id="xwines-results" class="wine-grid"></div>
+            <div id="xwines-pagination" class="pagination-controls" style="display: none;">
+                <button id="xwines-prev" class="btn btn-secondary btn-small">Previous</button>
+                <span id="xwines-page-info">Page 1 of 1</span>
+                <button id="xwines-next" class="btn btn-secondary btn-small">Next</button>
+            </div>
+        </section>
+
+        <!-- X-Wines Detail Modal -->
+        <div id="xwines-modal" class="modal">
+            <div class="modal-content">
+                <span class="modal-close">×</span>
+                <div id="xwines-detail"></div>
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <section id="page-settings" class="page">
+            <h2>Settings</h2>
+
+            <!-- Password Section -->
+            <div class="settings-section">
+                <h3>Change Password</h3>
+                <form id="password-form">
+                    <div class="form-group">
+                        <label for="current-password">Current Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="current-password" name="current_password" required="" autocomplete="current-password" style="">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-password">New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="new-password" name="new_password" required="" autocomplete="new-password" style="">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-password">Confirm New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="confirm-password" name="confirm_password" required="" autocomplete="new-password" style="">
+                            <button type="button" class="password-toggle" aria-label="Show password">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Change Password</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="danger-zone">
+                <h3>Danger Zone</h3>
+                <p class="settings-description">
+                    Permanently delete your entire wine collection, including all wines, transactions, label images, and import history. This action cannot be undone.
+                </p>
+                <button type="button" class="btn btn-danger" id="delete-collection-btn">Delete All My Wines</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="modal-close">×</span>
+            <h3>Check Out Wine</h3>
+            <form id="checkout-form">
+                <input type="hidden" id="checkout-wine-id" style="">
+                <div class="form-group">
+                    <label for="checkout-quantity">Quantity</label>
+                    <input type="number" id="checkout-quantity" name="quantity" min="1" value="1" required="" style="">
+                    <span id="checkout-available"></span>
+                </div>
+                <div class="form-group">
+                    <label for="checkout-notes">Notes</label>
+                    <textarea id="checkout-notes" name="notes" rows="3" placeholder="Occasion, tasting notes..." style=""></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Check Out</button>
+                    <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Checkin Confirmation Modal -->
+    <div id="checkin-confirm-modal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="modal-close">×</span>
+            <div class="checkin-confirm">
+                <div class="checkin-confirm-header">
+                    <h3>Confirm Wine Details</h3>
+                    <p class="checkin-confirm-subtitle">Review and edit the details before saving</p>
+                </div>
+                <div class="checkin-confirm-content">
+                    <div class="checkin-confirm-image" id="checkin-confirm-image"></div>
+                    <div class="checkin-confirm-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="confirm-wine-name">Wine Name</label>
+                                <input type="text" id="confirm-wine-name" required="" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-winery">Winery</label>
+                                <input type="text" id="confirm-winery" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-vintage">Vintage</label>
+                                <input type="number" id="confirm-vintage" min="1900" max="2100" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-grape-variety">Grape Variety</label>
+                                <input type="text" id="confirm-grape-variety" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-region">Region</label>
+                                <input type="text" id="confirm-region" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-sub-region">Sub-Region</label>
+                                <input type="text" id="confirm-sub-region" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-appellation">Appellation</label>
+                                <input type="text" id="confirm-appellation" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-country">Country</label>
+                                <input type="text" id="confirm-country" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-alcohol">Alcohol %</label>
+                                <input type="number" id="confirm-alcohol" min="0" max="100" step="0.1" style="">
+                            </div>
+                            <!-- Quantity removed from confirmation: met wines have no quantity -->
+                            <div class="form-group">
+                                <label for="confirm-wine-type">Wine Type</label>
+                                <select id="confirm-wine-type">
+                                    <option value="">Unknown</option>
+                                    <option value="red">Red</option>
+                                    <option value="white">White</option>
+                                    <option value="rosé">Rosé</option>
+                                    <option value="sparkling">Sparkling</option>
+                                    <option value="fortified">Fortified</option>
+                                    <option value="dessert">Dessert</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-classification">Classification</label>
+                                <input type="text" id="confirm-classification" placeholder="e.g., Grand Cru, DOCG" style="">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-price-tier">Price Tier</label>
+                                <select id="confirm-price-tier">
+                                    <option value="">Unknown</option>
+                                    <option value="budget">Budget</option>
+                                    <option value="value">Value</option>
+                                    <option value="mid_range">Mid-Range</option>
+                                    <option value="premium">Premium</option>
+                                    <option value="luxury">Luxury</option>
+                                    <option value="ultra_premium">Ultra Premium</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-producer-type">Producer Type</label>
+                                <select id="confirm-producer-type">
+                                    <option value="">Unknown</option>
+                                    <option value="estate">Estate</option>
+                                    <option value="negociant">Négociant</option>
+                                    <option value="cooperative">Cooperative</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Custom Fields</label>
+                            <div id="confirm-custom-fields-container"></div>
+                            <button type="button" class="btn btn-secondary btn-small" id="confirm-add-custom-field-btn" style="margin-top:0.5rem;">+ Add Custom Field</button>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="confirm-notes">Notes</label>
+                            <textarea id="confirm-notes" rows="2" style=""></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="checkin-confirm-ocr collapsible" id="confirm-ocr-section" style="display: none;">
+                    <div class="collapsible-header" id="confirm-ocr-toggle">
+                        <span class="label">Show Raw Label Text</span>
+                        <span class="collapse-icon">+</span>
+                    </div>
+                    <div class="collapsible-content" id="confirm-ocr-content" style="display: none;">
+                        <div class="ocr-text-container">
+                            <div class="ocr-section">
+                                <strong>Front Label:</strong>
+                                <pre id="checkin-confirm-front-ocr"></pre>
+                            </div>
+                            <div class="ocr-section" id="checkin-confirm-back-ocr-section" style="display: none;">
+                                <strong>Back Label:</strong>
+                                <pre id="checkin-confirm-back-ocr"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" id="checkin-confirm-btn">Save</button>
+                    <button type="button" class="btn btn-secondary" id="checkin-cancel-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Collection Confirmation Modal -->
+    <div id="delete-collection-modal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="modal-close">×</span>
+            <h3 style="color: var(--error-color);">Delete Entire Collection</h3>
+            <p>This will permanently delete <strong>all your wines</strong>, transactions, label images, and import history. This action <strong>cannot be undone</strong>.</p>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label for="delete-confirm-input">Type <strong>DELETE</strong> to confirm:</label>
+                <input type="text" id="delete-confirm-input" placeholder="Type DELETE" autocomplete="off" style="">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-danger" id="confirm-delete-collection-btn" disabled="">Delete Everything</button>
+                <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Wine Confirmation Modal -->
+    <div id="delete-wine-modal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="modal-close">×</span>
+            <h3 style="color: var(--error-color);">Delete Wine</h3>
+            <p>Are you sure you want to delete this wine and all its history? This action <strong>cannot be undone</strong>.</p>
+            <div class="form-actions">
+                <button type="button" class="btn btn-danger" id="confirm-delete-wine-btn">Delete Wine</button>
+                <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skipped Rows Modal -->
+    <div id="skipped-rows-modal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="modal-close">×</span>
+            <h3>Skipped Rows</h3>
+            <div id="skipped-rows-content" style="max-height:60vh;overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer id="app-footer">
+        <div class="footer-content">
+            <span id="app-info">WineBox <span class="version">v0.6.28</span></span>
+            <span class="footer-separator">|</span>
+            <span id="data-credits">
+                Wine data powered by
+                <a href="https://github.com/rogerioxavier/X-Wines" target="_blank" rel="noopener">X-Wines Dataset</a>
+            </span>
+        </div>
+        <div class="footer-feedback">
+            See a problem? Got feedback? Contact <a href="mailto:support@winebox.app?subject=Feedback">support@winebox.app</a>
+        </div>
+    </footer>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="/static/js/papaparse.min.js?v=0.6.28"></script>
+    <script src="/static/js/app.js?v=0.6.28"></script>
+
+
+</body></html>
