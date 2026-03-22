@@ -4243,7 +4243,7 @@ function showDemoWelcome() {
             <h3>Welcome to WineBox</h3>
             <p>Your cellar is empty. Load some sample wines to explore what WineBox can do, or add your first wine by scanning a label.</p>
             <div class="demo-welcome-actions">
-                <button class="btn btn-primary" onclick="installDemoData()">
+                <button class="btn btn-primary" id="demo-install-btn">
                     Load sample wines
                 </button>
                 <a href="#" data-page="checkin" class="btn btn-secondary">
@@ -4255,6 +4255,7 @@ function showDemoWelcome() {
     `;
 
     dashboard.insertBefore(welcome, statsGrid.nextSibling);
+    document.getElementById('demo-install-btn').addEventListener('click', installDemoData);
 }
 
 function showDemoBanner(wineCount, bottleCount) {
@@ -4266,10 +4267,11 @@ function showDemoBanner(wineCount, bottleCount) {
     banner.className = 'demo-banner';
     banner.innerHTML = `
         <span>You're viewing sample wines (${wineCount} wines, ${bottleCount} bottles). </span>
-        <button class="btn btn-sm btn-outline" onclick="removeDemoData()">Remove sample wines</button>
+        <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove sample wines</button>
     `;
 
     dashboard.insertBefore(banner, title.nextSibling);
+    document.getElementById('demo-remove-btn').addEventListener('click', removeDemoData);
 }
 
 async function installDemoData() {

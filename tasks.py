@@ -1,5 +1,6 @@
 """Invoke tasks for WineBox application management."""
 
+import os
 import re
 import sys
 import time
@@ -1362,6 +1363,27 @@ def deploy_oat(
 
     # Override nginx config for OAT
     ctx.run(cmd, pty=True, env={"WINEBOX_NGINX_CONF": OAT_NGINX_CONF})
+
+    # Ensure test user exists on OAT (idempotent — ignores if already exists)
+    if not dry_run:
+        from dotenv import load_dotenv
+        load_dotenv(".env")
+        test_user = os.environ.get("WINEBOX_TEST_USER")
+        test_pass = os.environ.get("WINEBOX_TEST_PASSWORD")
+        if test_user and test_pass:
+            print(f"\n[6/6] Ensuring test user exists...")
+            add_user_cmd = _oat_ssh_cmd(
+                oat_host,
+                f"{OAT_WINEBOX_ADMIN} add {test_user} --password '{test_pass}'"
+            )
+            result = ctx.run(add_user_cmd, warn=True, hide=True)
+            combined = (result.stdout or "") + (result.stderr or "")
+            if "already" in combined.lower():
+                print(f"  Test user {test_user}: already exists")
+            elif result.ok:
+                print(f"  Test user {test_user}: created")
+            else:
+                print(f"  Warning: could not create test user: {combined.strip()}")
 
     print(f"\nOAT deployment complete!")
     print(f"  URL: https://{OAT_DOMAIN}")
