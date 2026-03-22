@@ -68,11 +68,13 @@ class TestDashboardPage:
         expect(authenticated_page.locator("#stat-unique-wines")).to_be_visible()
 
     def test_dashboard_shows_charts(self, authenticated_page: Page) -> None:
-        """Chart containers render (by-country, by-grape, by-vintage)."""
+        """Chart canvases render (wine-type, country, grape, vintage, price-tier)."""
         _navigate_to_dashboard(authenticated_page)
-        expect(authenticated_page.locator("#by-country")).to_be_visible()
-        expect(authenticated_page.locator("#by-grape")).to_be_visible()
-        expect(authenticated_page.locator("#by-vintage")).to_be_visible()
+        expect(authenticated_page.locator("#chart-wine-type")).to_be_visible()
+        expect(authenticated_page.locator("#chart-country")).to_be_visible()
+        expect(authenticated_page.locator("#chart-grape")).to_be_visible()
+        expect(authenticated_page.locator("#chart-vintage")).to_be_visible()
+        expect(authenticated_page.locator("#chart-price-tier")).to_be_visible()
 
     def test_dashboard_shows_recent_activity(self, authenticated_page: Page) -> None:
         """Recent activity section present."""

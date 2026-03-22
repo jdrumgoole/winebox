@@ -36,6 +36,24 @@ def get_worker_id(request: pytest.FixtureRequest) -> str:
     return "main"
 
 
+def get_remote_test_credentials() -> tuple[str, str] | None:
+    """Return (email, password) from env vars when testing against a remote server.
+
+    When WINEBOX_TEST_URL is set (i.e. running E2E tests against OAT or
+    production), we can't create users via the local CLI. Instead, use the
+    pre-provisioned test user from WINEBOX_TEST_USER / WINEBOX_TEST_PASSWORD.
+
+    Returns None if not running against a remote server or credentials are
+    not configured.
+    """
+    test_url = os.environ.get("WINEBOX_TEST_URL", "")
+    test_user = os.environ.get("WINEBOX_TEST_USER")
+    test_pass = os.environ.get("WINEBOX_TEST_PASSWORD")
+    if test_url and test_user and test_pass:
+        return test_user, test_pass
+    return None
+
+
 def create_cli_worker_user(
     request: pytest.FixtureRequest,
     email_prefix: str,
@@ -43,7 +61,10 @@ def create_cli_worker_user(
     max_retries: int = 5,
     retry_delay: float = 2.0,
 ) -> tuple[str, str]:
-    """Create (or reuse) a CLI-managed test user for the current worker.
+    """Create (or reuse) a test user for the current worker.
+
+    When WINEBOX_TEST_URL is set (remote testing), returns the pre-provisioned
+    test credentials from environment variables instead of creating a local user.
 
     This function is intended to be called from a session-scoped fixture in an
     E2E test module, for example:
@@ -56,6 +77,11 @@ def create_cli_worker_user(
     The helper is resilient to the user already existing and will only emit a
     warning to stderr if creation fails entirely.
     """
+    # For remote servers, use pre-provisioned test user
+    remote_creds = get_remote_test_credentials()
+    if remote_creds:
+        print(f"Using remote test user: {remote_creds[0]}", file=sys.stderr)
+        return remote_creds
     worker_id = get_worker_id(request)
     email = f"{email_prefix}_{worker_id}@test.example.com"
 

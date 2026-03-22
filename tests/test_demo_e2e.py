@@ -31,23 +31,9 @@ def _e2e_preflight() -> None:
 
 @pytest.fixture(scope="session")
 def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], None, None]:
-    """Get test user for demo E2E tests.
-
-    Uses WINEBOX_TEST_USER/PASSWORD from .env when testing against a remote
-    server (WINEBOX_TEST_URL set), otherwise creates a local CLI user.
-    """
-    import os
-    test_url = os.environ.get("WINEBOX_TEST_URL", "")
-    test_user = os.environ.get("WINEBOX_TEST_USER")
-    test_pass = os.environ.get("WINEBOX_TEST_PASSWORD")
-
-    if test_url and test_user and test_pass:
-        yield test_user, test_pass
-    else:
-        email, password = create_cli_worker_user(
-            request, email_prefix="e2e_demo", password="testpass123"
-        )
-        yield email, password
+    """Get test user for demo E2E tests."""
+    email, password = create_cli_worker_user(request, email_prefix="e2e_demo", password="testpass123")
+    yield email, password
 
 
 @pytest.fixture(scope="function")
