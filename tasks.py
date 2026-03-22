@@ -1374,6 +1374,7 @@ def deploy_oat(
             print(f"\n[6/6] Ensuring test user exists...")
             add_user_cmd = _oat_ssh_cmd(
                 oat_host,
+                f"cd /opt/winebox && set -a && . secrets.env && set +a && "
                 f"{OAT_WINEBOX_ADMIN} add {test_user} --password '{test_pass}'"
             )
             result = ctx.run(add_user_cmd, warn=True, hide=True)
