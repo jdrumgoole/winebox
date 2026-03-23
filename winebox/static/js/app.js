@@ -3742,8 +3742,8 @@ function renderMappingStep(data) {
     const basicsFields = Object.entries(IMPORT_FIELD_META).filter(([,m]) => m.group === 'basics');
     const detailsFields = Object.entries(IMPORT_FIELD_META).filter(([,m]) => m.group === 'details');
 
-    // Build mapping table with multi-sample values
-    let tableHtml = '<table class="import-mapping-table"><thead><tr><th>Column</th><th>Example values</th><th>Map To</th></tr></thead><tbody>';
+    // Build mapping table: file columns on left, arrow, app fields on right
+    let tableHtml = '<table class="import-mapping-table"><thead><tr><th>Your Column</th><th>Example values</th><th></th><th>Maps To</th></tr></thead><tbody>';
 
     for (let colIndex = 0; colIndex < data.headers.length; colIndex++) {
         const header = data.headers[colIndex];
@@ -3783,6 +3783,7 @@ function renderMappingStep(data) {
                 <span class="import-not-mapped" style="display:${isSkipped ? 'block' : 'none'}">Won't be imported</span>
             </td>
             <td class="import-sample-cell">${escapeHtml(samples)}</td>
+            <td class="import-arrow-cell">&#x2192;</td>
             <td>
                 <div class="import-mapping-controls">
                     <select class="import-mapping-select" data-header="${escapeHtml(header)}">

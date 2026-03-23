@@ -2707,6 +2707,16 @@ body.logged-out #user-info {
     white-space: nowrap;
 }
 
+.import-arrow-cell {
+    text-align: center;
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+    white-space: nowrap;
+    width: 1.5rem;
+}
+
 .import-sample-cell {
     color: var(--text-muted);
     max-width: 200px;
