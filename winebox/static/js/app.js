@@ -2298,6 +2298,7 @@ async function loadHistory() {
         const response = await fetchWithAuth(url);
         const transactions = await response.json();
         renderTransactionList(transactions);
+        renderHistoryCharts(transactions);
     } catch (error) {
         console.error('Failed to load history:', error);
     }
@@ -2333,6 +2334,205 @@ function renderTransactionList(transactions) {
         </div>
     `;
     }).join('');
+}
+
+// History Charts
+function renderHistoryCharts(transactions) {
+    const chartsContainer = document.getElementById('history-charts');
+    if (!transactions || transactions.length === 0) {
+        chartsContainer.style.display = 'none';
+        return;
+    }
+    chartsContainer.style.display = '';
+
+    _renderTimelineChart(transactions);
+    _renderReasonsChart(transactions);
+    _renderHistoryStats(transactions);
+}
+
+function _renderTimelineChart(transactions) {
+    _destroyChart('chart-history-timeline');
+    const canvas = document.getElementById('chart-history-timeline');
+    if (!canvas) return;
+
+    // Group by month
+    const monthsMap = {};
+    transactions.forEach(t => {
+        const d = new Date(t.transaction_date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthsMap[key]) monthsMap[key] = { added: 0, removed: 0 };
+        if (t.transaction_type === 'CHECK_IN') {
+            monthsMap[key].added += t.quantity;
+        } else {
+            monthsMap[key].removed += t.quantity;
+        }
+    });
+
+    const sortedKeys = Object.keys(monthsMap).sort();
+    const labels = sortedKeys.map(k => {
+        const [y, m] = k.split('-');
+        return new Date(y, m - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    });
+
+    _dashboardCharts['chart-history-timeline'] = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Added',
+                    data: sortedKeys.map(k => monthsMap[k].added),
+                    backgroundColor: 'rgba(74, 124, 89, 0.7)',
+                    borderRadius: 3,
+                },
+                {
+                    label: 'Removed',
+                    data: sortedKeys.map(k => -monthsMap[k].removed),
+                    backgroundColor: 'rgba(139, 26, 74, 0.7)',
+                    borderRadius: 3,
+                },
+            ],
+        },
+        options: {
+            ...CHART_DEFAULTS,
+            plugins: {
+                ...CHART_DEFAULTS.plugins,
+                legend: {
+                    ...CHART_DEFAULTS.plugins.legend,
+                    position: 'top',
+                },
+                tooltip: {
+                    ...CHART_DEFAULTS.plugins.tooltip,
+                    callbacks: {
+                        label: function(ctx) {
+                            const val = Math.abs(ctx.raw);
+                            return `${ctx.dataset.label}: ${val} bottle${val !== 1 ? 's' : ''}`;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        font: { family: "'Cormorant Garamond', serif", size: 11 },
+                        maxRotation: 45,
+                        autoSkip: true,
+                    },
+                    grid: { display: false },
+                },
+                y: {
+                    ticks: {
+                        font: { family: "'Cormorant Garamond', serif" },
+                        callback: v => Math.abs(v),
+                        precision: 0,
+                    },
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                },
+            },
+        },
+    });
+}
+
+function _renderReasonsChart(transactions) {
+    _destroyChart('chart-history-reasons');
+    const canvas = document.getElementById('chart-history-reasons');
+    if (!canvas) return;
+
+    const removals = transactions.filter(t => t.transaction_type === 'CHECK_OUT');
+    if (removals.length === 0) {
+        canvas.parentElement.parentElement.style.display = 'none';
+        return;
+    }
+    canvas.parentElement.parentElement.style.display = '';
+
+    const reasonCounts = {};
+    removals.forEach(t => {
+        const reason = t.removal_reason || 'LEGACY';
+        reasonCounts[reason] = (reasonCounts[reason] || 0) + t.quantity;
+    });
+
+    const labelMap = { DRINK: 'Drank', SELL: 'Sold', GIFT: 'Gifted', OTHER: 'Other', LEGACY: 'Removed' };
+    const colorMap = { DRINK: '#8B1A4A', SELL: '#2962A8', GIFT: '#7E3AA8', OTHER: '#C9A227', LEGACY: '#999' };
+    const order = ['DRINK', 'SELL', 'GIFT', 'OTHER', 'LEGACY'];
+
+    const entries = Object.entries(reasonCounts)
+        .sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+
+    _dashboardCharts['chart-history-reasons'] = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: entries.map(([k]) => labelMap[k] || k),
+            datasets: [{
+                data: entries.map(([, v]) => v),
+                backgroundColor: entries.map(([k]) => colorMap[k] || '#ccc'),
+                borderWidth: 2,
+                borderColor: '#fff',
+            }],
+        },
+        options: {
+            ...CHART_DEFAULTS,
+            cutout: '55%',
+            plugins: {
+                ...CHART_DEFAULTS.plugins,
+                legend: {
+                    ...CHART_DEFAULTS.plugins.legend,
+                    position: 'bottom',
+                },
+                tooltip: {
+                    ...CHART_DEFAULTS.plugins.tooltip,
+                    callbacks: {
+                        label: function(ctx) {
+                            return `${ctx.label}: ${ctx.raw} bottle${ctx.raw !== 1 ? 's' : ''}`;
+                        },
+                    },
+                },
+            },
+        },
+    });
+}
+
+function _renderHistoryStats(transactions) {
+    const container = document.getElementById('history-stats');
+    if (!container) return;
+
+    const totalAdded = transactions.filter(t => t.transaction_type === 'CHECK_IN').reduce((sum, t) => sum + t.quantity, 0);
+    const totalRemoved = transactions.filter(t => t.transaction_type === 'CHECK_OUT').reduce((sum, t) => sum + t.quantity, 0);
+    const totalTransactions = transactions.length;
+
+    // Calculate date range
+    const dates = transactions.map(t => new Date(t.transaction_date));
+    const earliest = new Date(Math.min(...dates));
+    const latest = new Date(Math.max(...dates));
+    const rangeText = earliest.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) +
+        ' \u2013 ' + latest.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+    // Removal reason breakdown for stats
+    const removals = transactions.filter(t => t.transaction_type === 'CHECK_OUT');
+    const drank = removals.filter(t => t.removal_reason === 'DRINK').reduce((s, t) => s + t.quantity, 0);
+    const sold = removals.filter(t => t.removal_reason === 'SELL').reduce((s, t) => s + t.quantity, 0);
+    const gifted = removals.filter(t => t.removal_reason === 'GIFT').reduce((s, t) => s + t.quantity, 0);
+
+    container.innerHTML = `
+        <div class="history-stat-row">
+            <span class="history-stat-label">Period</span>
+            <span class="history-stat-value">${rangeText}</span>
+        </div>
+        <div class="history-stat-row">
+            <span class="history-stat-label">Transactions</span>
+            <span class="history-stat-value">${totalTransactions}</span>
+        </div>
+        <div class="history-stat-row">
+            <span class="history-stat-label">Bottles added</span>
+            <span class="history-stat-value history-stat-added">${totalAdded}</span>
+        </div>
+        <div class="history-stat-row">
+            <span class="history-stat-label">Bottles removed</span>
+            <span class="history-stat-value history-stat-removed">${totalRemoved}</span>
+        </div>
+        ${drank > 0 ? `<div class="history-stat-row"><span class="history-stat-label">Drank</span><span class="history-stat-value">${drank} bottle${drank !== 1 ? 's' : ''}</span></div>` : ''}
+        ${sold > 0 ? `<div class="history-stat-row"><span class="history-stat-label">Sold</span><span class="history-stat-value">${sold} bottle${sold !== 1 ? 's' : ''}</span></div>` : ''}
+        ${gifted > 0 ? `<div class="history-stat-row"><span class="history-stat-label">Gifted</span><span class="history-stat-value">${gifted} bottle${gifted !== 1 ? 's' : ''}</span></div>` : ''}
+    `;
 }
 
 // Utilities

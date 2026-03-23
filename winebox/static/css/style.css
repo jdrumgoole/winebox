@@ -1170,6 +1170,44 @@ details.advanced-fields .form-grid {
     color: var(--primary-color);
 }
 
+/* History Stats */
+.history-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+}
+
+.history-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.history-stat-row:last-child {
+    border-bottom: none;
+}
+
+.history-stat-label {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.history-stat-value {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.history-stat-added {
+    color: var(--success-color);
+}
+
+.history-stat-removed {
+    color: #8B1A4A;
+}
+
 .transaction-date {
     color: var(--text-muted);
     font-size: 0.9rem;
