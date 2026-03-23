@@ -43,6 +43,23 @@ def _navigate_to_cellar(page: Page) -> None:
     page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
 
 
+def _ensure_empty_cellar(page: Page) -> None:
+    """Delete all wines so the cellar is empty."""
+    page.evaluate("""
+        async () => {
+            const token = localStorage.getItem('winebox_token');
+            if (!token) return;
+            try {
+                await fetch('/api/wines/all', {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+            } catch {}
+        }
+    """)
+    page.wait_for_timeout(500)
+
+
 @pytest.mark.e2e
 class TestExportFromCellar:
     """E2E tests for export functionality from cellar page."""
@@ -72,7 +89,10 @@ class TestExportFromCellar:
 
     def test_export_button_disabled_when_empty(self, authenticated_page: Page) -> None:
         """Export button is disabled when cellar is empty."""
+        _ensure_empty_cellar(authenticated_page)
         _navigate_to_cellar(authenticated_page)
+        # Wait for cellar to render the empty state
+        authenticated_page.wait_for_timeout(1000)
         export_btn = authenticated_page.locator("#cellar-export-btn")
         expect(export_btn).to_be_attached()
         expect(export_btn).to_be_disabled()

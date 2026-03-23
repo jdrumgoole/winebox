@@ -43,6 +43,23 @@ def _navigate_to_history(page: Page) -> None:
     page.wait_for_selector("#page-history", state="visible", timeout=5000)
 
 
+def _ensure_empty_cellar(page: Page) -> None:
+    """Delete all wines so history is empty."""
+    page.evaluate("""
+        async () => {
+            const token = localStorage.getItem('winebox_token');
+            if (!token) return;
+            try {
+                await fetch('/api/wines/all', {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+            } catch {}
+        }
+    """)
+    page.wait_for_timeout(500)
+
+
 @pytest.mark.e2e
 class TestHistoryPage:
     """E2E tests for the history/transactions page."""
@@ -72,8 +89,11 @@ class TestHistoryPage:
         assert options.count() > 0
 
     def test_history_export_button_present(self, authenticated_page: Page) -> None:
-        """Export button is present on history page."""
+        """Export button is present and disabled when history is empty."""
+        _ensure_empty_cellar(authenticated_page)
         _navigate_to_history(authenticated_page)
+        # Wait for history to render the empty state
+        authenticated_page.wait_for_timeout(1000)
         export_btn = authenticated_page.locator("#history-export-btn")
         expect(export_btn).to_be_attached()
         # Button is disabled when there are no transactions

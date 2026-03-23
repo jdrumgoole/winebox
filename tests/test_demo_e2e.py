@@ -49,13 +49,19 @@ def _navigate_to_dashboard(page: Page) -> None:
 
 
 def _cleanup_demo_data(page: Page) -> None:
-    """Remove demo data via API if present, so tests start clean."""
+    """Remove all wines and demo data via API so tests start with a truly empty cellar."""
     page.evaluate("""
         async () => {
             const token = localStorage.getItem('winebox_token');
             if (!token) return;
             try {
                 await fetch('/api/demo/remove', {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+            } catch {}
+            try {
+                await fetch('/api/wines/all', {
                     method: 'DELETE',
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
@@ -123,7 +129,7 @@ class TestDemoDataE2E:
 
         try:
             expect(page.locator("#demo-remove-btn")).to_be_visible()
-            expect(page.locator("#demo-remove-btn")).to_have_text("Remove sample wines")
+            expect(page.locator("#demo-remove-btn")).to_have_text("Remove")
         except Exception:
             capture_artifacts(page, "demo_banner_remove")
             raise
