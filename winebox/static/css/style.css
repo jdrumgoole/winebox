@@ -2788,11 +2788,18 @@ body.logged-out #user-info {
     color: var(--text-muted);
 }
 
-.import-not-mapped {
-    font-size: 0.78rem;
+.import-mapping-row.skipped .import-mapping-select {
+    text-decoration: line-through;
     color: var(--text-muted);
-    font-style: italic;
-    margin-top: 0.15rem;
+    opacity: 0.5;
+}
+
+.import-mapping-row.skipped .import-sample-cell {
+    text-decoration: line-through;
+}
+
+.import-mapping-select option:disabled {
+    color: var(--text-muted);
 }
 
 .import-custom-name {
@@ -3508,7 +3515,7 @@ body.logged-out #user-info {
     padding: 0.1rem 0.5rem;
     border-radius: 9999px;
     white-space: nowrap;
-    flex-shrink: 0;
+    margin-bottom: 0.2rem;
 }
 
 .import-match-badge.auto-matched {

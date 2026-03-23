@@ -3813,13 +3813,12 @@ function renderMappingStep(data) {
             <td>
                 <span class="import-column-name"><strong>${escapeHtml(header)}</strong></span>
                 <span class="import-sample-cell">${escapeHtml(samples)}</span>
-                <span class="import-not-mapped" style="display:${isSkipped ? 'block' : 'none'}">Won't be imported</span>
             </td>
             <td class="import-arrow-cell">&#x2192;</td>
             <td>
+                ${badgeHtml}
                 <div class="import-mapping-controls">
-                    ${badgeHtml}
-                    <select class="import-mapping-select" data-header="${escapeHtml(header)}">
+                    <select class="import-mapping-select" data-header="${escapeHtml(header)}" ${isSkipped ? 'disabled' : ''}>
                         <optgroup label="The Basics">
                             ${basicsFields.map(([key, meta]) =>
                                 `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${optionLabel(key, meta, selectValue)}</option>`
@@ -3841,24 +3840,43 @@ function renderMappingStep(data) {
     tableHtml += '</tbody></table>';
     document.getElementById('import-mapping-table-container').innerHTML = tableHtml;
 
-    // Update "already matched" indicators across all dropdowns
+    // Update "already matched" indicators and ignored field states across all dropdowns
     function updateMatchedIndicators() {
+        // Collect fields that are actively matched (not ignored)
         const currentUsed = new Set();
+        // Collect custom values from ignored rows so they can be disabled in other selects
+        const ignoredCustomValues = new Set();
         document.querySelectorAll('.import-mapping-select').forEach(sel => {
             const row = sel.closest('.import-mapping-row');
             const skipBtn = row.querySelector('.import-skip-btn');
-            if (!skipBtn.classList.contains('active') && IMPORT_FIELD_META[sel.value]) {
+            const isIgnored = skipBtn.classList.contains('active');
+            if (isIgnored) {
+                // Track ignored custom values to disable them elsewhere
+                if (sel.value.startsWith('custom:')) {
+                    ignoredCustomValues.add(sel.value);
+                }
+            } else if (IMPORT_FIELD_META[sel.value]) {
                 currentUsed.add(sel.value);
             }
         });
         document.querySelectorAll('.import-mapping-select').forEach(sel => {
             const selectedVal = sel.value;
+            const row = sel.closest('.import-mapping-row');
+            const isThisIgnored = row.querySelector('.import-skip-btn').classList.contains('active');
             sel.querySelectorAll('option').forEach(opt => {
                 const key = opt.value;
                 const meta = IMPORT_FIELD_META[key];
-                if (!meta) return;
-                const inUse = currentUsed.has(key) && selectedVal !== key;
-                opt.textContent = inUse ? `${meta.label}  \u2713 already matched` : meta.label;
+                if (!meta && !key.startsWith('custom:')) return;
+
+                if (meta) {
+                    const inUse = currentUsed.has(key) && selectedVal !== key;
+                    opt.textContent = inUse ? `${meta.label}  \u2713 already matched` : meta.label;
+                    opt.disabled = inUse;
+                }
+                // Disable custom options from ignored rows in other selects
+                if (key.startsWith('custom:') && ignoredCustomValues.has(key) && !isThisIgnored) {
+                    opt.disabled = true;
+                }
             });
         });
     }
@@ -3894,10 +3912,10 @@ function renderMappingStep(data) {
         btn.addEventListener('click', (e) => {
             const header = e.target.dataset.header;
             const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
-            const notMapped = row.querySelector('.import-not-mapped');
+            const select = row.querySelector('.import-mapping-select');
             const isActive = btn.classList.toggle('active');
             row.classList.toggle('skipped', isActive);
-            notMapped.style.display = isActive ? 'block' : 'none';
+            select.disabled = isActive;
             updateMatchedIndicators();
         });
     });
