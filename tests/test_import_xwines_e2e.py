@@ -12,6 +12,7 @@ Run with:
 
 import csv
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -278,10 +279,11 @@ class TestXWinesImport:
             select = page.locator(f'.import-mapping-select[data-header="{header}"]')
             expect(select).to_have_value(expected_value)
 
-        # Check a sample of unmapped columns default to "custom" with pre-filled name
+        # Check a sample of unmapped columns default to custom with pre-filled name
+        # "Save as custom label" is now a separate button, not a select option
         for header in EXPECTED_CUSTOM[:5]:
-            select = page.locator(f'.import-mapping-select[data-header="{header}"]')
-            expect(select).to_have_value("custom")
+            custom_btn = page.locator(f'.import-custom-btn[data-header="{header}"]')
+            expect(custom_btn).to_have_class(re.compile(r'\bactive\b'))
             custom_input = page.locator(f'.import-custom-name[data-header="{header}"]')
             expect(custom_input).to_be_visible()
             expect(custom_input).to_have_value(header)

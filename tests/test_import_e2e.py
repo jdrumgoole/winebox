@@ -291,11 +291,11 @@ class TestImportCustomFields:
 
         # "Cellar Location" is not a known wine field, so it's auto-mapped to "skip".
         # Change its mapping to a custom field before confirming.
-        # Select "Custom Field..." from dropdown, then type the name in the revealed input.
-        cellar_select = page.locator(
-            '.import-mapping-select[data-header="Cellar Location"]'
+        # Click "Save as custom label" button, then type the name in the revealed input.
+        custom_btn = page.locator(
+            '.import-custom-btn[data-header="Cellar Location"]'
         )
-        cellar_select.select_option("custom")
+        custom_btn.click()
         custom_input = page.locator(
             '.import-custom-name[data-header="Cellar Location"]'
         )
