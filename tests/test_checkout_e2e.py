@@ -1,4 +1,4 @@
-"""E2E tests for the Checkout flow.
+"""E2E tests for the Remove Wine flow (formerly Checkout).
 
 Requirements:
     uv run python -m invoke start-background
@@ -40,46 +40,49 @@ def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
 
 @pytest.mark.e2e
 class TestCheckoutUI:
-    """E2E tests for checkout UI elements."""
+    """E2E tests for remove wine UI elements."""
 
     def test_checkout_modal_exists(self, authenticated_page: Page) -> None:
-        """Checkout modal element exists in DOM."""
+        """Remove modal element exists in DOM."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
         page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
-        expect(page.locator("#checkout-modal")).to_be_attached()
+        expect(page.locator("#remove-modal")).to_be_attached()
 
     def test_checkout_form_exists(self, authenticated_page: Page) -> None:
-        """Checkout form exists inside modal."""
+        """Remove form exists inside modal."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
         page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
-        expect(page.locator("#checkout-form")).to_be_attached()
+        expect(page.locator("#remove-form")).to_be_attached()
 
     def test_checkout_quantity_input_exists(self, authenticated_page: Page) -> None:
-        """Checkout quantity input exists in form."""
+        """Remove quantity input exists in form."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
         page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
-        expect(page.locator("#checkout-quantity")).to_be_attached()
-
-    def test_checkout_notes_input_exists(self, authenticated_page: Page) -> None:
-        """Checkout notes textarea exists in form."""
-        page = authenticated_page
-        page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
-        expect(page.locator("#checkout-notes")).to_be_attached()
+        expect(page.locator("#remove-quantity")).to_be_attached()
 
     def test_checkout_wine_id_hidden_field(self, authenticated_page: Page) -> None:
-        """Checkout has hidden wine ID field."""
+        """Remove modal has hidden wine ID field."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
         page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
-        expect(page.locator("#checkout-wine-id")).to_be_attached()
+        expect(page.locator("#remove-wine-id")).to_be_attached()
 
     def test_checkout_available_display(self, authenticated_page: Page) -> None:
         """Available quantity display element exists."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
         page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
-        expect(page.locator("#checkout-available")).to_be_attached()
+        expect(page.locator("#remove-available")).to_be_attached()
+
+    def test_reason_picker_exists(self, authenticated_page: Page) -> None:
+        """Reason picker cards exist in remove modal."""
+        page = authenticated_page
+        page.click("a[data-page='cellar']")
+        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        expect(page.locator("#remove-reason-picker")).to_be_attached()
+        # Four reason cards: DRINK, SELL, GIFT, OTHER
+        cards = page.locator(".reason-card")
+        expect(cards).to_have_count(4)

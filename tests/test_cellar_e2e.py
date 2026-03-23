@@ -96,9 +96,9 @@ class TestWineDetailModal:
         expect(modal).to_be_attached()
 
     def test_checkout_modal_container_exists(self, authenticated_page: Page) -> None:
-        """Checkout modal element exists in DOM."""
+        """Remove modal element exists in DOM."""
         _navigate_to_cellar(authenticated_page)
-        modal = authenticated_page.locator("#checkout-modal")
+        modal = authenticated_page.locator("#remove-modal")
         expect(modal).to_be_attached()
 
     def test_delete_wine_modal_container_exists(self, authenticated_page: Page) -> None:
