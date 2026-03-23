@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&amp;family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&amp;display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="/static/logos/favicon.png">
     <link rel="apple-touch-icon" href="/static/logos/favicon.png">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.6.32">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.6.33">
     <script src="/static/js/chart.min.js"></script>
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
@@ -219,22 +219,25 @@
         <section id="page-dashboard" class="page active" aria-labelledby="page-dashboard-title">
             <div class="dashboard-header" id="dashboard-header">
                 <h2 id="page-dashboard-title">Dashboard</h2>
-            </div>
+            <div id="demo-banner" class="demo-banner">
+        <span>Sample wines (475 wines, 1131 bottles)</span>
+        <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove</button>
+    </div></div>
             <div class="stats-grid" id="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-total-bottles">10020</div>
+                    <div class="stat-value" id="stat-total-bottles">1131</div>
                     <div class="stat-label">Bottles</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-unique-wines">9984</div>
+                    <div class="stat-value" id="stat-unique-wines">475</div>
                     <div class="stat-label">Wines</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-total-tracked">9984</div>
+                    <div class="stat-value" id="stat-total-tracked">475</div>
                     <div class="stat-label">Tracked</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-wines-met">4</div>
+                    <div class="stat-value" id="stat-wines-met">0</div>
                     <div class="stat-label">Met</div>
                 </div>
             </div>
@@ -243,31 +246,31 @@
                 <div class="chart-card">
                     <h3>Wine Types</h3>
                     <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-wine-type" style="box-sizing: border-box; display: block; height: 220px; width: 546px;" width="546" height="220"></canvas>
+                        <canvas id="chart-wine-type" width="546" height="220" style="display: block; box-sizing: border-box; height: 220px; width: 546px;"></canvas>
                     </div>
                 </div>
                 <div class="chart-card">
                     <h3>Price Range</h3>
                     <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-price-tier"></canvas>
+                        <canvas id="chart-price-tier" width="546" height="220" style="display: block; box-sizing: border-box; height: 220px; width: 546px;"></canvas>
                     </div>
                 </div>
                 <div class="chart-card chart-card-wide">
                     <h3>Top Countries</h3>
                     <div class="chart-wrapper">
-                        <canvas id="chart-country" style="box-sizing: border-box; display: block; height: 250px; width: 546px;" width="546" height="250"></canvas>
+                        <canvas id="chart-country" width="546" height="250" style="display: block; box-sizing: border-box; height: 250px; width: 546px;"></canvas>
                     </div>
                 </div>
                 <div class="chart-card chart-card-wide">
                     <h3>Top Grape Varieties</h3>
                     <div class="chart-wrapper">
-                        <canvas id="chart-grape" style="box-sizing: border-box; display: block; height: 250px; width: 546px;" width="546" height="250"></canvas>
+                        <canvas id="chart-grape" width="546" height="250" style="display: block; box-sizing: border-box; height: 250px; width: 546px;"></canvas>
                     </div>
                 </div>
                 <div class="chart-card chart-card-full">
                     <h3>Vintages</h3>
                     <div class="chart-wrapper">
-                        <canvas id="chart-vintage" style="box-sizing: border-box; display: block; height: 250px; width: 1166px;" width="1166" height="250"></canvas>
+                        <canvas id="chart-vintage" width="1166" height="250" style="display: block; box-sizing: border-box; height: 250px; width: 1166px;"></canvas>
                     </div>
                 </div>
             </div>
@@ -275,18 +278,36 @@
             <h3>Recent Activity</h3>
             <div id="recent-activity" class="activity-list">
         <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
+            <div class="activity-icon check-in">
+                +
             </div>
             <div class="activity-content">
                 <div class="activity-title">
-                    Unknown Wine
-                    
+                    Perlé
+                    (1998)
                 </div>
                 <div class="activity-meta">
                     1 bottle ·
-                    Removed ·
-                    Mar 21, 2026, 11:47 PM
+                    Added ·
+                    Mar 22, 2026, 01:09 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Saint-Julien (Grand Cru Classé)
+                    (1976)
+                </div>
+                <div class="activity-meta">
+                    2 bottles ·
+                    Added ·
+                    Mar 21, 2026, 01:09 AM
                 </div>
                 
             </div>
@@ -298,157 +319,139 @@
             </div>
             <div class="activity-content">
                 <div class="activity-title">
-                    Unknown Wine
+                    Viña Alberdi Reserva
+                    (2007)
+                </div>
+                <div class="activity-meta">
+                    2 bottles ·
+                    Removed ·
+                    Mar 21, 2026, 01:09 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Cava Brut
                     
+                </div>
+                <div class="activity-meta">
+                    1 bottle ·
+                    Added ·
+                    Mar 20, 2026, 01:09 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-out">
+                -
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Saint-Drézéry Prestige Rosé
+                    (2002)
+                </div>
+                <div class="activity-meta">
+                    2 bottles ·
+                    Removed ·
+                    Mar 20, 2026, 01:09 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Parallèle 45 Côtes du Rhône Rouge
+                    (1974)
+                </div>
+                <div class="activity-meta">
+                    2 bottles ·
+                    Added ·
+                    Mar 19, 2026, 01:09 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Valpolicella Ripasso
+                    (1993)
+                </div>
+                <div class="activity-meta">
+                    4 bottles ·
+                    Added ·
+                    Mar 18, 2026, 01:09 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-out">
+                -
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Rioja Rosado
+                    (2008)
                 </div>
                 <div class="activity-meta">
                     5 bottles ·
                     Removed ·
-                    Mar 21, 2026, 11:37 PM
+                    Mar 18, 2026, 01:09 AM
                 </div>
                 
             </div>
         </div>
     
         <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
+            <div class="activity-icon check-in">
+                +
             </div>
             <div class="activity-content">
                 <div class="activity-title">
-                    Unknown Wine
-                    
+                    Palazzo della Torre
+                    (1978)
+                </div>
+                <div class="activity-meta">
+                    2 bottles ·
+                    Added ·
+                    Mar 17, 2026, 01:09 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Eins Zwei Dry Riesling
+                    (2005)
                 </div>
                 <div class="activity-meta">
                     1 bottle ·
-                    Removed ·
-                    Mar 21, 2026, 11:37 PM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Unknown Wine
-                    
-                </div>
-                <div class="activity-meta">
-                    2 bottles ·
-                    Removed ·
-                    Mar 20, 2026, 11:37 PM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Unknown Wine
-                    
-                </div>
-                <div class="activity-meta">
-                    2 bottles ·
-                    Removed ·
-                    Mar 19, 2026, 12:45 AM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Unknown Wine
-                    
-                </div>
-                <div class="activity-meta">
-                    1 bottle ·
-                    Removed ·
-                    Mar 16, 2026, 11:47 PM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Unknown Wine
-                    
-                </div>
-                <div class="activity-meta">
-                    1 bottle ·
-                    Removed ·
-                    Mar 15, 2026, 11:47 PM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Unknown Wine
-                    
-                </div>
-                <div class="activity-meta">
-                    2 bottles ·
-                    Removed ·
-                    Mar 13, 2026, 11:23 PM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Unknown Wine
-                    
-                </div>
-                <div class="activity-meta">
-                    3 bottles ·
-                    Removed ·
-                    Mar 13, 2026, 12:45 AM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Unknown Wine
-                    
-                </div>
-                <div class="activity-meta">
-                    2 bottles ·
-                    Removed ·
-                    Mar 12, 2026, 11:47 PM
+                    Added ·
+                    Mar 16, 2026, 01:09 AM
                 </div>
                 
             </div>
@@ -1069,7 +1072,7 @@
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="xwines-q">Search</label>
-                        <input type="text" id="xwines-q" name="q" placeholder="Wine name, winery..." style="">
+                        <input type="text" id="xwines-q" name="q" placeholder="Wine name, winery..." minlength="2" required="" style="">
                     </div>
                     <div class="form-group">
                         <label for="xwines-type">Wine Type</label>
@@ -1458,7 +1461,7 @@
     <!-- Footer -->
     <footer id="app-footer">
         <div class="footer-content">
-            <span id="app-info">WineBox <span class="version">v0.6.32</span></span>
+            <span id="app-info">WineBox <span class="version">v0.6.33</span></span>
             <span class="footer-separator">|</span>
             <span id="data-credits">
                 Wine data powered by
@@ -1473,8 +1476,8 @@
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
-    <script src="/static/js/papaparse.min.js?v=0.6.32"></script>
-    <script src="/static/js/app.js?v=0.6.32"></script>
+    <script src="/static/js/papaparse.min.js?v=0.6.33"></script>
+    <script src="/static/js/app.js?v=0.6.33"></script>
 
 
 </body></html>
