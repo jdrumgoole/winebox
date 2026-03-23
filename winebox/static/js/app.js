@@ -3814,6 +3814,7 @@ function renderMappingStep(data) {
             <td class="import-arrow-cell">&#x2192;</td>
             <td>
                 <div class="import-mapping-controls">
+                    ${badgeHtml}
                     <select class="import-mapping-select" data-header="${escapeHtml(header)}">
                         <optgroup label="The Basics">
                             ${basicsFields.map(([key, meta]) =>
@@ -3830,7 +3831,6 @@ function renderMappingStep(data) {
                     <button type="button" class="btn btn-small btn-outline import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Don't Import</button>
                 </div>
                 <input type="text" class="import-custom-name" placeholder="What should we call this? e.g. Cellar Location" style="display:${isCustom ? 'block' : 'none'};margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}" value="${isCustom ? escapeHtml(customName) : ''}">
-                ${badgeHtml}
                 <span class="import-field-hint" data-header="${escapeHtml(header)}">${initialHint}</span>
             </td>
         </tr>`;

@@ -3516,7 +3516,8 @@ body.logged-out #user-info {
     font-size: 0.72rem;
     padding: 0.1rem 0.5rem;
     border-radius: 9999px;
-    margin-top: 0.25rem;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .import-match-badge.auto-matched {
