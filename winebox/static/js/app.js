@@ -3816,7 +3816,6 @@ function renderMappingStep(data) {
             </td>
             <td class="import-arrow-cell">&#x2192;</td>
             <td>
-                ${badgeHtml}
                 <div class="import-mapping-controls">
                     <select class="import-mapping-select" data-header="${escapeHtml(header)}" ${isSkipped ? 'disabled' : ''}>
                         <optgroup label="The Basics">
@@ -3831,6 +3830,7 @@ function renderMappingStep(data) {
                         </optgroup>
                         ${isCustom ? `<optgroup label="Custom"><option value="custom:${escapeHtml(customName)}" selected>${escapeHtml(customName)}</option></optgroup>` : ''}
                     </select>
+                    ${badgeHtml}
                     <button type="button" class="btn btn-small import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Ignore</button>
                 </div>
                 <span class="import-field-hint" data-header="${escapeHtml(header)}">${initialHint}</span>
