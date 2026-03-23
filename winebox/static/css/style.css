@@ -2718,11 +2718,14 @@ body.logged-out #user-info {
 }
 
 .import-sample-cell {
+    display: block;
     color: var(--text-muted);
-    max-width: 200px;
+    font-size: 0.82rem;
+    margin-top: 0.2rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 250px;
 }
 
 .import-mapping-select {
@@ -2750,24 +2753,24 @@ body.logged-out #user-info {
     align-items: center;
 }
 
-.import-mapping-controls .import-mapping-select {
-    flex: 1;
-}
-
 .import-skip-btn {
+    display: inline-block;
     white-space: nowrap;
     background: var(--card-background);
-    color: var(--text-muted);
-    border: 1px solid var(--border-color);
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
+    color: var(--primary-color);
+    border: 1.5px solid var(--primary-color);
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    border-radius: var(--radius);
     cursor: pointer;
     transition: all 0.2s;
+    margin-top: 0.4rem;
 }
 
 .import-skip-btn:hover {
-    border-color: var(--text-muted);
-    color: var(--text-color);
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
 }
 
 .import-skip-btn.active {

@@ -39,9 +39,14 @@ const analytics = {
     }
 };
 
+// Token storage: use localStorage if "stay logged in" was checked, else sessionStorage
+function getTokenStorage() {
+    return localStorage.getItem('winebox_remember') === 'true' ? localStorage : sessionStorage;
+}
+
 // State
 let currentPage = 'dashboard';
-let authToken = localStorage.getItem('winebox_token');
+let authToken = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
 let currentUser = null;
 let lastScanResult = null;  // Store last scan result to avoid rescanning on checkin
 let cellarViewMode = 'cards';
@@ -401,6 +406,7 @@ async function checkAuth() {
         await showMainApp();
     } catch (error) {
         localStorage.removeItem('winebox_token');
+        sessionStorage.removeItem('winebox_token');
         authToken = null;
         showLoginPage();
     }
@@ -482,7 +488,11 @@ async function handleLogin(e) {
 
         const data = await response.json();
         authToken = data.access_token;
-        localStorage.setItem('winebox_token', authToken);
+
+        // Store token in localStorage (persistent) or sessionStorage (browser session only)
+        const rememberMe = document.getElementById('login-remember-me').checked;
+        localStorage.setItem('winebox_remember', rememberMe ? 'true' : 'false');
+        getTokenStorage().setItem('winebox_token', authToken);
 
         // Track successful login
         analytics.capture('frontend_login_success');
@@ -501,6 +511,8 @@ function handleLogout() {
     analytics.reset();
 
     localStorage.removeItem('winebox_token');
+    sessionStorage.removeItem('winebox_token');
+    localStorage.removeItem('winebox_remember');
     authToken = null;
     currentUser = null;
     showLoginPage();
@@ -769,6 +781,7 @@ async function fetchWithAuth(url, options = {}) {
     // Handle 401 - redirect to login
     if (response.status === 401) {
         localStorage.removeItem('winebox_token');
+        sessionStorage.removeItem('winebox_token');
         authToken = null;
         showLoginPage();
         throw new Error('Session expired');
@@ -3742,6 +3755,21 @@ function renderMappingStep(data) {
     const basicsFields = Object.entries(IMPORT_FIELD_META).filter(([,m]) => m.group === 'basics');
     const detailsFields = Object.entries(IMPORT_FIELD_META).filter(([,m]) => m.group === 'details');
 
+    // Collect initially-matched fields to mark them in dropdowns
+    const usedFields = new Set();
+    for (const header of data.headers) {
+        const suggested = data.suggested_mapping[header] || `custom:${header}`;
+        if (!suggested.startsWith('custom:') && suggested !== 'skip' && IMPORT_FIELD_META[suggested]) {
+            usedFields.add(suggested);
+        }
+    }
+
+    // Helper to build option text with "already matched" indicator
+    function optionLabel(key, meta, currentSelectValue) {
+        const inUse = usedFields.has(key) && currentSelectValue !== key;
+        return inUse ? `${meta.label}  \u2713 already matched` : meta.label;
+    }
+
     // Build mapping table: file columns on left, arrow, app fields on right
     let tableHtml = '<table class="import-mapping-table"><thead><tr><th>Your Column</th><th>Example values</th><th></th><th>Maps To</th></tr></thead><tbody>';
 
@@ -3780,35 +3808,55 @@ function renderMappingStep(data) {
         tableHtml += `<tr class="import-mapping-row ${isSkipped ? 'skipped' : ''}" data-header="${escapeHtml(header)}" data-col-index="${colIndex}">
             <td>
                 <span class="import-column-name"><strong>${escapeHtml(header)}</strong></span>
+                <span class="import-sample-cell">${escapeHtml(samples)}</span>
                 <span class="import-not-mapped" style="display:${isSkipped ? 'block' : 'none'}">Won't be imported</span>
             </td>
-            <td class="import-sample-cell">${escapeHtml(samples)}</td>
             <td class="import-arrow-cell">&#x2192;</td>
             <td>
-                <div class="import-mapping-controls">
-                    <select class="import-mapping-select" data-header="${escapeHtml(header)}">
-                        <optgroup label="The Basics">
-                            ${basicsFields.map(([key, meta]) =>
-                                `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${meta.label}</option>`
-                            ).join('')}
-                        </optgroup>
-                        <optgroup label="Extra Details">
-                            ${detailsFields.map(([key, meta]) =>
-                                `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${meta.label}</option>`
-                            ).join('')}
-                        </optgroup>
-                        <option value="custom" ${isCustom ? 'selected' : ''}>Save as custom label</option>
-                    </select>
-                    <button type="button" class="btn btn-small import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Don't Import</button>
-                </div>
+                <select class="import-mapping-select" data-header="${escapeHtml(header)}">
+                    <optgroup label="The Basics">
+                        ${basicsFields.map(([key, meta]) =>
+                            `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${optionLabel(key, meta, selectValue)}</option>`
+                        ).join('')}
+                    </optgroup>
+                    <optgroup label="Extra Details">
+                        ${detailsFields.map(([key, meta]) =>
+                            `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${optionLabel(key, meta, selectValue)}</option>`
+                        ).join('')}
+                    </optgroup>
+                    <option value="custom" ${isCustom ? 'selected' : ''}>Save as custom label</option>
+                </select>
+                <input type="text" class="import-custom-name" placeholder="What should we call this? e.g. Cellar Location" style="display:${isCustom ? 'block' : 'none'};margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}" value="${isCustom ? escapeHtml(customName) : ''}">
                 ${badgeHtml}
                 <span class="import-field-hint" data-header="${escapeHtml(header)}">${initialHint}</span>
-                <input type="text" class="import-custom-name" placeholder="What should we call this? e.g. Cellar Location" style="display:${isCustom ? 'block' : 'none'};margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}" value="${isCustom ? escapeHtml(customName) : ''}">
+                <button type="button" class="btn btn-small btn-outline import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Don't Import</button>
             </td>
         </tr>`;
     }
     tableHtml += '</tbody></table>';
     document.getElementById('import-mapping-table-container').innerHTML = tableHtml;
+
+    // Update "already matched" indicators across all dropdowns
+    function updateMatchedIndicators() {
+        const currentUsed = new Set();
+        document.querySelectorAll('.import-mapping-select').forEach(sel => {
+            const row = sel.closest('.import-mapping-row');
+            const skipBtn = row.querySelector('.import-skip-btn');
+            if (!skipBtn.classList.contains('active') && sel.value !== 'custom' && IMPORT_FIELD_META[sel.value]) {
+                currentUsed.add(sel.value);
+            }
+        });
+        document.querySelectorAll('.import-mapping-select').forEach(sel => {
+            const selectedVal = sel.value;
+            sel.querySelectorAll('option').forEach(opt => {
+                const key = opt.value;
+                const meta = IMPORT_FIELD_META[key];
+                if (!meta) return;
+                const inUse = currentUsed.has(key) && selectedVal !== key;
+                opt.textContent = inUse ? `${meta.label}  \u2713 already matched` : meta.label;
+            });
+        });
+    }
 
     // Toggle custom field name input and update hint text on selection change
     document.querySelectorAll('.import-mapping-select').forEach(select => {
@@ -3827,6 +3875,9 @@ function renderMappingStep(data) {
 
             // Remove badge on manual change
             if (badge) badge.remove();
+
+            // Refresh matched indicators across all dropdowns
+            updateMatchedIndicators();
         });
     });
 
@@ -3848,6 +3899,7 @@ function renderMappingStep(data) {
                     customInput.style.display = 'block';
                 }
             }
+            updateMatchedIndicators();
         });
     });
 
@@ -4083,7 +4135,7 @@ function startEnrichmentProgress() {
     toast.textContent = 'Enriching wines with reference data...';
     container.appendChild(toast);
 
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const token = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
 
     // Use fetch + ReadableStream for SSE since EventSource doesn't support auth headers
     fetch(`${API_BASE}/wines/enrichment-progress`, {
@@ -4879,7 +4931,7 @@ async function installDemoData() {
         const total = result.total;
 
         // Follow progress via SSE
-        const token = localStorage.getItem('winebox_token');
+        const token = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
         const progressResponse = await fetch(`${API_BASE}/demo/install/progress`, {
             headers: { 'Authorization': `Bearer ${token}` },
         });
