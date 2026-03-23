@@ -289,16 +289,19 @@ class TestImportCustomFields:
 
         _upload_csv(page, sample_csv)
 
-        # "Cellar Location" is not a known wine field, so it's auto-mapped to "skip".
-        # Change its mapping to a custom field before confirming.
-        # Click "Save as custom label" button, then type the name in the revealed input.
+        # "Cellar Location" is not a known wine field — it may be auto-mapped to
+        # custom (with AI mapping) or skip. Ensure the custom button is active
+        # and the input has the right value.
         custom_btn = page.locator(
             '.import-custom-btn[data-header="Cellar Location"]'
         )
-        custom_btn.click()
+        # Only click if not already active (AI mapping may have already set it)
+        if "active" not in (custom_btn.get_attribute("class") or ""):
+            custom_btn.click()
         custom_input = page.locator(
             '.import-custom-name[data-header="Cellar Location"]'
         )
+        expect(custom_input).to_be_visible()
         custom_input.fill("Cellar Location")
 
         page.click("#import-confirm-mapping-btn")
