@@ -105,7 +105,7 @@ class TestDemoDataE2E:
             # Wait for the banner to appear (indicates install completed and dashboard reloaded)
             page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
             expect(page.locator("#demo-banner")).to_be_visible()
-            expect(page.locator("#demo-banner")).to_contain_text("sample wines")
+            expect(page.locator("#demo-banner")).to_contain_text("Sample wines")
 
             # Verify dashboard stats updated — total bottles should be > 0
             stat = page.locator("#stat-total-bottles")
