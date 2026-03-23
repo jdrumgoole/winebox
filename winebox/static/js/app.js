@@ -3813,23 +3813,25 @@ function renderMappingStep(data) {
             </td>
             <td class="import-arrow-cell">&#x2192;</td>
             <td>
-                <select class="import-mapping-select" data-header="${escapeHtml(header)}">
-                    <optgroup label="The Basics">
-                        ${basicsFields.map(([key, meta]) =>
-                            `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${optionLabel(key, meta, selectValue)}</option>`
-                        ).join('')}
-                    </optgroup>
-                    <optgroup label="Extra Details">
-                        ${detailsFields.map(([key, meta]) =>
-                            `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${optionLabel(key, meta, selectValue)}</option>`
-                        ).join('')}
-                    </optgroup>
-                    <option value="custom" ${isCustom ? 'selected' : ''}>Save as custom label</option>
-                </select>
+                <div class="import-mapping-controls">
+                    <select class="import-mapping-select" data-header="${escapeHtml(header)}">
+                        <optgroup label="The Basics">
+                            ${basicsFields.map(([key, meta]) =>
+                                `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${optionLabel(key, meta, selectValue)}</option>`
+                            ).join('')}
+                        </optgroup>
+                        <optgroup label="Extra Details">
+                            ${detailsFields.map(([key, meta]) =>
+                                `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${optionLabel(key, meta, selectValue)}</option>`
+                            ).join('')}
+                        </optgroup>
+                    </select>
+                    <button type="button" class="btn btn-small btn-outline import-custom-btn ${isCustom ? 'active' : ''}" data-header="${escapeHtml(header)}">Save as custom label</button>
+                    <button type="button" class="btn btn-small btn-outline import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Don't Import</button>
+                </div>
                 <input type="text" class="import-custom-name" placeholder="What should we call this? e.g. Cellar Location" style="display:${isCustom ? 'block' : 'none'};margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}" value="${isCustom ? escapeHtml(customName) : ''}">
                 ${badgeHtml}
                 <span class="import-field-hint" data-header="${escapeHtml(header)}">${initialHint}</span>
-                <button type="button" class="btn btn-small btn-outline import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Don't Import</button>
             </td>
         </tr>`;
     }
@@ -3842,7 +3844,8 @@ function renderMappingStep(data) {
         document.querySelectorAll('.import-mapping-select').forEach(sel => {
             const row = sel.closest('.import-mapping-row');
             const skipBtn = row.querySelector('.import-skip-btn');
-            if (!skipBtn.classList.contains('active') && sel.value !== 'custom' && IMPORT_FIELD_META[sel.value]) {
+            const customBtn = row.querySelector('.import-custom-btn');
+            if (!skipBtn.classList.contains('active') && !customBtn.classList.contains('active') && IMPORT_FIELD_META[sel.value]) {
                 currentUsed.add(sel.value);
             }
         });
@@ -3858,16 +3861,20 @@ function renderMappingStep(data) {
         });
     }
 
-    // Toggle custom field name input and update hint text on selection change
+    // Update hint text on selection change
     document.querySelectorAll('.import-mapping-select').forEach(select => {
         select.addEventListener('change', (e) => {
             const header = e.target.dataset.header;
             const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
-            const customInput = row.querySelector('.import-custom-name');
             const hintEl = row.querySelector('.import-field-hint');
             const badge = row.querySelector('.import-match-badge');
+            const customBtn = row.querySelector('.import-custom-btn');
 
-            customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+            // Deactivate custom mode when user picks a standard field
+            if (customBtn.classList.contains('active')) {
+                customBtn.classList.remove('active');
+                row.querySelector('.import-custom-name').style.display = 'none';
+            }
 
             // Update hint text
             const meta = IMPORT_FIELD_META[e.target.value];
@@ -3881,23 +3888,48 @@ function renderMappingStep(data) {
         });
     });
 
+    // "Save as custom label" button toggle
+    document.querySelectorAll('.import-custom-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const header = e.target.dataset.header;
+            const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
+            const customInput = row.querySelector('.import-custom-name');
+            const hintEl = row.querySelector('.import-field-hint');
+            const skipBtn = row.querySelector('.import-skip-btn');
+            const isActive = btn.classList.toggle('active');
+
+            customInput.style.display = isActive ? 'block' : 'none';
+            if (isActive) {
+                // Deactivate skip if active
+                if (skipBtn.classList.contains('active')) {
+                    skipBtn.classList.remove('active');
+                    row.classList.remove('skipped');
+                    row.querySelector('.import-not-mapped').style.display = 'none';
+                }
+                hintEl.textContent = 'Type a name for this custom field';
+                customInput.focus();
+            } else {
+                const meta = IMPORT_FIELD_META[row.querySelector('.import-mapping-select').value];
+                hintEl.textContent = meta ? meta.hint : '';
+            }
+            updateMatchedIndicators();
+        });
+    });
+
     // Skip button toggle
     document.querySelectorAll('.import-skip-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const header = e.target.dataset.header;
             const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
             const customInput = row.querySelector('.import-custom-name');
+            const customBtn = row.querySelector('.import-custom-btn');
             const notMapped = row.querySelector('.import-not-mapped');
             const isActive = btn.classList.toggle('active');
             row.classList.toggle('skipped', isActive);
             notMapped.style.display = isActive ? 'block' : 'none';
             if (isActive) {
                 customInput.style.display = 'none';
-            } else {
-                const select = row.querySelector('.import-mapping-select');
-                if (select.value === 'custom') {
-                    customInput.style.display = 'block';
-                }
+                customBtn.classList.remove('active');
             }
             updateMatchedIndicators();
         });
@@ -3950,14 +3982,14 @@ async function handleConfirmMapping() {
             mapping[header] = 'skip';
             return;
         }
-        const select = row.querySelector('.import-mapping-select');
-        let value = select.value;
-        if (value === 'custom') {
+        const customBtn = row.querySelector('.import-custom-btn');
+        if (customBtn && customBtn.classList.contains('active')) {
             const customInput = row.querySelector('.import-custom-name');
             const customName = customInput.value.trim();
-            value = customName ? `custom:${customName}` : 'skip';
+            mapping[header] = customName ? `custom:${customName}` : 'skip';
+        } else {
+            mapping[header] = row.querySelector('.import-mapping-select').value;
         }
-        mapping[header] = value;
     });
 
     // Validate at least one name mapping

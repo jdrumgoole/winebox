@@ -2751,10 +2751,16 @@ body.logged-out #user-info {
     display: flex;
     gap: 0.5rem;
     align-items: center;
+    flex-wrap: wrap;
 }
 
+.import-mapping-controls .import-mapping-select {
+    flex: 1;
+    min-width: 0;
+}
+
+.import-custom-btn,
 .import-skip-btn {
-    display: inline-block;
     white-space: nowrap;
     background: var(--card-background);
     color: var(--primary-color);
@@ -2764,10 +2770,17 @@ body.logged-out #user-info {
     border-radius: var(--radius);
     cursor: pointer;
     transition: all 0.2s;
-    margin-top: 0.4rem;
+    flex-shrink: 0;
 }
 
+.import-custom-btn:hover,
 .import-skip-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.import-custom-btn.active {
     background: var(--primary-color);
     color: white;
     border-color: var(--primary-color);
