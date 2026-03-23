@@ -3721,34 +3721,39 @@ function renderMappingStep(data) {
     document.getElementById('import-file-info').textContent =
         `${data.filename} - ${data.row_count} rows`;
 
-    // Wine fields for dropdown — split into core (canonical) and additional
-    const canonicalFields = [
-        { value: 'name', label: 'Wine Name (required)' },
-        { value: 'winery', label: 'Winery' },
-        { value: 'vintage', label: 'Vintage' },
-        { value: 'grape_variety', label: 'Grape Variety' },
-        { value: 'country', label: 'Country' },
-        { value: 'region', label: 'Region' },
-    ];
+    // Field metadata with friendly labels and hints
+    const IMPORT_FIELD_META = {
+        name:                { label: 'Wine Name (required)', hint: 'The name on the label, e.g. "Cloudy Bay Sauvignon Blanc"', group: 'basics' },
+        winery:              { label: 'Winery / Producer',    hint: 'Who made the wine, e.g. "Chateau Margaux"', group: 'basics' },
+        vintage:             { label: 'Vintage Year',         hint: 'The year the grapes were harvested, e.g. "2019"', group: 'basics' },
+        grape_variety:       { label: 'Grape',                hint: 'The grape or blend, e.g. "Pinot Noir", "Cabernet/Merlot"', group: 'basics' },
+        country:             { label: 'Country',              hint: 'Where the wine is from, e.g. "France", "Australia"', group: 'basics' },
+        region:              { label: 'Region',               hint: 'The wine region, e.g. "Bordeaux", "Napa Valley"', group: 'basics' },
+        sub_region:          { label: 'Sub-Region',           hint: 'A smaller area within the region, e.g. "Pauillac" within Bordeaux', group: 'details' },
+        appellation:         { label: 'Appellation',          hint: 'The official wine-growing designation, e.g. "AOC Saint-Émilion"', group: 'details' },
+        wine_type_id:        { label: 'Wine Style',           hint: 'Red, White, Rosé, Sparkling, Dessert, etc.', group: 'details' },
+        classification:      { label: 'Classification',       hint: 'Quality ranking, e.g. "Grand Cru", "Reserva", "First Growth"', group: 'details' },
+        alcohol_percentage:  { label: 'Alcohol (ABV)',        hint: 'Alcohol by volume as a number, e.g. "13.5"', group: 'details' },
+        price_tier:          { label: 'Price Range',          hint: 'Budget, Mid-range, Premium, or Luxury', group: 'details' },
+        quantity:            { label: 'Bottles',              hint: 'How many bottles you have of this wine', group: 'details' },
+        notes:               { label: 'Tasting Notes',       hint: 'Your personal notes about the wine', group: 'details' },
+    };
 
-    const optionalFields = [
-        { value: 'sub_region', label: 'Sub-Region' },
-        { value: 'appellation', label: 'Appellation' },
-        { value: 'alcohol_percentage', label: 'Alcohol %' },
-        { value: 'wine_type_id', label: 'Wine Type' },
-        { value: 'classification', label: 'Classification' },
-        { value: 'price_tier', label: 'Price Tier' },
-        { value: 'quantity', label: 'Quantity' },
-        { value: 'notes', label: 'Notes' },
-    ];
+    const basicsFields = Object.entries(IMPORT_FIELD_META).filter(([,m]) => m.group === 'basics');
+    const detailsFields = Object.entries(IMPORT_FIELD_META).filter(([,m]) => m.group === 'details');
 
-    // Build mapping table
-    const sampleRow = data.preview_rows[0] || {};
-    let tableHtml = '<table class="import-mapping-table"><thead><tr><th>Column</th><th>Sample</th><th>Map To</th></tr></thead><tbody>';
+    // Build mapping table with multi-sample values
+    let tableHtml = '<table class="import-mapping-table"><thead><tr><th>Column</th><th>Example values</th><th>Map To</th></tr></thead><tbody>';
 
-    for (const header of data.headers) {
+    for (let colIndex = 0; colIndex < data.headers.length; colIndex++) {
+        const header = data.headers[colIndex];
         const suggested = data.suggested_mapping[header] || `custom:${header}`;
-        const sample = sampleRow[header] || '';
+
+        // Show 2-3 sample values from preview rows
+        const samples = data.preview_rows.slice(0, 3)
+            .map(r => String(r[header] || '').substring(0, 30))
+            .filter(s => s)
+            .join(', ');
 
         // Detect custom field suggestions (e.g. "custom:Cellar Location")
         const isCustom = suggested.startsWith('custom:');
@@ -3756,43 +3761,71 @@ function renderMappingStep(data) {
         const selectValue = isCustom ? 'custom' : suggested;
 
         const isSkipped = selectValue === 'skip';
+        const isAutoMatched = !isCustom && !isSkipped && IMPORT_FIELD_META[selectValue];
 
-        tableHtml += `<tr class="import-mapping-row ${isSkipped ? 'skipped' : ''}" data-header="${escapeHtml(header)}">
+        // Determine initial hint text
+        let initialHint = '';
+        if (isAutoMatched) {
+            initialHint = IMPORT_FIELD_META[selectValue].hint;
+        }
+
+        // Build match badge
+        let badgeHtml = '';
+        if (isAutoMatched) {
+            badgeHtml = '<span class="import-match-badge auto-matched">Auto-matched</span>';
+        } else if (!isSkipped) {
+            badgeHtml = '<span class="import-match-badge needs-input">Needs your input</span>';
+        }
+
+        tableHtml += `<tr class="import-mapping-row ${isSkipped ? 'skipped' : ''}" data-header="${escapeHtml(header)}" data-col-index="${colIndex}">
             <td>
                 <span class="import-column-name"><strong>${escapeHtml(header)}</strong></span>
-                <span class="import-not-mapped" style="display:${isSkipped ? 'block' : 'none'}">Not mapped</span>
+                <span class="import-not-mapped" style="display:${isSkipped ? 'block' : 'none'}">Won't be imported</span>
             </td>
-            <td class="import-sample-cell">${escapeHtml(String(sample).substring(0, 60))}</td>
+            <td class="import-sample-cell">${escapeHtml(samples)}</td>
             <td>
                 <div class="import-mapping-controls">
                     <select class="import-mapping-select" data-header="${escapeHtml(header)}">
-                        <optgroup label="Core Fields">
-                            ${canonicalFields.map(f =>
-                                `<option value="${f.value}" ${selectValue === f.value ? 'selected' : ''}>${f.label}</option>`
+                        <optgroup label="The Basics">
+                            ${basicsFields.map(([key, meta]) =>
+                                `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${meta.label}</option>`
                             ).join('')}
                         </optgroup>
-                        <optgroup label="Additional Fields">
-                            ${optionalFields.map(f =>
-                                `<option value="${f.value}" ${selectValue === f.value ? 'selected' : ''}>${f.label}</option>`
+                        <optgroup label="Extra Details">
+                            ${detailsFields.map(([key, meta]) =>
+                                `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${meta.label}</option>`
                             ).join('')}
                         </optgroup>
-                        <option value="custom" ${isCustom ? 'selected' : ''}>Custom Field...</option>
+                        <option value="custom" ${isCustom ? 'selected' : ''}>Save as custom label</option>
                     </select>
-                    <button type="button" class="btn btn-small import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Skip</button>
+                    <button type="button" class="btn btn-small import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Don't Import</button>
                 </div>
-                <input type="text" class="import-custom-name" placeholder="Field name" style="display:${isCustom ? 'block' : 'none'};margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}" value="${isCustom ? escapeHtml(customName) : ''}">
+                ${badgeHtml}
+                <span class="import-field-hint" data-header="${escapeHtml(header)}">${initialHint}</span>
+                <input type="text" class="import-custom-name" placeholder="What should we call this? e.g. Cellar Location" style="display:${isCustom ? 'block' : 'none'};margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}" value="${isCustom ? escapeHtml(customName) : ''}">
             </td>
         </tr>`;
     }
     tableHtml += '</tbody></table>';
     document.getElementById('import-mapping-table-container').innerHTML = tableHtml;
 
-    // Toggle custom field name input
+    // Toggle custom field name input and update hint text on selection change
     document.querySelectorAll('.import-mapping-select').forEach(select => {
         select.addEventListener('change', (e) => {
             const header = e.target.dataset.header;
-            const customInput = document.querySelector(`.import-custom-name[data-header="${header}"]`);
+            const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
+            const customInput = row.querySelector('.import-custom-name');
+            const hintEl = row.querySelector('.import-field-hint');
+            const badge = row.querySelector('.import-match-badge');
+
             customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+
+            // Update hint text
+            const meta = IMPORT_FIELD_META[e.target.value];
+            hintEl.textContent = meta ? meta.hint : '';
+
+            // Remove badge on manual change
+            if (badge) badge.remove();
         });
     });
 
@@ -3817,23 +3850,39 @@ function renderMappingStep(data) {
         });
     });
 
-    // Build preview table
+    // Build preview table with data-col-index attributes for highlight
     if (data.preview_rows.length > 0) {
         let previewHtml = '<table class="import-preview-table"><thead><tr>';
-        for (const h of data.headers) {
-            previewHtml += `<th>${escapeHtml(h)}</th>`;
+        for (let i = 0; i < data.headers.length; i++) {
+            previewHtml += `<th data-col-index="${i}">${escapeHtml(data.headers[i])}</th>`;
         }
         previewHtml += '</tr></thead><tbody>';
         for (const row of data.preview_rows) {
             previewHtml += '<tr>';
-            for (const h of data.headers) {
-                previewHtml += `<td>${escapeHtml(String(row[h] || '').substring(0, 40))}</td>`;
+            for (let i = 0; i < data.headers.length; i++) {
+                previewHtml += `<td data-col-index="${i}">${escapeHtml(String(row[data.headers[i]] || '').substring(0, 40))}</td>`;
             }
             previewHtml += '</tr>';
         }
         previewHtml += '</tbody></table>';
         document.getElementById('import-preview-container').innerHTML = previewHtml;
     }
+
+    // Column highlight on mapping row hover
+    document.querySelectorAll('.import-mapping-row').forEach(row => {
+        row.addEventListener('mouseenter', () => {
+            const colIndex = row.dataset.colIndex;
+            document.querySelectorAll(`.import-preview-table [data-col-index="${colIndex}"]`).forEach(cell => {
+                cell.classList.add('import-preview-highlight');
+            });
+        });
+        row.addEventListener('mouseleave', () => {
+            const colIndex = row.dataset.colIndex;
+            document.querySelectorAll(`.import-preview-table [data-col-index="${colIndex}"]`).forEach(cell => {
+                cell.classList.remove('import-preview-highlight');
+            });
+        });
+    });
 }
 
 async function handleConfirmMapping() {
