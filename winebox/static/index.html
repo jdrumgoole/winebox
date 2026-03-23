@@ -787,8 +787,12 @@
             <div class="filter-bar">
                 <select id="history-filter">
                     <option value="all">All Transactions</option>
-                    <option value="CHECK_IN">Check Ins Only</option>
-                    <option value="CHECK_OUT">Check Outs Only</option>
+                    <option value="CHECK_IN">Added</option>
+                    <option value="CHECK_OUT">All Removals</option>
+                    <option value="DRINK">Drank</option>
+                    <option value="SELL">Sold</option>
+                    <option value="GIFT">Gifted</option>
+                    <option value="OTHER">Other</option>
                 </select>
                 <div class="export-dropdown" id="history-export-dropdown">
                     <button class="btn btn-secondary export-dropdown-btn" id="history-export-btn">
@@ -1031,25 +1035,80 @@
         </section>
     </main>
 
-    <!-- Checkout Modal -->
-    <div id="checkout-modal" class="modal">
+    <!-- Remove Wine Modal -->
+    <div id="remove-modal" class="modal">
         <div class="modal-content modal-small">
             <span class="modal-close">&times;</span>
-            <h3>Check Out Wine</h3>
-            <form id="checkout-form">
-                <input type="hidden" id="checkout-wine-id">
-                <div class="form-group">
-                    <label for="checkout-quantity">Quantity</label>
-                    <input type="number" id="checkout-quantity" name="quantity" min="1" value="1" required>
-                    <span id="checkout-available"></span>
+            <h3>Remove Wine</h3>
+            <form id="remove-form">
+                <input type="hidden" id="remove-wine-id">
+                <input type="hidden" id="remove-reason" name="removal_reason" value="">
+
+                <!-- Step 1: Reason picker -->
+                <div id="remove-reason-picker">
+                    <p class="reason-picker-label">What happened to this wine?</p>
+                    <div class="reason-picker">
+                        <button type="button" class="reason-card" data-reason="DRINK">
+                            <span class="reason-card-icon">&#127863;</span>
+                            <span class="reason-card-label">Drank</span>
+                        </button>
+                        <button type="button" class="reason-card" data-reason="SELL">
+                            <span class="reason-card-icon">&#128176;</span>
+                            <span class="reason-card-label">Sold</span>
+                        </button>
+                        <button type="button" class="reason-card" data-reason="GIFT">
+                            <span class="reason-card-icon">&#127873;</span>
+                            <span class="reason-card-label">Gifted</span>
+                        </button>
+                        <button type="button" class="reason-card" data-reason="OTHER">
+                            <span class="reason-card-icon">&#128230;</span>
+                            <span class="reason-card-label">Other</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="checkout-notes">Notes</label>
-                    <textarea id="checkout-notes" name="notes" rows="3" placeholder="Occasion, tasting notes..."></textarea>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Check Out</button>
-                    <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+
+                <!-- Step 2: Details (hidden until reason picked) -->
+                <div id="remove-details" class="removal-details" style="display: none;">
+                    <button type="button" id="remove-back-btn" class="btn btn-link remove-back-btn">&larr; Change reason</button>
+                    <div class="form-group">
+                        <label for="remove-quantity">Quantity</label>
+                        <input type="number" id="remove-quantity" name="quantity" min="1" value="1" required>
+                        <span id="remove-available"></span>
+                    </div>
+
+                    <!-- Conditional fields per reason -->
+                    <div id="remove-field-drink" class="removal-conditional-field" style="display: none;">
+                        <div class="form-group">
+                            <label for="remove-tasting-notes">Tasting notes (optional)</label>
+                            <textarea id="remove-tasting-notes" name="tasting_notes" rows="3" placeholder="How was it? Pair well with anything?"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="remove-field-sell" class="removal-conditional-field" style="display: none;">
+                        <div class="form-group">
+                            <label for="remove-sale-price">Sale price ($)</label>
+                            <input type="number" id="remove-sale-price" name="sale_price_usd" min="0" step="0.01" placeholder="0.00" required>
+                        </div>
+                    </div>
+
+                    <div id="remove-field-gift" class="removal-conditional-field" style="display: none;">
+                        <div class="form-group">
+                            <label for="remove-gift-recipient">Who did you give it to?</label>
+                            <input type="text" id="remove-gift-recipient" name="gift_recipient" maxlength="200" placeholder="Name" required>
+                        </div>
+                    </div>
+
+                    <div id="remove-field-other" class="removal-conditional-field" style="display: none;">
+                        <div class="form-group">
+                            <label for="remove-removal-notes">What happened? (optional)</label>
+                            <textarea id="remove-removal-notes" name="removal_notes" rows="3" placeholder="Breakage, loss, spoilage..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" id="remove-submit-btn" class="btn btn-primary">Record</button>
+                        <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                    </div>
                 </div>
             </form>
         </div>

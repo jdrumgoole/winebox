@@ -1025,12 +1025,34 @@ details.advanced-fields .form-grid {
     text-transform: uppercase;
 }
 
-.transaction-type.check-in {
+.transaction-type.check-in,
+.transaction-type.added {
     background: rgba(74, 124, 89, 0.1);
     color: var(--success-color);
 }
 
-.transaction-type.check-out {
+.transaction-type.check-out,
+.transaction-type.removed {
+    background: rgba(153, 153, 153, 0.15);
+    color: #888;
+}
+
+.transaction-type.drank {
+    background: rgba(139, 26, 74, 0.1);
+    color: #8B1A4A;
+}
+
+.transaction-type.sold {
+    background: rgba(41, 98, 168, 0.1);
+    color: #2962A8;
+}
+
+.transaction-type.gifted {
+    background: rgba(126, 58, 168, 0.1);
+    color: #7E3AA8;
+}
+
+.transaction-type.other {
     background: rgba(201, 162, 39, 0.1);
     color: var(--warning-color);
 }
@@ -1046,6 +1068,106 @@ details.advanced-fields .form-grid {
 
 .transaction-quantity {
     font-weight: 600;
+}
+
+.transaction-detail {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+}
+
+.tasting-notes-display {
+    font-style: italic;
+}
+
+.sale-price-display {
+    font-weight: 600;
+}
+
+.gift-recipient-display,
+.removal-notes-display {
+    font-style: italic;
+}
+
+.activity-detail {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+}
+
+/* Reason Picker */
+.reason-picker-label {
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.reason-picker {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+.reason-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 1rem 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--card-background);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 72px;
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--text-color);
+}
+
+.reason-card:hover {
+    border-color: var(--primary-light);
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-1px);
+}
+
+.reason-card.selected {
+    border-color: var(--primary-color);
+    background: rgba(139, 26, 74, 0.05);
+}
+
+.reason-card-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.reason-card-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.removal-details {
+    animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.remove-back-btn {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.remove-back-btn:hover {
+    color: var(--primary-color);
 }
 
 .transaction-date {

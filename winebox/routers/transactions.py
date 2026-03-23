@@ -7,7 +7,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException, status
 from pydantic import ValidationError
 
-from winebox.models import Transaction, TransactionType, Wine
+from winebox.models import RemovalReason, Transaction, TransactionType, Wine
 from winebox.schemas.transaction import TransactionResponse
 from winebox.services.auth import RequireAuth
 
@@ -23,6 +23,7 @@ async def list_transactions(
     limit: int = 100,
     transaction_type: TransactionType | None = None,
     wine_id: str | None = None,
+    removal_reason: RemovalReason | None = None,
 ) -> list[TransactionResponse]:
     """List all transactions with optional filtering."""
     # Always filter by owner
@@ -30,6 +31,9 @@ async def list_transactions(
 
     if transaction_type:
         conditions["transaction_type"] = transaction_type
+
+    if removal_reason:
+        conditions["removal_reason"] = removal_reason
 
     if wine_id:
         try:

@@ -927,8 +927,16 @@ function initForms() {
     // X-Wines search form
     document.getElementById('xwines-search-form').addEventListener('submit', handleXWinesSearch);
 
-    // Checkout form
-    document.getElementById('checkout-form').addEventListener('submit', handleCheckout);
+    // Remove form
+    document.getElementById('remove-form').addEventListener('submit', handleRemoval);
+
+    // Reason picker cards
+    document.querySelectorAll('.reason-card').forEach(card => {
+        card.addEventListener('click', () => selectRemovalReason(card.dataset.reason));
+    });
+
+    // Back button in remove modal
+    document.getElementById('remove-back-btn').addEventListener('click', resetRemovalPicker);
 
     // Cellar filter
     document.getElementById('cellar-filter').addEventListener('change', loadCellar);
@@ -1365,10 +1373,59 @@ async function handleSearch(e) {
     }
 }
 
-async function handleCheckout(e) {
+function selectRemovalReason(reason) {
+    document.getElementById('remove-reason').value = reason;
+    document.getElementById('remove-reason-picker').style.display = 'none';
+    document.getElementById('remove-details').style.display = 'block';
+
+    // Hide all conditional fields and remove required
+    document.querySelectorAll('.removal-conditional-field').forEach(f => {
+        f.style.display = 'none';
+        f.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    });
+
+    // Show the relevant conditional field
+    const fieldMap = { DRINK: 'drink', SELL: 'sell', GIFT: 'gift', OTHER: 'other' };
+    const fieldId = `remove-field-${fieldMap[reason]}`;
+    const field = document.getElementById(fieldId);
+    if (field) {
+        field.style.display = 'block';
+        // Re-add required for sell price and gift recipient
+        if (reason === 'SELL') {
+            document.getElementById('remove-sale-price').setAttribute('required', '');
+        } else if (reason === 'GIFT') {
+            document.getElementById('remove-gift-recipient').setAttribute('required', '');
+        }
+    }
+
+    // Update submit button text
+    const btnLabels = { DRINK: 'Record', SELL: 'Record Sale', GIFT: 'Record Gift', OTHER: 'Record' };
+    document.getElementById('remove-submit-btn').textContent = btnLabels[reason] || 'Record';
+
+    // Highlight selected reason card
+    document.querySelectorAll('.reason-card').forEach(c => c.classList.remove('selected'));
+    const selectedCard = document.querySelector(`.reason-card[data-reason="${reason}"]`);
+    if (selectedCard) selectedCard.classList.add('selected');
+}
+
+function resetRemovalPicker() {
+    document.getElementById('remove-reason').value = '';
+    document.getElementById('remove-reason-picker').style.display = 'block';
+    document.getElementById('remove-details').style.display = 'none';
+    document.querySelectorAll('.reason-card').forEach(c => c.classList.remove('selected'));
+}
+
+async function handleRemoval(e) {
     e.preventDefault();
-    const wineId = document.getElementById('checkout-wine-id').value;
+    const wineId = document.getElementById('remove-wine-id').value;
     const formData = new FormData(e.target);
+
+    // Remove empty optional fields so they don't get sent as empty strings
+    for (const [key, value] of [...formData.entries()]) {
+        if (value === '' && key !== 'quantity') {
+            formData.delete(key);
+        }
+    }
 
     try {
         const response = await fetchWithAuth(`${API_BASE}/wines/${wineId}/checkout`, {
@@ -1378,11 +1435,13 @@ async function handleCheckout(e) {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || 'Check-out failed');
+            throw new Error(error.detail || 'Removal failed');
         }
 
         const wine = await response.json();
-        showToast(`Successfully checked out: ${wine.name}`, 'success');
+        const reason = document.getElementById('remove-reason').value;
+        const reasonLabels = { DRINK: 'Recorded', SELL: 'Sale recorded', GIFT: 'Gift recorded', OTHER: 'Removal recorded' };
+        showToast(`${reasonLabels[reason] || 'Removed'}: ${wine.name}`, 'success');
         closeModals();
         loadCellar();
         loadDashboard();
@@ -1691,6 +1750,35 @@ function _renderVintageChart(canvasId, data) {
     });
 }
 
+function getRemovalBadge(t) {
+    if (t.transaction_type === 'CHECK_IN') return { label: 'Added', cssClass: 'added' };
+    if (!t.removal_reason) return { label: 'Removed', cssClass: 'removed' };
+    const map = {
+        DRINK: { label: 'Drank', cssClass: 'drank' },
+        SELL: { label: 'Sold', cssClass: 'sold' },
+        GIFT: { label: 'Gifted', cssClass: 'gifted' },
+        OTHER: { label: 'Other', cssClass: 'other' },
+    };
+    return map[t.removal_reason] || { label: 'Removed', cssClass: 'removed' };
+}
+
+function getRemovalDetail(t) {
+    if (t.transaction_type === 'CHECK_IN' || !t.removal_reason) return '';
+    if (t.removal_reason === 'DRINK' && t.tasting_notes) {
+        return `<span class="tasting-notes-display">${escapeHtml(t.tasting_notes)}</span>`;
+    }
+    if (t.removal_reason === 'SELL' && t.sale_price_usd != null) {
+        return `<span class="sale-price-display">Sold for $${Number(t.sale_price_usd).toFixed(2)}</span>`;
+    }
+    if (t.removal_reason === 'GIFT' && t.gift_recipient) {
+        return `<span class="gift-recipient-display">Gifted to ${escapeHtml(t.gift_recipient)}</span>`;
+    }
+    if (t.removal_reason === 'OTHER' && t.removal_notes) {
+        return `<span class="removal-notes-display">${escapeHtml(t.removal_notes)}</span>`;
+    }
+    return '';
+}
+
 function renderActivityList(transactions) {
     const container = document.getElementById('recent-activity');
     if (!transactions || transactions.length === 0) {
@@ -1698,7 +1786,10 @@ function renderActivityList(transactions) {
         return;
     }
 
-    container.innerHTML = transactions.map(t => `
+    container.innerHTML = transactions.map(t => {
+        const badge = getRemovalBadge(t);
+        const detail = getRemovalDetail(t);
+        return `
         <div class="activity-item">
             <div class="activity-icon ${t.transaction_type === 'CHECK_IN' ? 'check-in' : 'check-out'}">
                 ${t.transaction_type === 'CHECK_IN' ? '+' : '-'}
@@ -1710,11 +1801,14 @@ function renderActivityList(transactions) {
                 </div>
                 <div class="activity-meta">
                     ${t.quantity} bottle${t.quantity > 1 ? 's' : ''} &middot;
+                    ${badge.label} &middot;
                     ${formatDate(t.transaction_date)}
                 </div>
+                ${detail ? `<div class="activity-detail">${detail}</div>` : ''}
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // Cellar
@@ -1840,7 +1934,7 @@ function renderCellarTable(containerId, wines) {
                 <td class="wine-table-hide-mobile">${wine.region ? `<span class="${ef.includes('region') ? 'enriched' : ''}">${escapeHtml(wine.region)}</span>` : '-'}</td>
                 <td class="wine-table-hide-mobile">${wine.country ? `<span class="${ef.includes('country') ? 'enriched' : ''}">${escapeHtml(wine.country)}</span>` : '-'}</td>
                 <td><span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">${inStock ? quantity : 'Out'}</span></td>
-                <td>${inStock ? `<button class="btn btn-small btn-primary checkout-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Check Out</button>` : ''}</td>
+                <td>${inStock ? `<button class="btn btn-small btn-primary remove-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Remove</button>` : ''}</td>
             </tr>
             ${detailRow}
         `;
@@ -1882,16 +1976,16 @@ function renderCellarTable(containerId, wines) {
 
     container.querySelectorAll('.wine-table-row').forEach(row => {
         row.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('checkout-btn') && !e.target.classList.contains('wine-table-expand')) {
+            if (!e.target.classList.contains('remove-btn') && !e.target.classList.contains('wine-table-expand')) {
                 showWineDetail(row.dataset.wineId);
             }
         });
     });
 
-    container.querySelectorAll('.checkout-btn').forEach(btn => {
+    container.querySelectorAll('.remove-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            openCheckoutModal(btn.dataset.wineId, btn.dataset.quantity);
+            openRemoveModal(btn.dataset.wineId, btn.dataset.quantity);
         });
     });
 
@@ -1966,7 +2060,7 @@ function renderWineGrid(containerId, wines) {
                         <span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">
                             ${inStock ? `${quantity} bottle${quantity > 1 ? 's' : ''}` : 'Out of stock'}
                         </span>
-                        ${inStock ? `<button class="btn btn-small btn-primary checkout-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Check Out</button>` : ''}
+                        ${inStock ? `<button class="btn btn-small btn-primary remove-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Remove</button>` : ''}
                     </div>
                 </div>
             </div>
@@ -1976,16 +2070,16 @@ function renderWineGrid(containerId, wines) {
     // Add click handlers
     container.querySelectorAll('.wine-card').forEach(card => {
         card.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('checkout-btn') && !e.target.classList.contains('wine-card-expand-btn')) {
+            if (!e.target.classList.contains('remove-btn') && !e.target.classList.contains('wine-card-expand-btn')) {
                 showWineDetail(card.dataset.wineId);
             }
         });
     });
 
-    container.querySelectorAll('.checkout-btn').forEach(btn => {
+    container.querySelectorAll('.remove-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            openCheckoutModal(btn.dataset.wineId, btn.dataset.quantity);
+            openRemoveModal(btn.dataset.wineId, btn.dataset.quantity);
         });
     });
 
@@ -2121,7 +2215,7 @@ async function showWineDetail(wineId) {
                 ` : ''}
 
                 <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
-                    ${quantity > 0 ? `<button class="btn btn-primary" onclick="openCheckoutModal('${wine.id}', ${quantity})">Check Out</button>` : ''}
+                    ${quantity > 0 ? `<button class="btn btn-primary" onclick="openRemoveModal('${wine.id}', ${quantity})">Remove</button>` : ''}
                     <button class="btn btn-danger" onclick="deleteWine('${wine.id}')">Delete Wine</button>
                 </div>
             </div>
@@ -2130,16 +2224,20 @@ async function showWineDetail(wineId) {
                 <div class="wine-detail-transactions">
                     <h3>Transaction History</h3>
                     <div class="transaction-list">
-                        ${wine.transactions.map(t => `
+                        ${wine.transactions.map(t => {
+                            const badge = getRemovalBadge(t);
+                            const detail = getRemovalDetail(t);
+                            return `
                             <div class="transaction-item">
-                                <span class="transaction-type ${t.transaction_type === 'CHECK_IN' ? 'check-in' : 'check-out'}">
-                                    ${t.transaction_type === 'CHECK_IN' ? 'In' : 'Out'}
+                                <span class="transaction-type ${badge.cssClass}">
+                                    ${badge.label}
                                 </span>
                                 <span class="transaction-quantity">${t.quantity} bottle${t.quantity > 1 ? 's' : ''}</span>
                                 <span class="transaction-date">${formatDate(t.transaction_date)}</span>
+                                ${detail ? `<span class="transaction-detail">${detail}</span>` : ''}
                                 ${t.notes ? `<span>${t.notes}</span>` : ''}
                             </div>
-                        `).join('')}
+                        `;}).join('')}
                     </div>
                 </div>
             ` : ''}
@@ -2151,13 +2249,18 @@ async function showWineDetail(wineId) {
     }
 }
 
-function openCheckoutModal(wineId, availableQuantity) {
-    document.getElementById('checkout-wine-id').value = wineId;
-    document.getElementById('checkout-quantity').max = availableQuantity;
-    document.getElementById('checkout-quantity').value = 1;
-    document.getElementById('checkout-available').textContent = `(${availableQuantity} available)`;
-    document.getElementById('checkout-notes').value = '';
-    openModal('checkout-modal');
+function openRemoveModal(wineId, availableQuantity) {
+    document.getElementById('remove-wine-id').value = wineId;
+    document.getElementById('remove-quantity').max = availableQuantity;
+    document.getElementById('remove-quantity').value = 1;
+    document.getElementById('remove-available').textContent = `(${availableQuantity} available)`;
+    // Reset form fields
+    document.getElementById('remove-tasting-notes').value = '';
+    document.getElementById('remove-sale-price').value = '';
+    document.getElementById('remove-gift-recipient').value = '';
+    document.getElementById('remove-removal-notes').value = '';
+    resetRemovalPicker();
+    openModal('remove-modal');
 }
 
 function deleteWine(wineId) {
@@ -2185,8 +2288,10 @@ function deleteWine(wineId) {
 async function loadHistory() {
     const filter = document.getElementById('history-filter').value;
     let url = `${API_BASE}/transactions?limit=100`;
-    if (filter !== 'all') {
+    if (filter === 'CHECK_IN' || filter === 'CHECK_OUT') {
         url += `&transaction_type=${filter}`;
+    } else if (filter === 'DRINK' || filter === 'SELL' || filter === 'GIFT' || filter === 'OTHER') {
+        url += `&transaction_type=CHECK_OUT&removal_reason=${filter}`;
     }
 
     try {
@@ -2210,19 +2315,24 @@ function renderTransactionList(transactions) {
         return;
     }
 
-    container.innerHTML = transactions.map(t => `
+    container.innerHTML = transactions.map(t => {
+        const badge = getRemovalBadge(t);
+        const detail = getRemovalDetail(t);
+        return `
         <div class="transaction-item">
-            <span class="transaction-type ${t.transaction_type === 'CHECK_IN' ? 'check-in' : 'check-out'}">
-                ${t.transaction_type === 'CHECK_IN' ? 'In' : 'Out'}
+            <span class="transaction-type ${badge.cssClass}">
+                ${badge.label}
             </span>
             <span class="transaction-wine">
                 ${t.wine ? t.wine.name : 'Unknown Wine'}
                 ${t.wine && t.wine.vintage ? `<span class="vintage">(${t.wine.vintage})</span>` : ''}
+                ${detail ? `<span class="transaction-detail">${detail}</span>` : ''}
             </span>
             <span class="transaction-quantity">${t.quantity} bottle${t.quantity > 1 ? 's' : ''}</span>
             <span class="transaction-date">${formatDate(t.transaction_date)}</span>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // Utilities
@@ -2595,8 +2705,10 @@ async function handleExport(type, format) {
             }
         } else if (type === 'transactions') {
             const historyFilter = document.getElementById('history-filter')?.value;
-            if (historyFilter && historyFilter !== 'all') {
+            if (historyFilter === 'CHECK_IN' || historyFilter === 'CHECK_OUT') {
                 url += `&transaction_type=${historyFilter}`;
+            } else if (historyFilter === 'DRINK' || historyFilter === 'SELL' || historyFilter === 'GIFT' || historyFilter === 'OTHER') {
+                url += `&transaction_type=CHECK_OUT&removal_reason=${historyFilter}`;
             }
         }
     }

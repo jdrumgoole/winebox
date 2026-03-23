@@ -1,7 +1,7 @@
 """MongoDB document models for WineBox."""
 
 from winebox.models.wine import Wine, WineCollection, InventoryInfo, GrapeBlendEntry, ScoreEntry
-from winebox.models.transaction import Transaction, TransactionType
+from winebox.models.transaction import Transaction, TransactionType, RemovalReason
 from winebox.models.user import User
 from winebox.models.wine_type import WineType
 from winebox.models.grape_variety import GrapeVariety
@@ -19,6 +19,7 @@ __all__ = [
     "WineCollection",
     "Transaction",
     "TransactionType",
+    "RemovalReason",
     "User",
     "RevokedToken",
     "LoginAttempt",

@@ -6,7 +6,7 @@ from typing import Any
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from winebox.models.transaction import TransactionType
+from winebox.models.transaction import RemovalReason, TransactionType
 
 
 class TransactionCreate(BaseModel):
@@ -46,6 +46,11 @@ class TransactionResponse(BaseModel):
     transaction_date: datetime
     created_at: datetime
     wine: WineBasicInfo | None = None
+    removal_reason: RemovalReason | None = None
+    tasting_notes: str | None = None
+    sale_price_usd: float | None = None
+    gift_recipient: str | None = None
+    removal_notes: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
