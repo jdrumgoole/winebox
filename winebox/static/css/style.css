@@ -2759,12 +2759,11 @@ body.logged-out #user-info {
     min-width: 0;
 }
 
-.import-custom-btn,
 .import-skip-btn {
     white-space: nowrap;
     background: var(--card-background);
-    color: var(--primary-color);
-    border: 1.5px solid var(--primary-color);
+    color: var(--text-muted);
+    border: 1.5px solid var(--border-color);
     padding: 0.35rem 0.75rem;
     font-size: 0.8rem;
     border-radius: var(--radius);
@@ -2773,17 +2772,9 @@ body.logged-out #user-info {
     flex-shrink: 0;
 }
 
-.import-custom-btn:hover,
 .import-skip-btn:hover {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-}
-
-.import-custom-btn.active {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
+    border-color: var(--text-muted);
+    color: var(--text-color);
 }
 
 .import-skip-btn.active {

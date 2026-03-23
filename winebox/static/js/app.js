@@ -3533,6 +3533,7 @@ function initImportPage() {
     // Buttons
     document.getElementById('import-confirm-mapping-btn').addEventListener('click', handleConfirmMapping);
     document.getElementById('import-back-to-upload-btn').addEventListener('click', resetImportPage);
+    document.getElementById('import-use-different-file-btn').addEventListener('click', resetImportPage);
     document.getElementById('import-new-btn').addEventListener('click', resetImportPage);
 
     // Warn before navigating away during row upload
@@ -3786,7 +3787,8 @@ function renderMappingStep(data) {
         // Detect custom field suggestions (e.g. "custom:Cellar Location")
         const isCustom = suggested.startsWith('custom:');
         const customName = isCustom ? suggested.substring(7) : '';
-        const selectValue = isCustom ? 'custom' : suggested;
+        // For custom fields, select value will be the custom:name option we add to the dropdown
+        const selectValue = isCustom ? `custom:${customName}` : suggested;
 
         const isSkipped = selectValue === 'skip';
         const isAutoMatched = !isCustom && !isSkipped && IMPORT_FIELD_META[selectValue];
@@ -3795,6 +3797,8 @@ function renderMappingStep(data) {
         let initialHint = '';
         if (isAutoMatched) {
             initialHint = IMPORT_FIELD_META[selectValue].hint;
+        } else if (isCustom) {
+            initialHint = `"${customName}" will be saved as a custom field on each wine`;
         }
 
         // Build match badge
@@ -3826,11 +3830,10 @@ function renderMappingStep(data) {
                                 `<option value="${key}" ${selectValue === key ? 'selected' : ''}>${optionLabel(key, meta, selectValue)}</option>`
                             ).join('')}
                         </optgroup>
+                        ${isCustom ? `<optgroup label="Custom"><option value="custom:${escapeHtml(customName)}" selected>${escapeHtml(customName)}</option></optgroup>` : ''}
                     </select>
-                    <button type="button" class="btn btn-small btn-outline import-custom-btn ${isCustom ? 'active' : ''}" data-header="${escapeHtml(header)}">Save as custom label</button>
-                    <button type="button" class="btn btn-small btn-outline import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Don't Import</button>
+                    <button type="button" class="btn btn-small import-skip-btn ${isSkipped ? 'active' : ''}" data-header="${escapeHtml(header)}">Ignore</button>
                 </div>
-                <input type="text" class="import-custom-name" placeholder="What should we call this? e.g. Cellar Location" style="display:${isCustom ? 'block' : 'none'};margin-top:0.25rem;width:100%;" data-header="${escapeHtml(header)}" value="${isCustom ? escapeHtml(customName) : ''}">
                 <span class="import-field-hint" data-header="${escapeHtml(header)}">${initialHint}</span>
             </td>
         </tr>`;
@@ -3844,8 +3847,7 @@ function renderMappingStep(data) {
         document.querySelectorAll('.import-mapping-select').forEach(sel => {
             const row = sel.closest('.import-mapping-row');
             const skipBtn = row.querySelector('.import-skip-btn');
-            const customBtn = row.querySelector('.import-custom-btn');
-            if (!skipBtn.classList.contains('active') && !customBtn.classList.contains('active') && IMPORT_FIELD_META[sel.value]) {
+            if (!skipBtn.classList.contains('active') && IMPORT_FIELD_META[sel.value]) {
                 currentUsed.add(sel.value);
             }
         });
@@ -3868,17 +3870,16 @@ function renderMappingStep(data) {
             const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
             const hintEl = row.querySelector('.import-field-hint');
             const badge = row.querySelector('.import-match-badge');
-            const customBtn = row.querySelector('.import-custom-btn');
-
-            // Deactivate custom mode when user picks a standard field
-            if (customBtn.classList.contains('active')) {
-                customBtn.classList.remove('active');
-                row.querySelector('.import-custom-name').style.display = 'none';
-            }
 
             // Update hint text
-            const meta = IMPORT_FIELD_META[e.target.value];
-            hintEl.textContent = meta ? meta.hint : '';
+            const val = e.target.value;
+            if (val.startsWith('custom:')) {
+                const name = val.substring(7);
+                hintEl.textContent = `"${name}" will be saved as a custom field on each wine`;
+            } else {
+                const meta = IMPORT_FIELD_META[val];
+                hintEl.textContent = meta ? meta.hint : '';
+            }
 
             // Remove badge on manual change
             if (badge) badge.remove();
@@ -3888,49 +3889,15 @@ function renderMappingStep(data) {
         });
     });
 
-    // "Save as custom label" button toggle
-    document.querySelectorAll('.import-custom-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const header = e.target.dataset.header;
-            const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
-            const customInput = row.querySelector('.import-custom-name');
-            const hintEl = row.querySelector('.import-field-hint');
-            const skipBtn = row.querySelector('.import-skip-btn');
-            const isActive = btn.classList.toggle('active');
-
-            customInput.style.display = isActive ? 'block' : 'none';
-            if (isActive) {
-                // Deactivate skip if active
-                if (skipBtn.classList.contains('active')) {
-                    skipBtn.classList.remove('active');
-                    row.classList.remove('skipped');
-                    row.querySelector('.import-not-mapped').style.display = 'none';
-                }
-                hintEl.textContent = 'Type a name for this custom field';
-                customInput.focus();
-            } else {
-                const meta = IMPORT_FIELD_META[row.querySelector('.import-mapping-select').value];
-                hintEl.textContent = meta ? meta.hint : '';
-            }
-            updateMatchedIndicators();
-        });
-    });
-
-    // Skip button toggle
+    // Ignore button toggle
     document.querySelectorAll('.import-skip-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const header = e.target.dataset.header;
             const row = document.querySelector(`.import-mapping-row[data-header="${header}"]`);
-            const customInput = row.querySelector('.import-custom-name');
-            const customBtn = row.querySelector('.import-custom-btn');
             const notMapped = row.querySelector('.import-not-mapped');
             const isActive = btn.classList.toggle('active');
             row.classList.toggle('skipped', isActive);
             notMapped.style.display = isActive ? 'block' : 'none';
-            if (isActive) {
-                customInput.style.display = 'none';
-                customBtn.classList.remove('active');
-            }
             updateMatchedIndicators();
         });
     });
@@ -3982,14 +3949,7 @@ async function handleConfirmMapping() {
             mapping[header] = 'skip';
             return;
         }
-        const customBtn = row.querySelector('.import-custom-btn');
-        if (customBtn && customBtn.classList.contains('active')) {
-            const customInput = row.querySelector('.import-custom-name');
-            const customName = customInput.value.trim();
-            mapping[header] = customName ? `custom:${customName}` : 'skip';
-        } else {
-            mapping[header] = row.querySelector('.import-mapping-select').value;
-        }
+        mapping[header] = row.querySelector('.import-mapping-select').value;
     });
 
     // Validate at least one name mapping
