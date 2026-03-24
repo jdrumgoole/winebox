@@ -46,6 +46,7 @@ function getTokenStorage() {
 
 // State
 let currentPage = 'dashboard';
+let isHandlingPopState = false;
 let authToken = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
 let currentUser = null;
 let lastScanResult = null;  // Store last scan result to avoid rescanning on checkin
@@ -438,7 +439,11 @@ async function showMainApp() {
     // Check if URL hash specifies a valid app page
     const hashPage = window.location.hash.slice(1).split('?')[0];
     if (hashPage && APP_PAGES.includes(hashPage)) {
+        isHandlingPopState = true;
         navigateTo(hashPage);
+        isHandlingPopState = false;
+        // Set initial history entry with replaceState to avoid phantom extra entry
+        history.replaceState(null, '', `#${hashPage}`);
         return;
     }
 
@@ -447,7 +452,11 @@ async function showMainApp() {
     // Only navigate to dashboard if user hasn't navigated elsewhere
     const finalHash = window.location.hash.slice(1).split('?')[0];
     if (!finalHash || !APP_PAGES.includes(finalHash)) {
+        isHandlingPopState = true;
         navigateTo('dashboard');
+        isHandlingPopState = false;
+        // Set initial history entry with replaceState to avoid phantom extra entry
+        history.replaceState(null, '', '#dashboard');
     }
 }
 
@@ -562,7 +571,9 @@ function handleHashNavigation() {
 
     // If it's a valid app page and user is logged in, navigate to it
     if (hashPage && APP_PAGES.includes(hashPage) && authToken && currentUser) {
+        isHandlingPopState = true;
         navigateTo(hashPage);
+        isHandlingPopState = false;
         return;
     }
 
@@ -839,8 +850,8 @@ function navigateTo(page) {
     currentPage = page;
 
     // Update URL hash to reflect current page
-    if (window.location.hash !== `#${page}`) {
-        history.replaceState(null, '', `#${page}`);
+    if (!isHandlingPopState && window.location.hash !== `#${page}`) {
+        history.pushState(null, '', `#${page}`);
     }
 
     // Track page view
