@@ -10,6 +10,7 @@ from winebox.config import settings
 from .constants import (
     CANONICAL_WINE_FIELDS,
     HEADER_ALIASES,
+    MIN_CANONICAL_MATCHES,
     VALID_WINE_FIELDS,
     WINE_FIELD_DESCRIPTIONS,
 )
@@ -34,6 +35,44 @@ def suggest_column_mapping(headers: list[str]) -> dict[str, str]:
         else:
             mapping[header] = f"custom:{header}"
     return mapping
+
+
+def assess_mapping_confidence(
+    suggested_mapping: dict[str, str],
+) -> dict[str, Any]:
+    """Assess whether a suggested mapping is confident enough for auto-import.
+
+    Auto-import requires:
+    - "name" MUST be matched
+    - At least MIN_CANONICAL_MATCHES canonical fields total (including name)
+
+    Args:
+        suggested_mapping: Dict mapping header name -> wine field or "custom:<header>".
+
+    Returns:
+        Dict with keys:
+        - confident: bool — whether auto-import should proceed
+        - matched_fields: list[str] — canonical fields that were matched
+        - unmapped_headers: list[str] — headers mapped to custom/* or skip
+    """
+    matched_fields: list[str] = []
+    unmapped_headers: list[str] = []
+
+    for header, field in suggested_mapping.items():
+        if field in CANONICAL_WINE_FIELDS:
+            if field not in matched_fields:
+                matched_fields.append(field)
+        elif field.startswith("custom:") or field == "skip":
+            unmapped_headers.append(header)
+
+    has_name = "name" in matched_fields
+    confident = has_name and len(matched_fields) >= MIN_CANONICAL_MATCHES
+
+    return {
+        "confident": confident,
+        "matched_fields": matched_fields,
+        "unmapped_headers": unmapped_headers,
+    }
 
 
 def _static_fallback(header: str) -> str:

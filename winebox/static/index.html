@@ -711,12 +711,19 @@
                             <p class="form-hint">Supported formats: CSV, Excel (.xlsx). Max 10,000 rows.</p>
                             <p class="form-hint" style="margin-top:0.5rem;">We'll help you match your columns in the next step. Nothing is imported until you confirm.</p>
                         </div>
-                        <div class="form-group" style="margin-top:0.75rem;">
-                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
-                                <input type="checkbox" id="import-use-ai-mapping" checked>
-                                <span>Use AI to automatically match columns (takes a few extra seconds)</span>
-                            </label>
-                        </div>
+                        <details id="import-advanced-toggle" style="margin-top:0.75rem;">
+                            <summary style="cursor:pointer;font-size:0.9rem;color:var(--text-muted);">Advanced import options...</summary>
+                            <div style="margin-top:0.5rem;padding-left:0.25rem;">
+                                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;margin-bottom:0.5rem;">
+                                    <input type="checkbox" id="import-force-mapping">
+                                    <span>Always show column mapping step</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                                    <input type="checkbox" id="import-use-ai-mapping" checked>
+                                    <span>Use AI to automatically match columns (takes a few extra seconds)</span>
+                                </label>
+                            </div>
+                        </details>
                     </div>
                 </div>
 
@@ -778,6 +785,56 @@
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" id="import-new-btn">Import Another File</button>
                         <button type="button" class="btn btn-secondary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                    </div>
+                </div>
+
+                <!-- Step 5: Duplicate Detected -->
+                <div id="import-step-duplicate" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3>We already have this data</h3>
+                        <div id="import-duplicate-content"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="import-duplicate-augment-btn">Add more details from unmapped columns</button>
+                        <button type="button" class="btn btn-secondary" id="import-duplicate-reimport-btn">Import again anyway</button>
+                        <button type="button" class="btn btn-secondary" id="import-duplicate-cancel-btn">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Step 6: Augment Unmapped Columns -->
+                <div id="import-step-augment" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3>Add More Details</h3>
+                        <p class="form-note">These columns from your file weren't imported. Map them to wine fields to add the information to your wines.</p>
+                        <div id="import-augment-mapping-container"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="import-augment-confirm-btn">Update My Wines</button>
+                        <button type="button" class="btn btn-secondary" id="import-augment-cancel-btn">Skip</button>
+                    </div>
+                </div>
+
+                <!-- Step 7: Import Dashboard -->
+                <div id="import-step-dashboard" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3 id="import-dashboard-title">Just Added</h3>
+                        <div id="import-dashboard-summary" class="stats-grid" style="margin-bottom:1.5rem;"></div>
+                        <div id="import-dashboard-unmapped-notice" style="display:none;margin-bottom:1rem;"></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Your New Wines</h3>
+                        <div id="import-dashboard-wines" class="wine-grid"></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Your Cellar at a Glance</h3>
+                        <div class="dashboard-charts-grid" id="import-dashboard-charts">
+                            <div class="chart-card"><canvas id="import-chart-wine-type"></canvas></div>
+                            <div class="chart-card"><canvas id="import-chart-country"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                        <button type="button" class="btn btn-secondary" id="import-dashboard-new-btn">Import Another File</button>
                     </div>
                 </div>
             </div>

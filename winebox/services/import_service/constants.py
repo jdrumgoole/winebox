@@ -114,6 +114,10 @@ WINE_FIELD_DESCRIPTIONS: dict[str, str] = {
     "notes": "Tasting notes, description, or general notes",
 }
 
+# Minimum number of canonical fields (including name) that must match
+# for auto-import to proceed without showing the mapping UI
+MIN_CANONICAL_MATCHES = 2
+
 # Number of rows per insert_many chunk during upload
 UPLOAD_CHUNK_SIZE = 200
 

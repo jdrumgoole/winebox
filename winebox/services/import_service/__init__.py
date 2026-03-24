@@ -4,6 +4,7 @@ from .constants import (
     CANONICAL_WINE_FIELDS,
     HEADER_ALIASES,
     MAX_ROWS,
+    MIN_CANONICAL_MATCHES,
     NON_WINE_KEYWORDS,
     UPLOAD_CHUNK_SIZE,
     VALID_WINE_FIELDS,
@@ -20,6 +21,7 @@ from .converters import (
 from .mapping import (
     _is_valid_mapping_value,
     _static_fallback,
+    assess_mapping_confidence,
     suggest_column_mapping,
     suggest_column_mapping_ai,
 )
@@ -32,6 +34,7 @@ __all__ = [
     "CANONICAL_WINE_FIELDS",
     "HEADER_ALIASES",
     "MAX_ROWS",
+    "MIN_CANONICAL_MATCHES",
     "NON_WINE_KEYWORDS",
     "UPLOAD_CHUNK_SIZE",
     "VALID_WINE_FIELDS",
@@ -40,6 +43,7 @@ __all__ = [
     "parse_csv",
     "parse_xlsx",
     # Mapping
+    "assess_mapping_confidence",
     "suggest_column_mapping",
     "suggest_column_mapping_ai",
     "_is_valid_mapping_value",

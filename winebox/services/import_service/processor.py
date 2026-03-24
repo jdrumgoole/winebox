@@ -67,7 +67,7 @@ def _maybe_emit_progress(
 class _Chunk:
     """A batch of rows moving through the enrichment/write pipeline."""
 
-    __slots__ = ("wine_datas", "chunk_start", "chunk_end", "rows_skipped", "skipped_rows", "errors")
+    __slots__ = ("wine_datas", "chunk_start", "chunk_end", "rows_skipped", "skipped_rows", "errors", "batch_id")
 
     def __init__(
         self,
@@ -77,6 +77,7 @@ class _Chunk:
         rows_skipped: int,
         skipped_rows: list[dict[str, Any]],
         errors: list[str],
+        batch_id: PyObjectId | None = None,
     ) -> None:
         self.wine_datas = wine_datas
         self.chunk_start = chunk_start
@@ -84,6 +85,7 @@ class _Chunk:
         self.rows_skipped = rows_skipped
         self.skipped_rows = skipped_rows
         self.errors = errors
+        self.batch_id = batch_id
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +100,7 @@ def _convert_chunk_from_rows(
     chunk_end: int,
     skip_non_wine: bool,
     default_quantity: int,
+    batch_id: PyObjectId | None = None,
 ) -> _Chunk:
     """Phase 1 helper: Convert raw row dicts to wine dicts (sync, fast)."""
     chunk_rows = rows
@@ -128,13 +131,17 @@ def _convert_chunk_from_rows(
                 })
                 continue
 
+            # Link wine to its import batch for later augmentation
+            if batch_id is not None:
+                wine_data["import_batch_id"] = batch_id
+
             wine_datas.append((wine_data, row_index + 1))
         except Exception as e:
             error_msg = f"Row {row_index + 1}: {str(e)}"
             errors.append(error_msg)
             logger.warning("Import error on row %d: %s", row_index + 1, e)
 
-    return _Chunk(wine_datas, chunk_start, chunk_end, rows_skipped, skipped_rows, errors)
+    return _Chunk(wine_datas, chunk_start, chunk_end, rows_skipped, skipped_rows, errors, batch_id)
 
 
 def _convert_chunk(
@@ -155,6 +162,7 @@ def _convert_chunk(
         chunk_end,
         skip_non_wine,
         default_quantity,
+        batch_id=batch.id,
     )
 
 
@@ -375,6 +383,7 @@ async def _feeder(
                 chunk_end,
                 skip_non_wine,
                 default_quantity,
+                batch_id=batch.id,
             )
             await enrichment_queue.put(chunk)
 
@@ -520,6 +529,13 @@ async def _process_chunks(
     # Clear embedded rows — feeder has consumed them and audit data lives in
     # raw_uploads. This avoids writing the full rows list in the final save.
     batch.rows = []
+
+    # Compute unmapped headers from the column mapping
+    if batch.column_mapping:
+        batch.unmapped_headers = [
+            header for header, field in batch.column_mapping.items()
+            if field.startswith("custom:") or field == "skip"
+        ]
 
     # Save final batch state
     batch.wines_created = wines_created

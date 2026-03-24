@@ -3501,6 +3501,7 @@ let currentImportBatchId = null;
 let currentImportData = null;
 let pendingCsvRows = null;
 let isUploadingRows = false;
+let pendingCsvFile = null;  // Original file reference for checksum
 
 function initImportPage() {
     const fileInput = document.getElementById('import-file-input');
@@ -3536,6 +3537,18 @@ function initImportPage() {
     document.getElementById('import-use-different-file-btn').addEventListener('click', resetImportPage);
     document.getElementById('import-new-btn').addEventListener('click', resetImportPage);
 
+    // Duplicate step buttons
+    document.getElementById('import-duplicate-augment-btn')?.addEventListener('click', handleDuplicateAugment);
+    document.getElementById('import-duplicate-reimport-btn')?.addEventListener('click', handleDuplicateReimport);
+    document.getElementById('import-duplicate-cancel-btn')?.addEventListener('click', resetImportPage);
+
+    // Augment step buttons
+    document.getElementById('import-augment-confirm-btn')?.addEventListener('click', handleAugmentConfirm);
+    document.getElementById('import-augment-cancel-btn')?.addEventListener('click', handleAugmentSkip);
+
+    // Dashboard buttons
+    document.getElementById('import-dashboard-new-btn')?.addEventListener('click', resetImportPage);
+
     // Warn before navigating away during row upload
     window.addEventListener('beforeunload', (e) => {
         if (isUploadingRows) {
@@ -3559,12 +3572,27 @@ async function handleImportFileSelect(file) {
 }
 
 /**
+ * Compute SHA-256 hash of a File using the Web Crypto API.
+ */
+async function computeFileChecksum(file) {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
  * Parse CSV client-side with PapaParse streaming, then upload metadata to server.
  */
 async function handleCsvImport(file) {
     try {
         showToast('Parsing CSV...', 'info');
-        const parsed = await parseCsvFile(file);
+
+        // Parse and compute checksum concurrently
+        const [parsed, fileChecksum] = await Promise.all([
+            parseCsvFile(file),
+            computeFileChecksum(file),
+        ]);
 
         if (parsed.errors.length > 0) {
             showToast(`CSV parse error: ${parsed.errors[0].message}`, 'error');
@@ -3583,6 +3611,7 @@ async function handleCsvImport(file) {
 
         // Store rows for later upload after mapping
         pendingCsvRows = parsed.rows;
+        pendingCsvFile = file;
 
         const useAiCheckbox = document.getElementById('import-use-ai-mapping');
         const useAiMapping = !useAiCheckbox || useAiCheckbox.checked;
@@ -3597,6 +3626,7 @@ async function handleCsvImport(file) {
                 preview_rows: parsed.rows.slice(0, 5),
                 row_count: parsed.rows.length,
                 use_ai_mapping: useAiMapping,
+                file_checksum: fileChecksum,
             })
         });
 
@@ -3609,7 +3639,8 @@ async function handleCsvImport(file) {
         currentImportBatchId = data.batch_id;
         currentImportData = data;
 
-        renderMappingStep(data);
+        // Route based on duplicate/confidence/force-mapping
+        routeAfterUpload(data);
     } catch (error) {
         showToast(error.message, 'error');
     }
@@ -3642,7 +3673,8 @@ async function handleXlsxImport(file) {
         currentImportBatchId = data.batch_id;
         currentImportData = data;
 
-        renderMappingStep(data);
+        // Route based on duplicate/confidence/force-mapping
+        routeAfterUpload(data);
     } catch (error) {
         showToast(error.message, 'error');
     }
@@ -3723,6 +3755,423 @@ async function uploadRowChunks(batchId, rows) {
         }
     } finally {
         isUploadingRows = false;
+    }
+}
+
+/**
+ * Route the user after upload based on duplicate detection, confidence, and settings.
+ */
+function routeAfterUpload(data) {
+    const forceMapping = document.getElementById('import-force-mapping');
+    const forceMappingChecked = forceMapping && forceMapping.checked;
+
+    // Check for duplicate first
+    if (data.duplicate_of) {
+        showDuplicateScreen(data);
+        return;
+    }
+
+    // Auto-import if eligible and user hasn't forced mapping
+    if (data.auto_import_eligible && !forceMappingChecked) {
+        handleAutoImport(data);
+        return;
+    }
+
+    // Fall through to existing mapping UI
+    renderMappingStep(data);
+}
+
+/**
+ * Handle auto-import: silently set mapping, upload rows, process, then show dashboard.
+ */
+async function handleAutoImport(data) {
+    try {
+        // Show progress immediately
+        _showImportStep('progress');
+
+        // Reset progress UI
+        document.getElementById('import-progress-fill').style.width = '0%';
+        document.getElementById('import-progress-text').textContent = 'Auto-importing...';
+        document.getElementById('import-progress-percent').textContent = '';
+        document.getElementById('import-progress-created').textContent = '';
+        document.getElementById('import-progress-skipped').textContent = '';
+
+        // Set the suggested mapping directly
+        const mapResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/mapping`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mapping: data.suggested_mapping })
+        });
+
+        if (!mapResponse.ok) {
+            const error = await mapResponse.json();
+            throw new Error(error.detail || 'Failed to set mapping');
+        }
+
+        // If client-parsed CSV, upload rows in chunks
+        if (pendingCsvRows) {
+            await uploadRowChunks(currentImportBatchId, pendingCsvRows);
+            pendingCsvRows = null;
+        }
+
+        // Reset progress for processing phase
+        document.getElementById('import-progress-fill').style.width = '0%';
+        document.getElementById('import-progress-text').textContent = '0 / 0 rows';
+        document.getElementById('import-progress-percent').textContent = '0%';
+
+        // Stream processing
+        const processResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/process-stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1, skip_enrichment: true })
+        });
+
+        if (!processResponse.ok) {
+            const error = await processResponse.json();
+            throw new Error(error.detail || 'Processing failed');
+        }
+
+        const result = await readImportStream(processResponse);
+
+        // Start enrichment progress if triggered
+        if (result.enrichment_started) {
+            startEnrichmentProgress();
+        }
+
+        // Navigate to import dashboard instead of results
+        showImportDashboard(currentImportBatchId, data.filename, result);
+    } catch (error) {
+        showToast(error.message, 'error');
+        // Fall back to mapping step on error
+        renderMappingStep(data);
+    }
+}
+
+/**
+ * Show the duplicate detection screen.
+ */
+function showDuplicateScreen(data) {
+    _showImportStep('duplicate');
+
+    let html = `<p style="font-size:1.05rem;margin-bottom:1rem;">
+        This file was imported before as <strong>${escapeHtml(data.duplicate_filename || data.filename)}</strong>
+        with <strong>${data.duplicate_wines_created} wines</strong> added to your cellar.</p>`;
+
+    // Show the mapping that was used
+    if (data.duplicate_mapping) {
+        html += '<h4 style="margin-bottom:0.5rem;">Columns that were imported:</h4><ul style="margin-bottom:1rem;">';
+        for (const [header, field] of Object.entries(data.duplicate_mapping)) {
+            if (field !== 'skip' && !field.startsWith('custom:')) {
+                html += `<li><strong>${escapeHtml(header)}</strong> &rarr; ${escapeHtml(field)}</li>`;
+            }
+        }
+        html += '</ul>';
+    }
+
+    // Highlight unmapped columns
+    if (data.duplicate_unmapped_headers && data.duplicate_unmapped_headers.length > 0) {
+        html += '<h4 style="margin-bottom:0.5rem;color:var(--primary-color);">Columns that were not imported:</h4><ul>';
+        for (const header of data.duplicate_unmapped_headers) {
+            html += `<li>${escapeHtml(header)}</li>`;
+        }
+        html += '</ul>';
+    }
+
+    document.getElementById('import-duplicate-content').innerHTML = html;
+
+    // Show/hide augment button based on unmapped headers
+    const augmentBtn = document.getElementById('import-duplicate-augment-btn');
+    if (augmentBtn) {
+        augmentBtn.style.display = (data.duplicate_unmapped_headers && data.duplicate_unmapped_headers.length > 0) ? '' : 'none';
+    }
+}
+
+/**
+ * Handle "Add more details" from duplicate screen — show augment UI for the original batch.
+ */
+async function handleDuplicateAugment() {
+    if (!currentImportData || !currentImportData.duplicate_of) return;
+    showAugmentUI(currentImportData.duplicate_of);
+}
+
+/**
+ * Handle "Import again anyway" from duplicate screen.
+ */
+function handleDuplicateReimport() {
+    if (!currentImportData) return;
+
+    // Check if auto-import eligible
+    const forceMapping = document.getElementById('import-force-mapping');
+    const forceMappingChecked = forceMapping && forceMapping.checked;
+
+    if (currentImportData.auto_import_eligible && !forceMappingChecked) {
+        handleAutoImport(currentImportData);
+    } else {
+        renderMappingStep(currentImportData);
+    }
+}
+
+/**
+ * Show the augment UI for unmapped columns of a completed batch.
+ */
+async function showAugmentUI(batchId) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/import/${batchId}/unmapped-columns`);
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to fetch unmapped columns');
+        }
+
+        const data = await response.json();
+        if (data.unmapped_headers.length === 0) {
+            showToast('No unmapped columns to add', 'info');
+            return;
+        }
+
+        _showImportStep('augment');
+
+        // Store batch ID for the confirm handler
+        document.getElementById('import-step-augment').dataset.batchId = batchId;
+
+        // Field metadata (same as mapping step)
+        const IMPORT_FIELD_META = {
+            name:                { label: 'Wine Name', group: 'basics' },
+            winery:              { label: 'Winery / Producer', group: 'basics' },
+            vintage:             { label: 'Vintage Year', group: 'basics' },
+            grape_variety:       { label: 'Grape', group: 'basics' },
+            country:             { label: 'Country', group: 'basics' },
+            region:              { label: 'Region', group: 'basics' },
+            sub_region:          { label: 'Sub-Region', group: 'details' },
+            appellation:         { label: 'Appellation', group: 'details' },
+            wine_type_id:        { label: 'Wine Style', group: 'details' },
+            classification:      { label: 'Classification', group: 'details' },
+            alcohol_percentage:  { label: 'Alcohol (ABV)', group: 'details' },
+            price_tier:          { label: 'Price Range', group: 'details' },
+            quantity:            { label: 'Bottles', group: 'details' },
+            notes:               { label: 'Tasting Notes', group: 'details' },
+        };
+
+        const basicsFields = Object.entries(IMPORT_FIELD_META).filter(([,m]) => m.group === 'basics');
+        const detailsFields = Object.entries(IMPORT_FIELD_META).filter(([,m]) => m.group === 'details');
+
+        let html = '<table class="import-mapping-table"><thead><tr><th>Unmapped Column</th><th>Example values</th><th></th><th>Map To</th></tr></thead><tbody>';
+
+        for (const header of data.unmapped_headers) {
+            const samples = data.preview_data.slice(0, 3)
+                .map(r => String(r[header] || '').substring(0, 30))
+                .filter(s => s)
+                .join(', ');
+
+            html += `<tr class="import-mapping-row" data-header="${escapeHtml(header)}">
+                <td><strong>${escapeHtml(header)}</strong>
+                    <span class="import-sample-cell">${escapeHtml(samples)}</span></td>
+                <td class="import-arrow-cell">&#x2192;</td>
+                <td>
+                    <select class="import-mapping-select" data-header="${escapeHtml(header)}">
+                        <option value="skip">Skip this column</option>
+                        <optgroup label="The Basics">
+                            ${basicsFields.map(([key, meta]) =>
+                                `<option value="${key}">${meta.label}</option>`
+                            ).join('')}
+                        </optgroup>
+                        <optgroup label="Extra Details">
+                            ${detailsFields.map(([key, meta]) =>
+                                `<option value="${key}">${meta.label}</option>`
+                            ).join('')}
+                        </optgroup>
+                        <optgroup label="Custom">
+                            <option value="custom:${escapeHtml(header)}">${escapeHtml(header)} (custom field)</option>
+                        </optgroup>
+                    </select>
+                </td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+
+        document.getElementById('import-augment-mapping-container').innerHTML = html;
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+/**
+ * Handle confirm button on augment UI.
+ */
+async function handleAugmentConfirm() {
+    const stepEl = document.getElementById('import-step-augment');
+    const batchId = stepEl.dataset.batchId;
+    if (!batchId) return;
+
+    // Collect mapping
+    const mapping = {};
+    stepEl.querySelectorAll('.import-mapping-select').forEach(sel => {
+        mapping[sel.dataset.header] = sel.value;
+    });
+
+    // Remove skipped entries
+    const filteredMapping = {};
+    for (const [h, f] of Object.entries(mapping)) {
+        if (f !== 'skip') {
+            filteredMapping[h] = f;
+        }
+    }
+
+    if (Object.keys(filteredMapping).length === 0) {
+        showToast('No columns selected for mapping', 'info');
+        return;
+    }
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/import/${batchId}/remap`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mapping: filteredMapping })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Remap failed');
+        }
+
+        const result = await response.json();
+        showToast(`Updated ${result.wines_updated} wines with ${result.fields_added.join(', ')}`, 'success');
+
+        // Navigate to cellar to see updated wines
+        resetImportPage();
+        navigateTo('cellar');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+/**
+ * Handle skip button on augment UI.
+ */
+function handleAugmentSkip() {
+    resetImportPage();
+}
+
+/**
+ * Show the import dashboard for a completed batch.
+ */
+async function showImportDashboard(batchId, filename, importResult) {
+    _showImportStep('dashboard');
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/import/${batchId}/wines`);
+        if (!response.ok) {
+            // Fall back to basic results if dashboard endpoint fails
+            showImportResults(importResult);
+            return;
+        }
+
+        const data = await response.json();
+
+        // Title
+        document.getElementById('import-dashboard-title').textContent =
+            `You just added ${data.summary.wines_created} wines from ${escapeHtml(filename)}`;
+
+        // Summary cards
+        const summary = data.summary;
+        let summaryHtml = `
+            <div class="stat-card">
+                <div class="stat-value">${summary.total_bottles}</div>
+                <div class="stat-label">Bottles Added</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${summary.wines_created}</div>
+                <div class="stat-label">Unique Wines</div>
+            </div>`;
+
+        // Wine type breakdown
+        const typeEntries = Object.entries(summary.by_wine_type);
+        if (typeEntries.length > 0) {
+            const typeText = typeEntries.map(([t, c]) => `${c} ${t}`).join(', ');
+            summaryHtml += `
+                <div class="stat-card">
+                    <div class="stat-value">${typeEntries.length}</div>
+                    <div class="stat-label">Wine Styles (${typeText})</div>
+                </div>`;
+        }
+
+        document.getElementById('import-dashboard-summary').innerHTML = summaryHtml;
+
+        // Unmapped columns notice
+        const unmappedNotice = document.getElementById('import-dashboard-unmapped-notice');
+        if (data.unmapped_headers && data.unmapped_headers.length > 0) {
+            unmappedNotice.style.display = 'block';
+            unmappedNotice.innerHTML = `
+                <div style="padding:1rem;background:rgba(139,26,74,0.05);border:1px solid var(--border-color);border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                    <span>Some columns weren't imported: <strong>${data.unmapped_headers.map(h => escapeHtml(h)).join(', ')}</strong></span>
+                    <button type="button" class="btn btn-small btn-primary" onclick="showAugmentUI('${escapeHtml(batchId)}')">Add these details</button>
+                </div>`;
+        } else {
+            unmappedNotice.style.display = 'none';
+        }
+
+        // Render wine cards (reuse cellar grid rendering)
+        const winesContainer = document.getElementById('import-dashboard-wines');
+        if (data.wines.length > 0) {
+            renderWineGrid('import-dashboard-wines', data.wines);
+        } else {
+            winesContainer.innerHTML = '<p style="color:var(--text-muted);">No wines were created.</p>';
+        }
+
+        // Render mini charts for wine type and country
+        _renderImportDashboardCharts(summary);
+
+    } catch (error) {
+        console.error('Failed to load import dashboard:', error);
+        showImportResults(importResult);
+    }
+}
+
+/**
+ * Render mini charts on the import dashboard.
+ */
+function _renderImportDashboardCharts(summary) {
+    // Wine type chart
+    const typeCanvas = document.getElementById('import-chart-wine-type');
+    if (typeCanvas && summary.by_wine_type && Object.keys(summary.by_wine_type).length > 0) {
+        const entries = Object.entries(summary.by_wine_type).sort((a, b) => b[1] - a[1]);
+        const labels = entries.map(([k]) => (WINE_TYPE_LABELS && WINE_TYPE_LABELS[k]) || k);
+        const values = entries.map(([, v]) => v);
+        const colors = entries.map(([k], i) => (WINE_TYPE_COLORS && WINE_TYPE_COLORS[k]) || CHART_COLORS[i % CHART_COLORS.length]);
+
+        new Chart(typeCanvas, {
+            type: 'doughnut',
+            data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+        });
+    }
+
+    // Country chart
+    const countryCanvas = document.getElementById('import-chart-country');
+    if (countryCanvas && summary.by_country && Object.keys(summary.by_country).length > 0) {
+        const entries = Object.entries(summary.by_country).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const labels = entries.map(([k]) => k);
+        const values = entries.map(([, v]) => v);
+
+        new Chart(countryCanvas, {
+            type: 'bar',
+            data: { labels, datasets: [{ data: values, backgroundColor: CHART_COLORS[0], borderRadius: 4 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            },
+        });
+    }
+}
+
+/**
+ * Helper to show only the specified import step.
+ */
+function _showImportStep(step) {
+    const steps = ['upload', 'map', 'progress', 'results', 'duplicate', 'augment', 'dashboard'];
+    for (const s of steps) {
+        const el = document.getElementById(`import-step-${s}`);
+        if (el) el.style.display = (s === step) ? 'block' : 'none';
     }
 }
 
@@ -3978,10 +4427,7 @@ async function handleConfirmMapping() {
 
     try {
         // Show progress bar immediately so user gets instant feedback
-        document.getElementById('import-step-upload').style.display = 'none';
-        document.getElementById('import-step-map').style.display = 'none';
-        document.getElementById('import-step-progress').style.display = 'block';
-        document.getElementById('import-step-results').style.display = 'none';
+        _showImportStep('progress');
 
         // Reset progress UI
         document.getElementById('import-progress-fill').style.width = '0%';
@@ -4029,12 +4475,19 @@ async function handleConfirmMapping() {
         }
 
         const result = await readImportStream(processResponse);
-        showImportResults(result);
+
+        // Start enrichment progress if triggered
+        if (result.enrichment_started) {
+            startEnrichmentProgress();
+        }
+
+        // Show import dashboard for richer post-import experience
+        const filename = currentImportData ? currentImportData.filename : 'your file';
+        showImportDashboard(currentImportBatchId, filename, result);
     } catch (error) {
         showToast(error.message, 'error');
         // Restore mapping step if progress was shown prematurely
-        document.getElementById('import-step-progress').style.display = 'none';
-        document.getElementById('import-step-map').style.display = 'block';
+        _showImportStep('map');
     }
 }
 
@@ -4085,10 +4538,7 @@ async function readImportStream(response) {
 }
 
 function showImportResults(result) {
-    document.getElementById('import-step-upload').style.display = 'none';
-    document.getElementById('import-step-map').style.display = 'none';
-    document.getElementById('import-step-progress').style.display = 'none';
-    document.getElementById('import-step-results').style.display = 'block';
+    _showImportStep('results');
 
     // Store skipped rows for modal access
     window._lastSkippedRows = result.skipped_rows || [];
@@ -4237,14 +4687,12 @@ function showSkippedRows() {
 }
 
 function resetImportPage() {
-    document.getElementById('import-step-upload').style.display = 'block';
-    document.getElementById('import-step-map').style.display = 'none';
-    document.getElementById('import-step-progress').style.display = 'none';
-    document.getElementById('import-step-results').style.display = 'none';
+    _showImportStep('upload');
     document.getElementById('import-file-input').value = '';
     currentImportBatchId = null;
     currentImportData = null;
     pendingCsvRows = null;
+    pendingCsvFile = null;
     isUploadingRows = false;
 }
 

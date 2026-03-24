@@ -1,7 +1,7 @@
 """Pydantic schemas for spreadsheet import functionality."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,18 @@ class ImportUploadResponse(BaseModel):
     preview_rows: list[dict[str, Any]]
     suggested_mapping: dict[str, str]
     mapping_source: str = "static"
+
+    # Auto-import confidence assessment
+    auto_import_eligible: bool = False
+    matched_canonical_fields: list[str] = Field(default_factory=list)
+    unmapped_headers: list[str] = Field(default_factory=list)
+
+    # Duplicate detection
+    duplicate_of: Optional[str] = None
+    duplicate_filename: Optional[str] = None
+    duplicate_wines_created: Optional[int] = None
+    duplicate_mapping: Optional[dict[str, str]] = None
+    duplicate_unmapped_headers: list[str] = Field(default_factory=list)
 
 
 class ColumnMappingRequest(BaseModel):
@@ -59,6 +71,10 @@ class ParsedUploadRequest(BaseModel):
         True,
         description="Whether to use AI for column mapping (can be disabled for faster uploads)",
     )
+    file_checksum: Optional[str] = Field(
+        None,
+        description="SHA-256 hex digest of the uploaded file (for duplicate detection)",
+    )
 
 
 class RowChunkRequest(BaseModel):
@@ -77,3 +93,5 @@ class ImportBatchSummary(BaseModel):
     row_count: int
     wines_created: int
     rows_skipped: int
+    file_checksum: Optional[str] = None
+    unmapped_headers: list[str] = Field(default_factory=list)

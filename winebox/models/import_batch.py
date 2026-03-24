@@ -31,6 +31,12 @@ class ImportBatch(MongoDocument):
     # Column mapping: header name -> wine field / "custom:FieldName" / "skip"
     column_mapping: Optional[dict[str, str]] = None
 
+    # File checksum for duplicate detection (SHA-256 hex digest)
+    file_checksum: Optional[str] = None
+
+    # Headers that were not mapped to canonical wine fields
+    unmapped_headers: list[str] = Field(default_factory=list)
+
     # Raw data from spreadsheet
     headers: list[str] = Field(default_factory=list)
     rows: list[dict[str, Any]] = Field(default_factory=list)
