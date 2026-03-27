@@ -75,8 +75,9 @@ jobs:
       - name: Start WineBox server (background)
         env:
           WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED: "false"
+          WINEBOX_DATABASE: "winebox_test"
         run: |
-          WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false uv run python -m invoke start-background &
+          WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false WINEBOX_DATABASE=winebox_test uv run python -m invoke start-background &
           for i in {1..20}; do
             if curl -sf http://localhost:8000/health > /dev/null; then
               echo "Server is up"
@@ -87,12 +88,15 @@ jobs:
           done
 
       - name: Import X-Wines test data
+        env:
+          WINEBOX_DATABASE: "winebox_test"
         run: uv run python deploy/import_xwines_mongo.py --version test --force
 
       - name: Run fast E2E suite
         env:
           WINEBOX_TEST_URL: "http://localhost:8000"
           WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED: "false"
+          WINEBOX_DATABASE: "winebox_test"
         run: uv run python -m invoke test-e2e-fast --verbose
 
   lint:
