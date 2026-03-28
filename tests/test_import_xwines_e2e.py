@@ -139,6 +139,25 @@ def _upload_file(page: Page, csv_path: Path, timeout_ms: int = 60000) -> None:
     # Force the mapping step so auto-import doesn't skip it
     page.evaluate("document.getElementById('import-force-mapping').checked = true")
     page.set_input_files("#import-file-input", str(csv_path))
+    # After upload, wait for any post-upload step (map, duplicate, or dashboard)
+    page.evaluate("""(timeout) => new Promise((resolve, reject) => {
+        const start = Date.now();
+        const check = () => {
+            const map = document.getElementById('import-step-map');
+            const dup = document.getElementById('import-step-duplicate');
+            const dash = document.getElementById('import-step-dashboard');
+            if (map && map.style.display !== 'none') return resolve('map');
+            if (dup && dup.style.display !== 'none') return resolve('duplicate');
+            if (dash && dash.style.display !== 'none') return resolve('dashboard');
+            if (Date.now() - start > timeout) return reject(new Error('No import step appeared'));
+            requestAnimationFrame(check);
+        };
+        check();
+    })""", timeout_ms)
+    # If duplicate detected, click "Import again anyway" to proceed to mapping
+    dup_btn = page.locator("#import-duplicate-reimport-btn")
+    if dup_btn.is_visible():
+        dup_btn.click()
     page.wait_for_selector("#import-step-map", state="visible", timeout=timeout_ms)
 
 
