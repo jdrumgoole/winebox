@@ -136,6 +136,8 @@ def _upload_file(page: Page, csv_path: Path, timeout_ms: int = 60000) -> None:
     """Upload a CSV file and wait for the mapping step (long timeout for large files)."""
     # Disable AI mapping to avoid slow API calls during E2E tests
     page.evaluate("document.getElementById('import-use-ai-mapping').checked = false")
+    # Force the mapping step so auto-import doesn't skip it
+    page.evaluate("document.getElementById('import-force-mapping').checked = true")
     page.set_input_files("#import-file-input", str(csv_path))
     page.wait_for_selector("#import-step-map", state="visible", timeout=timeout_ms)
 

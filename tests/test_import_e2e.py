@@ -108,6 +108,8 @@ def _navigate_to_import(page: Page) -> None:
 
 def _upload_csv(page: Page, csv_path: Path, timeout_ms: int = 25000) -> None:
     """Upload a CSV file via the import page file input."""
+    # Force the mapping step so auto-import doesn't skip it
+    page.evaluate("document.getElementById('import-force-mapping').checked = true")
     page.set_input_files("#import-file-input", str(csv_path))
     # Wait for the mapping step to appear (backend parses file then shows map step)
     page.wait_for_selector("#import-step-map", state="visible", timeout=timeout_ms)
