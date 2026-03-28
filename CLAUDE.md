@@ -10,6 +10,12 @@
 - **Never display naked numbers in the UI.** Every number must have a label or unit that explains what it represents. For example, show "3.8 (245 ratings)" not "3.8 (245)"; show "14.5% ABV" not "14.5%". A non-technical user should never have to guess what a number means.
 - **When renaming UI elements, update the code to match.** If a button label changes from "Check In" to "Record Wine", rename the corresponding HTML IDs, CSS classes, JS functions, API endpoints, and test references too. The codebase must reflect what the user sees on screen — stale names like `checkin-form` for a "Record Wine" feature create confusion and maintenance burden.
 
+## Backups
+- **All database backups must go to S3**, never just `/tmp/` on a droplet. Use `scripts/mongodb_backup.py` with the `--profile winebox_backup` flag.
+- Example: `uv run python scripts/mongodb_backup.py --profile winebox_backup backup "mongodb+srv://...@shared.2t22cum.mongodb.net/winebox"`
+- S3 bucket is configured via `WINEBOX_S3_BUCKET` env var. AWS credentials use the `winebox_backup` profile.
+- Always back up the production database before any deployment or data migration.
+
 ## Scripts
 - Always write Python scripts instead of bash/shell scripts
 - All scripts should be in the `scripts/` or `deploy/` directories
@@ -19,6 +25,7 @@
 - Example: `WINEBOX_USE_CLAUDE_VISION=false uv run python -m pytest tests/`
 - Production test credentials are available via `WINEBOX_TEST_USER` and `WINEBOX_TEST_PASSWORD` environment variables in `.env`. This user has been validated and can be used to log in to production for testing.
 - **Treat skipped tests as failures.** Do not use `pytest.skip()` or `pytest.mark.skipif` to hide broken tests. Tests must either pass or fail — skipping masks regressions. If a test cannot run because a resource is unavailable, fix the test infrastructure so the resource is available, or remove the test entirely if the feature is no longer supported.
+- **All tests must be designed from the start to run in parallel.** Use per-worker users, isolated data, and fresh browser contexts. Avoid shared mutable state, fixed ports, shared databases, or any resources that cause conflicts when tests run concurrently via pytest-xdist. E2E tests use `--dist loadfile` so same-file tests share a worker, but different files run in parallel.
 
 ## Development Approach
 - Use Test-Driven Development (TDD) for all new components

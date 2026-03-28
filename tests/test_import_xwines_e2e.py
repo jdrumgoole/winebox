@@ -348,7 +348,10 @@ class TestXWinesImport:
         # Extract result statistics from dashboard or results step
         dash = page.locator("#import-step-dashboard")
         if dash.is_visible():
-            # Dashboard shows stat cards with wines created, bottles added
+            # Wait for dashboard content to load (async API call populates stats)
+            page.wait_for_selector(
+                "#import-step-dashboard .stat-value", state="visible", timeout=15000
+            )
             stat_values = page.locator("#import-step-dashboard .stat-value").all()
             assert len(stat_values) >= 2, "Expected at least 2 stat values in dashboard"
             # Dashboard: first stat is total bottles, second is unique wines
