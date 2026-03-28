@@ -2778,7 +2778,7 @@ wheels = [
 
 [[package]]
 name = "winebox"
-version = "0.6.45"
+version = "0.6.48"
 source = { editable = "." }
 dependencies = [
     { name = "aioboto3" },
