@@ -114,6 +114,6 @@ class TestCoreNavigation:
     def test_record_wine_nav_text(self, authenticated_page: Page) -> None:
         """Test that the nav link says 'Add Wine'."""
         page = authenticated_page
-        nav_link = page.locator("a[data-page='checkin']")
+        nav_link = page.locator("nav a[data-page='checkin']")
         expect(nav_link).to_have_text("Add Wine")
 
