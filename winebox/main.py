@@ -29,8 +29,12 @@ logger = logging.getLogger(__name__)
 _cleanup_task: asyncio.Task | None = None
 
 
-# Rate limiter configuration
-limiter = Limiter(key_func=get_remote_address)
+# Rate limiter configuration — disabled in test mode (CI runs many parallel
+# logins from the same IP which would trigger the per-IP rate limit)
+limiter = Limiter(
+    key_func=get_remote_address,
+    enabled=os.environ.get("WINEBOX_RATE_LIMIT_DISABLED", "").lower() not in ("1", "true"),
+)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

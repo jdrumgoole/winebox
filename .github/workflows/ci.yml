@@ -76,8 +76,9 @@ jobs:
         env:
           WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED: "false"
           WINEBOX_DATABASE: "winebox_test"
+          WINEBOX_RATE_LIMIT_DISABLED: "true"
         run: |
-          WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false WINEBOX_DATABASE=winebox_test uv run python -m invoke start-background &
+          WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false WINEBOX_DATABASE=winebox_test WINEBOX_RATE_LIMIT_DISABLED=true uv run python -m invoke start-background &
           for i in {1..20}; do
             if curl -sf http://localhost:8000/health > /dev/null; then
               echo "Server is up"
