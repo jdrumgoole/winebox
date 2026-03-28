@@ -1511,6 +1511,9 @@ def test_e2e_oat(
         f"WINEBOX_DATABASE={OAT_DATABASE} "
         f"WINEBOX_SECRET_KEY={secret_key} "
         f"WINEBOX_USE_CLAUDE_VISION=false "
+        # Unset shared test user so each worker creates its own user via
+        # winebox-admin against the OAT database (needed for parallel workers)
+        f"WINEBOX_TEST_USER= WINEBOX_TEST_PASSWORD= "
         f'uv run python -m pytest {test_files} -n {workers} --dist loadfile --override-ini="addopts="'
     )
     if verbose:
