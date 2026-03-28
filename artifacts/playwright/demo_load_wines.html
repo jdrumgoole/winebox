@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&amp;family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&amp;display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="/static/logos/favicon.png">
     <link rel="apple-touch-icon" href="/static/logos/favicon.png">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.6.33">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.6.47">
     <script src="/static/js/chart.min.js"></script>
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
@@ -77,6 +77,12 @@
                                 </svg>
                             </button>
                         </div>
+                    </div>
+                    <div class="form-group" style="margin-top:0.25rem;">
+                        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;cursor:pointer;">
+                            <input type="checkbox" id="login-remember-me" checked="" style="">
+                            <span>Stay logged in on this machine</span>
+                        </label>
                     </div>
                     <div id="login-error" class="login-error" style="display: none;"></div>
                     <button type="submit" class="btn btn-primary btn-full">Sign In</button>
@@ -220,20 +226,20 @@
             <div class="dashboard-header" id="dashboard-header">
                 <h2 id="page-dashboard-title">Dashboard</h2>
             <div id="demo-banner" class="demo-banner">
-        <span>Sample wines (475 wines, 1131 bottles)</span>
+        <span>Sample wines (1 wines, 2 bottles)</span>
         <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove</button>
     </div></div>
             <div class="stats-grid" id="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-total-bottles">1131</div>
+                    <div class="stat-value" id="stat-total-bottles">0</div>
                     <div class="stat-label">Bottles</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-unique-wines">475</div>
+                    <div class="stat-value" id="stat-unique-wines">0</div>
                     <div class="stat-label">Wines</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-total-tracked">475</div>
+                    <div class="stat-value" id="stat-total-tracked">0</div>
                     <div class="stat-label">Tracked</div>
                 </div>
                 <div class="stat-card">
@@ -246,31 +252,31 @@
                 <div class="chart-card">
                     <h3>Wine Types</h3>
                     <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-wine-type" width="546" height="220" style="display: block; box-sizing: border-box; height: 220px; width: 546px;"></canvas>
+                        <canvas id="chart-wine-type"></canvas>
                     </div>
                 </div>
                 <div class="chart-card">
                     <h3>Price Range</h3>
                     <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-price-tier" width="546" height="220" style="display: block; box-sizing: border-box; height: 220px; width: 546px;"></canvas>
+                        <canvas id="chart-price-tier"></canvas>
                     </div>
                 </div>
                 <div class="chart-card chart-card-wide">
                     <h3>Top Countries</h3>
                     <div class="chart-wrapper">
-                        <canvas id="chart-country" width="546" height="250" style="display: block; box-sizing: border-box; height: 250px; width: 546px;"></canvas>
+                        <canvas id="chart-country"></canvas>
                     </div>
                 </div>
                 <div class="chart-card chart-card-wide">
                     <h3>Top Grape Varieties</h3>
                     <div class="chart-wrapper">
-                        <canvas id="chart-grape" width="546" height="250" style="display: block; box-sizing: border-box; height: 250px; width: 546px;"></canvas>
+                        <canvas id="chart-grape"></canvas>
                     </div>
                 </div>
                 <div class="chart-card chart-card-full">
                     <h3>Vintages</h3>
                     <div class="chart-wrapper">
-                        <canvas id="chart-vintage" width="1166" height="250" style="display: block; box-sizing: border-box; height: 250px; width: 1166px;"></canvas>
+                        <canvas id="chart-vintage"></canvas>
                     </div>
                 </div>
             </div>
@@ -283,13 +289,13 @@
             </div>
             <div class="activity-content">
                 <div class="activity-title">
-                    Perlé
-                    (1998)
+                    Rosé Syrah
+                    (2014)
                 </div>
                 <div class="activity-meta">
-                    1 bottle ·
+                    3 bottles ·
                     Added ·
-                    Mar 22, 2026, 01:09 AM
+                    Dec 24, 2024, 10:34 AM
                 </div>
                 
             </div>
@@ -301,121 +307,31 @@
             </div>
             <div class="activity-content">
                 <div class="activity-title">
-                    Saint-Julien (Grand Cru Classé)
-                    (1976)
-                </div>
-                <div class="activity-meta">
-                    2 bottles ·
-                    Added ·
-                    Mar 21, 2026, 01:09 AM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Viña Alberdi Reserva
-                    (2007)
-                </div>
-                <div class="activity-meta">
-                    2 bottles ·
-                    Removed ·
-                    Mar 21, 2026, 01:09 AM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-in">
-                +
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Cava Brut
-                    
-                </div>
-                <div class="activity-meta">
-                    1 bottle ·
-                    Added ·
-                    Mar 20, 2026, 01:09 AM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Saint-Drézéry Prestige Rosé
-                    (2002)
-                </div>
-                <div class="activity-meta">
-                    2 bottles ·
-                    Removed ·
-                    Mar 20, 2026, 01:09 AM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-in">
-                +
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Parallèle 45 Côtes du Rhône Rouge
-                    (1974)
-                </div>
-                <div class="activity-meta">
-                    2 bottles ·
-                    Added ·
-                    Mar 19, 2026, 01:09 AM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-in">
-                +
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Valpolicella Ripasso
+                    Sito Moresco Langhe
                     (1993)
+                </div>
+                <div class="activity-meta">
+                    1 bottle ·
+                    Added ·
+                    Dec 23, 2024, 10:34 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Sauvignon Blanc
+                    (2013)
                 </div>
                 <div class="activity-meta">
                     4 bottles ·
                     Added ·
-                    Mar 18, 2026, 01:09 AM
-                </div>
-                
-            </div>
-        </div>
-    
-        <div class="activity-item">
-            <div class="activity-icon check-out">
-                -
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">
-                    Rioja Rosado
-                    (2008)
-                </div>
-                <div class="activity-meta">
-                    5 bottles ·
-                    Removed ·
-                    Mar 18, 2026, 01:09 AM
+                    Dec 22, 2024, 10:34 AM
                 </div>
                 
             </div>
@@ -427,13 +343,13 @@
             </div>
             <div class="activity-content">
                 <div class="activity-title">
-                    Palazzo della Torre
-                    (1978)
+                    Chardonnay
+                    (1991)
                 </div>
                 <div class="activity-meta">
                     2 bottles ·
                     Added ·
-                    Mar 17, 2026, 01:09 AM
+                    Dec 21, 2024, 10:34 AM
                 </div>
                 
             </div>
@@ -445,13 +361,103 @@
             </div>
             <div class="activity-content">
                 <div class="activity-title">
-                    Eins Zwei Dry Riesling
+                    Sancerre
                     (2005)
+                </div>
+                <div class="activity-meta">
+                    6 bottles ·
+                    Added ·
+                    Dec 20, 2024, 10:34 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Phantom
+                    (2021)
                 </div>
                 <div class="activity-meta">
                     1 bottle ·
                     Added ·
-                    Mar 16, 2026, 01:09 AM
+                    Dec 19, 2024, 10:34 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Muscat de Beaumes de Venise
+                    (1997)
+                </div>
+                <div class="activity-meta">
+                    2 bottles ·
+                    Added ·
+                    Dec 18, 2024, 10:34 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Superior
+                    (1998)
+                </div>
+                <div class="activity-meta">
+                    6 bottles ·
+                    Added ·
+                    Dec 17, 2024, 10:34 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Chardonnay (1685 Series)
+                    (1988)
+                </div>
+                <div class="activity-meta">
+                    3 bottles ·
+                    Added ·
+                    Dec 16, 2024, 10:34 AM
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="activity-item">
+            <div class="activity-icon check-in">
+                +
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">
+                    Sideral
+                    (2011)
+                </div>
+                <div class="activity-meta">
+                    3 bottles ·
+                    Added ·
+                    Dec 15, 2024, 10:34 AM
                 </div>
                 
             </div>
@@ -883,13 +889,21 @@
                             <label for="import-file-input" class="btn btn-primary" style="cursor:pointer;">Browse Files</label>
                             <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display: none;">
                             <p class="form-hint">Supported formats: CSV, Excel (.xlsx). Max 10,000 rows.</p>
+                            <p class="form-hint" style="margin-top:0.5rem;">We'll help you match your columns in the next step. Nothing is imported until you confirm.</p>
                         </div>
-                        <div class="form-group" style="margin-top:0.75rem;">
-                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
-                                <input type="checkbox" id="import-use-ai-mapping" checked="" style="">
-                                <span>Use AI to improve column mapping (slower)</span>
-                            </label>
-                        </div>
+                        <details id="import-advanced-toggle" style="margin-top:0.75rem;">
+                            <summary style="cursor:pointer;font-size:0.9rem;color:var(--text-muted);">Advanced import options...</summary>
+                            <div style="margin-top:0.5rem;padding-left:0.25rem;">
+                                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;margin-bottom:0.5rem;">
+                                    <input type="checkbox" id="import-force-mapping" style="">
+                                    <span>Always show column mapping step</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
+                                    <input type="checkbox" id="import-use-ai-mapping" checked="" style="">
+                                    <span>Use AI to automatically match columns (takes a few extra seconds)</span>
+                                </label>
+                            </div>
+                        </details>
                     </div>
                 </div>
 
@@ -897,18 +911,21 @@
                 <div id="import-step-map" class="import-step" style="display:none;">
                     <div class="form-section">
                         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-                            <h3>Map Columns</h3>
-                            <span id="import-file-info" class="form-hint"></span>
+                            <h3>Match Your Columns</h3>
+                            <div style="display:flex;align-items:center;gap:0.75rem;">
+                                <span id="import-file-info" style="font-weight:700;font-size:0.95rem;"></span>
+                                <button type="button" class="btn btn-small btn-outline" id="import-use-different-file-btn">Use a different file</button>
+                            </div>
                         </div>
-                        <p class="form-note">Match your spreadsheet columns to wine fields. Unmapped columns can be saved as custom fields.</p>
+                        <p class="form-note">Tell us what each column in your spreadsheet contains. We've made our best guess — just check and adjust anything that looks wrong.</p>
                         <div id="import-mapping-table-container"></div>
                     </div>
                     <div class="form-section">
-                        <h3>Preview</h3>
+                        <h3>Your data (first 5 rows)</h3>
                         <div id="import-preview-container" style="overflow-x:auto;"></div>
                     </div>
                     <div class="form-actions">
-                        <button type="button" class="btn btn-primary" id="import-confirm-mapping-btn">Confirm Mapping &amp; Import</button>
+                        <button type="button" class="btn btn-primary" id="import-confirm-mapping-btn">Looks Good — Import My Wines</button>
                         <button type="button" class="btn btn-secondary" id="import-back-to-upload-btn">Back</button>
                     </div>
                 </div>
@@ -916,7 +933,7 @@
                 <!-- Step 3: Processing Progress -->
                 <div id="import-step-progress" class="import-step" style="display:none;">
                     <div class="form-section">
-                        <h3>Importing Wines...</h3>
+                        <h3>Adding wines to your cellar...</h3>
                         <div class="import-progress-container">
                             <div class="import-progress-bar-track">
                                 <div class="import-progress-bar-fill" id="import-progress-fill" style="width:0%"></div>
@@ -933,7 +950,7 @@
                         <div class="form-group" style="margin-top:0.75rem;">
                             <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
                                 <input type="checkbox" id="import-skip-enrichment" style="">
-                                <span>Skip X-Wines enrichment (fast import, no automatic reference data fill)</span>
+                                <span>Skip automatic detail lookup (faster, but missing details like region or grape won't be filled in)</span>
                             </label>
                         </div>
                     </div>
@@ -942,12 +959,62 @@
                 <!-- Step 4: Results -->
                 <div id="import-step-results" class="import-step" style="display:none;">
                     <div class="form-section">
-                        <h3>Import Results</h3>
+                        <h3>Import Complete</h3>
                         <div id="import-results-content"></div>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" id="import-new-btn">Import Another File</button>
                         <button type="button" class="btn btn-secondary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                    </div>
+                </div>
+
+                <!-- Step 5: Duplicate Detected -->
+                <div id="import-step-duplicate" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3>We already have this data</h3>
+                        <div id="import-duplicate-content"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="import-duplicate-augment-btn">Add more details from unmapped columns</button>
+                        <button type="button" class="btn btn-secondary" id="import-duplicate-reimport-btn">Import again anyway</button>
+                        <button type="button" class="btn btn-secondary" id="import-duplicate-cancel-btn">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Step 6: Augment Unmapped Columns -->
+                <div id="import-step-augment" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3>Add More Details</h3>
+                        <p class="form-note">These columns from your file weren't imported. Map them to wine fields to add the information to your wines.</p>
+                        <div id="import-augment-mapping-container"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" id="import-augment-confirm-btn">Update My Wines</button>
+                        <button type="button" class="btn btn-secondary" id="import-augment-cancel-btn">Skip</button>
+                    </div>
+                </div>
+
+                <!-- Step 7: Import Dashboard -->
+                <div id="import-step-dashboard" class="import-step" style="display:none;">
+                    <div class="form-section">
+                        <h3 id="import-dashboard-title">Just Added</h3>
+                        <div id="import-dashboard-summary" class="stats-grid" style="margin-bottom:1.5rem;"></div>
+                        <div id="import-dashboard-unmapped-notice" style="display:none;margin-bottom:1rem;"></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Your New Wines</h3>
+                        <div id="import-dashboard-wines" class="wine-grid"></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Your Cellar at a Glance</h3>
+                        <div class="dashboard-charts-grid" id="import-dashboard-charts">
+                            <div class="chart-card"><canvas id="import-chart-wine-type"></canvas></div>
+                            <div class="chart-card"><canvas id="import-chart-country"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                        <button type="button" class="btn btn-secondary" id="import-dashboard-new-btn">Import Another File</button>
                     </div>
                 </div>
             </div>
@@ -984,6 +1051,25 @@
                         <a href="#" data-format="xlsx" data-type="transactions">Excel</a>
                         <a href="#" data-format="yaml" data-type="transactions">YAML</a>
                         <a href="#" data-format="json" data-type="transactions">JSON</a>
+                    </div>
+                </div>
+            </div>
+            <div id="history-charts" class="chart-grid" style="display: none;">
+                <div class="chart-card chart-card-full">
+                    <h3>Activity Timeline</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-history-timeline"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Removal Reasons</h3>
+                    <div class="chart-wrapper chart-wrapper-sm">
+                        <canvas id="chart-history-reasons"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Activity Summary</h3>
+                    <div class="history-stats" id="history-stats">
                     </div>
                 </div>
             </div>
@@ -1461,7 +1547,7 @@
     <!-- Footer -->
     <footer id="app-footer">
         <div class="footer-content">
-            <span id="app-info">WineBox <span class="version">v0.6.33</span></span>
+            <span id="app-info">WineBox <span class="version">v0.6.47</span></span>
             <span class="footer-separator">|</span>
             <span id="data-credits">
                 Wine data powered by
@@ -1476,8 +1562,8 @@
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
-    <script src="/static/js/papaparse.min.js?v=0.6.33"></script>
-    <script src="/static/js/app.js?v=0.6.33"></script>
+    <script src="/static/js/papaparse.min.js?v=0.6.47"></script>
+    <script src="/static/js/app.js?v=0.6.47"></script>
 
 
 </body></html>
