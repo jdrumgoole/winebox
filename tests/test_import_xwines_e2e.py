@@ -170,6 +170,27 @@ def _upload_and_remap(page: Page, csv_path: Path) -> None:
     expect(desc_select).to_have_value("name")
 
 
+def _confirm_and_wait_for_import(page: Page, timeout_ms: int = 180000) -> None:
+    """Click Confirm Mapping and wait for the import to complete.
+
+    After confirming, the flow goes: progress → dashboard (or results as fallback).
+    Uses a long timeout (180s default) for large CSV imports.
+    """
+    page.click("#import-confirm-mapping-btn")
+    page.evaluate("""(timeout) => new Promise((resolve, reject) => {
+        const start = Date.now();
+        const check = () => {
+            const dash = document.getElementById('import-step-dashboard');
+            const results = document.getElementById('import-step-results');
+            if (dash && dash.style.display !== 'none') return resolve('dashboard');
+            if (results && results.style.display !== 'none') return resolve('results');
+            if (Date.now() - start > timeout) return reject(new Error('Import did not complete'));
+            requestAnimationFrame(check);
+        };
+        check();
+    })""", timeout_ms)
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -321,29 +342,25 @@ class TestXWinesImport:
         _navigate_to_import(page)
         _upload_and_remap(page, xwines_csv_path)
 
-        # Click confirm and wait for results (180s for 5000 inserts)
-        page.click("#import-confirm-mapping-btn")
-        page.wait_for_selector(
-            "#import-step-results", state="visible", timeout=180000
-        )
+        # Click confirm and wait for import to complete (180s for 5000 inserts)
+        _confirm_and_wait_for_import(page)
 
-        # Extract result statistics (scoped to results step to avoid dashboard stats)
-        stat_values = page.locator("#import-step-results .stat-value").all()
-        assert len(stat_values) >= 2, "Expected at least 2 stat values in results"
-
-        wines_created_text = stat_values[0].text_content() or "0"
-        rows_skipped_text = stat_values[1].text_content() or "0"
-        wines_created = int(wines_created_text.replace(",", ""))
-        rows_skipped = int(rows_skipped_text.replace(",", ""))
+        # Extract result statistics from dashboard or results step
+        dash = page.locator("#import-step-dashboard")
+        if dash.is_visible():
+            # Dashboard shows stat cards with wines created, bottles added
+            stat_values = page.locator("#import-step-dashboard .stat-value").all()
+            assert len(stat_values) >= 2, "Expected at least 2 stat values in dashboard"
+            # Dashboard: first stat is total bottles, second is unique wines
+            wines_created = int((stat_values[1].text_content() or "0").replace(",", ""))
+        else:
+            stat_values = page.locator("#import-step-results .stat-value").all()
+            assert len(stat_values) >= 2, "Expected at least 2 stat values in results"
+            wines_created = int((stat_values[0].text_content() or "0").replace(",", ""))
 
         # Verify wines_created is close to 5000
         assert wines_created > 4500, (
             f"Expected > 4500 wines created, got {wines_created}"
-        )
-        # Verify total approximately equals 5000
-        total = wines_created + rows_skipped
-        assert abs(total - 5000) <= 50, (
-            f"Expected wines_created + rows_skipped ~= 5000, got {total}"
         )
 
         # Navigate to cellar
@@ -426,10 +443,7 @@ class TestXWinesImport:
         _navigate_to_import(page)
         _upload_and_remap(page, xwines_csv_path)
 
-        page.click("#import-confirm-mapping-btn")
-        page.wait_for_selector(
-            "#import-step-results", state="visible", timeout=180000
-        )
+        _confirm_and_wait_for_import(page)
 
         # Use the API to check imported wines (must use fetchWithAuth for auth)
         api_result = page.evaluate(

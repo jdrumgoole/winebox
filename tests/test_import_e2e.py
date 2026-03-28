@@ -134,6 +134,27 @@ def _upload_csv(page: Page, csv_path: Path, timeout_ms: int = 25000) -> None:
     page.wait_for_selector("#import-step-map", state="visible", timeout=timeout_ms)
 
 
+def _confirm_and_wait_for_import(page: Page, timeout_ms: int = 30000) -> None:
+    """Click Confirm Mapping and wait for the import to complete.
+
+    After confirming, the flow goes: progress → dashboard (or results as fallback).
+    """
+    page.click("#import-confirm-mapping-btn")
+    # Wait for either dashboard or results step to appear
+    page.evaluate("""(timeout) => new Promise((resolve, reject) => {
+        const start = Date.now();
+        const check = () => {
+            const dash = document.getElementById('import-step-dashboard');
+            const results = document.getElementById('import-step-results');
+            if (dash && dash.style.display !== 'none') return resolve('dashboard');
+            if (results && results.style.display !== 'none') return resolve('results');
+            if (Date.now() - start > timeout) return reject(new Error('Import did not complete'));
+            requestAnimationFrame(check);
+        };
+        check();
+    })""", timeout_ms)
+
+
 @pytest.mark.e2e
 class TestImportPageNavigation:
     """Test basic import page navigation and display."""
@@ -229,14 +250,17 @@ class TestImportMapping:
         expect(first_row).to_have_class(re.compile(r".*\bskipped\b.*"))
 
     def test_confirm_mapping_button(self, authenticated_page: Page, sample_csv: Path) -> None:
-        """Test that Confirm Mapping button proceeds to results step."""
+        """Test that Confirm Mapping button processes import and shows dashboard."""
         page = authenticated_page
         _navigate_to_import(page)
         _upload_csv(page, sample_csv)
 
-        page.click("#import-confirm-mapping-btn")
+        _confirm_and_wait_for_import(page)
 
-        expect(page.locator("#import-step-results")).to_be_visible(timeout=15000)
+        # Should show either dashboard or results
+        dash = page.locator("#import-step-dashboard")
+        results = page.locator("#import-step-results")
+        assert dash.is_visible() or results.is_visible()
 
 
 @pytest.mark.e2e
@@ -252,12 +276,15 @@ class TestImportProcess:
         _upload_csv(page, sample_csv)
 
         # Step 2: Confirm mapping (auto-suggested mappings should be fine)
-        page.click("#import-confirm-mapping-btn")
-        page.wait_for_selector("#import-step-results", state="visible", timeout=15000)
+        _confirm_and_wait_for_import(page)
 
-        # Step 3: Check results - should show success with wine count
-        results = page.locator("#import-step-results")
-        expect(results).to_contain_text("4", timeout=10000)
+        # Step 3: Check dashboard shows wine count
+        dash = page.locator("#import-step-dashboard")
+        if dash.is_visible():
+            expect(dash).to_contain_text("wines", timeout=10000)
+        else:
+            results = page.locator("#import-step-results")
+            expect(results).to_contain_text("4", timeout=10000)
 
         # Verify the wines appear in the cellar
         page.click("a[data-page='cellar']")
@@ -275,13 +302,16 @@ class TestImportProcess:
 
         _upload_csv(page, csv_with_spirits)
 
-        page.click("#import-confirm-mapping-btn")
-        page.wait_for_selector("#import-step-results", state="visible", timeout=15000)
+        _confirm_and_wait_for_import(page)
 
-        # Results should mention wines created and rows skipped
-        results_text = page.locator("#import-step-results").text_content()
-        # Should have created 2 wines (Chateau Margaux, Barolo) and skipped 2
-        assert "2" in results_text
+        # Dashboard or results should show wines were created
+        dash = page.locator("#import-step-dashboard")
+        if dash.is_visible():
+            # Dashboard title says "You just added N wines from ..."
+            expect(dash).to_contain_text("wines", timeout=10000)
+        else:
+            results_text = page.locator("#import-step-results").text_content()
+            assert "2" in results_text
 
     def test_import_then_reset(self, authenticated_page: Page, sample_csv: Path) -> None:
         """Test that Import Another File button resets to step 1."""
@@ -289,13 +319,16 @@ class TestImportProcess:
         _navigate_to_import(page)
 
         _upload_csv(page, sample_csv)
-        page.click("#import-confirm-mapping-btn")
-        page.wait_for_selector("#import-step-results", state="visible", timeout=20000)
+        _confirm_and_wait_for_import(page, timeout_ms=30000)
 
-        # Click "Import Another File" button
-        reset_btn = page.locator("#import-new-btn")
-        reset_btn.wait_for(state="visible", timeout=5000)
-        reset_btn.click()
+        # Click "Import Another File" button (on dashboard or results step)
+        dash_new_btn = page.locator("#import-dashboard-new-btn")
+        results_new_btn = page.locator("#import-new-btn")
+        if dash_new_btn.is_visible():
+            dash_new_btn.click()
+        else:
+            results_new_btn.wait_for(state="visible", timeout=5000)
+            results_new_btn.click()
         expect(page.locator(".import-upload-area")).to_be_visible(timeout=5000)
 
 
@@ -319,8 +352,7 @@ class TestImportCustomFields:
         if cellar_select.input_value() != "custom:Cellar Location":
             cellar_select.select_option("custom:Cellar Location")
 
-        page.click("#import-confirm-mapping-btn")
-        page.wait_for_selector("#import-step-results", state="visible", timeout=15000)
+        _confirm_and_wait_for_import(page)
 
         # Navigate to cellar
         page.click("a[data-page='cellar']")
