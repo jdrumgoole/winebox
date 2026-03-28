@@ -201,7 +201,7 @@ def test_e2e_fast(ctx: Context, verbose: bool = False, workers: int = 4) -> None
         "tests/test_import_e2e.py "
         "tests/test_xwines_e2e.py "
         "tests/test_app_navigation_e2e.py "
-        f"-n {workers}"
+        f"-n {workers} --dist loadfile"
     )
     if verbose:
         cmd += " -v"
@@ -221,7 +221,7 @@ def test_e2e_full(ctx: Context, verbose: bool = False, workers: int = 4) -> None
     cmd = (
         "WINEBOX_USE_CLAUDE_VISION=false "
         "uv run python -m pytest -m e2e "
-        f"-n {workers}"
+        f"-n {workers} --dist loadfile"
     )
     if verbose:
         cmd += " -v"
@@ -1452,7 +1452,7 @@ def oat_logs(ctx: Context, host: str = "", lines: int = 50, follow: bool = False
 def test_e2e_oat(
     ctx: Context,
     verbose: bool = False,
-    workers: int = 1,
+    workers: int = 2,
     pattern: str = "",
     host: str = "",
 ) -> None:
@@ -1464,7 +1464,7 @@ def test_e2e_oat(
     Args:
         ctx: Invoke context
         verbose: Enable verbose output
-        workers: Number of parallel workers (default: 1)
+        workers: Number of parallel workers (default: 2)
         pattern: Optional test file pattern (e.g. 'test_checkin_e2e.py')
         host: Override droplet IP for user creation
     """
@@ -1473,11 +1473,31 @@ def test_e2e_oat(
 
     print(f"Running E2E tests against OAT: {oat_url}")
 
-    # Build test command
+    # Build test command — order files by speed for better xdist distribution
     if pattern:
         test_files = f"tests/{pattern}"
     else:
-        test_files = "-m e2e"
+        test_files = (
+            "-m e2e "
+            # Fast (UI-only)
+            "tests/test_admin_e2e.py "
+            "tests/test_app_navigation_e2e.py "
+            "tests/test_cellar_e2e.py "
+            "tests/test_checkout_e2e.py "
+            "tests/test_dashboard_e2e.py "
+            "tests/test_export_e2e.py "
+            "tests/test_history_e2e.py "
+            "tests/test_search_e2e.py "
+            "tests/test_settings_e2e.py "
+            "tests/test_registration_e2e.py "
+            # Medium
+            "tests/test_checkin_e2e.py "
+            "tests/test_demo_e2e.py "
+            "tests/test_xwines_e2e.py "
+            "tests/test_import_e2e.py "
+            # Slow (large CSV imports)
+            "tests/test_import_xwines_e2e.py"
+        )
 
     # Load .env to get WINEBOX_MONGODB_URL for user creation via winebox-admin
     from dotenv import dotenv_values
@@ -1491,7 +1511,7 @@ def test_e2e_oat(
         f"WINEBOX_DATABASE={OAT_DATABASE} "
         f"WINEBOX_SECRET_KEY={secret_key} "
         f"WINEBOX_USE_CLAUDE_VISION=false "
-        f'uv run python -m pytest {test_files} -n {workers} --override-ini="addopts="'
+        f'uv run python -m pytest {test_files} -n {workers} --dist loadfile --override-ini="addopts="'
     )
     if verbose:
         test_cmd += " -v"
