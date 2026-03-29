@@ -24,6 +24,14 @@ from .playwright_utils import (
     preflight_check,
 )
 
+
+def _navigate_to_checkin(page: Page) -> None:
+    """Navigate to checkin page via Wines I've Met → Record a Wine button."""
+    page.click("a[data-page='met']")
+    page.wait_for_selector("#page-met", state="visible", timeout=10000)
+    page.click("#met-record-wine-btn")
+    page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
+
 # Test data directory containing wine label images
 TEST_DATA_DIR = Path(__file__).parent / "data" / "wine_labels"
 
@@ -109,11 +117,10 @@ class TestCheckinFlow:
         expect(page.locator("#main-content")).to_be_visible(timeout=10000)
 
     def test_navigate_to_checkin(self, authenticated_page: Page) -> None:
-        """Test navigating to the checkin page."""
+        """Test navigating to the checkin page via Wines I've Met → Record a Wine."""
         page = authenticated_page
 
-        # Click Check In nav link (uses data-page attribute)
-        page.click("a[data-page='checkin']")
+        _navigate_to_checkin(page)
 
         # Should show checkin page
         expect(page.locator("#page-checkin")).to_be_visible()
@@ -124,8 +131,7 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin
-        page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
+        _navigate_to_checkin(page)
 
         # Upload first wine image
         image_path = wine_images[0]
@@ -143,8 +149,7 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin (now "Record Wine")
-        page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
+        _navigate_to_checkin(page)
 
         # Upload image
         image_path = wine_images[0]
@@ -170,8 +175,7 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin (Record Wine)
-        page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
+        _navigate_to_checkin(page)
 
         # Upload image
         image_path = wine_images[0]
@@ -200,8 +204,7 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin (Record Wine)
-        page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
+        _navigate_to_checkin(page)
 
         # Upload image
         image_path = wine_images[0]
@@ -230,8 +233,7 @@ class TestCheckinFlow:
         page = authenticated_page
 
         # Navigate to checkin (Record Wine)
-        page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
+        _navigate_to_checkin(page)
 
         # Upload image
         image_path = wine_images[0]
@@ -278,8 +280,7 @@ class TestWineImageUploads:
         page = authenticated_page
 
         # Navigate to checkin
-        page.click("a[data-page='checkin']")
-        page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
+        _navigate_to_checkin(page)
 
         # Upload the image
         page.set_input_files("#front-label", str(image_path))
