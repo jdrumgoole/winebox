@@ -439,11 +439,11 @@ async def test_minimal_wines(client: AsyncClient) -> None:
     assert result["wines_created"] == 3
 
     wines_resp = await client.get("/api/wines")
-    wines = wines_resp.json()
-    assert len(wines) == 3
+    wines = {w["name"]: w for w in wines_resp.json()}
+    expected_names = {"My Birthday Wine", "That Nice Red from Holiday", "Kitchen Red"}
+    assert set(wines.keys()) == expected_names
 
-    for wine in wines:
-        assert wine["name"] is not None
+    for wine in wines.values():
         assert wine["winery"] is None
         assert wine["vintage"] is None
         assert wine["country"] is None
@@ -486,8 +486,8 @@ async def test_auto_mapping_case_quantities(client: AsyncClient) -> None:
     data = upload_resp.json()
 
     suggested = data["suggested_mapping"]
-    assert suggested["Cases"] == "case_size"  # "cases" alias
-    assert suggested["Case Size"] == "case_size"  # "case size" alias
+    assert suggested["Cases"] == "quantity"  # "cases" maps to quantity (number of cases)
+    assert suggested["Case Size"] == "case_size"  # "case size" maps to bottles per case
 
 
 @pytest.mark.asyncio

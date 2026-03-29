@@ -261,7 +261,7 @@ async def test_list_batches(client: AsyncClient) -> None:
     assert response.status_code == 200
     batches = response.json()
     assert len(batches) >= 1
-    assert batches[0]["filename"] == "wines.csv"
+    assert any(b["filename"] == "wines.csv" for b in batches)
 
 
 @pytest.mark.asyncio

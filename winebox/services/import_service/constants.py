@@ -88,12 +88,13 @@ HEADER_ALIASES: dict[str, str] = {
     "bought": "purchase_date",
     "acquired": "purchase_date",
     "purchase": "purchase_date",
-    # case_size
+    # case_size (bottles per case)
     "case size": "case_size",
     "case_size": "case_size",
-    "cases": "case_size",
     "bottles per case": "case_size",
     "bottles_per_case": "case_size",
+    # cases (number of cases — maps to quantity)
+    "cases": "quantity",
     # notes (for transactions)
     "notes": "notes",
     "note": "notes",
