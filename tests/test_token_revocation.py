@@ -3,7 +3,10 @@
 import pytest
 from httpx import AsyncClient
 
-from winebox.services.auth import create_access_token, get_current_user, revoke_token
+from winebox.services.auth import create_access_token, get_current_user, get_password_hash, revoke_token
+
+# Pre-compute password hash — Argon2 is deliberately slow (~38ms per call)
+_HASH_TESTPASS = get_password_hash("testpass")
 
 
 @pytest.mark.asyncio
@@ -46,12 +49,11 @@ class TestRevokedTokenRejection:
     async def test_get_current_user_rejects_revoked(self, init_test_db):
         """Revoked token returns None from get_current_user."""
         from winebox.models.user import User
-        from winebox.services.auth import get_password_hash
 
         # Create user first
         user = User(
             email="revoke-test@example.com",
-            hashed_password=get_password_hash("testpass"),
+            hashed_password=_HASH_TESTPASS,
             is_active=True,
             is_verified=True,
             is_superuser=False,
@@ -80,11 +82,9 @@ class TestLogoutRevokesToken:
     async def test_logout_revokes_token(self, init_test_db):
         """Revoking a token via revoke_token makes get_current_user reject it."""
         from winebox.models.user import User
-        from winebox.services.auth import get_password_hash
-
         user = User(
             email="logout-test@example.com",
-            hashed_password=get_password_hash("testpass"),
+            hashed_password=_HASH_TESTPASS,
             is_active=True,
             is_verified=True,
             is_superuser=False,

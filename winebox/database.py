@@ -18,6 +18,7 @@ async def init_db(
     mongodb_url: str | None = None,
     mongodb_database: str | None = None,
     mongo_client: AsyncMongoClient | None = None,
+    skip_indexes: bool = False,
 ) -> None:
     """Initialize the MongoDB database connection.
 
@@ -25,6 +26,7 @@ async def init_db(
         mongodb_url: Optional MongoDB connection URL. Defaults to settings.
         mongodb_database: Optional database name. Defaults to settings.
         mongo_client: Optional pre-configured client (for testing).
+        skip_indexes: If True, skip index creation (for throwaway test databases).
     """
     global client, database
 
@@ -44,9 +46,10 @@ async def init_db(
     database = client[db_name]
 
     # Create indexes (idempotent)
-    from winebox.db.indexes import ensure_indexes
+    if not skip_indexes:
+        from winebox.db.indexes import ensure_indexes
 
-    await ensure_indexes(database)
+        await ensure_indexes(database)
 
     logger.info("Database initialized: %s", db_name)
 

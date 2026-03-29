@@ -11,6 +11,10 @@ from httpx import ASGITransport, AsyncClient
 from winebox.models import User
 from winebox.services.auth import create_access_token, get_password_hash
 
+# Pre-compute password hashes — Argon2 is deliberately slow (~38ms per call)
+_HASH_PASSWORD1 = get_password_hash("password1")
+_HASH_PASSWORD2 = get_password_hash("password2")
+
 
 @pytest_asyncio.fixture(scope="function")
 async def two_users_clients(init_test_db):
@@ -27,7 +31,7 @@ async def two_users_clients(init_test_db):
     # Create user 1
     user1 = User(
         email=user1_email,
-        hashed_password=get_password_hash("password1"),
+        hashed_password=_HASH_PASSWORD1,
         is_active=True,
         is_verified=True,
         is_superuser=False,
@@ -40,7 +44,7 @@ async def two_users_clients(init_test_db):
     # Create user 2
     user2 = User(
         email=user2_email,
-        hashed_password=get_password_hash("password2"),
+        hashed_password=_HASH_PASSWORD2,
         is_active=True,
         is_verified=True,
         is_superuser=False,

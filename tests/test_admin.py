@@ -11,6 +11,13 @@ from httpx import ASGITransport, AsyncClient
 from winebox.models import User
 from winebox.services.auth import create_access_token, get_password_hash
 
+# Pre-compute password hashes — Argon2 is deliberately slow (~38ms per call)
+_HASH_ADMIN = get_password_hash("adminpassword")
+_HASH_USER = get_password_hash("userpassword")
+_HASH_PASSWORD1 = get_password_hash("password1")
+_HASH_PASSWORD2 = get_password_hash("password2")
+_HASH_PASSWORD3 = get_password_hash("password3")
+
 
 @pytest_asyncio.fixture(scope="function")
 async def admin_client(init_test_db):
@@ -22,7 +29,7 @@ async def admin_client(init_test_db):
     # Create admin user
     admin_user = User(
         email=admin_email,
-        hashed_password=get_password_hash("adminpassword"),
+        hashed_password=_HASH_ADMIN,
         is_active=True,
         is_verified=True,
         is_superuser=True,  # This is an admin
@@ -52,7 +59,7 @@ async def regular_user_client(init_test_db):
     # Create regular user
     user = User(
         email=user_email,
-        hashed_password=get_password_hash("userpassword"),
+        hashed_password=_HASH_USER,
         is_active=True,
         is_verified=True,
         is_superuser=False,  # Not an admin
@@ -86,7 +93,7 @@ async def populated_admin_client(init_test_db, sample_image_bytes):
     # Create admin user
     admin_user = User(
         email=admin_email,
-        hashed_password=get_password_hash("adminpassword"),
+        hashed_password=_HASH_ADMIN,
         is_active=True,
         is_verified=True,
         is_superuser=True,
@@ -98,7 +105,7 @@ async def populated_admin_client(init_test_db, sample_image_bytes):
     # Create regular user 1
     user1 = User(
         email=user1_email,
-        hashed_password=get_password_hash("password1"),
+        hashed_password=_HASH_PASSWORD1,
         is_active=True,
         is_verified=True,
         is_superuser=False,
@@ -110,7 +117,7 @@ async def populated_admin_client(init_test_db, sample_image_bytes):
     # Create regular user 2 (unverified)
     user2 = User(
         email=user2_email,
-        hashed_password=get_password_hash("password2"),
+        hashed_password=_HASH_PASSWORD2,
         is_active=True,
         is_verified=False,  # Not verified
         is_superuser=False,
@@ -122,7 +129,7 @@ async def populated_admin_client(init_test_db, sample_image_bytes):
     # Create inactive user
     user3 = User(
         email=inactive_email,
-        hashed_password=get_password_hash("password3"),
+        hashed_password=_HASH_PASSWORD3,
         is_active=False,  # Inactive
         is_verified=True,
         is_superuser=False,

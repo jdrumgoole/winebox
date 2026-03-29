@@ -1,8 +1,9 @@
 """Pytest configuration and fixtures for WineBox tests with real MongoDB.
 
-Database strategy: one database per xdist worker (session-scoped), data
-accumulates across tests just like production. Each test gets its own
-unique user so user-scoped data is naturally isolated.
+Database strategy: all xdist workers share a single database (test_winebox),
+dropped by pytest_configure before workers start. Data accumulates across
+tests just like production. Each test gets its own unique user so
+user-scoped data is naturally isolated.
 """
 
 import asyncio
@@ -35,9 +36,32 @@ from winebox.database import init_db
 from winebox.models import User
 from winebox.services.auth import get_password_hash, create_access_token
 
+# Pre-compute password hash for test fixtures — Argon2 is deliberately slow
+# (~38ms per call), and every test using the `client` fixture hashes the same
+# string. Computing once per worker saves significant CPU time.
+_CACHED_TEST_PASSWORD_HASH = get_password_hash("testpassword")
+
 
 # MongoDB connection URL for tests (can be overridden with env var)
 TEST_MONGODB_URL = os.environ.get("TEST_MONGODB_URL", "mongodb://localhost:27017")
+
+# Shared database name for all xdist workers
+SHARED_TEST_DB = "test_winebox"
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Drop shared test database before xdist workers start.
+
+    Runs only in the master/controller process (workers have 'workerinput').
+    Uses sync MongoClient since pytest_configure is synchronous.
+    """
+    if not hasattr(config, "workerinput"):
+        from pymongo import MongoClient
+
+        url = os.environ.get("TEST_MONGODB_URL", "mongodb://localhost:27017")
+        sync_client = MongoClient(url)
+        sync_client.drop_database(SHARED_TEST_DB)
+        sync_client.close()
 
 
 # Create a test-specific app to avoid lifespan conflicts
@@ -121,22 +145,41 @@ async def mongo_client():
 
 @pytest_asyncio.fixture(scope="session")
 async def init_test_db(mongo_client):
-    """Initialize database with a shared test database per worker.
+    """Initialize shared test database across all xdist workers.
 
-    Session-scoped: one database per xdist worker. Data accumulates
-    across tests, mirroring production behaviour. The database is
-    dropped when the worker session ends.
+    The database was dropped by pytest_configure in the controller process.
+    ensure_indexes() is idempotent — first worker creates them, others
+    find them already present.
     """
-    db_name = f"test_winebox_{os.getpid()}"
-
-    await init_db(mongo_client=mongo_client, mongodb_database=db_name)
+    await init_db(mongo_client=mongo_client, mongodb_database=SHARED_TEST_DB)
 
     from winebox.database import get_database
-    db = get_database()
-    yield db
 
-    # Cleanup: drop the entire test database when the worker finishes
+    yield get_database()
+    # No per-worker cleanup: database is dropped at the start of the next run
+
+
+@pytest_asyncio.fixture
+async def isolated_db(mongo_client):
+    """Isolated database for tests that purge all data.
+
+    Creates a throwaway database, switches the global to it,
+    runs the test, then restores the shared database connection.
+    Safe because xdist runs tests sequentially within a worker.
+    """
+    db_name = f"test_winebox_isolated_{os.getpid()}_{uuid.uuid4().hex[:8]}"
+    await init_db(
+        mongo_client=mongo_client, mongodb_database=db_name, skip_indexes=True
+    )
+
+    from winebox.database import get_database
+
+    yield get_database()
     await mongo_client.drop_database(db_name)
+    # Restore the shared database connection
+    await init_db(
+        mongo_client=mongo_client, mongodb_database=SHARED_TEST_DB, skip_indexes=True
+    )
 
 
 @pytest.fixture
@@ -154,7 +197,7 @@ async def client(init_test_db, test_user_email) -> AsyncGenerator[AsyncClient, N
     """Create an async test client with a unique authenticated user."""
     test_user = User(
         email=test_user_email,
-        hashed_password=get_password_hash("testpassword"),
+        hashed_password=_CACHED_TEST_PASSWORD_HASH,
         is_active=True,
         is_verified=True,
         is_superuser=False,

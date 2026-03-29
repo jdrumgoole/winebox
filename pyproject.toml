@@ -83,8 +83,8 @@ asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 # Exclude E2E tests by default - they use sync Playwright which conflicts with pytest-asyncio
 # Run E2E tests separately with: pytest -m e2e
-# loadfile: same-file tests run in same worker (better fixture reuse, less IPC)
-addopts = "-n auto -m 'not e2e' --dist loadfile"
+# worksteal: idle workers steal tests from busy workers for better load balancing
+addopts = "-n auto -m 'not e2e' --dist worksteal --durations=10"
 markers = [
     "e2e: marks tests as end-to-end tests (run separately with '-m e2e')",
 ]

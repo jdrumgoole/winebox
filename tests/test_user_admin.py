@@ -18,6 +18,10 @@ from winebox.cli.user_admin import (
 from winebox.models.user import User
 from winebox.services.auth import get_password_hash, verify_password
 
+# Pre-compute password hashes — Argon2 is deliberately slow (~38ms per call)
+_HASH_ADMINPASS = get_password_hash("adminpass")
+_HASH_USERPASS = get_password_hash("userpass")
+
 
 @pytest_asyncio.fixture
 async def admin_user(init_test_db):
@@ -26,7 +30,7 @@ async def admin_user(init_test_db):
     email = f"admin-{uuid.uuid4().hex[:8]}@example.com"
     user = User(
         email=email,
-        hashed_password=get_password_hash("adminpass"),
+        hashed_password=_HASH_ADMINPASS,
         is_superuser=True,
         is_active=True,
         is_verified=True,
@@ -44,7 +48,7 @@ async def regular_user(init_test_db):
     email = f"user-{uuid.uuid4().hex[:8]}@example.com"
     user = User(
         email=email,
-        hashed_password=get_password_hash("userpass"),
+        hashed_password=_HASH_USERPASS,
         is_superuser=False,
         is_active=True,
         is_verified=True,

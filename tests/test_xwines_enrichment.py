@@ -2,6 +2,7 @@
 
 import io
 import os
+import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -214,12 +215,16 @@ async def test_batch_match_uses_claude_when_enabled() -> None:
 @pytest.mark.asyncio
 async def test_enrich_fills_gaps(init_test_db) -> None:
     """Empty parsed fields are filled from X-Wines match."""
-    # Insert an X-Wines wine
+    uid = uuid.uuid4().hex[:8]
+    wine_name = f"Chateau Margaux {uid}"
+    xwines_id = hash(uid) % 1_000_000
+
+    # Insert an X-Wines wine with unique name to avoid shared-DB collisions
     xwine = XWinesWine(
-        xwines_id=100,
-        name="Chateau Margaux",
+        xwines_id=xwines_id,
+        name=wine_name,
         wine_type="Red",
-        winery_name="Chateau Margaux",
+        winery_name=wine_name,
         country="France",
         country_code="FR",
         region_name="Bordeaux",
@@ -231,28 +236,32 @@ async def test_enrich_fills_gaps(init_test_db) -> None:
     await xwine.insert()
 
     # Parsed data with only name detected
-    parsed = {"name": "Chateau Margaux"}
+    parsed = {"name": wine_name}
 
     result = await enrich_parsed_with_xwines(parsed)
 
-    assert result["name"] == "Chateau Margaux"
-    assert result["winery"] == "Chateau Margaux"
+    assert result["name"] == wine_name
+    assert result["winery"] == wine_name
     assert result["grape_variety"] == "Cabernet Sauvignon, Merlot"
     assert result["region"] == "Bordeaux"
     assert result["country"] == "France"
     assert result["alcohol_percentage"] == 13.5
     assert result["wine_type"] == "red"  # Lowercased
-    assert result["xwines_id"] == 100
+    assert result["xwines_id"] == xwines_id
 
 
 @pytest.mark.asyncio
 async def test_enrich_preserves_existing(init_test_db) -> None:
     """Non-empty parsed fields are NOT overwritten by X-Wines data."""
+    uid = uuid.uuid4().hex[:8]
+    wine_name = f"Opus One {uid}"
+    xwines_id = hash(uid) % 1_000_000 + 1_000_000
+
     xwine = XWinesWine(
-        xwines_id=200,
-        name="Opus One",
+        xwines_id=xwines_id,
+        name=wine_name,
         wine_type="Red",
-        winery_name="Opus One Winery",
+        winery_name=f"Opus One Winery {uid}",
         country="United States",
         country_code="US",
         region_name="Napa Valley",
@@ -265,7 +274,7 @@ async def test_enrich_preserves_existing(init_test_db) -> None:
 
     # Parsed data with some fields already filled by OCR
     parsed = {
-        "name": "Opus One",
+        "name": wine_name,
         "winery": "My Custom Winery",  # Should NOT be overwritten
         "country": "USA",  # Should NOT be overwritten
         "grape_variety": "Pinot Noir",  # Should NOT be overwritten
@@ -280,7 +289,7 @@ async def test_enrich_preserves_existing(init_test_db) -> None:
     assert result["region"] == "Napa Valley"
     assert result["alcohol_percentage"] == 14.5
     assert result["wine_type"] == "red"
-    assert result["xwines_id"] == 200
+    assert result["xwines_id"] == xwines_id
 
 
 @pytest.mark.asyncio
@@ -300,20 +309,24 @@ async def test_enrich_no_match(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_enrich_adds_xwines_id(init_test_db) -> None:
     """xwines_id is added when a match is found."""
+    uid = uuid.uuid4().hex[:8]
+    wine_name = f"Merlot Reserve {uid}"
+    xwines_id = hash(uid) % 1_000_000 + 2_000_000
+
     xwine = XWinesWine(
-        xwines_id=42,
-        name="Merlot Reserve",
+        xwines_id=xwines_id,
+        name=wine_name,
         wine_type="Red",
-        winery_name="Test Winery",
+        winery_name=f"Test Winery {uid}",
         avg_rating=3.5,
         rating_count=100,
     )
     await xwine.insert()
 
-    parsed = {"name": "Merlot Reserve"}
+    parsed = {"name": wine_name}
     result = await enrich_parsed_with_xwines(parsed)
 
-    assert result["xwines_id"] == 42
+    assert result["xwines_id"] == xwines_id
 
 
 @pytest.mark.asyncio
@@ -341,12 +354,16 @@ async def test_enrich_no_name_skipped(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_scan_returns_xwines_fields(client: AsyncClient, init_test_db, sample_image_bytes: bytes) -> None:
     """Scan endpoint includes wine_type and xwines_id from enrichment."""
+    uid = uuid.uuid4().hex[:8]
+    wine_name = f"Test Scan Wine {uid}"
+    xwines_id = hash(uid) % 1_000_000 + 3_000_000
+
     # Insert an X-Wines wine that will match the OCR result
     xwine = XWinesWine(
-        xwines_id=300,
-        name="Test Scan Wine",
+        xwines_id=xwines_id,
+        name=wine_name,
         wine_type="White",
-        winery_name="Scan Winery",
+        winery_name=f"Scan Winery {uid}",
         country="Italy",
         country_code="IT",
         region_name="Tuscany",
@@ -362,8 +379,8 @@ async def test_scan_returns_xwines_fields(client: AsyncClient, init_test_db, sam
          patch("winebox.routers.wines.scan.ocr_service") as mock_ocr, \
          patch("winebox.routers.wines.scan.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
-        mock_ocr.extract_text_from_bytes = AsyncMock(return_value="Test Scan Wine")
-        mock_parser.parse.return_value = {"name": "Test Scan Wine"}
+        mock_ocr.extract_text_from_bytes = AsyncMock(return_value=wine_name)
+        mock_parser.parse.return_value = {"name": wine_name}
 
         response = await client.post(
             "/api/wines/scan",
@@ -375,7 +392,7 @@ async def test_scan_returns_xwines_fields(client: AsyncClient, init_test_db, sam
     parsed = data["parsed"]
 
     assert parsed["wine_type"] == "white"
-    assert parsed["xwines_id"] == 300
+    assert parsed["xwines_id"] == xwines_id
     assert parsed["region"] == "Tuscany"
     assert parsed["grape_variety"] == "Trebbiano"
 
