@@ -91,22 +91,40 @@ class TestDemoDataE2E:
             capture_artifacts(page, "demo_empty_welcome")
             raise
 
-    def test_add_my_own_wine_link_navigates(self, authenticated_page: Page) -> None:
-        """'Add my own wine' link on welcome screen navigates to check-in page."""
+    def test_welcome_add_to_cellar_navigates(self, authenticated_page: Page) -> None:
+        """'Add to my cellar' button on welcome screen navigates to Add to Cellar page."""
         page = authenticated_page
         _cleanup_demo_data(page)
         _navigate_to_dashboard(page)
 
         try:
             page.wait_for_selector("#demo-welcome", state="visible", timeout=10000)
-            link = page.locator('#demo-welcome a[data-page="checkin"]')
+            link = page.locator('#demo-welcome a[data-page="add-to-cellar"]').first
             expect(link).to_be_visible()
-            expect(link).to_have_text("Add my own wine")
+            expect(link).to_have_text("Add to my cellar")
+            link.click()
+            page.wait_for_selector("#page-add-to-cellar", state="visible", timeout=5000)
+            expect(page.locator("#page-add-to-cellar")).to_be_visible()
+        except Exception:
+            capture_artifacts(page, "demo_add_to_cellar_link")
+            raise
+
+    def test_welcome_record_tasted_navigates(self, authenticated_page: Page) -> None:
+        """'Record a wine I tasted' button navigates to checkin page in met mode."""
+        page = authenticated_page
+        _cleanup_demo_data(page)
+        _navigate_to_dashboard(page)
+
+        try:
+            page.wait_for_selector("#demo-welcome", state="visible", timeout=10000)
+            link = page.locator('#demo-welcome a[data-mode="met"]')
+            expect(link).to_be_visible()
+            expect(link).to_have_text("Record a wine I tasted")
             link.click()
             page.wait_for_selector("#page-checkin", state="visible", timeout=5000)
             expect(page.locator("#page-checkin")).to_be_visible()
         except Exception:
-            capture_artifacts(page, "demo_add_own_wine_link")
+            capture_artifacts(page, "demo_record_tasted_link")
             raise
 
     def test_load_sample_wines(self, authenticated_page: Page) -> None:

@@ -824,7 +824,28 @@ function initNavigation() {
         const link = e.target.closest('a[data-page]');
         if (!link || link.classList.contains('nav-link')) return; // nav-links handled above
         e.preventDefault();
-        navigateTo(link.dataset.page);
+
+        const page = link.dataset.page;
+
+        // Handle mode flag for checkin page (met vs cellar)
+        if (link.dataset.mode === 'met' && page === 'checkin') {
+            currentCheckinMode = 'met';
+            navigateTo('checkin');
+            const heading = document.querySelector('#page-checkin h2');
+            const subtitle = document.querySelector('#page-checkin .page-subtitle');
+            if (heading) heading.textContent = 'Record a Wine';
+            if (subtitle) subtitle.textContent = 'Scan a label to record a wine you\'ve encountered';
+            return;
+        }
+
+        // Handle import tab shortcut on add-to-cellar page
+        if (link.dataset.tab === 'import' && page === 'add-to-cellar') {
+            navigateTo('add-to-cellar');
+            setTimeout(() => selectEntryPath('import'), 50);
+            return;
+        }
+
+        navigateTo(page);
     });
 
     // Hamburger menu toggle
@@ -1168,6 +1189,7 @@ function showScanningIndicator(show) {
 
 // Store pending checkin data for confirmation
 let pendingCheckinData = null;
+let currentCheckinMode = 'met'; // 'met' or 'cellar' — determines where the wine is saved
 
 function handleCheckin(e) {
     e.preventDefault();
@@ -1206,6 +1228,24 @@ function handleCheckin(e) {
 function showCheckinConfirmation() {
     const modal = document.getElementById('checkin-confirm-modal');
     const data = pendingCheckinData;
+
+    // Adapt modal for cellar vs met mode
+    const headerEl = modal.querySelector('.checkin-confirm-header h3');
+    const subtitleEl = modal.querySelector('.checkin-confirm-subtitle');
+    const confirmBtn = document.getElementById('checkin-confirm-btn');
+    const qtySection = document.getElementById('confirm-quantity-section');
+
+    if (currentCheckinMode === 'cellar') {
+        headerEl.textContent = 'Add to Cellar';
+        subtitleEl.textContent = 'Review the details and set the quantity';
+        confirmBtn.textContent = 'Add to Cellar';
+        qtySection.style.display = 'block';
+    } else {
+        headerEl.textContent = 'Record Wine';
+        subtitleEl.textContent = 'Review and edit the details before saving';
+        confirmBtn.textContent = 'Record Wine';
+        qtySection.style.display = 'none';
+    }
 
     // Set image preview
     const imageContainer = document.getElementById('checkin-confirm-image');
@@ -1335,22 +1375,31 @@ async function submitCheckin() {
         formData.append('custom_fields', JSON.stringify(customFields));
     }
 
+    // Add quantity for cellar mode
+    if (currentCheckinMode === 'cellar') {
+        const qty = document.getElementById('confirm-quantity')?.value || '1';
+        formData.append('quantity', qty);
+    }
+
     try {
-        const response = await fetchWithAuth(`${API_BASE}/wines/met`, {
+        const endpoint = currentCheckinMode === 'cellar' ? 'wines/checkin' : 'wines/met';
+        const response = await fetchWithAuth(`${API_BASE}/${endpoint}`, {
             method: 'POST',
             body: formData
         });
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || 'Failed to record wine');
+            throw new Error(error.detail || (currentCheckinMode === 'cellar' ? 'Failed to add wine' : 'Failed to record wine'));
         }
 
         const wine = await response.json();
-        showToast(`Recorded: ${wine.name}`, 'success');
+        const toastMsg = currentCheckinMode === 'cellar' ? `Added to cellar: ${wine.name}` : `Recorded: ${wine.name}`;
+        showToast(toastMsg, 'success');
 
-        // Track record event
-        analytics.capture('frontend_wine_met_recorded', {
+        // Track event
+        const eventName = currentCheckinMode === 'cellar' ? 'frontend_wine_cellar_added' : 'frontend_wine_met_recorded';
+        analytics.capture(eventName, {
             wine_name: wine.name,
             country: document.getElementById('confirm-country').value || null
         });
@@ -1364,8 +1413,8 @@ async function submitCheckin() {
         lastScanResult = null;
         pendingCheckinData = null;
 
-        // Navigate to met wines
-        navigateTo('met');
+        // Navigate to the appropriate page
+        navigateTo(currentCheckinMode === 'cellar' ? 'cellar' : 'met');
     } catch (error) {
         showToast(error.message, 'error');
     }
@@ -4823,6 +4872,15 @@ function initMetPage() {
     }
     document.getElementById('met-view-cards')?.addEventListener('click', () => setMetViewMode('cards'));
     document.getElementById('met-view-table')?.addEventListener('click', () => setMetViewMode('table'));
+    document.getElementById('met-record-wine-btn')?.addEventListener('click', () => {
+        currentCheckinMode = 'met';
+        navigateTo('checkin');
+        // Update checkin page heading for met mode
+        const heading = document.querySelector('#page-checkin h2');
+        const subtitle = document.querySelector('#page-checkin .page-subtitle');
+        if (heading) heading.textContent = 'Record a Wine';
+        if (subtitle) subtitle.textContent = 'Scan a label to record a wine you\'ve encountered';
+    });
 }
 
 async function loadMet() {
@@ -5442,14 +5500,20 @@ function showDemoWelcome() {
     welcome.innerHTML = `
         <div class="demo-welcome-content">
             <h3>Welcome to WineBox</h3>
-            <p>Your cellar is empty. Load some sample wines to explore what WineBox can do, or add your first wine by scanning a label.</p>
+            <p>Your cellar is empty. How would you like to get started?</p>
             <div class="demo-welcome-actions">
-                <button class="btn btn-primary" id="demo-install-btn">
-                    Load sample wines
-                </button>
-                <a href="#" data-page="checkin" class="btn btn-secondary">
-                    Add my own wine
+                <a href="#" data-page="add-to-cellar" class="btn btn-primary">
+                    Add to my cellar
                 </a>
+                <a href="#" data-page="checkin" data-mode="met" class="btn btn-secondary">
+                    Record a wine I tasted
+                </a>
+                <a href="#" data-page="add-to-cellar" data-tab="import" class="btn btn-secondary">
+                    Import from a spreadsheet
+                </a>
+            </div>
+            <div style="margin-top:1rem;">
+                <button class="btn btn-outline btn-small" id="demo-install-btn">Load sample wines</button>
             </div>
             <p class="demo-hint">Sample wines can be removed at any time without affecting your own wines.</p>
         </div>

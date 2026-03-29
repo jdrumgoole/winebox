@@ -31,7 +31,6 @@
             </button>
             <nav id="main-nav">
                 <a href="#" data-page="dashboard" class="nav-link active" aria-current="page">Dashboard</a>
-                <a href="#" data-page="checkin" class="nav-link">Add Wine</a>
                 <a href="#" data-page="add-to-cellar" class="nav-link">Add to Cellar</a>
                 <a href="#" data-page="cellar" class="nav-link">My Cellar</a>
                 <a href="#" data-page="met" class="nav-link">Wines I've Met</a>
@@ -473,8 +472,13 @@
 
         <!-- Wines I've Met Page -->
         <section id="page-met" class="page" aria-labelledby="page-met-title">
-            <h2 id="page-met-title">Wines I've Met</h2>
-            <p class="page-subtitle">Wines you've encountered in shops, restaurants, and tastings</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <div>
+                    <h2 id="page-met-title" style="margin-bottom:0;">Wines I've Met</h2>
+                    <p class="page-subtitle">Wines you've encountered in shops, restaurants, and tastings</p>
+                </div>
+                <button class="btn btn-primary" id="met-record-wine-btn">+ Record a Wine</button>
+            </div>
             <div class="filter-bar">
                 <input type="text" id="met-search" placeholder="Search wines I've met...">
                 <div class="view-toggle">
@@ -1329,6 +1333,10 @@
                             </div>
                         </div>
                     </div>
+                </div>
+                <div id="confirm-quantity-section" class="form-group" style="display:none;margin:0 1.5rem;">
+                    <label for="confirm-quantity">How many bottles?</label>
+                    <input type="number" id="confirm-quantity" min="1" max="9999" value="1" style="width:6rem;">
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-primary" id="checkin-confirm-btn">Save</button>
