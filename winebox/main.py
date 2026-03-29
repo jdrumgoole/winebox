@@ -270,8 +270,8 @@ async def root() -> FileResponse:
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon() -> FileResponse:
     """Serve favicon for browser tab."""
-    favicon_path = Path(__file__).parent / "static" / "logos" / "favicon.png"
-    return FileResponse(favicon_path, media_type="image/png")
+    favicon_path = Path(__file__).parent / "static" / "logos" / "favicon.svg"
+    return FileResponse(favicon_path, media_type="image/svg+xml")
 
 
 # Health check endpoint

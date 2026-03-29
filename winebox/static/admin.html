@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#8B1A4A">
+    <meta name="theme-color" content="#5C0A2D">
     <title>WineBox Admin Panel</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" href="/static/logos/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/static/logos/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/logos/favicon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/logos/apple-touch-icon.png">
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
         /* Admin-specific styles */
@@ -30,7 +32,7 @@
         .admin-header h1 {
             font-family: 'Playfair Display', serif;
             font-size: 2rem;
-            color: #8B1A4A;
+            color: var(--burgundy-light);
             margin: 0;
         }
 
@@ -49,7 +51,7 @@
 
         .admin-nav a:hover {
             background-color: rgba(139, 26, 74, 0.1);
-            color: #8B1A4A;
+            color: var(--burgundy-light);
         }
 
         .stats-overview {
@@ -71,7 +73,7 @@
             font-family: 'Playfair Display', serif;
             font-size: 2.5rem;
             font-weight: 700;
-            color: #8B1A4A;
+            color: var(--burgundy-light);
             line-height: 1;
         }
 
@@ -105,7 +107,7 @@
         }
 
         .users-table th {
-            background: linear-gradient(135deg, #8B1A4A 0%, #722040 100%);
+            background: linear-gradient(135deg, var(--burgundy-light) 0%, var(--burgundy) 100%);
             color: #fff;
             font-weight: 600;
             font-size: 0.875rem;
@@ -148,7 +150,7 @@
 
         .badge-primary {
             background-color: #f8e1ea;
-            color: #8B1A4A;
+            color: var(--burgundy-light);
         }
 
         .loading {
@@ -162,7 +164,7 @@
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 2px solid #8B1A4A;
+            border: 2px solid var(--burgundy-light);
             border-radius: 50%;
             border-top-color: transparent;
             animation: spin 1s linear infinite;
@@ -189,7 +191,7 @@
 
         .cellar-size {
             font-weight: 600;
-            color: #8B1A4A;
+            color: var(--burgundy-light);
         }
 
         @media (max-width: 768px) {
@@ -272,6 +274,6 @@
         </div>
     </footer>
 
-    <script src="/static/js/admin.js?v=0.6.53"></script>
+    <script src="/static/js/admin.js?v=0.6.54"></script>
 </body>
 </html>

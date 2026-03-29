@@ -1,15 +1,26 @@
 /* WineBox Landing Page Styles */
 
 :root {
-    --primary-color: #8B1A4A;
-    --primary-light: #B82860;
-    --primary-dark: #5C0A2D;
-    --secondary-color: #C49A3C;
-    --background-color: #FAF7F2;
+    /* Brand palette */
+    --burgundy: #5C0A2D;
+    --burgundy-light: #8B1A4A;
+    --bottle: #B82860;
+    --gold: #C49A3C;
+    --gold-light: #F0D78C;
+    --case-wood: #B8956A;
+    --cream: #FAF7F2;
+    --dark-bg: #1A0A10;
+
+    /* Semantic aliases */
+    --primary-color: var(--burgundy-light);
+    --primary-light: var(--bottle);
+    --primary-dark: var(--burgundy);
+    --secondary-color: var(--gold);
+    --background-color: var(--cream);
     --card-background: #ffffff;
-    --text-color: #2c2c2c;
-    --text-muted: #666666;
-    --border-color: #e0dcd5;
+    --text-color: #2D1A22;
+    --text-muted: #8A7A80;
+    --border-color: #E8E0D8;
     --success-color: #4a7c59;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -28,14 +39,14 @@ html {
 }
 
 body {
-    font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+    font-family: 'DM Sans', -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: var(--background-color);
     color: var(--text-color);
     line-height: 1.6;
 }
 
 h1, h2, h3, h4 {
-    font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+    font-family: 'Playfair Display', Georgia, serif;
 }
 
 /* Header */
