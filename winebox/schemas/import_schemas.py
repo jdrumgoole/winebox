@@ -48,6 +48,10 @@ class ImportProcessRequest(BaseModel):
         True,
         description="Skip X-Wines enrichment during import (background enrichment runs afterwards)",
     )
+    skip_duplicates: bool = Field(
+        True,
+        description="Skip wines that already exist in your cellar (matched by name, winery, vintage)",
+    )
 
 
 class ImportResultResponse(BaseModel):

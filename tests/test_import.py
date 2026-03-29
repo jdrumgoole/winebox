@@ -617,3 +617,207 @@ async def test_append_rows_requires_auth(unauthenticated_client: AsyncClient) ->
         json={"rows": [{"Name": "Wine A"}]},
     )
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_case_size_multiplies_quantity(client: AsyncClient) -> None:
+    """Test that case_size multiplies quantity to compute total bottles."""
+    csv_data = _make_csv(
+        ["Wine Name", "Cases", "Case Size"],
+        [
+            ["Bordeaux Blend", "2", "12"],
+            ["Single Case", "1", "6"],
+        ],
+    )
+
+    files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp = await client.post("/api/import/upload", files=files)
+    batch_id = upload_resp.json()["batch_id"]
+
+    await client.post(
+        f"/api/import/{batch_id}/mapping",
+        json={"mapping": {
+            "Wine Name": "name",
+            "Cases": "quantity",
+            "Case Size": "case_size",
+        }},
+    )
+    process_resp = await client.post(
+        f"/api/import/{batch_id}/process",
+        json={"skip_non_wine": False, "default_quantity": 1},
+    )
+    assert process_resp.json()["wines_created"] == 2
+
+    wines_resp = await client.get("/api/wines")
+    wines = {w["name"]: w for w in wines_resp.json()}
+    assert wines["Bordeaux Blend"]["inventory"]["quantity"] == 24  # 2 * 12
+    assert wines["Single Case"]["inventory"]["quantity"] == 6  # 1 * 6
+
+
+@pytest.mark.asyncio
+async def test_case_size_without_quantity(client: AsyncClient) -> None:
+    """Test that case_size alone uses default quantity of 1 case."""
+    csv_data = _make_csv(
+        ["Wine Name", "Bottles per Case"],
+        [["Rioja Reserva", "6"]],
+    )
+
+    files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp = await client.post("/api/import/upload", files=files)
+    batch_id = upload_resp.json()["batch_id"]
+
+    await client.post(
+        f"/api/import/{batch_id}/mapping",
+        json={"mapping": {
+            "Wine Name": "name",
+            "Bottles per Case": "case_size",
+        }},
+    )
+    process_resp = await client.post(
+        f"/api/import/{batch_id}/process",
+        json={"skip_non_wine": False, "default_quantity": 1},
+    )
+    assert process_resp.json()["wines_created"] == 1
+
+    wines_resp = await client.get("/api/wines")
+    wine = wines_resp.json()[0]
+    assert wine["inventory"]["quantity"] == 6  # 1 (default) * 6
+
+
+@pytest.mark.asyncio
+async def test_undo_import(client: AsyncClient) -> None:
+    """Test that undo import deletes wines and marks batch as rolled back."""
+    csv_data = _make_csv(
+        ["Name", "Country"],
+        [
+            ["Wine Alpha", "France"],
+            ["Wine Beta", "Italy"],
+            ["Wine Gamma", "Spain"],
+        ],
+    )
+
+    files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp = await client.post("/api/import/upload", files=files)
+    batch_id = upload_resp.json()["batch_id"]
+
+    await client.post(
+        f"/api/import/{batch_id}/mapping",
+        json={"mapping": {"Name": "name", "Country": "country"}},
+    )
+    process_resp = await client.post(
+        f"/api/import/{batch_id}/process",
+        json={"skip_non_wine": False, "default_quantity": 1},
+    )
+    assert process_resp.json()["wines_created"] == 3
+
+    # Verify wines exist
+    wines_resp = await client.get("/api/wines")
+    assert len(wines_resp.json()) == 3
+
+    # Undo import
+    undo_resp = await client.delete(f"/api/import/batches/{batch_id}/wines")
+    assert undo_resp.status_code == 200
+    undo_result = undo_resp.json()
+    assert undo_result["wines_deleted"] == 3
+    assert undo_result["status"] == "rolled_back"
+
+    # Verify wines are gone
+    wines_resp = await client.get("/api/wines")
+    assert len(wines_resp.json()) == 0
+
+    # Verify batch is marked as rolled_back
+    batch_resp = await client.get(f"/api/import/batches/{batch_id}")
+    assert batch_resp.json()["status"] == "rolled_back"
+
+
+@pytest.mark.asyncio
+async def test_undo_import_only_completed_or_processing(client: AsyncClient) -> None:
+    """Test that undo is only allowed on completed or processing batches."""
+    csv_data = _make_csv(["Name"], [["Wine A"]])
+    files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp = await client.post("/api/import/upload", files=files)
+    batch_id = upload_resp.json()["batch_id"]
+
+    # Try to undo an uploaded (not completed/processing) batch
+    undo_resp = await client.delete(f"/api/import/batches/{batch_id}/wines")
+    assert undo_resp.status_code == 400
+    assert "Only completed or in-progress" in undo_resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_skip_duplicates(client: AsyncClient) -> None:
+    """Test that skip_duplicates skips wines already in cellar."""
+    # First import: add 2 wines
+    csv_data = _make_csv(
+        ["Name", "Winery", "Vintage"],
+        [
+            ["Margaux", "Chateau Margaux", "2015"],
+            ["Barolo", "Conterno", "2018"],
+        ],
+    )
+    files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp = await client.post("/api/import/upload", files=files)
+    batch_id = upload_resp.json()["batch_id"]
+
+    await client.post(
+        f"/api/import/{batch_id}/mapping",
+        json={"mapping": {"Name": "name", "Winery": "winery", "Vintage": "vintage"}},
+    )
+    process_resp = await client.post(
+        f"/api/import/{batch_id}/process",
+        json={"skip_non_wine": False, "default_quantity": 1, "skip_duplicates": False},
+    )
+    assert process_resp.json()["wines_created"] == 2
+
+    # Second import: same 2 wines + 1 new, with skip_duplicates=True
+    csv_data2 = _make_csv(
+        ["Name", "Winery", "Vintage"],
+        [
+            ["Margaux", "Chateau Margaux", "2015"],  # duplicate
+            ["Barolo", "Conterno", "2018"],            # duplicate
+            ["Brunello", "Biondi Santi", "2016"],      # new
+        ],
+    )
+    files2 = {"file": ("wines2.csv", io.BytesIO(csv_data2), "text/csv")}
+    upload_resp2 = await client.post("/api/import/upload", files=files2)
+    batch_id2 = upload_resp2.json()["batch_id"]
+
+    await client.post(
+        f"/api/import/{batch_id2}/mapping",
+        json={"mapping": {"Name": "name", "Winery": "winery", "Vintage": "vintage"}},
+    )
+    process_resp2 = await client.post(
+        f"/api/import/{batch_id2}/process",
+        json={"skip_non_wine": False, "default_quantity": 1, "skip_duplicates": True},
+    )
+    result2 = process_resp2.json()
+    assert result2["wines_created"] == 1  # only Brunello
+    assert result2["rows_skipped"] == 2   # Margaux + Barolo skipped
+
+    # Verify total wines: 2 original + 1 new = 3
+    wines_resp = await client.get("/api/wines")
+    assert len(wines_resp.json()) == 3
+
+
+@pytest.mark.asyncio
+async def test_skip_duplicates_false_allows_duplicates(client: AsyncClient) -> None:
+    """Test that skip_duplicates=False imports duplicates."""
+    csv_data = _make_csv(["Name"], [["Same Wine"]])
+
+    # First import
+    files = {"file": ("wines.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp = await client.post("/api/import/upload", files=files)
+    batch_id = upload_resp.json()["batch_id"]
+    await client.post(f"/api/import/{batch_id}/mapping", json={"mapping": {"Name": "name"}})
+    await client.post(f"/api/import/{batch_id}/process", json={"skip_duplicates": False})
+
+    # Second import, same wine, skip_duplicates=False
+    files2 = {"file": ("wines2.csv", io.BytesIO(csv_data), "text/csv")}
+    upload_resp2 = await client.post("/api/import/upload", files=files2)
+    batch_id2 = upload_resp2.json()["batch_id"]
+    await client.post(f"/api/import/{batch_id2}/mapping", json={"mapping": {"Name": "name"}})
+    process_resp = await client.post(f"/api/import/{batch_id2}/process", json={"skip_duplicates": False})
+    assert process_resp.json()["wines_created"] == 1  # imported despite being duplicate
+
+    wines_resp = await client.get("/api/wines")
+    assert len(wines_resp.json()) == 2  # both copies exist

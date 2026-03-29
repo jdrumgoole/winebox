@@ -163,9 +163,9 @@ def test_suggest_mapping_case_insensitive() -> None:
 
 def test_suggest_mapping_unknown_custom() -> None:
     """Test that unknown headers default to custom fields using the column name."""
-    mapping = suggest_column_mapping(["Cellar Location", "Purchase Date", "name"])
+    mapping = suggest_column_mapping(["Cellar Location", "Tasting Room", "name"])
     assert mapping["Cellar Location"] == "custom:Cellar Location"
-    assert mapping["Purchase Date"] == "custom:Purchase Date"
+    assert mapping["Tasting Room"] == "custom:Tasting Room"
     assert mapping["name"] == "name"
 
 
@@ -298,6 +298,80 @@ def test_row_to_wine_quantity_from_row() -> None:
     mapping = {"Name": "name", "Qty": "quantity"}
     result = row_to_wine_data(row, mapping, ObjectId())
     assert result["inventory"].quantity == 6
+
+
+def test_row_to_wine_case_size_multiplies_quantity() -> None:
+    """Test case_size multiplies quantity to compute total bottles."""
+    from bson import ObjectId
+
+    row = {"Name": "Test", "Cases": "2", "Size": "12"}
+    mapping = {"Name": "name", "Cases": "quantity", "Size": "case_size"}
+    result = row_to_wine_data(row, mapping, ObjectId())
+    assert result["inventory"].quantity == 24  # 2 cases * 12 bottles
+
+
+def test_row_to_wine_case_size_without_quantity() -> None:
+    """Test case_size with default quantity of 1."""
+    from bson import ObjectId
+
+    row = {"Name": "Test", "Bottles per Case": "6"}
+    mapping = {"Name": "name", "Bottles per Case": "case_size"}
+    result = row_to_wine_data(row, mapping, ObjectId())
+    assert result["inventory"].quantity == 6  # 1 (default) * 6
+
+
+def test_row_to_wine_purchase_date() -> None:
+    """Test purchase_date parsing from row."""
+    from bson import ObjectId
+
+    row = {"Name": "Test", "Date Bought": "2024-03-15"}
+    mapping = {"Name": "name", "Date Bought": "purchase_date"}
+    result = row_to_wine_data(row, mapping, ObjectId())
+    assert result["purchase_date"].year == 2024
+    assert result["purchase_date"].month == 3
+    assert result["purchase_date"].day == 15
+
+
+def test_coerce_date_formats() -> None:
+    """Test various date formats."""
+    from winebox.services.import_service import _coerce_date
+
+    assert _coerce_date("2024-03-15").year == 2024
+    assert _coerce_date("15/03/2024").day == 15
+    assert _coerce_date("Mar 15, 2024").month == 3
+    assert _coerce_date("15 March 2024").day == 15
+    assert _coerce_date("") is None
+    assert _coerce_date("not a date") is None
+
+
+def test_wine_identity_key() -> None:
+    """Test identity key generation for dedup."""
+    from winebox.services.import_service import _wine_identity_key
+
+    wine = {"name": "Chateau Margaux", "winery": "Margaux", "vintage": 2015}
+    key = _wine_identity_key(wine)
+    assert key == ("chateau margaux", "margaux", "2015")
+
+    # Missing fields use empty string
+    wine2 = {"name": "Simple Wine"}
+    key2 = _wine_identity_key(wine2)
+    assert key2 == ("simple wine", "", "")
+
+
+def test_duplicate_flag_in_row_to_wine_data() -> None:
+    """Test that _duplicate flag is set when wine matches existing set."""
+    from bson import ObjectId
+
+    existing = {("test wine", "winery a", "2020")}
+    row = {"Name": "Test Wine", "Winery": "Winery A", "Year": "2020"}
+    mapping = {"Name": "name", "Winery": "winery", "Year": "vintage"}
+    result = row_to_wine_data(row, mapping, ObjectId(), existing_wines=existing)
+    assert result.get("_duplicate") is True
+
+    # Non-matching wine should not have flag
+    row2 = {"Name": "Different Wine", "Winery": "Winery B", "Year": "2021"}
+    result2 = row_to_wine_data(row2, mapping, ObjectId(), existing_wines=existing)
+    assert "_duplicate" not in result2
 
 
 # =============================================================================

@@ -3559,6 +3559,16 @@ function initImportPage() {
 
     // Dashboard buttons
     document.getElementById('import-dashboard-new-btn')?.addEventListener('click', resetImportPage);
+    document.getElementById('import-undo-btn')?.addEventListener('click', handleUndoImport);
+
+    // Incomplete batch buttons
+    document.getElementById('import-incomplete-undo-btn')?.addEventListener('click', handleIncompleteUndo);
+    document.getElementById('import-incomplete-dismiss-btn')?.addEventListener('click', () => {
+        document.getElementById('import-incomplete-notice').style.display = 'none';
+    });
+
+    // Check for incomplete batches on page load
+    checkIncompleteBatches();
 
     // Warn before navigating away during row upload
     window.addEventListener('beforeunload', (e) => {
@@ -4210,6 +4220,8 @@ function renderMappingStep(data) {
         alcohol_percentage:  { label: 'Alcohol (ABV)',        hint: 'Alcohol by volume as a number, e.g. "13.5"', group: 'details' },
         price_tier:          { label: 'Price Range',          hint: 'Budget, Mid-range, Premium, or Luxury', group: 'details' },
         quantity:            { label: 'Bottles',              hint: 'How many bottles you have of this wine', group: 'details' },
+        case_size:           { label: 'Bottles per Case',     hint: 'Number of bottles in each case (e.g. 6 or 12) — multiplied by quantity', group: 'details' },
+        purchase_date:       { label: 'Date Purchased',      hint: 'When you bought the wine (e.g. 2024-03-15)', group: 'details' },
         notes:               { label: 'Tasting Notes',       hint: 'Your personal notes about the wine', group: 'details' },
     };
 
@@ -4364,6 +4376,7 @@ function renderMappingStep(data) {
 
             // Refresh matched indicators across all dropdowns
             updateMatchedIndicators();
+            updateQuantityNotice();
         });
     });
 
@@ -4377,6 +4390,7 @@ function renderMappingStep(data) {
             row.classList.toggle('skipped', isActive);
             select.disabled = isActive;
             updateMatchedIndicators();
+            updateQuantityNotice();
         });
     });
 
@@ -4398,6 +4412,9 @@ function renderMappingStep(data) {
         document.getElementById('import-preview-container').innerHTML = previewHtml;
     }
 
+    // Show/hide quantity notice based on current mappings
+    updateQuantityNotice();
+
     // Column highlight on mapping row hover
     document.querySelectorAll('.import-mapping-row').forEach(row => {
         row.addEventListener('mouseenter', () => {
@@ -4413,6 +4430,88 @@ function renderMappingStep(data) {
             });
         });
     });
+}
+
+let _incompleteBatchId = null;
+
+async function checkIncompleteBatches() {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/import/batches`);
+        if (!response.ok) return;
+        const batches = await response.json();
+        const incomplete = batches.find(b => b.status === 'processing');
+        if (!incomplete) return;
+
+        _incompleteBatchId = incomplete.id;
+        const notice = document.getElementById('import-incomplete-notice');
+        const text = document.getElementById('import-incomplete-text');
+        text.textContent = `You have an incomplete import of "${incomplete.filename}" (${incomplete.wines_created} of ${incomplete.row_count} wines imported). You can remove the partial import or re-upload the file — duplicates will be skipped automatically.`;
+        notice.style.display = 'block';
+    } catch (err) {
+        // Silently ignore — not critical
+    }
+}
+
+async function handleIncompleteUndo() {
+    if (!_incompleteBatchId) return;
+    const confirmed = confirm('This will remove all wines from the incomplete import. Are you sure?');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/import/batches/${_incompleteBatchId}/wines`, {
+            method: 'DELETE',
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to remove partial import', 'error');
+            return;
+        }
+        const result = await response.json();
+        showToast(`Removed ${result.wines_deleted} wines from incomplete import`, 'success');
+        document.getElementById('import-incomplete-notice').style.display = 'none';
+        _incompleteBatchId = null;
+    } catch (err) {
+        showToast('Failed to remove partial import: ' + err.message, 'error');
+    }
+}
+
+async function handleUndoImport() {
+    if (!currentImportBatchId) return;
+
+    const wineCount = document.getElementById('import-dashboard-title')?.textContent?.match(/\d+/)?.[0] || 'these';
+    const confirmed = confirm(`This will remove all ${wineCount} wines from this import. This cannot be undone.\n\nAre you sure?`);
+    if (!confirmed) return;
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/import/batches/${currentImportBatchId}/wines`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to undo import', 'error');
+            return;
+        }
+
+        const result = await response.json();
+        showToast(`Removed ${result.wines_deleted} wines from your cellar`, 'success');
+        resetImportPage();
+    } catch (err) {
+        showToast('Failed to undo import: ' + err.message, 'error');
+    }
+}
+
+function updateQuantityNotice() {
+    const notice = document.getElementById('import-quantity-notice');
+    if (!notice) return;
+    let hasQuantity = false;
+    document.querySelectorAll('.import-mapping-row').forEach(row => {
+        const skipBtn = row.querySelector('.import-skip-btn');
+        if (skipBtn && skipBtn.classList.contains('active')) return;
+        const sel = row.querySelector('.import-mapping-select');
+        if (sel && sel.value === 'quantity') hasQuantity = true;
+    });
+    notice.style.display = hasQuantity ? 'none' : 'block';
 }
 
 async function handleConfirmMapping() {

@@ -409,6 +409,7 @@ async def process_batch(
         skip_non_wine=opts.skip_non_wine,
         default_quantity=opts.default_quantity,
         skip_enrichment=opts.skip_enrichment,
+        skip_duplicates=opts.skip_duplicates,
     )
 
     return ImportResultResponse(
@@ -450,6 +451,7 @@ async def process_batch_stream(
             skip_non_wine=opts.skip_non_wine,
             default_quantity=opts.default_quantity,
             skip_enrichment=opts.skip_enrichment,
+            skip_duplicates=opts.skip_duplicates,
         ):
             yield f"data: {json.dumps(progress)}\n\n"
 
@@ -516,6 +518,48 @@ async def delete_batch(
     """Delete an import batch (does not delete wines created from it)."""
     batch = await _get_user_batch(batch_id, current_user.id)
     await batch.delete()
+
+
+@router.delete("/batches/{batch_id}/wines")
+async def undo_import(
+    batch_id: str,
+    current_user: RequireAuth,
+) -> dict:
+    """Undo an import by deleting all wines created from a batch.
+
+    Allowed for COMPLETED or PROCESSING batches (partial imports).
+    Deletes all wines where import_batch_id matches and sets batch
+    status to ROLLED_BACK.
+    """
+    batch = await _get_user_batch(batch_id, current_user.id)
+
+    if batch.status not in (ImportStatus.COMPLETED, ImportStatus.PROCESSING):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only completed or in-progress imports can be undone",
+        )
+
+    # Delete all wines created by this batch for this user
+    wines_col = Wine.get_pymongo_collection()
+    result = await wines_col.delete_many({
+        "owner_id": batch.owner_id,
+        "import_batch_id": batch.id,
+    })
+
+    # Mark batch as rolled back
+    batch.status = ImportStatus.ROLLED_BACK
+    await batch.save()
+
+    logger.info(
+        "Undid import batch %s: deleted %d wines for user %s",
+        batch_id, result.deleted_count, current_user.id,
+    )
+
+    return {
+        "wines_deleted": result.deleted_count,
+        "batch_id": batch_id,
+        "status": ImportStatus.ROLLED_BACK.value,
+    }
 
 
 @router.get("/{batch_id}/unmapped-columns")

@@ -79,6 +79,45 @@ def _coerce_int(value: str) -> int | None:
         return None
 
 
+_DATE_FORMATS = [
+    "%Y-%m-%d",       # 2024-03-15
+    "%d/%m/%Y",       # 15/03/2024
+    "%m/%d/%Y",       # 03/15/2024
+    "%d-%m-%Y",       # 15-03-2024
+    "%d %b %Y",       # 15 Mar 2024
+    "%d %B %Y",       # 15 March 2024
+    "%b %d, %Y",      # Mar 15, 2024
+    "%B %d, %Y",      # March 15, 2024
+    "%Y/%m/%d",       # 2024/03/15
+]
+
+
+def _coerce_date(value: str) -> datetime | None:
+    """Try to parse a date string into a timezone-aware datetime."""
+    if not value:
+        return None
+    value = value.strip()
+    for fmt in _DATE_FORMATS:
+        try:
+            dt = datetime.strptime(value, fmt)
+            return dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _wine_identity_key(wine_data: dict[str, Any]) -> tuple[str, ...]:
+    """Build a dedup identity tuple from wine data.
+
+    Uses (name, winery, vintage) as the key. All values are lowercased
+    and stripped for comparison. Missing fields use empty string.
+    """
+    name = str(wine_data.get("name", "")).strip().lower()
+    winery = str(wine_data.get("winery", "") or "").strip().lower()
+    vintage = str(wine_data.get("vintage", "") or "").strip()
+    return (name, winery, vintage)
+
+
 def _compute_custom_fields_text(custom_fields: dict[str, str] | None) -> str | None:
     """Compute denormalized text from custom fields for search indexing."""
     if not custom_fields:
@@ -91,6 +130,7 @@ def row_to_wine_data(
     mapping: dict[str, str],
     owner_id: PyObjectId,
     default_quantity: int = 1,
+    existing_wines: set[tuple[str, ...]] | None = None,
 ) -> dict[str, Any] | None:
     """Convert a spreadsheet row to Wine constructor kwargs.
 
@@ -99,6 +139,9 @@ def row_to_wine_data(
         mapping: Column mapping dict.
         owner_id: Owner's ID.
         default_quantity: Default quantity if not specified in row.
+        existing_wines: Set of (name, winery, vintage) tuples already in cellar.
+            If provided and the wine matches, the returned dict will include
+            ``_duplicate: True`` so callers can flag it.
 
     Returns:
         Dict of Wine constructor kwargs, or None if row has no name.
@@ -106,6 +149,7 @@ def row_to_wine_data(
     wine_data: dict[str, Any] = {}
     custom_fields: dict[str, str] = {}
     quantity = default_quantity
+    case_size: int | None = None
 
     for header, field in mapping.items():
         value = row.get(header, "").strip()
@@ -129,8 +173,20 @@ def row_to_wine_data(
             coerced = _coerce_int(value)
             if coerced is not None and coerced > 0:
                 quantity = coerced
+        elif field == "case_size":
+            coerced = _coerce_int(value)
+            if coerced is not None and coerced > 0:
+                case_size = coerced
+        elif field == "purchase_date":
+            coerced_date = _coerce_date(value)
+            if coerced_date is not None:
+                wine_data["purchase_date"] = coerced_date
         elif field in VALID_WINE_FIELDS:
             wine_data[field] = value
+
+    # Compute total bottles from quantity and case_size
+    if case_size is not None:
+        quantity = quantity * case_size
 
     # Name is required
     if "name" not in wine_data:
@@ -146,5 +202,11 @@ def row_to_wine_data(
     if custom_fields:
         wine_data["custom_fields"] = custom_fields
         wine_data["custom_fields_text"] = _compute_custom_fields_text(custom_fields)
+
+    # Flag potential duplicates (not auto-skipped — caller decides)
+    if existing_wines is not None:
+        key = _wine_identity_key(wine_data)
+        if key in existing_wines:
+            wine_data["_duplicate"] = True
 
     return wine_data
