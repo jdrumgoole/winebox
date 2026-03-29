@@ -839,9 +839,9 @@ function initNavigation() {
         }
 
         // Handle import tab shortcut on add-to-cellar page
-        if (link.dataset.tab === 'import' && page === 'add-to-cellar') {
+        if (link.dataset.tab && page === 'add-to-cellar') {
             navigateTo('add-to-cellar');
-            setTimeout(() => selectEntryPath('import'), 50);
+            setTimeout(() => selectEntryPath(link.dataset.tab), 50);
             return;
         }
 
@@ -860,9 +860,10 @@ function initNavigation() {
 }
 
 function navigateTo(page) {
-    // Update nav links
+    // Update nav links — highlight "My Cellar" when on add-to-cellar page
     document.querySelectorAll('.nav-link').forEach(link => {
-        const isActive = link.dataset.page === page;
+        const isActive = link.dataset.page === page ||
+            (link.dataset.page === 'cellar' && page === 'add-to-cellar');
         link.classList.toggle('active', isActive);
         if (isActive) {
             link.setAttribute('aria-current', 'page');
@@ -994,6 +995,11 @@ function initForms() {
     // Cellar filter
     document.getElementById('cellar-filter').addEventListener('change', loadCellar);
     document.getElementById('cellar-search').addEventListener('input', debounce(loadCellar, 300));
+
+    // Add Wine button on cellar page
+    document.getElementById('cellar-add-wine-btn')?.addEventListener('click', () => {
+        navigateTo('add-to-cellar');
+    });
 
     // Cellar view toggle
     document.getElementById('cellar-view-cards')?.addEventListener('click', () => setCellarViewMode('cards'));
@@ -1965,7 +1971,7 @@ function renderCellarTable(containerId, wines) {
         if (hasFilters) {
             container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
         } else {
-            container.innerHTML = '<div class="empty-state"><h3>Your cellar is empty</h3><p>Add your first wine to get started!</p><a href="#" data-page="checkin" class="btn btn-primary" style="margin-top:1rem">Add Wine</a></div>';
+            container.innerHTML = '<div class="empty-state"><h3>Your cellar is empty</h3><p>How would you like to add your first wine?</p><div style="display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;margin-top:1rem;"><a href="#" data-page="add-to-cellar" data-tab="scan" class="btn btn-primary">Scan a Label</a><a href="#" data-page="add-to-cellar" data-tab="manual" class="btn btn-secondary">Enter Details</a><a href="#" data-page="add-to-cellar" data-tab="import" class="btn btn-secondary">Import from File</a></div></div>';
         }
         return;
     }
@@ -2083,7 +2089,7 @@ function renderWineGrid(containerId, wines) {
         if (hasFilters) {
             container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
         } else {
-            container.innerHTML = '<div class="empty-state"><h3>Your cellar is empty</h3><p>Add your first wine to get started!</p><a href="#" data-page="checkin" class="btn btn-primary" style="margin-top:1rem">Add Wine</a></div>';
+            container.innerHTML = '<div class="empty-state"><h3>Your cellar is empty</h3><p>How would you like to add your first wine?</p><div style="display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;margin-top:1rem;"><a href="#" data-page="add-to-cellar" data-tab="scan" class="btn btn-primary">Scan a Label</a><a href="#" data-page="add-to-cellar" data-tab="manual" class="btn btn-secondary">Enter Details</a><a href="#" data-page="add-to-cellar" data-tab="import" class="btn btn-secondary">Import from File</a></div></div>';
         }
         return;
     }
@@ -5132,8 +5138,9 @@ function resetAddToCellarWizard() {
     document.querySelectorAll('.entry-path-card').forEach(c => c.classList.remove('active'));
     selectedMetWineId = null;
 
-    // Hide breadcrumb, show subtitle
-    document.getElementById('add-cellar-breadcrumb').style.display = 'none';
+    // Hide step breadcrumb, show subtitle
+    document.querySelectorAll('.breadcrumb-step-sep').forEach(el => el.style.display = 'none');
+    document.getElementById('breadcrumb-current').textContent = '';
     document.getElementById('add-cellar-subtitle').style.display = '';
 }
 
@@ -5146,9 +5153,8 @@ function selectEntryPath(path) {
         c.classList.toggle('active', c.dataset.path === path);
     });
 
-    // Show breadcrumb, hide subtitle
-    const breadcrumb = document.getElementById('add-cellar-breadcrumb');
-    breadcrumb.style.display = '';
+    // Show step in breadcrumb, hide subtitle
+    document.querySelectorAll('.breadcrumb-step-sep').forEach(el => el.style.display = '');
     document.getElementById('breadcrumb-current').textContent = ENTRY_PATH_LABELS[path] || path;
     document.getElementById('add-cellar-subtitle').style.display = 'none';
 
