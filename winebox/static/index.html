@@ -695,6 +695,13 @@
             <div id="add-cellar-import" class="add-cellar-subwizard" style="display:none;">
                 <!-- Step 1: Upload -->
                 <div id="import-step-upload" class="import-step">
+                    <div id="import-incomplete-notice" class="form-note" style="display:none;padding:0.75rem 1rem;margin-bottom:1rem;background:var(--bg-secondary);border-radius:var(--radius);border-left:3px solid var(--wine-gold);">
+                        <span id="import-incomplete-text"></span>
+                        <div style="margin-top:0.5rem;display:flex;gap:0.5rem;">
+                            <button type="button" class="btn btn-small btn-danger" id="import-incomplete-undo-btn">Remove Partial Import</button>
+                            <button type="button" class="btn btn-small btn-outline" id="import-incomplete-dismiss-btn">Dismiss</button>
+                        </div>
+                    </div>
                     <div class="form-section">
                         <h3>Upload Spreadsheet</h3>
                         <div class="import-upload-area" id="import-drop-zone">
@@ -743,6 +750,9 @@
                     <div class="form-section">
                         <h3>Your data (first 5 rows)</h3>
                         <div id="import-preview-container" style="overflow-x:auto;"></div>
+                    </div>
+                    <div id="import-quantity-notice" class="form-note" style="display:none;padding:0.75rem 1rem;background:var(--bg-secondary);border-radius:var(--radius);border-left:3px solid var(--wine-gold);">
+                        No quantity column matched — each wine will be added as <strong>1 bottle</strong>.
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" id="import-confirm-mapping-btn">Looks Good — Import My Wines</button>
@@ -835,6 +845,7 @@
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" onclick="navigateTo('cellar')">Go to Cellar</button>
                         <button type="button" class="btn btn-secondary" id="import-dashboard-new-btn">Import Another File</button>
+                        <button type="button" class="btn btn-danger btn-small" id="import-undo-btn" style="margin-left:auto;">Undo This Import</button>
                     </div>
                 </div>
             </div>

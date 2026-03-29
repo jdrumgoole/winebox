@@ -111,6 +111,9 @@ class Wine(MongoDocument):
     custom_fields: Optional[dict[str, str]] = None
     custom_fields_text: Optional[str] = None  # Denormalized for text search
 
+    # Purchase info
+    purchase_date: Optional[datetime] = None
+
     # Timestamps
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

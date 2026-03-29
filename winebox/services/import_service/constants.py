@@ -79,6 +79,21 @@ HEADER_ALIASES: dict[str, str] = {
     "qty": "quantity",
     "bottles": "quantity",
     "count": "quantity",
+    # purchase_date
+    "purchase date": "purchase_date",
+    "purchase_date": "purchase_date",
+    "date bought": "purchase_date",
+    "date purchased": "purchase_date",
+    "date acquired": "purchase_date",
+    "bought": "purchase_date",
+    "acquired": "purchase_date",
+    "purchase": "purchase_date",
+    # case_size
+    "case size": "case_size",
+    "case_size": "case_size",
+    "cases": "case_size",
+    "bottles per case": "case_size",
+    "bottles_per_case": "case_size",
     # notes (for transactions)
     "notes": "notes",
     "note": "notes",
@@ -90,7 +105,8 @@ HEADER_ALIASES: dict[str, str] = {
 VALID_WINE_FIELDS = {
     "name", "winery", "vintage", "grape_variety", "region", "sub_region",
     "appellation", "country", "alcohol_percentage", "wine_type_id",
-    "classification", "price_tier", "quantity", "notes",
+    "classification", "price_tier", "quantity", "case_size", "purchase_date",
+    "notes",
 }
 
 # Core identifying fields for a wine record (name is required; others strongly recommended)
@@ -111,6 +127,8 @@ WINE_FIELD_DESCRIPTIONS: dict[str, str] = {
     "classification": "Quality classification (e.g. Grand Cru, Reserva, DOCG)",
     "price_tier": "Price or price tier",
     "quantity": "Number of bottles (integer)",
+    "case_size": "Bottles per case (e.g. 6 or 12) — multiplied by quantity to get total bottles",
+    "purchase_date": "When you bought the wine (e.g. 2024-03-15, 15/03/2024)",
     "notes": "Tasting notes, description, or general notes",
 }
 

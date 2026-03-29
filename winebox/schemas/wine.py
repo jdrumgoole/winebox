@@ -32,6 +32,9 @@ class WineBase(BaseModel):
     producer_type: str | None = Field(None, description="Producer type: estate, negociant, cooperative")
     custom_fields: dict[str, str] | None = Field(None, description="User-defined custom fields")
 
+    # Purchase info
+    purchase_date: datetime | None = Field(None, description="When the wine was purchased")
+
     # X-Wines enrichment tracking
     enriched_fields: list[str] | None = Field(None, description="Fields filled by X-Wines enrichment")
     xwines_id: int | None = Field(None, description="ID from X-Wines dataset")

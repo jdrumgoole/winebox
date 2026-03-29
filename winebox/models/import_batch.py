@@ -17,6 +17,7 @@ class ImportStatus(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    ROLLED_BACK = "rolled_back"
 
 
 class ImportBatch(MongoDocument):

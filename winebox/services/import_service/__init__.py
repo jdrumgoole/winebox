@@ -11,10 +11,12 @@ from .constants import (
     WINE_FIELD_DESCRIPTIONS,
 )
 from .converters import (
+    _coerce_date,
     _coerce_float,
     _coerce_int,
     _coerce_vintage,
     _compute_custom_fields_text,
+    _wine_identity_key,
     is_non_wine_row,
     row_to_wine_data,
 )
@@ -51,10 +53,12 @@ __all__ = [
     # Converters
     "is_non_wine_row",
     "row_to_wine_data",
+    "_coerce_date",
     "_coerce_float",
     "_coerce_int",
     "_coerce_vintage",
     "_compute_custom_fields_text",
+    "_wine_identity_key",
     # Processor
     "process_import_batch",
     "process_import_batch_streaming",
