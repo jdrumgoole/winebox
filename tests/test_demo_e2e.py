@@ -91,6 +91,24 @@ class TestDemoDataE2E:
             capture_artifacts(page, "demo_empty_welcome")
             raise
 
+    def test_add_my_own_wine_link_navigates(self, authenticated_page: Page) -> None:
+        """'Add my own wine' link on welcome screen navigates to check-in page."""
+        page = authenticated_page
+        _cleanup_demo_data(page)
+        _navigate_to_dashboard(page)
+
+        try:
+            page.wait_for_selector("#demo-welcome", state="visible", timeout=10000)
+            link = page.locator('#demo-welcome a[data-page="checkin"]')
+            expect(link).to_be_visible()
+            expect(link).to_have_text("Add my own wine")
+            link.click()
+            page.wait_for_selector("#page-checkin", state="visible", timeout=5000)
+            expect(page.locator("#page-checkin")).to_be_visible()
+        except Exception:
+            capture_artifacts(page, "demo_add_own_wine_link")
+            raise
+
     def test_load_sample_wines(self, authenticated_page: Page) -> None:
         """Clicking 'Load sample wines' populates the cellar."""
         page = authenticated_page

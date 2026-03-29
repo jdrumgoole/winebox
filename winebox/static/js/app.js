@@ -819,6 +819,14 @@ function initNavigation() {
         });
     });
 
+    // Delegated handler for any [data-page] link (e.g. welcome message, empty states)
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('a[data-page]');
+        if (!link || link.classList.contains('nav-link')) return; // nav-links handled above
+        e.preventDefault();
+        navigateTo(link.dataset.page);
+    });
+
     // Hamburger menu toggle
     const hamburger = document.getElementById('hamburger-btn');
     const nav = document.getElementById('main-nav');
