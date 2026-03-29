@@ -42,22 +42,29 @@ class MotorUserDatabase(BaseUserDatabase):
         return self.user_model._from_doc(doc)
 
     async def get_by_email(self, email: str) -> Optional[Any]:
-        """Get a user by email (case-insensitive)."""
-        doc = await self.collection.find_one(
-            {"email": {"$regex": f"^{email}$", "$options": "i"}}
-        )
+        """Get a user by email.
+
+        Emails are normalised to lowercase on insert/update, so an exact
+        match on the lowered value uses the unique index directly instead
+        of a $regex collection scan.
+        """
+        doc = await self.collection.find_one({"email": email.lower()})
         if doc is None:
             return None
         return self.user_model._from_doc(doc)
 
     async def create(self, create_dict: dict) -> Any:
-        """Create a new user."""
+        """Create a new user (email normalised to lowercase)."""
+        if "email" in create_dict:
+            create_dict["email"] = create_dict["email"].lower()
         user = self.user_model(**create_dict)
         await user.insert()
         return user
 
     async def update(self, user: Any, update_dict: dict) -> Any:
-        """Update a user."""
+        """Update a user (email normalised to lowercase if changed)."""
+        if "email" in update_dict:
+            update_dict["email"] = update_dict["email"].lower()
         for key, value in update_dict.items():
             setattr(user, key, value)
         await user.save()

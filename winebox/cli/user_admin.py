@@ -42,6 +42,8 @@ async def add_user(
     if not skip_db_init:
         await init_db()
 
+    email = email.lower()
+
     # Check if email already exists
     existing = await User.find_one({"email": email})
     if existing:

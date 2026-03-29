@@ -234,7 +234,7 @@ class TestPurgeData:
     """Tests for purge_data CLI functions."""
 
     @pytest.mark.asyncio
-    async def test_count_wine_data(self, init_test_db):
+    async def test_count_wine_data(self, isolated_db):
         """Test counting wine data."""
         from winebox.cli.purge_data import count_wine_data
 
@@ -264,12 +264,12 @@ class TestPurgeData:
 
         counts = await count_wine_data(skip_db_init=True)
 
-        assert counts["wines"] >= baseline_wines + 1
-        assert counts["transactions"] >= baseline_transactions + 1
+        assert counts["wines"] == baseline_wines + 1
+        assert counts["transactions"] == baseline_transactions + 1
 
     @pytest.mark.asyncio
-    async def test_count_all_data(self, init_test_db):
-        """Test counting all data (using relative counts for shared DB)."""
+    async def test_count_all_data(self, isolated_db):
+        """Test counting all data."""
         from winebox.cli.purge_data import count_all_data
 
         # Record baseline counts before creating test data
@@ -311,9 +311,9 @@ class TestPurgeData:
 
         counts = await count_all_data(skip_db_init=True)
 
-        assert counts["users"] >= baseline_users + 1
-        assert counts["wines"] >= baseline_wines + 1
-        assert counts["transactions"] >= baseline_transactions + 1
+        assert counts["users"] == baseline_users + 1
+        assert counts["wines"] == baseline_wines + 1
+        assert counts["transactions"] == baseline_transactions + 1
 
     @pytest.mark.asyncio
     async def test_remove_user_via_purge(self, init_test_db):

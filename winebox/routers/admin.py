@@ -98,26 +98,38 @@ async def get_admin_stats(
     - Total wines across all users
     - Total bottles across all users
     """
-    # User counts
-    total_users = await User.count()
-    active_users = await User.find({"is_active": True}).count()
-    verified_users = await User.find({"is_verified": True}).count()
-    admin_users = await User.find({"is_superuser": True}).count()
+    # User counts — single $facet instead of 4 separate counts
+    user_cursor = await User.get_pymongo_collection().aggregate([
+        {"$facet": {
+            "total": [{"$count": "count"}],
+            "active": [{"$match": {"is_active": True}}, {"$count": "count"}],
+            "verified": [{"$match": {"is_verified": True}}, {"$count": "count"}],
+            "admins": [{"$match": {"is_superuser": True}}, {"$count": "count"}],
+        }},
+    ])
+    user_result = await user_cursor.to_list(length=None)
+    uf = user_result[0] if user_result else {}
+    total_users = uf.get("total", [{}])[0].get("count", 0) if uf.get("total") else 0
+    active_users = uf.get("active", [{}])[0].get("count", 0) if uf.get("active") else 0
+    verified_users = uf.get("verified", [{}])[0].get("count", 0) if uf.get("verified") else 0
+    admin_users = uf.get("admins", [{}])[0].get("count", 0) if uf.get("admins") else 0
 
-    # Wine counts
-    total_wines = await Wine.count()
-    wines_in_stock = await Wine.find({"inventory.quantity": {"$gt": 0}}).count()
-
-    # Total bottles via aggregation
-    total_bottles_pipeline = [
-        {"$match": {"inventory.quantity": {"$gt": 0}}},
-        {"$group": {"_id": None, "total": {"$sum": "$inventory.quantity"}}},
-    ]
-    cursor = await Wine.get_pymongo_collection().aggregate(
-        total_bottles_pipeline
-    )
-    total_bottles_result = await cursor.to_list(length=None)
-    total_bottles = total_bottles_result[0]["total"] if total_bottles_result else 0
+    # Wine counts — single $facet instead of 2 counts + 1 aggregation
+    wine_cursor = await Wine.get_pymongo_collection().aggregate([
+        {"$facet": {
+            "total": [{"$count": "count"}],
+            "in_stock": [{"$match": {"inventory.quantity": {"$gt": 0}}}, {"$count": "count"}],
+            "total_bottles": [
+                {"$match": {"inventory.quantity": {"$gt": 0}}},
+                {"$group": {"_id": None, "total": {"$sum": "$inventory.quantity"}}},
+            ],
+        }},
+    ])
+    wine_result = await wine_cursor.to_list(length=None)
+    wf = wine_result[0] if wine_result else {}
+    total_wines = wf.get("total", [{}])[0].get("count", 0) if wf.get("total") else 0
+    wines_in_stock = wf.get("in_stock", [{}])[0].get("count", 0) if wf.get("in_stock") else 0
+    total_bottles = wf.get("total_bottles", [{}])[0].get("total", 0) if wf.get("total_bottles") else 0
 
     return {
         "users": {

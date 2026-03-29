@@ -26,6 +26,8 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("wine_type_id", ASCENDING)]),
         IndexModel([("owner_id", ASCENDING), ("inventory.quantity", ASCENDING)]),
         IndexModel([("owner_id", ASCENDING), ("collection", ASCENDING)]),
+        IndexModel([("owner_id", ASCENDING), ("collection", ASCENDING), ("inventory.quantity", ASCENDING)]),
+        IndexModel([("owner_id", ASCENDING), ("xwines_id", ASCENDING)]),
         IndexModel(
             [
                 ("name", TEXT),
@@ -81,11 +83,12 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     "revoked_tokens": [
         IndexModel([("jti", ASCENDING)], unique=True),
-        IndexModel([("expires_at", ASCENDING)]),
+        IndexModel([("expires_at", ASCENDING)], expireAfterSeconds=0),
     ],
     "login_attempts": [
         IndexModel([("email", ASCENDING)]),
-        IndexModel([("attempted_at", ASCENDING)]),
+        IndexModel([("attempted_at", ASCENDING)], expireAfterSeconds=86400),
+        IndexModel([("email", ASCENDING), ("failed", ASCENDING), ("attempted_at", ASCENDING)]),
     ],
     "import_batches": [
         IndexModel([("owner_id", ASCENDING)]),
@@ -111,6 +114,22 @@ async def ensure_indexes(db: AsyncDatabase) -> None:
         db: The async pymongo database instance.
     """
     from pymongo.errors import OperationFailure
+
+    # Drop non-TTL indexes that are being replaced by TTL versions.
+    # MongoDB cannot convert a regular index to TTL in-place.
+    ttl_migrations = [
+        ("revoked_tokens", "expires_at_1"),
+        ("login_attempts", "attempted_at_1"),
+    ]
+    for coll_name, idx_name in ttl_migrations:
+        try:
+            coll = db[coll_name]
+            existing = await coll.index_information()
+            if idx_name in existing and "expireAfterSeconds" not in existing[idx_name]:
+                await coll.drop_index(idx_name)
+                logger.info("Dropped non-TTL index %s.%s for TTL migration", coll_name, idx_name)
+        except Exception:
+            pass  # Collection may not exist yet
 
     for collection_name, index_models in INDEXES.items():
         collection = db[collection_name]

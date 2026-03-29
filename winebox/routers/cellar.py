@@ -28,75 +28,71 @@ async def get_cellar_inventory(
 async def get_cellar_summary(
     current_user: RequireAuth,
 ) -> dict:
-    """Get cellar summary statistics."""
-    # Total bottles in cellar using aggregation (filtered by owner)
-    total_bottles_pipeline = [
-        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}}},
-        {"$group": {"_id": None, "total": {"$sum": "$inventory.quantity"}}},
+    """Get cellar summary statistics.
+
+    Uses a single $facet aggregation to compute all breakdowns in one
+    round-trip instead of 8 separate queries.
+    """
+    base_match = {
+        "owner_id": current_user.id,
+        "collection": "cellar",
+        "inventory.quantity": {"$gt": 0},
+    }
+
+    pipeline = [
+        {"$match": base_match},
+        {"$facet": {
+            "total_bottles": [
+                {"$group": {"_id": None, "total": {"$sum": "$inventory.quantity"}}},
+            ],
+            "unique_wines": [
+                {"$count": "count"},
+            ],
+            "by_vintage": [
+                {"$match": {"vintage": {"$ne": None}}},
+                {"$group": {"_id": "$vintage", "count": {"$sum": "$inventory.quantity"}}},
+                {"$sort": {"_id": -1}},
+            ],
+            "by_country": [
+                {"$match": {"country": {"$ne": None}}},
+                {"$group": {"_id": "$country", "count": {"$sum": "$inventory.quantity"}}},
+                {"$sort": {"count": -1}},
+            ],
+            "by_grape": [
+                {"$match": {"grape_variety": {"$ne": None}}},
+                {"$group": {"_id": "$grape_variety", "count": {"$sum": "$inventory.quantity"}}},
+                {"$sort": {"count": -1}},
+            ],
+            "by_wine_type": [
+                {"$match": {"wine_type_id": {"$ne": None}}},
+                {"$group": {"_id": "$wine_type_id", "count": {"$sum": "$inventory.quantity"}}},
+                {"$sort": {"count": -1}},
+            ],
+            "by_price_tier": [
+                {"$match": {"price_tier": {"$ne": None}}},
+                {"$group": {"_id": "$price_tier", "count": {"$sum": "$inventory.quantity"}}},
+                {"$sort": {"count": -1}},
+            ],
+        }},
     ]
-    cursor = await Wine.get_pymongo_collection().aggregate(total_bottles_pipeline)
-    total_bottles_result = await cursor.to_list(length=None)
-    total_bottles = total_bottles_result[0]["total"] if total_bottles_result else 0
 
-    # Unique wines in stock (filtered by owner, cellar only)
-    unique_wines = await Wine.find(
-        {"owner_id": current_user.id, "collection": WineCollection.CELLAR, "inventory.quantity": {"$gt": 0}}
-    ).count()
+    cursor = await Wine.get_pymongo_collection().aggregate(pipeline)
+    result = await cursor.to_list(length=None)
+    facets = result[0] if result else {}
 
-    # Total wines ever tracked (including out of stock, cellar only)
+    total_bottles = facets.get("total_bottles", [{}])[0].get("total", 0) if facets.get("total_bottles") else 0
+    unique_wines = facets.get("unique_wines", [{}])[0].get("count", 0) if facets.get("unique_wines") else 0
+
+    # Total wines tracked uses a different filter (includes out-of-stock)
     total_wines_tracked = await Wine.find(
         {"owner_id": current_user.id, "collection": WineCollection.CELLAR}
     ).count()
 
-    # Wines by vintage (in stock, filtered by owner)
-    by_vintage_pipeline = [
-        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "vintage": {"$ne": None}}},
-        {"$group": {"_id": "$vintage", "count": {"$sum": "$inventory.quantity"}}},
-        {"$sort": {"_id": -1}},
-    ]
-    cursor = await Wine.get_pymongo_collection().aggregate(by_vintage_pipeline)
-    by_vintage_result = await cursor.to_list(length=None)
-    by_vintage = {str(row["_id"]): row["count"] for row in by_vintage_result}
-
-    # Wines by country (in stock, filtered by owner)
-    by_country_pipeline = [
-        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "country": {"$ne": None}}},
-        {"$group": {"_id": "$country", "count": {"$sum": "$inventory.quantity"}}},
-        {"$sort": {"count": -1}},
-    ]
-    cursor = await Wine.get_pymongo_collection().aggregate(by_country_pipeline)
-    by_country_result = await cursor.to_list(length=None)
-    by_country = {row["_id"]: row["count"] for row in by_country_result}
-
-    # Wines by grape variety (in stock, filtered by owner)
-    by_grape_pipeline = [
-        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "grape_variety": {"$ne": None}}},
-        {"$group": {"_id": "$grape_variety", "count": {"$sum": "$inventory.quantity"}}},
-        {"$sort": {"count": -1}},
-    ]
-    cursor = await Wine.get_pymongo_collection().aggregate(by_grape_pipeline)
-    by_grape_result = await cursor.to_list(length=None)
-    by_grape = {row["_id"]: row["count"] for row in by_grape_result}
-
-    # Wines by type (in stock, filtered by owner)
-    by_type_pipeline = [
-        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "wine_type_id": {"$ne": None}}},
-        {"$group": {"_id": "$wine_type_id", "count": {"$sum": "$inventory.quantity"}}},
-        {"$sort": {"count": -1}},
-    ]
-    cursor = await Wine.get_pymongo_collection().aggregate(by_type_pipeline)
-    by_type_result = await cursor.to_list(length=None)
-    by_wine_type = {row["_id"]: row["count"] for row in by_type_result}
-
-    # Wines by price tier (in stock, filtered by owner)
-    by_tier_pipeline = [
-        {"$match": {"owner_id": current_user.id, "collection": "cellar", "inventory.quantity": {"$gt": 0}, "price_tier": {"$ne": None}}},
-        {"$group": {"_id": "$price_tier", "count": {"$sum": "$inventory.quantity"}}},
-        {"$sort": {"count": -1}},
-    ]
-    cursor = await Wine.get_pymongo_collection().aggregate(by_tier_pipeline)
-    by_tier_result = await cursor.to_list(length=None)
-    by_price_tier = {row["_id"]: row["count"] for row in by_tier_result}
+    by_vintage = {str(row["_id"]): row["count"] for row in facets.get("by_vintage", [])}
+    by_country = {row["_id"]: row["count"] for row in facets.get("by_country", [])}
+    by_grape = {row["_id"]: row["count"] for row in facets.get("by_grape", [])}
+    by_wine_type = {row["_id"]: row["count"] for row in facets.get("by_wine_type", [])}
+    by_price_tier = {row["_id"]: row["count"] for row in facets.get("by_price_tier", [])}
 
     return {
         "total_bottles": total_bottles,

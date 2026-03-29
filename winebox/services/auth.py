@@ -58,8 +58,8 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 
 async def get_user_by_email(email: str) -> User | None:
-    """Get a user by email."""
-    return await User.find_one({"email": email})
+    """Get a user by email (normalised to lowercase)."""
+    return await User.find_one({"email": email.lower()})
 
 
 async def authenticate_user(

@@ -253,18 +253,30 @@ async def get_region_path(region_id: str) -> list[RegionResponse]:
     if not region:
         raise HTTPException(status_code=404, detail="Region not found")
 
-    # Build path from current to root
+    def _to_response(r: Region) -> RegionResponse:
+        return RegionResponse(
+            id=str(r.id),
+            name=r.name,
+            display_name=r.display_name,
+            country=r.country,
+            level=r.level,
+            parent_id=str(r.parent_id) if r.parent_id else None,
+        )
+
+    # Fast path: use pre-computed ancestors list (single $in query)
+    if region.ancestors:
+        ancestor_docs = await Region.find(
+            {"_id": {"$in": region.ancestors}}
+        ).sort([("level", 1)]).to_list()
+        path = [_to_response(a) for a in ancestor_docs]
+        path.append(_to_response(region))
+        return path
+
+    # Fallback: walk up the tree for regions without ancestors populated
     path = []
     current = region
     while current:
-        path.insert(0, RegionResponse(
-            id=str(current.id),
-            name=current.name,
-            display_name=current.display_name,
-            country=current.country,
-            level=current.level,
-            parent_id=str(current.parent_id) if current.parent_id else None,
-        ))
+        path.insert(0, _to_response(current))
         if current.parent_id:
             current = await Region.get(current.parent_id)
         else:
