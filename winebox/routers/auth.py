@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -104,6 +104,17 @@ class PasswordChangeRequest(BaseModel):
 
     current_password: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_length(cls, v: str) -> str:
+        from winebox.auth.schemas import MIN_PASSWORD_LENGTH
+
+        if len(v) < MIN_PASSWORD_LENGTH:
+            raise ValueError(
+                f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+            )
+        return v
 
 
 class Token(BaseModel):

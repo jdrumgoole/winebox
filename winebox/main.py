@@ -33,6 +33,7 @@ _cleanup_task: asyncio.Task | None = None
 # logins from the same IP which would trigger the per-IP rate limit)
 limiter = Limiter(
     key_func=get_remote_address,
+    default_limits=["60/minute"],
     enabled=os.environ.get("WINEBOX_RATE_LIMIT_DISABLED", "").lower() not in ("1", "true"),
 )
 

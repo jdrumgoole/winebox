@@ -3,9 +3,11 @@
 from datetime import datetime
 
 from fastapi_users import schemas
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 
 from winebox.db import PyObjectId
+
+MIN_PASSWORD_LENGTH = 6
 
 
 class UserRead(schemas.BaseUser[PyObjectId]):
@@ -28,6 +30,15 @@ class UserCreate(schemas.BaseUserCreate):
     """
 
     full_name: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_length(cls, v: str) -> str:
+        if len(v) < MIN_PASSWORD_LENGTH:
+            raise ValueError(
+                f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+            )
+        return v
 
 
 class UserUpdate(schemas.BaseUserUpdate):

@@ -66,6 +66,34 @@ class TestRegistration:
 
         assert response.status_code == 422  # Validation error
 
+    @pytest.mark.asyncio
+    async def test_register_password_too_short(self, client: AsyncClient):
+        """Test that registration rejects passwords shorter than 6 characters."""
+        response = await client.post(
+            "/api/auth/register",
+            json={
+                "email": "shortpw@example.com",
+                "password": "12345",
+            },
+        )
+
+        assert response.status_code == 422
+        body = response.json()
+        assert "6 characters" in str(body)
+
+    @pytest.mark.asyncio
+    async def test_register_password_minimum_length_accepted(self, client: AsyncClient, mock_email_service):
+        """Test that registration accepts passwords of exactly 6 characters."""
+        response = await client.post(
+            "/api/auth/register",
+            json={
+                "email": "minpw@example.com",
+                "password": "abcdef",
+            },
+        )
+
+        assert response.status_code in [200, 201]
+
 
 class TestLogin:
     """Tests for user login flow."""
@@ -198,6 +226,24 @@ class TestPasswordChange:
         )
 
         assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_change_password_too_short(
+        self, client: AsyncClient, auth_headers
+    ):
+        """Test that password change rejects new passwords shorter than 6 characters."""
+        response = await client.put(
+            "/api/auth/password",
+            headers=auth_headers,
+            json={
+                "current_password": "testpassword123",
+                "new_password": "short",
+            },
+        )
+
+        assert response.status_code == 422
+        body = response.json()
+        assert "6 characters" in str(body)
 
 
 class TestAccountLockout:
