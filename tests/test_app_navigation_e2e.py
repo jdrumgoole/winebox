@@ -110,7 +110,7 @@ class TestCoreNavigation:
         expect(page.locator("#page-cellar")).to_be_visible()
         page.click("#cellar-add-wine-btn")
         expect(page.locator("#page-add-to-cellar")).to_be_visible()
-        expect(page.locator(".entry-path-cards")).to_be_visible()
+        expect(page.locator("#page-add-to-cellar #entry-path-cards")).to_be_visible()
 
     def test_record_wine_on_met_page(self, authenticated_page: Page) -> None:
         """Test that 'Record a Wine' button on Wines I've Met navigates to checkin form."""
