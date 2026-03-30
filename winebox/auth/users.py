@@ -47,6 +47,10 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PyObjectId]):
     reset_password_token_secret = _derive_secret(settings.secret_key, "reset_password")
     verification_token_secret = _derive_secret(settings.secret_key, "verification")
 
+    # Extend token lifetimes (defaults are 1 hour which is too short)
+    verification_token_lifetime_seconds = 3600 * 72  # 72 hours
+    reset_password_token_lifetime_seconds = 3600 * 24  # 24 hours
+
     async def on_after_register(
         self, user: User, request: Optional[Request] = None
     ) -> None:

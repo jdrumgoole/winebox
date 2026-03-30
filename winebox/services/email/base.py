@@ -88,7 +88,7 @@ class EmailService(ABC):
         Returns:
             True if email was sent successfully, False otherwise.
         """
-        verify_url = f"{self.frontend_url}/static/index.html#verify?token={token}"
+        verify_url = f"{self.frontend_url}/#verify?token={token}"
 
         html_content = self._render_template(
             "verification.html",
@@ -126,7 +126,7 @@ The {self.settings.app_name} Team
         Returns:
             True if email was sent successfully, False otherwise.
         """
-        reset_url = f"{self.frontend_url}/static/index.html#reset-password?token={token}"
+        reset_url = f"{self.frontend_url}/#reset-password?token={token}"
 
         html_content = self._render_template(
             "password_reset.html",
