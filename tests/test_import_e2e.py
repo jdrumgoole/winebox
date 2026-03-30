@@ -98,10 +98,11 @@ def csv_with_spirits(tmp_path: Path) -> Path:
 
 
 def _navigate_to_import(page: Page) -> None:
-    """Navigate to the import wizard (embedded in Add to Cellar page)."""
-    page.click("a[data-page='add-to-cellar']")
+    """Navigate to the import wizard via My Cellar → + Add Wine → Import."""
+    page.click("a[data-page='cellar']")
+    page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+    page.click("#cellar-add-wine-btn")
     page.wait_for_selector("#page-add-to-cellar", state="visible", timeout=10000)
-    # Click the "Import from File" entry path card
     page.click(".entry-path-card[data-path='import']")
     page.wait_for_selector("#import-step-upload", state="visible", timeout=5000)
 
