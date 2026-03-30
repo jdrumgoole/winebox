@@ -1,0 +1,374 @@
+{
+  "brand": {
+    "name": "WineBox",
+    "domain": "winebox.app",
+    "tagline": "Curate Your Collection",
+    "version": "1.0",
+    "lastUpdated": "2025-03-30",
+    "contact": {
+      "general": "hello@winebox.app",
+      "branding": "branding@winebox.app",
+      "partnerships": "partners@winebox.app"
+    }
+  },
+  "colors": {
+    "primary": {
+      "wineRed": {
+        "name": "Wine Red",
+        "hex": "#8B3A3A",
+        "rgb": {
+          "r": 139,
+          "g": 58,
+          "b": 58
+        },
+        "cmyk": {
+          "c": 0,
+          "m": 75,
+          "y": 75,
+          "k": 40
+        },
+        "hsla": {
+          "h": 0,
+          "s": "41%",
+          "l": "39%",
+          "a": 1
+        },
+        "usage": "Primary brand color, key UI elements"
+      },
+      "deepWine": {
+        "name": "Deep Wine",
+        "hex": "#5A1D1D",
+        "rgb": {
+          "r": 90,
+          "g": 29,
+          "b": 29
+        },
+        "cmyk": {
+          "c": 0,
+          "m": 80,
+          "y": 80,
+          "k": 65
+        },
+        "hsla": {
+          "h": 0,
+          "s": "51%",
+          "l": "23%",
+          "a": 1
+        },
+        "usage": "Darker accents, hover states, text"
+      }
+    },
+    "accent": {
+      "gold": {
+        "name": "Gold Accent",
+        "hex": "#D4AF37",
+        "rgb": {
+          "r": 212,
+          "g": 175,
+          "b": 55
+        },
+        "cmyk": {
+          "c": 6,
+          "m": 20,
+          "y": 73,
+          "k": 0
+        },
+        "hsla": {
+          "h": 43,
+          "s": "74%",
+          "l": "52%",
+          "a": 1
+        },
+        "usage": "Highlights, premium elements, decorative"
+      },
+      "cream": {
+        "name": "Cream Accent",
+        "hex": "#FEFEF8",
+        "rgb": {
+          "r": 254,
+          "g": 254,
+          "b": 248
+        },
+        "cmyk": {
+          "c": 0,
+          "m": 0,
+          "y": 4,
+          "k": 0
+        },
+        "hsla": {
+          "h": 60,
+          "s": "100%",
+          "l": "99%",
+          "a": 1
+        },
+        "usage": "Backgrounds, card surfaces"
+      }
+    },
+    "secondary": {
+      "wineLiquid": {
+        "name": "Wine Liquid",
+        "hex": "#D4A574",
+        "rgb": {
+          "r": 212,
+          "g": 165,
+          "b": 116
+        },
+        "usage": "Secondary decorative, lighter wines"
+      },
+      "cork": {
+        "name": "Cork",
+        "hex": "#C4A469",
+        "rgb": {
+          "r": 196,
+          "g": 164,
+          "b": 105
+        },
+        "usage": "Accents, subtle backgrounds"
+      },
+      "warmGold": {
+        "name": "Warm Gold",
+        "hex": "#C9A227",
+        "rgb": {
+          "r": 201,
+          "g": 162,
+          "b": 39
+        },
+        "usage": "Gold variations, gradients"
+      },
+      "darkNeutral": {
+        "name": "Dark Neutral",
+        "hex": "#3D1D1D",
+        "rgb": {
+          "r": 61,
+          "g": 29,
+          "b": 29
+        },
+        "usage": "Text, borders, dark elements"
+      }
+    },
+    "neutral": {
+      "offWhite": {
+        "name": "Off-White",
+        "hex": "#F5F1E8",
+        "rgb": {
+          "r": 245,
+          "g": 241,
+          "b": 232
+        },
+        "usage": "Secondary backgrounds"
+      },
+      "lightGray": {
+        "name": "Light Gray",
+        "hex": "#E8E3D8",
+        "rgb": {
+          "r": 232,
+          "g": 227,
+          "b": 216
+        },
+        "usage": "Borders, dividers"
+      },
+      "mediumGray": {
+        "name": "Medium Gray",
+        "hex": "#999999",
+        "rgb": {
+          "r": 153,
+          "g": 153,
+          "b": 153
+        },
+        "usage": "Secondary text, disabled states"
+      },
+      "darkGray": {
+        "name": "Dark Gray",
+        "hex": "#333333",
+        "rgb": {
+          "r": 51,
+          "g": 51,
+          "b": 51
+        },
+        "usage": "Primary text on light backgrounds"
+      }
+    }
+  },
+  "typography": {
+    "families": {
+      "serif": {
+        "name": "Georgia",
+        "fallbacks": ["Garamond", "serif"],
+        "usage": "All headings, body text, logo"
+      },
+      "monospace": {
+        "name": "Monaco",
+        "fallbacks": ["Courier New", "monospace"],
+        "usage": "Code, technical content"
+      }
+    },
+    "scales": {
+      "logo": {
+        "font": "Georgia",
+        "weight": 700,
+        "size": "48-64px",
+        "lineHeight": 1.2
+      },
+      "h1": {
+        "font": "Georgia",
+        "weight": 700,
+        "size": "32-40px",
+        "lineHeight": 1.3
+      },
+      "h2": {
+        "font": "Georgia",
+        "weight": 700,
+        "size": "24-28px",
+        "lineHeight": 1.4
+      },
+      "h3": {
+        "font": "Georgia",
+        "weight": 700,
+        "size": "18-20px",
+        "lineHeight": 1.4
+      },
+      "body": {
+        "font": "Georgia",
+        "weight": 400,
+        "size": "16px",
+        "lineHeight": 1.6
+      },
+      "small": {
+        "font": "Georgia",
+        "weight": 400,
+        "size": "14px",
+        "lineHeight": 1.5
+      },
+      "label": {
+        "font": "Georgia",
+        "weight": 700,
+        "size": "12-14px",
+        "lineHeight": 1.4
+      }
+    }
+  },
+  "logos": {
+    "horizontal": {
+      "file": "winebox_logo_horizontal.svg",
+      "format": "SVG",
+      "viewBox": "0 0 400 120",
+      "width": 400,
+      "height": 120,
+      "aspectRatio": "3.33:1",
+      "description": "Primary logo - color horizontal lockup with wordmark",
+      "useCase": "Website headers, navigation, documents, marketing",
+      "minSize": {
+        "web": "180px",
+        "print": "2 inches"
+      },
+      "exports": {
+        "web": ["logo_horizontal_web.png", "logo_horizontal_web@2x.png", "logo_horizontal_web@3x.png"],
+        "print": ["logo_horizontal_print_300dpi.png", "logo_horizontal_print_300dpi_large.png"]
+      }
+    },
+    "icon": {
+      "file": "winebox_icon.svg",
+      "format": "SVG",
+      "viewBox": "0 0 120 120",
+      "width": 120,
+      "height": 120,
+      "aspectRatio": "1:1",
+      "description": "Icon logo - color square symbol only",
+      "useCase": "App icons, favicons, small spaces, social media",
+      "minSize": {
+        "web": "32px",
+        "print": "0.5 inches"
+      },
+      "exports": {
+        "web": ["icon_web_256.png", "icon_web_512.png", "icon_web_1024.png"],
+        "print": ["icon_print_300dpi_2048.png"],
+        "social": ["winebox_linkedin_400x400.png", "winebox_instagram_1080x1080.png", "winebox_twitter_400x400.png", "winebox_facebook_500x500.png"],
+        "favicons": ["favicon_16.png", "favicon_32.png", "favicon_64.png", "favicon_128.png", "favicon_256.png", "favicon_512.png"]
+      }
+    },
+    "monochrome": {
+      "file": "winebox_logo_monochrome.svg",
+      "format": "SVG",
+      "viewBox": "0 0 400 120",
+      "width": 400,
+      "height": 120,
+      "aspectRatio": "3.33:1",
+      "description": "Single-color logo - for limited-color printing and embroidery",
+      "useCase": "Embroidery, single-color printing, fax, press materials",
+      "minSize": {
+        "web": "180px",
+        "print": "2 inches"
+      },
+      "exports": {
+        "web": ["logo_monochrome_web.png", "logo_monochrome_web@2x.png"],
+        "print": ["logo_monochrome_print_300dpi.png"]
+      }
+    }
+  },
+  "specifications": {
+    "web": {
+      "dpi": 72,
+      "colorMode": "RGB",
+      "format": "PNG",
+      "transparency": "Yes",
+      "sizes": {
+        "logo": ["400x120", "800x240", "1600x480"],
+        "icon": ["256x256", "512x512", "1024x1024"]
+      }
+    },
+    "print": {
+      "dpi": 300,
+      "colorMode": "CMYK or RGB",
+      "format": "PNG or PDF",
+      "transparency": "No (or white background)",
+      "sizes": {
+        "logo": ["2400x720", "4800x1440"],
+        "icon": ["2048x2048"]
+      }
+    },
+    "email": {
+      "width": "180-200px",
+      "format": "PNG",
+      "dpi": 72,
+      "transparency": "Yes"
+    },
+    "social": {
+      "linkedin": "400x400px",
+      "instagram": "1080x1080px",
+      "twitter": "400x400px",
+      "facebook": "500x500px"
+    },
+    "favicon": {
+      "sizes": [16, 32, 64, 128, 256, 512],
+      "format": "PNG",
+      "dpi": 72,
+      "transparency": "Yes"
+    }
+  },
+  "clearSpace": {
+    "description": "Maintain clear space around logo equal to height of W",
+    "value": "~40% of logo height on all sides"
+  },
+  "accessibility": {
+    "contrastRatio": {
+      "text": "4.5:1",
+      "graphics": "3:1"
+    },
+    "wcag": "AA"
+  },
+  "files": {
+    "svg": {
+      "winebox_logo_horizontal.svg": "Primary color horizontal logo",
+      "winebox_icon.svg": "Primary color square icon",
+      "winebox_logo_monochrome.svg": "Single-color version"
+    },
+    "documentation": {
+      "README.md": "Quick start and overview",
+      "BRAND.md": "Complete brand guidelines",
+      "EXPORT_SPECS.md": "Detailed export specifications and technical guides"
+    },
+    "tools": {
+      "winebox_export.py": "Python utility for generating PNG exports"
+    }
+  }
+}

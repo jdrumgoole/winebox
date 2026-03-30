@@ -27,13 +27,13 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "pytesseract>=0.3.10",
-    "pillow>=12.1.1",  # CVE-2026-25990 fix
+    "pillow>=12.1.1", # CVE-2026-25990 fix
     "python-multipart>=0.0.6",
     "aiofiles>=23.0.0",
     "jinja2>=3.1.0",
     "bcrypt>=4.1.2",
     "python-jose[cryptography]>=3.3.0",
-    "cryptography>=46.0.5",  # CVE-2026-26007 fix (transitive via python-jose)
+    "cryptography>=46.0.5", # CVE-2026-26007 fix (transitive via python-jose)
     "anthropic>=0.40.0",
     "slowapi>=0.1.9",
     "pyyaml>=6.0.0",
@@ -45,6 +45,7 @@ dependencies = [
     "openpyxl>=3.1.0",
     # Analytics
     "posthog>=3.0.0",
+    "cairosvg>=2.9.0",
 ]
 
 [project.urls]
