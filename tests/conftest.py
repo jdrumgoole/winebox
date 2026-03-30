@@ -220,6 +220,32 @@ async def client(init_test_db, test_user_email) -> AsyncGenerator[AsyncClient, N
         yield ac
 
 
+@pytest_asyncio.fixture
+async def admin_client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client with an admin user."""
+    admin_email = f"admin_{uuid.uuid4().hex[:8]}@test.example.com"
+    admin_user = User(
+        email=admin_email,
+        hashed_password=_CACHED_TEST_PASSWORD_HASH,
+        is_active=True,
+        is_verified=True,
+        is_superuser=True,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    await admin_user.insert()
+
+    access_token = create_access_token(data={"sub": admin_email})
+    app = get_test_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {access_token}"}
+    ) as ac:
+        yield ac
+
+
 @pytest.fixture
 def temp_image_dir() -> Generator[Path, None, None]:
     """Create a temporary directory for test images."""
