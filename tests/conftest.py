@@ -64,6 +64,56 @@ def pytest_configure(config: pytest.Config) -> None:
         sync_client.close()
 
 
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Clean up test users from remote databases after all tests finish.
+
+    Deletes users matching @test.example.com and all their data (wines,
+    transactions, import batches, raw uploads). Only runs in the controller
+    process and only when WINEBOX_DATABASE is set (remote testing against OAT).
+    """
+    if hasattr(config, "workerinput"):
+        return  # Only run in controller, not workers
+
+    db_name = os.environ.get("WINEBOX_DATABASE")
+    mongo_url = os.environ.get("WINEBOX_MONGODB_URL")
+    if not db_name or not mongo_url or db_name == "winebox_test":
+        return  # Only clean up remote databases, not local test DB
+
+    from pymongo import MongoClient
+
+    try:
+        client = MongoClient(mongo_url)
+        db = client[db_name]
+
+        # Find all test users
+        test_users = list(db.users.find(
+            {"email": {"$regex": r"@test\.example\.com$"}},
+            {"_id": 1, "email": 1},
+        ))
+
+        if not test_users:
+            client.close()
+            return
+
+        user_ids = [u["_id"] for u in test_users]
+        emails = [u["email"] for u in test_users]
+
+        # Delete all data owned by test users
+        for collection in ["wines", "transactions", "import_batches", "raw_uploads"]:
+            db[collection].delete_many({"owner_id": {"$in": user_ids}})
+
+        # Delete the test users themselves
+        result = db.users.delete_many({"_id": {"$in": user_ids}})
+
+        print(
+            f"\nE2E cleanup: deleted {result.deleted_count} test users "
+            f"from {db_name} ({', '.join(emails[:5])}{'...' if len(emails) > 5 else ''})",
+        )
+        client.close()
+    except Exception as e:
+        print(f"\nE2E cleanup warning: {e}")
+
+
 # Create a test-specific app to avoid lifespan conflicts
 def create_test_app():
     """Create a FastAPI app configured for testing (no database lifespan)."""
