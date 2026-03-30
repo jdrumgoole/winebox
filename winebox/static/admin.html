@@ -194,6 +194,33 @@
             color: var(--burgundy-light);
         }
 
+        .actions-cell {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-admin {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background: white;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .btn-admin:hover { background: #f0f0f0; }
+
+        .btn-admin-outline { border-color: var(--burgundy-light); color: var(--burgundy-light); }
+        .btn-admin-outline:hover { background: #fdf0f0; }
+
+        .btn-admin-success { border-color: #28a745; color: #28a745; }
+        .btn-admin-success:hover { background: #e6f9eb; }
+
+        .btn-admin-danger { border-color: #dc3545; color: #dc3545; }
+        .btn-admin-danger:hover { background: #fde8ea; }
+
         @media (max-width: 768px) {
             .admin-container {
                 padding: 1rem;

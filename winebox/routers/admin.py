@@ -4,13 +4,16 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from bson import ObjectId
+from bson.errors import InvalidId
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from pathlib import Path
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from winebox.models import User, Wine
+from winebox.models import ImportBatch, Transaction, User, Wine
+from winebox.models.import_batch_row import RawUploadRow
 from winebox.services.auth import RequireAdmin
 
 logger = logging.getLogger(__name__)
@@ -144,4 +147,106 @@ async def get_admin_stats(
             "total_bottles": total_bottles,
         },
         "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# User management endpoints
+# ---------------------------------------------------------------------------
+
+async def _get_user(user_id: str) -> User:
+    """Fetch a user by ID or raise 404."""
+    try:
+        oid = ObjectId(user_id)
+    except InvalidId:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user = await User.find_one({"_id": oid})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
+
+
+def _check_not_self(admin: User, target: User, action: str) -> None:
+    """Prevent admins from modifying their own account."""
+    if admin.id == target.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot {action} your own account",
+        )
+
+
+@router.patch("/api/users/{user_id}/activate")
+async def activate_user(user_id: str, admin: RequireAdmin) -> dict:
+    """Activate a user account."""
+    user = await _get_user(user_id)
+    await user.set({"is_active": True})
+    logger.info("Admin %s activated user %s (%s)", admin.email, user_id, user.email)
+    return {"status": "activated", "user_id": user_id}
+
+
+@router.patch("/api/users/{user_id}/deactivate")
+async def deactivate_user(user_id: str, admin: RequireAdmin) -> dict:
+    """Deactivate a user account."""
+    user = await _get_user(user_id)
+    _check_not_self(admin, user, "deactivate")
+    await user.set({"is_active": False})
+    logger.info("Admin %s deactivated user %s (%s)", admin.email, user_id, user.email)
+    return {"status": "deactivated", "user_id": user_id}
+
+
+@router.patch("/api/users/{user_id}/make-admin")
+async def make_admin(user_id: str, admin: RequireAdmin) -> dict:
+    """Grant admin privileges to a user."""
+    user = await _get_user(user_id)
+    await user.set({"is_superuser": True})
+    logger.info("Admin %s granted admin to user %s (%s)", admin.email, user_id, user.email)
+    return {"status": "admin_granted", "user_id": user_id}
+
+
+@router.patch("/api/users/{user_id}/remove-admin")
+async def remove_admin(user_id: str, admin: RequireAdmin) -> dict:
+    """Remove admin privileges from a user."""
+    user = await _get_user(user_id)
+    _check_not_self(admin, user, "remove admin from")
+    await user.set({"is_superuser": False})
+    logger.info("Admin %s removed admin from user %s (%s)", admin.email, user_id, user.email)
+    return {"status": "admin_removed", "user_id": user_id}
+
+
+@router.patch("/api/users/{user_id}/verify")
+async def verify_user(user_id: str, admin: RequireAdmin) -> dict:
+    """Manually verify a user's email address."""
+    user = await _get_user(user_id)
+    await user.set({"is_verified": True})
+    logger.info("Admin %s verified user %s (%s)", admin.email, user_id, user.email)
+    return {"status": "verified", "user_id": user_id}
+
+
+@router.delete("/api/users/{user_id}")
+async def delete_user(user_id: str, admin: RequireAdmin) -> dict:
+    """Delete a user and all their data (wines, transactions, import batches)."""
+    user = await _get_user(user_id)
+    _check_not_self(admin, user, "delete")
+
+    wines_col = Wine.get_pymongo_collection()
+    transactions_col = Transaction.get_pymongo_collection()
+    batches_col = ImportBatch.get_pymongo_collection()
+    raw_col = RawUploadRow.get_pymongo_collection()
+
+    wines_deleted = (await wines_col.delete_many({"owner_id": user.id})).deleted_count
+    txns_deleted = (await transactions_col.delete_many({"owner_id": user.id})).deleted_count
+    batches_deleted = (await batches_col.delete_many({"owner_id": user.id})).deleted_count
+    await raw_col.delete_many({"owner_id": user.id})
+
+    await user.delete()
+
+    logger.info(
+        "Admin %s deleted user %s (%s): %d wines, %d transactions, %d batches",
+        admin.email, user_id, user.email, wines_deleted, txns_deleted, batches_deleted,
+    )
+    return {
+        "status": "deleted",
+        "user_id": user_id,
+        "wines_deleted": wines_deleted,
+        "transactions_deleted": txns_deleted,
     }
