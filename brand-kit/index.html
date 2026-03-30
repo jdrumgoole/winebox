@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WineBox Brand Kit</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --burgundy: #5C0A2D;
+    --burgundy-light: #8B1A4A;
+    --rose: #B82860;
+    --gold: #C49A3C;
+    --gold-light: #F0D78C;
+    --cream: #FAF7F2;
+    --cream-dark: #F0EBE3;
+    --dark-bg: #1A0A10;
+    --text-body: #666;
+    --text-heading: #2C2C2C;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, system-ui, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+    background: var(--cream);
+    color: var(--text-heading);
+    line-height: 1.6;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header — matches actual site nav gradient */
+  header {
+    background: linear-gradient(135deg, var(--burgundy-light) 0%, var(--burgundy) 100%);
+    color: rgba(255,255,255,0.9);
+    padding: 48px 0;
+    text-align: center;
+  }
+  header h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2.8rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: #fff;
+  }
+  header h1 span { font-weight: 400; color: var(--gold-light); }
+  header .subtitle {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 1.1rem;
+    letter-spacing: 3px;
+    color: var(--gold-light);
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+
+  section { padding: 48px 0; border-bottom: 1px solid #e0d8ce; }
+  section:last-child { border-bottom: none; }
+  h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--burgundy-light);
+    margin-bottom: 20px;
+  }
+  h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 28px 0 14px;
+  }
+  .intro { color: var(--text-body); margin-bottom: 20px; font-size: 0.95rem; }
+
+  /* Logo grid */
+  .logo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+  }
+  .logo-card {
+    border: 1px solid #e0d8ce;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .logo-card .preview {
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; min-height: 130px;
+  }
+  .logo-card .preview.dark-bg { background: var(--dark-bg); }
+  .logo-card .preview.cream-bg { background: var(--cream); }
+  .logo-card .preview.checker-bg {
+    background-image: repeating-conic-gradient(#e8e3dc 0% 25%, #fff 0% 50%);
+    background-size: 14px 14px;
+  }
+  .logo-card .preview.burgundy-bg {
+    background: linear-gradient(135deg, var(--burgundy-light), var(--burgundy));
+  }
+  .logo-card .preview img { max-width: 100%; max-height: 110px; }
+  .logo-card .info {
+    padding: 10px 14px; border-top: 1px solid #e0d8ce;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 6px;
+  }
+  .logo-card .info .label { font-size: 0.82rem; color: var(--text-body); }
+  .btn {
+    display: inline-block; padding: 5px 12px;
+    background: var(--burgundy-light); color: #fff;
+    text-decoration: none; border-radius: 8px;
+    font-size: 0.75rem; font-weight: 500;
+    transition: background 0.2s; border: none; cursor: pointer;
+  }
+  .btn:hover { background: var(--burgundy); }
+  .btn-sm { padding: 3px 8px; font-size: 0.7rem; }
+  .btn-gold { background: var(--gold); color: #fff; }
+  .btn-gold:hover { background: #b38a30; }
+
+  /* Colours */
+  .colour-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+  }
+  .colour-swatch {
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid #e0d8ce; cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .colour-swatch:hover { transform: translateY(-2px); }
+  .colour-swatch .block { height: 64px; }
+  .colour-swatch .meta { padding: 8px 10px; background: #fff; }
+  .colour-swatch .meta .name { font-weight: 500; font-size: 0.8rem; }
+  .colour-swatch .meta .hex { font-size: 0.72rem; color: #999; font-family: monospace; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--burgundy); color: #fff; padding: 8px 20px;
+    border-radius: 8px; font-size: 0.85rem; opacity: 0;
+    transition: opacity 0.3s; pointer-events: none; z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Typography */
+  .type-specimen {
+    background: #fff; border: 1px solid #e0d8ce;
+    border-radius: 12px; padding: 20px; margin-bottom: 14px;
+  }
+  .type-specimen .meta { font-size: 0.78rem; color: #999; margin-top: 6px; }
+
+  /* Rules */
+  .rules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 14px;
+  }
+  .rule-card { padding: 16px; border-radius: 12px; border: 1px solid; }
+  .rule-do { border-color: #2a7d4f; background: #f0faf4; }
+  .rule-dont { border-color: #c0392b; background: #fdf2f1; }
+  .rule-card h4 { margin-bottom: 6px; font-size: 0.9rem; }
+  .rule-do h4 { color: #2a7d4f; }
+  .rule-dont h4 { color: #c0392b; }
+  .rule-card p { font-size: 0.82rem; color: #555; }
+
+  /* Favicons */
+  .favicon-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+  .favicon-item { text-align: center; }
+  .favicon-item img { border: 1px solid #e0d8ce; border-radius: 4px; display: block; margin-bottom: 3px; }
+  .favicon-item span { font-size: 0.68rem; color: #999; }
+
+  /* Gradient showcase */
+  .gradient-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .gradient-sample {
+    flex: 1; min-width: 200px; height: 60px;
+    border-radius: 10px; display: flex; align-items: center;
+    justify-content: center; font-size: 0.78rem; color: rgba(255,255,255,0.9);
+    font-family: monospace;
+  }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid #e0d8ce; font-size: 0.82rem; }
+  th { font-weight: 600; color: var(--burgundy-light); }
+  td code { font-size: 0.76rem; background: #f5f0ea; padding: 2px 5px; border-radius: 3px; }
+
+  pre {
+    background: var(--dark-bg); color: var(--cream);
+    padding: 14px 18px; border-radius: 8px;
+    overflow-x: auto; font-size: 0.82rem; margin: 10px 0;
+  }
+
+  footer {
+    background: var(--burgundy);
+    color: rgba(255,255,255,0.6);
+    text-align: center; padding: 28px 0; font-size: 0.82rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1>Wine<span>Box</span></h1>
+    <div class="subtitle">Brand Kit</div>
+  </div>
+</header>
+
+<div class="container">
+
+<section>
+  <h2>Logo Variants</h2>
+  <p class="intro">12 SVG variants across 3 styles and 4 themes, derived from the actual logos at winebox.app. Download individual SVGs or pre-rendered PNGs at multiple sizes.</p>
+
+  <h3>Full Logo (Icon + Wordmark + Tagline)</h3>
+  <div class="logo-grid" id="full-logos"></div>
+
+  <h3>Compact Logo (Icon + Wordmark)</h3>
+  <div class="logo-grid" id="compact-logos"></div>
+
+  <h3>Icon Only</h3>
+  <div class="logo-grid" id="icon-logos"></div>
+</section>
+
+<section>
+  <h2>Colour Palette</h2>
+  <p class="intro">Click any swatch to copy its hex value. Colours extracted from the live site.</p>
+  <div class="colour-grid" id="colour-grid"></div>
+
+  <h3>Gradients</h3>
+  <div class="gradient-row">
+    <div class="gradient-sample" style="background:linear-gradient(135deg,#8B1A4A 0%,#5C0A2D 100%)">Nav / CTA</div>
+    <div class="gradient-sample" style="background:linear-gradient(135deg,#FAF7F2 0%,#F0EBE3 100%); color:#666">Hero section</div>
+  </div>
+</section>
+
+<section>
+  <h2>Typography</h2>
+
+  <div class="type-specimen">
+    <div style="font-family:'Playfair Display',Georgia,serif; font-size:2rem; letter-spacing:-1px;">
+      <span style="font-weight:700; color:#5C0A2D;">Wine</span><span style="font-weight:400; color:#C49A3C;">Box</span>
+    </div>
+    <div class="meta">Playfair Display — Wordmark (700 "Wine" / 400 "Box")</div>
+  </div>
+
+  <div class="type-specimen">
+    <div style="font-family:'Cormorant Garamond',Georgia,serif; font-size:1.2rem; letter-spacing:3px; text-transform:uppercase; color:#8B1A4A;">
+      YOUR CELLAR, CURATED. — Discover, Collect, Savour.
+    </div>
+    <div class="meta">Cormorant Garamond — Tagline &amp; Subtitles</div>
+  </div>
+
+  <div class="type-specimen">
+    <div style="font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif; color:#2C2C2C;">
+      <div style="font-size:1.6rem; font-weight:700; color:#8B1A4A; margin-bottom:4px;">Manage Your Wine Collection with AI</div>
+      <div style="font-family:'Cormorant Garamond',Georgia,serif; font-size:1.05rem; color:#666; font-style:italic;">Scan wine labels with Claude Vision AI, track your cellar inventory, and discover information from a database of over 100,000 wines.</div>
+    </div>
+    <div class="meta">System font stack (headings) + Cormorant Garamond (subtitles) — as used on site</div>
+  </div>
+</section>
+
+<section>
+  <h2>Favicons &amp; App Icons</h2>
+  <div class="favicon-row" id="favicon-row"></div>
+  <h3>Implementation</h3>
+  <pre>&lt;link rel="icon" href="/favicon.svg" type="image/svg+xml"&gt;
+&lt;link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png"&gt;
+&lt;link rel="apple-touch-icon" href="/apple-touch-icon.png"&gt;</pre>
+</section>
+
+<section>
+  <h2>Usage Guidelines</h2>
+  <div class="rules-grid" id="rules-grid"></div>
+</section>
+
+<section>
+  <h2>File Index</h2>
+  <div id="file-index" style="overflow-x:auto;"></div>
+</section>
+
+</div>
+
+<footer>WineBox Brand Kit &mdash; winebox.app &mdash; v0.6.75</footer>
+<div class="toast" id="toast">Copied!</div>
+
+<script>
+const themes = [
+  { key:'light', label:'Light', bgClass:'checker-bg' },
+  { key:'dark', label:'Dark (on burgundy)', bgClass:'burgundy-bg' },
+  { key:'on-cream', label:'On Cream', bgClass:'cream-bg' },
+  { key:'on-dark', label:'On Dark', bgClass:'dark-bg' },
+];
+
+const configs = [
+  { style:'logo-full', label:'Full Logo', container:'full-logos', pngSizes:[400,800,1600] },
+  { style:'logo-compact', label:'Compact', container:'compact-logos', pngSizes:[200,400,800,1600] },
+  { style:'icon', label:'Icon', container:'icon-logos', pngSizes:[64,128,256,512,1024] },
+];
+
+configs.forEach(cfg => {
+  const grid = document.getElementById(cfg.container);
+  themes.forEach(t => {
+    const name = `winebox-${cfg.style}-${t.key}`;
+    const svgPath = `svg/${name}.svg`;
+    const pngBtns = cfg.pngSizes.map(sz =>
+      `<a class="btn btn-sm btn-gold" href="png/${name}-${sz}w.png" download>${sz}</a>`
+    ).join(' ');
+    grid.innerHTML += `
+      <div class="logo-card">
+        <div class="preview ${t.bgClass}">
+          <img src="${svgPath}" alt="${cfg.label} ${t.label}">
+        </div>
+        <div class="info">
+          <span class="label">${t.label}</span>
+          <div><a class="btn btn-sm" href="${svgPath}" download>SVG</a> ${pngBtns}</div>
+        </div>
+      </div>`;
+  });
+});
+
+const colours = [
+  { name:'Burgundy', hex:'#5C0A2D' },
+  { name:'Burgundy Light', hex:'#8B1A4A' },
+  { name:'Rose', hex:'#B82860' },
+  { name:'Gold', hex:'#C49A3C' },
+  { name:'Gold Light', hex:'#F0D78C' },
+  { name:'Case Wood', hex:'#B8956A' },
+  { name:'Case Wood Dark', hex:'#A08060' },
+  { name:'Case Stroke', hex:'#8A6C4E' },
+  { name:'Cream', hex:'#FAF7F2' },
+  { name:'Cream Dark', hex:'#F0EBE3' },
+  { name:'Dark BG', hex:'#1A0A10' },
+  { name:'Body Text', hex:'#666666' },
+];
+const cg = document.getElementById('colour-grid');
+colours.forEach(c => {
+  cg.innerHTML += `
+    <div class="colour-swatch" onclick="copyHex('${c.hex}')">
+      <div class="block" style="background:${c.hex}"></div>
+      <div class="meta"><div class="name">${c.name}</div><div class="hex">${c.hex}</div></div>
+    </div>`;
+});
+
+function copyHex(hex) {
+  navigator.clipboard.writeText(hex).then(() => {
+    const t = document.getElementById('toast');
+    t.textContent = 'Copied ' + hex;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1500);
+  });
+}
+
+const favicons = [
+  { file:'favicon.svg', label:'SVG', size:32 },
+  { file:'favicon-16x16.png', label:'16px', size:16 },
+  { file:'favicon-32x32.png', label:'32px', size:32 },
+  { file:'favicon-48x48.png', label:'48px', size:48 },
+  { file:'favicon-180x180.png', label:'180px', size:60 },
+  { file:'favicon-192x192.png', label:'192px', size:60 },
+  { file:'favicon-512x512.png', label:'512px', size:72 },
+  { file:'apple-touch-icon.png', label:'Apple Touch', size:60 },
+];
+const fr = document.getElementById('favicon-row');
+favicons.forEach(f => {
+  fr.innerHTML += `
+    <div class="favicon-item">
+      <img src="favicon/${f.file}" width="${f.size}" height="${f.size}" alt="${f.label}">
+      <span>${f.label}</span>
+      <a class="btn btn-sm" href="favicon/${f.file}" download style="margin-top:3px;display:inline-block;">↓</a>
+    </div>`;
+});
+
+const rules = [
+  { type:'do', title:'✓ Use official colours', desc:'Only the exact hex values from the brand palette.' },
+  { type:'do', title:'✓ Scale proportionally', desc:'Always maintain aspect ratio. Use SVG wherever possible.' },
+  { type:'do', title:'✓ Maintain clear space', desc:'Keep clear space equal to icon height around the logo.' },
+  { type:'do', title:'✓ Match theme to background', desc:'Use dark theme on burgundy/dark surfaces, light on cream/white.' },
+  { type:'dont', title:'✗ Don\'t alter colours', desc:'Never change brand colours or apply filters to the logo.' },
+  { type:'dont', title:'✗ Don\'t add effects', desc:'No drop shadows, bevels, outlines or gradients on the logo.' },
+  { type:'dont', title:'✗ Don\'t distort or crop', desc:'Never stretch, skew, rotate or partially crop the logo.' },
+  { type:'dont', title:'✗ Don\'t change the two-tone', desc:'The Wine/Box colour split is integral to the identity.' },
+];
+const rg = document.getElementById('rules-grid');
+rules.forEach(r => {
+  rg.innerHTML += `<div class="rule-card rule-${r.type}"><h4>${r.title}</h4><p>${r.desc}</p></div>`;
+});
+
+// File index
+const allFiles = [];
+configs.forEach(cfg => {
+  themes.forEach(t => {
+    const name = `winebox-${cfg.style}-${t.key}`;
+    allFiles.push({ path:`svg/${name}.svg`, desc:`${cfg.label} — ${t.label} (SVG)`, href:`svg/${name}.svg` });
+    cfg.pngSizes.forEach(sz => {
+      allFiles.push({ path:`png/${name}-${sz}w.png`, desc:`${cfg.label} — ${t.label} — ${sz}px`, href:`png/${name}-${sz}w.png` });
+    });
+  });
+});
+favicons.forEach(f => allFiles.push({ path:`favicon/${f.file}`, desc:`Favicon — ${f.label}`, href:`favicon/${f.file}` }));
+allFiles.push({ path:'BRAND.md', desc:'Brand guidelines (Markdown)', href:'BRAND.md' });
+allFiles.push({ path:'colors.json', desc:'Colour palette (JSON)', href:'colors.json' });
+
+let html = '<table><thead><tr><th>Path</th><th>Description</th><th></th></tr></thead><tbody>';
+allFiles.forEach(f => { html += `<tr><td><code>${f.path}</code></td><td>${f.desc}</td><td><a class="btn btn-sm" href="${f.href}" download>↓</a></td></tr>`; });
+html += '</tbody></table>';
+document.getElementById('file-index').innerHTML = html;
+</script>
+</body>
+</html>

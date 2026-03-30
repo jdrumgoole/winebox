@@ -1,0 +1,17 @@
+{
+  "burgundy": "#5C0A2D",
+  "burgundy-light": "#8B1A4A",
+  "rose": "#B82860",
+  "gold": "#C49A3C",
+  "gold-light": "#F0D78C",
+  "case-wood": "#B8956A",
+  "case-wood-dark": "#A08060",
+  "case-stroke": "#8A6C4E",
+  "case-grain": "#907050",
+  "cream": "#FAF7F2",
+  "cream-dark": "#F0EBE3",
+  "dark-wine": "#E0C0CC",
+  "dark-bg": "#1A0A10",
+  "text-body": "#666666",
+  "text-heading": "#2C2C2C"
+}
