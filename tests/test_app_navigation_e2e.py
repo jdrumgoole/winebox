@@ -95,7 +95,7 @@ class TestCoreNavigation:
         page = authenticated_page
         page.click("a[data-page='met']")
         expect(page.locator("#page-met")).to_be_visible()
-        expect(page.locator("#met-list")).to_be_visible()
+        expect(page.locator("#met-record-wine-btn")).to_be_visible()
 
     def test_no_add_to_cellar_nav_link(self, authenticated_page: Page) -> None:
         """Test that 'Add to Cellar' nav link no longer exists — folded into My Cellar."""
