@@ -69,7 +69,7 @@ class TestCoreNavigation:
         page = authenticated_page
         page.click("a[data-page='cellar']")
         expect(page.locator("#page-cellar")).to_be_visible()
-        expect(page.locator("#cellar-list")).to_be_visible()
+        expect(page.locator("#cellar-add-wine-btn")).to_be_visible()
 
     def test_navigate_to_history(self, authenticated_page: Page) -> None:
         page = authenticated_page
