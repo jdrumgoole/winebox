@@ -555,6 +555,18 @@ details.advanced-fields .form-grid {
     color: white;
 }
 
+/* Page Header — title left, action button right */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.page-header h2 { margin-bottom: 0; }
+.page-header .page-subtitle { margin-top: 0.25rem; margin-bottom: 0; }
+
 /* Filter Bar */
 .filter-bar {
     display: flex;
@@ -3241,6 +3253,9 @@ body.logged-out #user-info {
     text-align: center;
     cursor: pointer;
     transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
 }
 
 .entry-path-card:hover {
