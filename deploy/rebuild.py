@@ -174,8 +174,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--droplet-name",
-        default="winebox-droplet",
-        help="Droplet name (default: winebox-droplet)",
+        default="winebox-production",
+        help="Droplet name (default: winebox-production)",
     )
     parser.add_argument(
         "--image",

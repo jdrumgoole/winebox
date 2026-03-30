@@ -924,7 +924,7 @@ def deploy(
     Args:
         ctx: Invoke context
         host: Droplet IP (optional, auto-discovered if not set)
-        droplet_name: Droplet name for IP lookup (default: winebox-droplet)
+        droplet_name: Droplet name for IP lookup (default: winebox-production)
         version: Explicit version to release (overrides auto-bump)
         minor: Bump minor version instead of patch
         major: Bump major version instead of patch
@@ -986,7 +986,7 @@ def deploy_only(
     Args:
         ctx: Invoke context
         host: Droplet IP (optional, auto-discovered if not set)
-        droplet_name: Droplet name for IP lookup (default: winebox-droplet)
+        droplet_name: Droplet name for IP lookup (default: winebox-production)
         version: Package version to install (default: latest)
         no_secrets: Skip syncing secrets to production
         setup_dns: Configure DNS A records (first-time setup)
@@ -1027,7 +1027,7 @@ def deploy_xwines(
     Args:
         ctx: Invoke context
         host: Droplet IP (optional, auto-discovered if not set)
-        droplet_name: Droplet name for IP lookup (default: winebox-droplet)
+        droplet_name: Droplet name for IP lookup (default: winebox-production)
         test: Use test dataset (100 wines) instead of full dataset
         dry_run: Preview changes without applying
     """
@@ -1082,7 +1082,7 @@ def initialise_droplet(
 @task
 def rebuild_droplet(
     ctx: Context,
-    droplet_name: str = "winebox-droplet",
+    droplet_name: str = "winebox-production",
     image: str = "ubuntu-24-04-x64",
     confirm: bool = True,
 ) -> None:
@@ -1093,7 +1093,7 @@ def rebuild_droplet(
 
     Args:
         ctx: Invoke context
-        droplet_name: Droplet name (default: winebox-droplet)
+        droplet_name: Droplet name (default: winebox-production)
         image: OS image to rebuild with (default: ubuntu-24-04-x64)
         confirm: Skip confirmation prompt (default: True)
     """

@@ -112,7 +112,7 @@ OAT management tasks:
 ### Production
 - **URL:** https://booze.winebox.app
 - **Database:** `winebox`
-- **Droplet:** `winebox-droplet` (104.248.46.96)
+- **Droplet:** `winebox-production` (104.248.46.96)
 - **When the user says "make a production release"** or "make a release" or "deploy": run `invoke deploy`
 
 Full production release (tests, version bump, PyPI publish, deploy):

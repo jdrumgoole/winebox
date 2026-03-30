@@ -18,7 +18,7 @@ Usage:
 
 Environment variables (in .env):
     WINEBOX_DO_TOKEN - Digital Ocean API token (required for IP lookup)
-    WINEBOX_DROPLET_NAME - Droplet name (default: winebox-droplet)
+    WINEBOX_DROPLET_NAME - Droplet name (default: winebox-production)
     WINEBOX_DROPLET_IP - Override IP (optional)
 """
 
@@ -277,8 +277,8 @@ Examples:
     )
     parser.add_argument(
         "--droplet-name",
-        default="winebox-droplet",
-        help="Droplet name for IP lookup (default: winebox-droplet)",
+        default="winebox-production",
+        help="Droplet name for IP lookup (default: winebox-production)",
     )
     parser.add_argument(
         "--user",

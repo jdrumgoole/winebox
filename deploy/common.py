@@ -60,7 +60,7 @@ def get_env_config(
     return DeployConfig(
         host=host or os.environ.get("WINEBOX_DROPLET_IP"),
         user=user or os.environ.get("WINEBOX_DROPLET_USER", "root"),
-        droplet_name=droplet_name or os.environ.get("WINEBOX_DROPLET_NAME", "winebox-droplet"),
+        droplet_name=droplet_name or os.environ.get("WINEBOX_DROPLET_NAME", "winebox-production"),
         do_token=os.environ.get("WINEBOX_DO_TOKEN"),
         domain=domain or os.environ.get("WINEBOX_DOMAIN", "booze.winebox.app"),
         env_values=env_values,

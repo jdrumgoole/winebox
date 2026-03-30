@@ -310,7 +310,7 @@ WINEBOX_DO_TOKEN=your-digital-ocean-api-token
 
 # Optional: Override droplet lookup
 WINEBOX_DROPLET_IP=your-droplet-ip
-WINEBOX_DROPLET_NAME=winebox-droplet
+WINEBOX_DROPLET_NAME=winebox-production
 
 # MongoDB Atlas connection string
 WINEBOX_MONGODB_URL=mongodb+srv://user:pass@cluster.mongodb.net

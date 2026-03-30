@@ -512,8 +512,8 @@ Examples:
     )
     parser.add_argument(
         "--droplet-name",
-        default="winebox-droplet",
-        help="Droplet name for IP lookup (default: winebox-droplet)",
+        default="winebox-production",
+        help="Droplet name for IP lookup (default: winebox-production)",
     )
     parser.add_argument(
         "--version",
