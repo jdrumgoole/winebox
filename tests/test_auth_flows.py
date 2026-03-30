@@ -95,6 +95,79 @@ class TestRegistration:
         assert response.status_code in [200, 201]
 
 
+class TestEmailVerification:
+    """Tests for email verification flow."""
+
+    @pytest.mark.asyncio
+    async def test_verify_token_succeeds(self, client: AsyncClient, mock_email_service):
+        """Test that a verification token generated at registration actually works."""
+        import jwt
+        from winebox.auth.users import UserManager
+
+        # Register a new user
+        reg_resp = await client.post(
+            "/api/auth/register",
+            json={"email": "verify_test@example.com", "password": "securepassword123"},
+        )
+        assert reg_resp.status_code in [200, 201]
+        user_id = reg_resp.json()["id"]
+
+        # Generate a verification token (same way fastapi-users does internally)
+        import time
+        token = jwt.encode(
+            {
+                "sub": user_id,
+                "email": "verify_test@example.com",
+                "aud": "fastapi-users:verify",
+                "exp": int(time.time()) + 3600,
+            },
+            UserManager.verification_token_secret,
+            algorithm="HS256",
+        )
+
+        # Verify the token via the API
+        verify_resp = await client.post(
+            "/api/auth/verify",
+            json={"token": token},
+        )
+        assert verify_resp.status_code == 200, (
+            f"Verification failed with {verify_resp.status_code}: {verify_resp.json()}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_verify_bad_token_rejected(self, client: AsyncClient):
+        """Test that an invalid token is rejected."""
+        verify_resp = await client.post(
+            "/api/auth/verify",
+            json={"token": "invalid.token.here"},
+        )
+        assert verify_resp.status_code == 400
+        assert verify_resp.json()["detail"] == "VERIFY_USER_BAD_TOKEN"
+
+    @pytest.mark.asyncio
+    async def test_parse_id_returns_objectid_not_coroutine(self):
+        """Regression test: parse_id must be sync, not async.
+
+        fastapi-users' verify() method calls parse_id() without await.
+        If parse_id is async, it returns a coroutine that never equals
+        the user's ObjectId, causing all verifications to fail.
+        """
+        import asyncio
+        import inspect
+        from winebox.auth.users import UserManager
+
+        manager = UserManager.__new__(UserManager)
+        result = manager.parse_id("507f1f77bcf86cd799439011")
+
+        # Must NOT be a coroutine
+        assert not asyncio.iscoroutine(result), (
+            "parse_id must be synchronous — fastapi-users calls it without await"
+        )
+        assert not inspect.isawaitable(result), (
+            "parse_id must not return an awaitable"
+        )
+
+
 class TestLogin:
     """Tests for user login flow."""
 

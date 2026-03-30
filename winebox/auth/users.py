@@ -35,7 +35,7 @@ def _derive_secret(base_secret: str, purpose: str) -> str:
 class ObjectIDIDMixin:
     """Mixin to handle ObjectId parsing for fastapi-users."""
 
-    async def parse_id(self, value: str) -> ObjectId:
+    def parse_id(self, value: str) -> ObjectId:
         """Parse a string ID to ObjectId."""
         return ObjectId(value)
 
