@@ -39,9 +39,9 @@
             </button>
             <nav id="main-nav">
                 <a href="#" data-page="cellar" class="nav-link active" aria-current="page">My Cellar</a>
+                <a href="#" data-page="search" class="nav-link">Cellar Search</a>
                 <a href="#" data-page="met" class="nav-link">Wines I've Met</a>
                 <a href="#" data-page="history" class="nav-link">History</a>
-                <a href="#" data-page="search" class="nav-link">Search</a>
                 <a href="#" data-page="xwines" class="nav-link">Wine Reference</a>
             </nav>
             <div id="user-info" class="user-info" style="display: none;">
@@ -979,15 +979,13 @@
 
         <!-- Search Page -->
         <section id="page-search" class="page" aria-labelledby="page-search-title">
-            <h2 id="page-search-title">Search Wines</h2>
+            <h2 id="page-search-title">Cellar Search</h2>
             <form id="search-form">
                 <div class="form-group full-width">
                     <label for="search-q">Search</label>
                     <input type="text" id="search-q" name="q" placeholder="Search by name, winery, region, grape...">
                 </div>
-                <details class="advanced-fields">
-                    <summary>Advanced Filters</summary>
-                    <div class="form-grid">
+                <div class="form-grid">
                         <div class="form-group">
                             <label for="search-vintage">Vintage</label>
                             <input type="number" id="search-vintage" name="vintage" min="1900" max="2100">
@@ -1039,7 +1037,7 @@
                             </label>
                         </div>
                     </div>
-                </details>
+                </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Search</button>
                     <button type="reset" class="btn btn-secondary">Clear</button>
