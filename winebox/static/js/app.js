@@ -1910,7 +1910,7 @@ async function checkDemoBanner() {
         const resp = await fetchWithAuth(`${API_BASE}/demo/status`);
         if (!resp.ok) return;
         const status = await resp.json();
-        if (status.has_demo_data && status.wine_count > 0) {
+        if (status.installed && status.wine_count > 0) {
             container.innerHTML = `
                 <div class="demo-banner" id="demo-banner">
                     <span>Sample wines (${status.wine_count} wines, ${status.bottle_count} bottles)</span>
