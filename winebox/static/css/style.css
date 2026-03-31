@@ -3483,6 +3483,12 @@ body.logged-out #user-info {
     margin-bottom: 0;
 }
 
+#cellar-demo-banner-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+}
+
 .demo-banner {
     background: #fef3cd;
     border: 1px solid #ffc107;

@@ -1896,8 +1896,42 @@ async function loadCellar() {
 
         // Check demo data status and show/hide banner
         checkDemoBanner();
+
+        // Load analytics (stats, charts, activity)
+        loadCellarAnalytics();
     } catch (error) {
         console.error('Failed to load cellar:', error);
+    }
+}
+
+async function loadCellarAnalytics() {
+    try {
+        // Load cellar summary for stats + charts
+        const summaryResponse = await fetchWithAuth(`${API_BASE}/cellar/summary`);
+        const summary = await summaryResponse.json();
+
+        document.getElementById('stat-total-bottles').textContent = summary.total_bottles;
+        document.getElementById('stat-unique-wines').textContent = summary.unique_wines;
+        document.getElementById('stat-total-tracked').textContent = summary.total_wines_tracked;
+
+        // Render charts
+        renderDashboardCharts(summary);
+
+        // Load met count
+        try {
+            const metResponse = await fetchWithAuth(`${API_BASE}/met/summary`);
+            const metSummary = await metResponse.json();
+            document.getElementById('stat-wines-met').textContent = metSummary.total_met;
+        } catch {
+            document.getElementById('stat-wines-met').textContent = '0';
+        }
+
+        // Load recent activity
+        const transResponse = await fetchWithAuth(`${API_BASE}/transactions?limit=10`);
+        const transactions = await transResponse.json();
+        renderActivityList(transactions);
+    } catch (error) {
+        console.error('Failed to load cellar analytics:', error);
     }
 }
 

@@ -453,6 +453,58 @@
                 <button class="btn btn-primary" id="cellar-add-wine-btn">+ Add Wine</button>
             </div>
             <div id="cellar-demo-banner-container"></div>
+            <div class="stats-grid" id="cellar-stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-total-bottles">-</div>
+                    <div class="stat-label">Bottles</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-unique-wines">-</div>
+                    <div class="stat-label">Wines</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-total-tracked">-</div>
+                    <div class="stat-label">Tracked</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-wines-met">-</div>
+                    <div class="stat-label">Met</div>
+                </div>
+            </div>
+            <div class="chart-grid" id="cellar-chart-grid">
+                <div class="chart-card">
+                    <h3>Wine Types</h3>
+                    <div class="chart-wrapper chart-wrapper-sm">
+                        <canvas id="chart-wine-type"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Price Range</h3>
+                    <div class="chart-wrapper chart-wrapper-sm">
+                        <canvas id="chart-price-tier"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card chart-card-wide">
+                    <h3>Top Countries</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-country"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card chart-card-wide">
+                    <h3>Top Grape Varieties</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-grape"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card chart-card-full">
+                    <h3>Vintages</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-vintage"></canvas>
+                    </div>
+                </div>
+            </div>
+            <h3 id="cellar-activity-heading">Recent Activity</h3>
+            <div id="recent-activity" class="activity-list"></div>
             <div class="filter-bar">
                 <select id="cellar-filter">
                     <option value="all">All Wines</option>
