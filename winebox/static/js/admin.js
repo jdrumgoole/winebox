@@ -124,15 +124,15 @@ async function loadUsers() {
                             <td class="cellar-size">${user.cellar_size} bottles</td>
                             <td class="actions-cell">
                                 ${user.is_active
-                                    ? `<button class="btn-admin btn-admin-outline" onclick="toggleActive('${user.id}', false)">Disable</button>`
-                                    : `<button class="btn-admin btn-admin-success" onclick="toggleActive('${user.id}', true)">Enable</button>`}
+                                    ? `<button class="btn-admin btn-admin-outline" data-action="deactivate" data-user-id="${user.id}">Disable</button>`
+                                    : `<button class="btn-admin btn-admin-success" data-action="activate" data-user-id="${user.id}">Enable</button>`}
                                 ${user.is_superuser
-                                    ? `<button class="btn-admin btn-admin-outline" onclick="toggleAdmin('${user.id}', false)">Remove Admin</button>`
-                                    : `<button class="btn-admin btn-admin-outline" onclick="toggleAdmin('${user.id}', true)">Make Admin</button>`}
+                                    ? `<button class="btn-admin btn-admin-outline" data-action="remove-admin" data-user-id="${user.id}">Remove Admin</button>`
+                                    : `<button class="btn-admin btn-admin-outline" data-action="make-admin" data-user-id="${user.id}">Make Admin</button>`}
                                 ${!user.is_verified
-                                    ? `<button class="btn-admin btn-admin-success" onclick="verifyUser('${user.id}')">Verify</button>`
+                                    ? `<button class="btn-admin btn-admin-success" data-action="verify" data-user-id="${user.id}">Verify</button>`
                                     : ''}
-                                <button class="btn-admin btn-admin-danger" onclick="deleteUser('${user.id}', '${escapeHtml(user.email)}')">Delete</button>
+                                <button class="btn-admin btn-admin-danger" data-action="delete" data-user-id="${user.id}" data-user-email="${escapeHtml(user.email)}">Delete</button>
                             </td>
                         </tr>
                     `).join('')}
@@ -141,6 +141,9 @@ async function loadUsers() {
         `;
 
         container.innerHTML = tableHtml;
+
+        // Attach click handlers via delegation (CSP blocks inline onclick)
+        container.addEventListener('click', handleAdminAction);
     } catch (error) {
         console.error('Error loading users:', error);
         container.innerHTML = `
@@ -167,58 +170,40 @@ async function refreshData() {
     ]);
 }
 
-// User management actions
-async function toggleActive(userId, activate) {
-    const action = activate ? 'activate' : 'deactivate';
-    try {
-        const resp = await apiRequest(`/admin/api/users/${userId}/${action}`, { method: 'PATCH' });
-        if (!resp.ok) {
-            const err = await resp.json();
-            alert(err.detail || `Failed to ${action} user`);
-            return;
-        }
-        await refreshData();
-    } catch (e) { console.error(e); }
-}
+// Delegated click handler for user management actions (CSP-compliant)
+async function handleAdminAction(e) {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
 
-async function toggleAdmin(userId, makeAdmin) {
-    const action = makeAdmin ? 'make-admin' : 'remove-admin';
-    try {
-        const resp = await apiRequest(`/admin/api/users/${userId}/${action}`, { method: 'PATCH' });
-        if (!resp.ok) {
-            const err = await resp.json();
-            alert(err.detail || `Failed to ${action}`);
-            return;
-        }
-        await refreshData();
-    } catch (e) { console.error(e); }
-}
+    const action = btn.dataset.action;
+    const userId = btn.dataset.userId;
+    const email = btn.dataset.userEmail || '';
 
-async function verifyUser(userId) {
-    try {
-        const resp = await apiRequest(`/admin/api/users/${userId}/verify`, { method: 'PATCH' });
-        if (!resp.ok) {
-            const err = await resp.json();
-            alert(err.detail || 'Failed to verify user');
-            return;
-        }
-        await refreshData();
-    } catch (e) { console.error(e); }
-}
+    if (action === 'delete') {
+        if (!confirm(`Delete user ${email} and ALL their data?\n\nThis cannot be undone.`)) return;
+        try {
+            const resp = await apiRequest(`/admin/api/users/${userId}`, { method: 'DELETE' });
+            if (!resp.ok) {
+                const err = await resp.json();
+                alert(err.detail || 'Failed to delete user');
+                return;
+            }
+            const result = await resp.json();
+            alert(`Deleted ${email}: ${result.wines_deleted} wines, ${result.transactions_deleted} transactions removed.`);
+        } catch (e) { console.error(e); return; }
+    } else {
+        // activate, deactivate, make-admin, remove-admin, verify
+        try {
+            const resp = await apiRequest(`/admin/api/users/${userId}/${action}`, { method: 'PATCH' });
+            if (!resp.ok) {
+                const err = await resp.json();
+                alert(err.detail || `Failed: ${action}`);
+                return;
+            }
+        } catch (e) { console.error(e); return; }
+    }
 
-async function deleteUser(userId, email) {
-    if (!confirm(`Delete user ${email} and ALL their data?\n\nThis cannot be undone.`)) return;
-    try {
-        const resp = await apiRequest(`/admin/api/users/${userId}`, { method: 'DELETE' });
-        if (!resp.ok) {
-            const err = await resp.json();
-            alert(err.detail || 'Failed to delete user');
-            return;
-        }
-        const result = await resp.json();
-        alert(`Deleted ${email}: ${result.wines_deleted} wines, ${result.transactions_deleted} transactions removed.`);
-        await refreshData();
-    } catch (e) { console.error(e); }
+    await refreshData();
 }
 
 // Initialize admin panel
