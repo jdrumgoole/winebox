@@ -85,8 +85,8 @@ class TestDemoDataE2E:
             # Wait for the demo welcome to appear
             page.wait_for_selector("#demo-welcome", state="visible", timeout=10000)
             expect(page.locator("#demo-welcome")).to_be_visible()
-            expect(page.locator("#demo-install-btn")).to_be_visible()
-            expect(page.locator("#demo-install-btn")).to_have_text("Load sample wines")
+            expect(page.locator("#cellar-demo-install-btn")).to_be_visible()
+            expect(page.locator("#cellar-demo-install-btn")).to_have_text("Load sample wines")
         except Exception:
             capture_artifacts(page, "demo_empty_welcome")
             raise
@@ -117,8 +117,8 @@ class TestDemoDataE2E:
 
         try:
             # Wait for welcome and click install
-            page.wait_for_selector("#demo-install-btn", state="visible", timeout=10000)
-            page.click("#demo-install-btn")
+            page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
+            page.click("#cellar-demo-install-btn")
 
             # Wait for the banner to appear (indicates install completed and cellar reloaded)
             page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
@@ -134,8 +134,8 @@ class TestDemoDataE2E:
         # Ensure demo data is loaded
         _cleanup_demo_data(page)
         _navigate_to_cellar(page)
-        page.wait_for_selector("#demo-install-btn", state="visible", timeout=10000)
-        page.click("#demo-install-btn")
+        page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
+        page.click("#cellar-demo-install-btn")
         page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
 
         try:
@@ -151,8 +151,8 @@ class TestDemoDataE2E:
         # Load demo data first
         _cleanup_demo_data(page)
         _navigate_to_cellar(page)
-        page.wait_for_selector("#demo-install-btn", state="visible", timeout=10000)
-        page.click("#demo-install-btn")
+        page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
+        page.click("#cellar-demo-install-btn")
         page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
 
         try:
@@ -177,8 +177,8 @@ class TestDemoDataE2E:
 
         try:
             # Install demo data
-            page.wait_for_selector("#demo-install-btn", state="visible", timeout=10000)
-            page.click("#demo-install-btn")
+            page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
+            page.click("#cellar-demo-install-btn")
             page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
 
             # Navigate to cellar

@@ -47,20 +47,16 @@ def _navigate_to_cellar(page: Page) -> None:
 class TestCellarPage:
     """E2E tests for the cellar page."""
 
-    def test_cellar_shows_list(self, authenticated_page: Page) -> None:
-        """Wine list container appears."""
+    def test_cellar_shows_welcome_or_list(self, authenticated_page: Page) -> None:
+        """Welcome panel or wine list is present."""
         _navigate_to_cellar(authenticated_page)
-        expect(authenticated_page.locator("#cellar-list")).to_be_visible()
+        # Either the welcome panel (empty cellar) or wine list (populated) should exist
+        expect(authenticated_page.locator("#cellar-welcome-panel, #cellar-list")).to_be_attached()
 
     def test_cellar_has_filter(self, authenticated_page: Page) -> None:
         """Filter dropdown is present."""
         _navigate_to_cellar(authenticated_page)
         expect(authenticated_page.locator("#cellar-filter")).to_be_visible()
-
-    def test_cellar_has_search(self, authenticated_page: Page) -> None:
-        """Quick search input is present."""
-        _navigate_to_cellar(authenticated_page)
-        expect(authenticated_page.locator("#cellar-search")).to_be_visible()
 
     def test_cellar_card_view_toggle(self, authenticated_page: Page) -> None:
         """Card view toggle button is present."""

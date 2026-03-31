@@ -290,16 +290,18 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
         await Transaction.insert_many(txn_batch)
         wines_created += len(wine_batch)
 
-    # Create checkout transactions
+    # Create checkout transactions in batch
     checkout_count = min(len(checkout_candidates), max(20, total // 10))
     random.shuffle(checkout_candidates)
+    checkout_txns: list[Transaction] = []
+    wine_updates: list[tuple[Any, int, datetime]] = []  # (wine_id, qty, date)
 
     for wine_id, max_qty in checkout_candidates[:checkout_count]:
         qty = random.randint(1, max(1, max_qty - 1))
         notes = random.choice(_CHECKOUT_NOTES)
         checkout_date = now - timedelta(days=random.randint(1, 60))
 
-        txn = Transaction(
+        checkout_txns.append(Transaction(
             owner_id=owner_id,
             wine_id=wine_id,
             transaction_type=TransactionType.CHECK_OUT,
@@ -307,16 +309,20 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
             notes=notes,
             transaction_date=checkout_date,
             created_at=checkout_date,
-        )
-        await txn.insert()
+        ))
+        wine_updates.append((wine_id, qty, checkout_date))
+        total_bottles -= qty
 
-        wine = await Wine.find_one({"_id": wine_id})
-        if wine:
-            wine.inventory.quantity -= qty
-            wine.inventory.updated_at = checkout_date
-            wine.updated_at = checkout_date
-            await wine.save()
-            total_bottles -= qty
+    if checkout_txns:
+        await Transaction.insert_many(checkout_txns)
+        # Batch update wine quantities
+        wines_col = Wine.get_pymongo_collection()
+        for wine_id, qty, checkout_date in wine_updates:
+            await wines_col.update_one(
+                {"_id": wine_id},
+                {"$inc": {"inventory.quantity": -qty},
+                 "$set": {"inventory.updated_at": checkout_date, "updated_at": checkout_date}},
+            )
 
     _install_progress[owner_str] = {
         "phase": "done",

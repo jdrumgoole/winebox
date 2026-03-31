@@ -1885,6 +1885,12 @@ async function loadCellar() {
         cellarLastWines = wines;
         renderCellarView();
 
+        // Show/hide welcome panel based on whether cellar has wines
+        const welcomePanel = document.getElementById('cellar-welcome-panel');
+        if (welcomePanel) {
+            welcomePanel.style.display = wines.length > 0 ? 'none' : '';
+        }
+
         // Check demo data status and show/hide banner
         checkDemoBanner();
 
@@ -5652,19 +5658,22 @@ async function installDemoData() {
                         const text = document.getElementById('demo-progress-text');
 
                         if (data.phase === 'done') {
-                            if (bar) bar.style.width = '100%';
-                            if (text) text.textContent = `Done! ${data.created} wines loaded.`;
                             showToast(
                                 `Loaded ${data.created} sample wines (${data.bottles} bottles) from ${data.countries} countries`,
                                 'success'
                             );
-                            setTimeout(() => loadCellar(), 500);
+                            // Hide progress panel and reload everything
+                            const panel = document.getElementById('cellar-welcome-panel');
+                            if (panel) panel.style.display = 'none';
+                            loadCellar();
                             return;
                         } else if (data.phase === 'loading' && data.total > 0) {
                             const pct = Math.round((data.created / data.total) * 100);
                             if (bar) bar.style.width = pct + '%';
                             if (text) text.textContent = `Adding wines: ${data.created} of ${data.total}`;
                         } else if (data.phase === 'idle') {
+                            const idlePanel = document.getElementById('cellar-welcome-panel');
+                            if (idlePanel) idlePanel.style.display = 'none';
                             loadCellar();
                             return;
                         }
