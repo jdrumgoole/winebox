@@ -1980,49 +1980,7 @@ function setCellarViewMode(mode) {
 }
 
 function emptyCellarHtml() {
-    return `<div class="demo-welcome" id="demo-welcome">
-        <div class="demo-welcome-content">
-            <h3>Welcome to WineBox</h3>
-            <p>Your cellar is empty. How would you like to get started?</p>
-            <div class="entry-path-cards" style="margin-top:1.5rem;">
-                <a href="#" data-page="add-to-cellar" data-tab="scan" class="entry-path-card">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                            <circle cx="12" cy="13" r="4"></circle>
-                        </svg>
-                    </div>
-                    <h3>Scan a Label</h3>
-                    <p>Take a photo to auto-detect wine details</p>
-                </a>
-                <a href="#" data-page="add-to-cellar" data-tab="manual" class="entry-path-card">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </div>
-                    <h3>Enter Details</h3>
-                    <p>Type in the wine details manually</p>
-                </a>
-                <a href="#" data-page="add-to-cellar" data-tab="import" class="entry-path-card">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                    </div>
-                    <h3>Import from File</h3>
-                    <p>Upload a CSV or Excel spreadsheet</p>
-                </a>
-            </div>
-            <div style="margin-top:1.5rem;">
-                <button class="btn btn-outline btn-small" id="demo-install-btn">Load sample wines</button>
-                <p class="demo-hint">Sample wines can be removed at any time</p>
-            </div>
-        </div>
-    </div>`;
+    return '';
 }
 
 function renderCellarTable(containerId, wines) {
@@ -2033,8 +1991,6 @@ function renderCellarTable(containerId, wines) {
             container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
         } else {
             container.innerHTML = emptyCellarHtml();
-            const installBtn = document.getElementById('demo-install-btn');
-            if (installBtn) installBtn.addEventListener('click', installDemoData);
         }
         return;
     }
@@ -2152,8 +2108,6 @@ function renderWineGrid(containerId, wines) {
             container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
         } else {
             container.innerHTML = emptyCellarHtml();
-            const installBtn = document.getElementById('demo-install-btn');
-            if (installBtn) installBtn.addEventListener('click', installDemoData);
         }
         return;
     }
@@ -5630,11 +5584,11 @@ function showDemoBanner(wineCount, bottleCount) {
 
 async function installDemoData() {
     try {
-        const btn = document.getElementById('demo-install-btn');
+        const btn = document.getElementById('cellar-demo-install-btn') || document.getElementById('demo-install-btn');
         if (btn) btn.disabled = true;
 
         // Replace the welcome content with a progress bar
-        const welcome = document.getElementById('demo-welcome');
+        const welcome = document.getElementById('cellar-welcome-panel') || document.getElementById('demo-welcome');
         if (welcome) {
             welcome.innerHTML = `
                 <div class="demo-welcome-content">

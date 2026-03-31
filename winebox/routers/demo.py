@@ -16,6 +16,7 @@ import random
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
@@ -209,6 +210,11 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
         "total": total,
     }
 
+    # Batch insert for speed — collect wines in chunks, insert, then create transactions
+    BATCH_SIZE = 50
+    wine_batch: list[Wine] = []
+    batch_meta: list[tuple[int, datetime]] = []  # (quantity, created_at) per wine
+
     for i, wine_data in enumerate(sample_wines):
         data = dict(wine_data)
         quantity = data.pop("quantity", 1)
@@ -217,7 +223,9 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
         days_ago = total - i
         created_at = now - timedelta(days=days_ago)
 
+        wine_id = ObjectId()
         wine = Wine(
+            id=wine_id,
             owner_id=owner_id,
             custom_fields=DEMO_TAG,
             xwines_id=xwines_id,
@@ -226,19 +234,9 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
             inventory=InventoryInfo(quantity=quantity, updated_at=created_at),
             **data,
         )
-        await wine.insert()
+        wine_batch.append(wine)
+        batch_meta.append((quantity, created_at))
 
-        txn = Transaction(
-            owner_id=owner_id,
-            wine_id=wine.id,
-            transaction_type=TransactionType.CHECK_IN,
-            quantity=quantity,
-            transaction_date=created_at,
-            created_at=created_at,
-        )
-        await txn.insert()
-
-        wines_created += 1
         total_bottles += quantity
         if data.get("country"):
             countries.add(data["country"])
@@ -246,15 +244,51 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
             wine_types.add(data["wine_type_id"])
 
         if quantity >= 3:
-            checkout_candidates.append((wine.id, quantity))
+            checkout_candidates.append((wine_id, quantity))
 
-        # Update progress every 10 wines
-        if wines_created % 10 == 0 or wines_created == total:
+        # Flush batch
+        if len(wine_batch) >= BATCH_SIZE:
+            await Wine.insert_many(wine_batch)
+            # Now wine.id is set — create transactions
+            txn_batch = [
+                Transaction(
+                    owner_id=owner_id,
+                    wine_id=w.id,
+                    transaction_type=TransactionType.CHECK_IN,
+                    quantity=q,
+                    transaction_date=ca,
+                    created_at=ca,
+                )
+                for w, (q, ca) in zip(wine_batch, batch_meta)
+            ]
+            await Transaction.insert_many(txn_batch)
+
+            wines_created += len(wine_batch)
+            wine_batch.clear()
+            batch_meta.clear()
+
             _install_progress[owner_str] = {
                 "phase": "loading",
                 "created": wines_created,
                 "total": total,
             }
+
+    # Flush remaining
+    if wine_batch:
+        await Wine.insert_many(wine_batch)
+        txn_batch = [
+            Transaction(
+                owner_id=owner_id,
+                wine_id=w.id,
+                transaction_type=TransactionType.CHECK_IN,
+                quantity=q,
+                transaction_date=ca,
+                created_at=ca,
+            )
+            for w, (q, ca) in zip(wine_batch, batch_meta)
+        ]
+        await Transaction.insert_many(txn_batch)
+        wines_created += len(wine_batch)
 
     # Create checkout transactions
     checkout_count = min(len(checkout_candidates), max(20, total // 10))
