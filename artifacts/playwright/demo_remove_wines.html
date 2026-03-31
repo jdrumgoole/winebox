@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<!DOCTYPE html><html lang="en"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,8 +14,8 @@
     <meta name="author" content="Joe Drumgoole">
     <title>WineBox - Wine Cellar Management</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&amp;family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&amp;family=DM+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/static/logos/favicon.svg">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/logos/favicon.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/static/logos/favicon-16x16.png">
@@ -27,7 +25,7 @@
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
 </head>
-    <body class="logged-out">
+    <body class="">
     <header>
         <div class="header-content">
             <div class="logo-wrapper">
@@ -44,9 +42,9 @@
                 <a href="#" data-page="history" class="nav-link">History</a>
                 <a href="#" data-page="xwines" class="nav-link">Wine Reference</a>
             </nav>
-            <div id="user-info" class="user-info" style="display: none;">
+            <div id="user-info" class="user-info" style="display: flex;">
                 <a href="/admin" id="admin-link" class="nav-link" style="display: none;">Admin</a>
-                <a href="#" id="username-display" data-page="settings" class="username-link" title="Settings"></a>
+                <a href="#" id="username-display" data-page="settings" class="username-link" title="Settings">e2e_demo_gw1@test.example.com</a>
                 <a href="#" data-page="settings" class="nav-link settings-icon-link" title="Settings" aria-label="Settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                         <circle cx="12" cy="12" r="3"></circle>
@@ -59,7 +57,7 @@
     </header>
 
     <!-- Login Page -->
-    <section id="page-login" class="login-page active">
+    <section id="page-login" class="login-page">
         <div class="login-container">
             <!-- Login Form -->
             <div class="login-card" id="login-card">
@@ -69,12 +67,12 @@
                 <form id="login-form">
                     <div class="form-group">
                         <label for="login-email">Email</label>
-                        <input type="email" id="login-email" name="username" required autocomplete="email">
+                        <input type="email" id="login-email" name="username" required="" autocomplete="email" style="">
                     </div>
                     <div class="form-group">
                         <label for="login-password">Password</label>
                         <div class="password-input-wrapper">
-                            <input type="password" id="login-password" name="password" required autocomplete="current-password">
+                            <input type="password" id="login-password" name="password" required="" autocomplete="current-password" style="">
                             <button type="button" class="password-toggle" aria-label="Show password">
                                 <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -89,7 +87,7 @@
                     </div>
                     <div class="form-group" style="margin-top:0.25rem;">
                         <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;cursor:pointer;">
-                            <input type="checkbox" id="login-remember-me" checked>
+                            <input type="checkbox" id="login-remember-me" checked="" style="">
                             <span>Stay logged in on this machine</span>
                         </label>
                     </div>
@@ -110,13 +108,12 @@
                 <form id="register-form">
                     <div class="form-group">
                         <label for="register-email">Email</label>
-                        <input type="email" id="register-email" name="email" required autocomplete="email"
-                               title="Please enter a valid email address (e.g., name@example.com)">
+                        <input type="email" id="register-email" name="email" required="" autocomplete="email" title="Please enter a valid email address (e.g., name@example.com)" style="">
                     </div>
                     <div class="form-group">
                         <label for="register-password">Password</label>
                         <div class="password-input-wrapper">
-                            <input type="password" id="register-password" name="password" required minlength="8" autocomplete="new-password">
+                            <input type="password" id="register-password" name="password" required="" minlength="8" autocomplete="new-password" style="">
                             <button type="button" class="password-toggle" aria-label="Show password">
                                 <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -133,7 +130,7 @@
                     <div class="form-group">
                         <label for="register-confirm-password">Confirm Password</label>
                         <div class="password-input-wrapper">
-                            <input type="password" id="register-confirm-password" name="confirm_password" required autocomplete="new-password">
+                            <input type="password" id="register-confirm-password" name="confirm_password" required="" autocomplete="new-password" style="">
                             <button type="button" class="password-toggle" aria-label="Show password">
                                 <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -161,7 +158,7 @@
                 <form id="forgot-password-form">
                     <div class="form-group">
                         <label for="forgot-email">Email</label>
-                        <input type="email" id="forgot-email" name="email" required autocomplete="email">
+                        <input type="email" id="forgot-email" name="email" required="" autocomplete="email" style="">
                     </div>
                     <div id="forgot-error" class="login-error" style="display: none;"></div>
                     <div id="forgot-success" class="login-success" style="display: none;"></div>
@@ -177,11 +174,11 @@
                 <h2>Set New Password</h2>
                 <p class="login-subtitle">Enter your new password</p>
                 <form id="reset-password-form">
-                    <input type="hidden" id="reset-token" name="token">
+                    <input type="hidden" id="reset-token" name="token" style="">
                     <div class="form-group">
                         <label for="reset-password">New Password</label>
                         <div class="password-input-wrapper">
-                            <input type="password" id="reset-password" name="password" required minlength="8" autocomplete="new-password">
+                            <input type="password" id="reset-password" name="password" required="" minlength="8" autocomplete="new-password" style="">
                             <button type="button" class="password-toggle" aria-label="Show password">
                                 <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -198,7 +195,7 @@
                     <div class="form-group">
                         <label for="reset-confirm-password">Confirm New Password</label>
                         <div class="password-input-wrapper">
-                            <input type="password" id="reset-confirm-password" name="confirm_password" required autocomplete="new-password">
+                            <input type="password" id="reset-confirm-password" name="confirm_password" required="" autocomplete="new-password" style="">
                             <button type="button" class="password-toggle" aria-label="Show password">
                                 <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -244,12 +241,12 @@
                     <div class="image-upload-grid">
                         <div class="image-upload">
                             <label for="front-label">Front Label (Required)</label>
-                            <input type="file" id="front-label" name="front_label" accept="image/*" capture="environment" required>
+                            <input type="file" id="front-label" name="front_label" accept="image/*" capture="environment" required="" style="">
                             <div id="front-preview" class="image-preview">Tap to take photo or select image</div>
                         </div>
                         <div class="image-upload">
                             <label for="back-label">Back Label (Optional)</label>
-                            <input type="file" id="back-label" name="back_label" accept="image/*" capture="environment">
+                            <input type="file" id="back-label" name="back_label" accept="image/*" capture="environment" style="">
                             <div id="back-preview" class="image-preview">Tap to take photo or select image</div>
                         </div>
                     </div>
@@ -262,28 +259,28 @@
                     <div class="form-grid">
                         <div class="form-group autocomplete-wrapper">
                             <label for="wine-name">Wine Name</label>
-                            <input type="text" id="wine-name" name="name" placeholder="Start typing to search..." autocomplete="off">
+                            <input type="text" id="wine-name" name="name" placeholder="Start typing to search..." autocomplete="off" style="">
                             <div id="wine-autocomplete" class="autocomplete-dropdown"></div>
                         </div>
                         <div class="form-group">
                             <label for="winery">Winery</label>
-                            <input type="text" id="winery" name="winery" placeholder="e.g., Chateau Margaux">
+                            <input type="text" id="winery" name="winery" placeholder="e.g., Chateau Margaux" style="">
                         </div>
                         <div class="form-group">
                             <label for="vintage">Vintage</label>
-                            <input type="number" id="vintage" name="vintage" min="1900" max="2100" placeholder="e.g., 2020">
+                            <input type="number" id="vintage" name="vintage" min="1900" max="2100" placeholder="e.g., 2020" style="">
                         </div>
                         <div class="form-group">
                             <label for="grape-variety">Grape Variety</label>
-                            <input type="text" id="grape-variety" name="grape_variety" placeholder="e.g., Cabernet Sauvignon">
+                            <input type="text" id="grape-variety" name="grape_variety" placeholder="e.g., Cabernet Sauvignon" style="">
                         </div>
                         <div class="form-group">
                             <label for="region">Region</label>
-                            <input type="text" id="region" name="region" placeholder="e.g., Bordeaux">
+                            <input type="text" id="region" name="region" placeholder="e.g., Bordeaux" style="">
                         </div>
                         <div class="form-group">
                             <label for="country">Country</label>
-                            <input type="text" id="country" name="country" placeholder="e.g., France">
+                            <input type="text" id="country" name="country" placeholder="e.g., France" style="">
                         </div>
                         <div class="form-group">
                             <label for="wine-type">Wine Type</label>
@@ -304,19 +301,19 @@
                         <div class="form-grid">
                             <div class="form-group">
                                 <label for="sub-region">Sub-Region</label>
-                                <input type="text" id="sub-region" name="sub_region" placeholder="e.g., C&ocirc;te de Nuits">
+                                <input type="text" id="sub-region" name="sub_region" placeholder="e.g., Côte de Nuits" style="">
                             </div>
                             <div class="form-group">
                                 <label for="appellation">Appellation</label>
-                                <input type="text" id="appellation" name="appellation" placeholder="e.g., Nuits-St-Georges, Pomerol">
+                                <input type="text" id="appellation" name="appellation" placeholder="e.g., Nuits-St-Georges, Pomerol" style="">
                             </div>
                             <div class="form-group">
                                 <label for="alcohol">Alcohol %</label>
-                                <input type="number" id="alcohol" name="alcohol_percentage" min="0" max="100" step="0.1" placeholder="e.g., 13.5">
+                                <input type="number" id="alcohol" name="alcohol_percentage" min="0" max="100" step="0.1" placeholder="e.g., 13.5" style="">
                             </div>
                             <div class="form-group">
                                 <label for="classification">Classification</label>
-                                <input type="text" id="classification" name="classification" placeholder="e.g., Grand Cru, DOCG, Reserve">
+                                <input type="text" id="classification" name="classification" placeholder="e.g., Grand Cru, DOCG, Reserve" style="">
                             </div>
                             <div class="form-group">
                                 <label for="price-tier">Price Tier</label>
@@ -341,11 +338,11 @@
                             </div>
                             <div class="form-group">
                                 <label for="drink-window-start">Drink Window Start</label>
-                                <input type="number" id="drink-window-start" name="drink_window_start" min="1900" max="2200" placeholder="Year">
+                                <input type="number" id="drink-window-start" name="drink_window_start" min="1900" max="2200" placeholder="Year" style="">
                             </div>
                             <div class="form-group">
                                 <label for="drink-window-end">Drink Window End</label>
-                                <input type="number" id="drink-window-end" name="drink_window_end" min="1900" max="2200" placeholder="Year">
+                                <input type="number" id="drink-window-end" name="drink_window_end" min="1900" max="2200" placeholder="Year" style="">
                             </div>
                         </div>
                     </details>
@@ -358,7 +355,7 @@
 
                     <div class="form-group full-width">
                         <label for="notes">Notes</label>
-                        <textarea id="notes" name="notes" rows="3" placeholder="Purchase notes, occasion, etc."></textarea>
+                        <textarea id="notes" name="notes" rows="3" placeholder="Purchase notes, occasion, etc." style=""></textarea>
                     </div>
                 </div>
 
@@ -389,66 +386,36 @@
         </section>
 
         <!-- Cellar Page -->
-        <section id="page-cellar" class="page" aria-labelledby="page-cellar-title">
-            <h2 id="page-cellar-title">My Cellar</h2>
-            <div class="demo-welcome" id="cellar-welcome-panel">
+        <section id="page-cellar" class="page active" aria-labelledby="page-cellar-title">
+            <div class="page-header" id="cellar-header">
+                <h2 id="page-cellar-title">My Cellar</h2>
+                <button class="btn btn-primary" id="cellar-add-wine-btn">+ Add Wine</button>
+            </div>
+            <div class="demo-welcome" id="cellar-welcome-panel" style="">
                 <div class="demo-welcome-content">
-                    <h3>Welcome to WineBox</h3>
-                    <p>How would you like to add wines to your cellar?</p>
-                    <div class="entry-path-cards" style="margin-top:1.5rem;">
-                        <a href="#" data-page="add-to-cellar" data-tab="scan" class="entry-path-card">
-                            <div class="entry-path-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                                    <circle cx="12" cy="13" r="4"></circle>
-                                </svg>
-                            </div>
-                            <h3>Scan a Label</h3>
-                            <p>Take a photo to auto-detect wine details</p>
-                        </a>
-                        <a href="#" data-page="add-to-cellar" data-tab="manual" class="entry-path-card">
-                            <div class="entry-path-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                </svg>
-                            </div>
-                            <h3>Enter Details</h3>
-                            <p>Type in the wine details manually</p>
-                        </a>
-                        <a href="#" data-page="add-to-cellar" data-tab="import" class="entry-path-card">
-                            <div class="entry-path-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="17 8 12 3 7 8"></polyline>
-                                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                                </svg>
-                            </div>
-                            <h3>Import from File</h3>
-                            <p>Upload a CSV or Excel spreadsheet</p>
-                        </a>
+                    <h3>Loading sample wines...</h3>
+                    <div class="demo-progress-container">
+                        <div class="demo-progress-bar" id="demo-progress-bar" style="width: 74%;"></div>
                     </div>
-                    <div style="margin-top:1.5rem;">
-                        <button class="btn btn-outline btn-small" id="cellar-demo-install-btn">Load sample wines</button>
-                        <p class="demo-hint">Sample wines can be removed at any time</p>
-                    </div>
+                    <p class="demo-progress-text" id="demo-progress-text">Adding wines: 350 of 475</p>
                 </div>
             </div>
+            <div id="cellar-demo-banner-container"></div>
             <div class="stats-grid" id="cellar-stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-total-bottles">-</div>
+                    <div class="stat-value" id="stat-total-bottles">0</div>
                     <div class="stat-label">Bottles</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-unique-wines">-</div>
+                    <div class="stat-value" id="stat-unique-wines">0</div>
                     <div class="stat-label">Wines</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-total-tracked">-</div>
+                    <div class="stat-value" id="stat-total-tracked">0</div>
                     <div class="stat-label">Tracked</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-wines-met">-</div>
+                    <div class="stat-value" id="stat-wines-met">0</div>
                     <div class="stat-label">Met</div>
                 </div>
             </div>
@@ -456,31 +423,31 @@
                 <div class="chart-card">
                     <h3>Wine Types</h3>
                     <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-wine-type"></canvas>
+                        <canvas id="chart-wine-type" style="box-sizing: border-box;" width="300"></canvas>
                     </div>
                 </div>
                 <div class="chart-card">
                     <h3>Price Range</h3>
                     <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-price-tier"></canvas>
+                        <canvas id="chart-price-tier" style="box-sizing: border-box;" width="300"></canvas>
                     </div>
                 </div>
                 <div class="chart-card chart-card-wide">
                     <h3>Top Countries</h3>
                     <div class="chart-wrapper">
-                        <canvas id="chart-country"></canvas>
+                        <canvas id="chart-country" style="box-sizing: border-box;" width="300"></canvas>
                     </div>
                 </div>
                 <div class="chart-card chart-card-wide">
                     <h3>Top Grape Varieties</h3>
                     <div class="chart-wrapper">
-                        <canvas id="chart-grape"></canvas>
+                        <canvas id="chart-grape" style="box-sizing: border-box;" width="300"></canvas>
                     </div>
                 </div>
                 <div class="chart-card chart-card-full">
                     <h3>Vintages</h3>
                     <div class="chart-wrapper">
-                        <canvas id="chart-vintage"></canvas>
+                        <canvas id="chart-vintage" style="box-sizing: border-box;" width="300"></canvas>
                     </div>
                 </div>
             </div>
@@ -491,9 +458,9 @@
                     <option value="out-of-stock">Out of Stock</option>
                 </select>
                 <div class="export-dropdown" id="cellar-export-dropdown">
-                    <button class="btn btn-secondary export-dropdown-btn" id="cellar-export-btn">
+                    <button class="btn btn-secondary export-dropdown-btn" id="cellar-export-btn" disabled="">
                         Export
-                        <span class="dropdown-arrow">&#9662;</span>
+                        <span class="dropdown-arrow">▾</span>
                     </button>
                     <div class="export-dropdown-menu">
                         <a href="#" data-format="csv" data-type="wines">CSV</a>
@@ -509,7 +476,7 @@
             </div>
             <div id="cellar-list" class="wine-grid"></div>
             <h3 id="cellar-activity-heading">Recent Activity</h3>
-            <div id="recent-activity" class="activity-list"></div>
+            <div id="recent-activity" class="activity-list"><div class="empty-state">No recent activity</div></div>
         </section>
 
         <!-- Wines I've Met Page -->
@@ -522,7 +489,7 @@
                 <button class="btn btn-primary" id="met-record-wine-btn">+ Record a Wine</button>
             </div>
             <div class="filter-bar">
-                <input type="text" id="met-search" placeholder="Search wines I've met...">
+                <input type="text" id="met-search" placeholder="Search wines I've met..." style="">
                 <div class="view-toggle">
                     <button id="met-view-cards" class="active" title="Card view">Cards</button>
                     <button id="met-view-table" title="Table view">Table</button>
@@ -535,9 +502,9 @@
         <section id="page-add-to-cellar" class="page" aria-labelledby="page-add-to-cellar-title">
             <div class="wizard-breadcrumb" id="add-cellar-breadcrumb-top">
                 <a href="#" data-page="cellar">My Cellar</a>
-                <span class="breadcrumb-sep">&rsaquo;</span>
+                <span class="breadcrumb-sep">›</span>
                 <a href="#" id="breadcrumb-root">Add Wine</a>
-                <span class="breadcrumb-sep breadcrumb-step-sep" style="display:none;">&rsaquo;</span>
+                <span class="breadcrumb-sep breadcrumb-step-sep" style="display:none;">›</span>
                 <span id="breadcrumb-current"></span>
             </div>
             <h2 id="page-add-to-cellar-title">Add Wine to Your Cellar</h2>
@@ -593,12 +560,12 @@
                     <div class="image-upload-grid">
                         <div class="image-upload">
                             <label for="scan-front-label">Front Label (Required)</label>
-                            <input type="file" id="scan-front-label" accept="image/*" capture="environment">
+                            <input type="file" id="scan-front-label" accept="image/*" capture="environment" style="">
                             <div id="scan-front-preview" class="image-preview">Tap to take photo or select image</div>
                         </div>
                         <div class="image-upload">
                             <label for="scan-back-label">Back Label (Optional)</label>
-                            <input type="file" id="scan-back-label" accept="image/*" capture="environment">
+                            <input type="file" id="scan-back-label" accept="image/*" capture="environment" style="">
                             <div id="scan-back-preview" class="image-preview">Tap to take photo or select image</div>
                         </div>
                     </div>
@@ -610,31 +577,31 @@
                 <div id="scan-cellar-fields" style="display:none;">
                     <div class="form-section">
                         <h3>Wine Details</h3>
-                        <p class="form-note">Detected from label &mdash; edit as needed</p>
+                        <p class="form-note">Detected from label — edit as needed</p>
                         <div class="form-grid">
                             <div class="form-group">
                                 <label for="scan-wine-name">Wine Name</label>
-                                <input type="text" id="scan-wine-name" required>
+                                <input type="text" id="scan-wine-name" required="" style="">
                             </div>
                             <div class="form-group">
                                 <label for="scan-winery">Winery</label>
-                                <input type="text" id="scan-winery">
+                                <input type="text" id="scan-winery" style="">
                             </div>
                             <div class="form-group">
                                 <label for="scan-vintage">Vintage</label>
-                                <input type="number" id="scan-vintage" min="1900" max="2100">
+                                <input type="number" id="scan-vintage" min="1900" max="2100" style="">
                             </div>
                             <div class="form-group">
                                 <label for="scan-grape-variety">Grape Variety</label>
-                                <input type="text" id="scan-grape-variety">
+                                <input type="text" id="scan-grape-variety" style="">
                             </div>
                             <div class="form-group">
                                 <label for="scan-region">Region</label>
-                                <input type="text" id="scan-region">
+                                <input type="text" id="scan-region" style="">
                             </div>
                             <div class="form-group">
                                 <label for="scan-country">Country</label>
-                                <input type="text" id="scan-country">
+                                <input type="text" id="scan-country" style="">
                             </div>
                             <div class="form-group">
                                 <label for="scan-wine-type">Wine Type</label>
@@ -642,7 +609,7 @@
                                     <option value="">Unknown</option>
                                     <option value="red">Red</option>
                                     <option value="white">White</option>
-                                    <option value="ros&eacute;">Ros&eacute;</option>
+                                    <option value="rosé">Rosé</option>
                                     <option value="sparkling">Sparkling</option>
                                     <option value="fortified">Fortified</option>
                                     <option value="dessert">Dessert</option>
@@ -650,7 +617,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="scan-quantity">Quantity (Bottles)</label>
-                                <input type="number" id="scan-quantity" min="1" value="1" required>
+                                <input type="number" id="scan-quantity" min="1" value="1" required="" style="">
                             </div>
                         </div>
                     </div>
@@ -668,27 +635,27 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="manual-wine-name">Wine Name</label>
-                            <input type="text" id="manual-wine-name" name="name" required>
+                            <input type="text" id="manual-wine-name" name="name" required="" style="">
                         </div>
                         <div class="form-group">
                             <label for="manual-winery">Winery</label>
-                            <input type="text" id="manual-winery" name="winery">
+                            <input type="text" id="manual-winery" name="winery" style="">
                         </div>
                         <div class="form-group">
                             <label for="manual-vintage">Vintage</label>
-                            <input type="number" id="manual-vintage" name="vintage" min="1900" max="2100">
+                            <input type="number" id="manual-vintage" name="vintage" min="1900" max="2100" style="">
                         </div>
                         <div class="form-group">
                             <label for="manual-grape-variety">Grape Variety</label>
-                            <input type="text" id="manual-grape-variety" name="grape_variety">
+                            <input type="text" id="manual-grape-variety" name="grape_variety" style="">
                         </div>
                         <div class="form-group">
                             <label for="manual-region">Region</label>
-                            <input type="text" id="manual-region" name="region">
+                            <input type="text" id="manual-region" name="region" style="">
                         </div>
                         <div class="form-group">
                             <label for="manual-country">Country</label>
-                            <input type="text" id="manual-country" name="country">
+                            <input type="text" id="manual-country" name="country" style="">
                         </div>
                         <div class="form-group">
                             <label for="manual-wine-type">Wine Type</label>
@@ -696,7 +663,7 @@
                                 <option value="">Unknown</option>
                                 <option value="red">Red</option>
                                 <option value="white">White</option>
-                                <option value="ros&eacute;">Ros&eacute;</option>
+                                <option value="rosé">Rosé</option>
                                 <option value="sparkling">Sparkling</option>
                                 <option value="fortified">Fortified</option>
                                 <option value="dessert">Dessert</option>
@@ -704,7 +671,7 @@
                         </div>
                         <div class="form-group">
                             <label for="manual-quantity">Quantity (Bottles)</label>
-                            <input type="number" id="manual-quantity" name="quantity" min="1" value="1" required>
+                            <input type="number" id="manual-quantity" name="quantity" min="1" value="1" required="" style="">
                         </div>
                     </div>
                     <div class="form-actions">
@@ -717,7 +684,7 @@
             <!-- From Met Wine Sub-wizard -->
             <div id="add-cellar-from-met" class="add-cellar-subwizard" style="display:none;">
                 <h3>Select a Wine You've Met</h3>
-                <input type="text" id="met-picker-search" placeholder="Search your met wines..." class="met-picker-search">
+                <input type="text" id="met-picker-search" placeholder="Search your met wines..." class="met-picker-search" style="">
                 <div id="met-picker-list" class="met-picker-list"></div>
                 <div id="met-picker-selected" class="met-picker-selected" style="display:none;">
                     <h4 id="met-picker-wine-name"></h4>
@@ -729,7 +696,7 @@
                             <button type="button" class="qty-preset" data-qty="6">6 (half case)</button>
                             <button type="button" class="qty-preset" data-qty="12">12 (case)</button>
                         </div>
-                        <input type="number" id="met-picker-quantity" min="1" value="1">
+                        <input type="number" id="met-picker-quantity" min="1" value="1" style="">
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" id="met-add-to-cellar-btn">Add to Cellar</button>
@@ -764,7 +731,7 @@
                             </div>
                             <p>Drag and drop your file here, or</p>
                             <label for="import-file-input" class="btn btn-primary" style="cursor:pointer;">Browse Files</label>
-                            <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none;">
+                            <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display: none;">
                             <p class="form-hint">Supported formats: CSV, Excel (.xlsx). Max 10,000 rows.</p>
                             <p class="form-hint" style="margin-top:0.5rem;">We'll help you match your columns in the next step. Nothing is imported until you confirm.</p>
                         </div>
@@ -772,11 +739,11 @@
                             <summary style="cursor:pointer;font-size:0.9rem;color:var(--text-muted);">Advanced import options...</summary>
                             <div style="margin-top:0.5rem;padding-left:0.25rem;">
                                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;margin-bottom:0.5rem;">
-                                    <input type="checkbox" id="import-force-mapping">
+                                    <input type="checkbox" id="import-force-mapping" style="">
                                     <span>Always show column mapping step</span>
                                 </label>
                                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
-                                    <input type="checkbox" id="import-use-ai-mapping" checked>
+                                    <input type="checkbox" id="import-use-ai-mapping" checked="" style="">
                                     <span>Use AI to automatically match columns (takes a few extra seconds)</span>
                                 </label>
                             </div>
@@ -829,7 +796,7 @@
                         </div>
                         <div class="form-group" style="margin-top:0.75rem;">
                             <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
-                                <input type="checkbox" id="import-skip-enrichment">
+                                <input type="checkbox" id="import-skip-enrichment" style="">
                                 <span>Skip automatic detail lookup (faster, but missing details like region or grape won't be filled in)</span>
                             </label>
                         </div>
@@ -904,7 +871,7 @@
         <!-- Wine Detail Modal -->
         <div id="wine-modal" class="modal">
             <div class="modal-content">
-                <span class="modal-close">&times;</span>
+                <span class="modal-close">×</span>
                 <div id="wine-detail"></div>
             </div>
         </div>
@@ -925,7 +892,7 @@
                 <div class="export-dropdown" id="history-export-dropdown">
                     <button class="btn btn-secondary export-dropdown-btn" id="history-export-btn">
                         Export
-                        <span class="dropdown-arrow">&#9662;</span>
+                        <span class="dropdown-arrow">▾</span>
                     </button>
                     <div class="export-dropdown-menu">
                         <a href="#" data-format="csv" data-type="transactions">CSV</a>
@@ -963,28 +930,28 @@
             <form id="search-form">
                 <div class="form-group full-width">
                     <label for="search-q">Search</label>
-                    <input type="text" id="search-q" name="q" placeholder="Search by name, winery, region, grape...">
+                    <input type="text" id="search-q" name="q" placeholder="Search by name, winery, region, grape..." style="">
                 </div>
                 <div class="form-grid">
                         <div class="form-group">
                             <label for="search-vintage">Vintage</label>
-                            <input type="number" id="search-vintage" name="vintage" min="1900" max="2100">
+                            <input type="number" id="search-vintage" name="vintage" min="1900" max="2100" style="">
                         </div>
                         <div class="form-group">
                             <label for="search-grape">Grape Variety</label>
-                            <input type="text" id="search-grape" name="grape">
+                            <input type="text" id="search-grape" name="grape" style="">
                         </div>
                         <div class="form-group">
                             <label for="search-winery">Winery</label>
-                            <input type="text" id="search-winery" name="winery">
+                            <input type="text" id="search-winery" name="winery" style="">
                         </div>
                         <div class="form-group">
                             <label for="search-region">Region</label>
-                            <input type="text" id="search-region" name="region">
+                            <input type="text" id="search-region" name="region" style="">
                         </div>
                         <div class="form-group">
                             <label for="search-country">Country</label>
-                            <input type="text" id="search-country" name="country">
+                            <input type="text" id="search-country" name="country" style="">
                         </div>
                         <div class="form-group">
                             <label for="search-wine-type">Wine Type</label>
@@ -1012,12 +979,12 @@
                         </div>
                         <div class="form-group">
                             <label for="search-in-stock">
-                                <input type="checkbox" id="search-in-stock" name="in_stock">
+                                <input type="checkbox" id="search-in-stock" name="in_stock" style="">
                                 In Stock Only
                             </label>
                         </div>
                     </div>
-                </div>
+                
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Search</button>
                     <button type="reset" class="btn btn-secondary">Clear</button>
@@ -1037,7 +1004,7 @@
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="xwines-q">Search</label>
-                        <input type="text" id="xwines-q" name="q" placeholder="Wine name, winery..." minlength="2" required>
+                        <input type="text" id="xwines-q" name="q" placeholder="Wine name, winery..." minlength="2" required="" style="">
                     </div>
                     <div class="form-group">
                         <label for="xwines-type">Wine Type</label>
@@ -1055,16 +1022,16 @@
                         <label for="xwines-limit">Results</label>
                         <select id="xwines-limit" name="limit">
                             <option value="10">10</option>
-                            <option value="25" selected>25</option>
+                            <option value="25" selected="">25</option>
                             <option value="50">50</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Price Range (USD)</label>
                         <div class="price-range-inputs">
-                            <input type="number" id="xwines-price-min" name="price_min" placeholder="Min" min="0" step="1">
+                            <input type="number" id="xwines-price-min" name="price_min" placeholder="Min" min="0" step="1" style="">
                             <span class="price-range-separator">to</span>
-                            <input type="number" id="xwines-price-max" name="price_max" placeholder="Max" min="0" step="1">
+                            <input type="number" id="xwines-price-max" name="price_max" placeholder="Max" min="0" step="1" style="">
                         </div>
                     </div>
                 </div>
@@ -1081,7 +1048,7 @@
                 <div class="export-dropdown" id="xwines-export-dropdown">
                     <button class="btn btn-secondary export-dropdown-btn" id="xwines-export-btn">
                         Export
-                        <span class="dropdown-arrow">&#9662;</span>
+                        <span class="dropdown-arrow">▾</span>
                     </button>
                     <div class="export-dropdown-menu">
                         <a href="#" data-format="csv" data-type="xwines">CSV</a>
@@ -1102,7 +1069,7 @@
         <!-- X-Wines Detail Modal -->
         <div id="xwines-modal" class="modal">
             <div class="modal-content">
-                <span class="modal-close">&times;</span>
+                <span class="modal-close">×</span>
                 <div id="xwines-detail"></div>
             </div>
         </div>
@@ -1118,7 +1085,7 @@
                     <div class="form-group">
                         <label for="current-password">Current Password</label>
                         <div class="password-input-wrapper">
-                            <input type="password" id="current-password" name="current_password" required autocomplete="current-password">
+                            <input type="password" id="current-password" name="current_password" required="" autocomplete="current-password" style="">
                             <button type="button" class="password-toggle" aria-label="Show password">
                                 <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -1134,7 +1101,7 @@
                     <div class="form-group">
                         <label for="new-password">New Password</label>
                         <div class="password-input-wrapper">
-                            <input type="password" id="new-password" name="new_password" required autocomplete="new-password">
+                            <input type="password" id="new-password" name="new_password" required="" autocomplete="new-password" style="">
                             <button type="button" class="password-toggle" aria-label="Show password">
                                 <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -1150,7 +1117,7 @@
                     <div class="form-group">
                         <label for="confirm-password">Confirm New Password</label>
                         <div class="password-input-wrapper">
-                            <input type="password" id="confirm-password" name="confirm_password" required autocomplete="new-password">
+                            <input type="password" id="confirm-password" name="confirm_password" required="" autocomplete="new-password" style="">
                             <button type="button" class="password-toggle" aria-label="Show password">
                                 <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -1183,30 +1150,30 @@
     <!-- Remove Wine Modal -->
     <div id="remove-modal" class="modal">
         <div class="modal-content modal-small">
-            <span class="modal-close">&times;</span>
+            <span class="modal-close">×</span>
             <h3>Remove Wine</h3>
             <form id="remove-form">
-                <input type="hidden" id="remove-wine-id">
-                <input type="hidden" id="remove-reason" name="removal_reason" value="">
+                <input type="hidden" id="remove-wine-id" style="">
+                <input type="hidden" id="remove-reason" name="removal_reason" value="" style="">
 
                 <!-- Step 1: Reason picker -->
                 <div id="remove-reason-picker">
                     <p class="reason-picker-label">What happened to this wine?</p>
                     <div class="reason-picker">
                         <button type="button" class="reason-card" data-reason="DRINK">
-                            <span class="reason-card-icon">&#127863;</span>
+                            <span class="reason-card-icon">🍷</span>
                             <span class="reason-card-label">Drank</span>
                         </button>
                         <button type="button" class="reason-card" data-reason="SELL">
-                            <span class="reason-card-icon">&#128176;</span>
+                            <span class="reason-card-icon">💰</span>
                             <span class="reason-card-label">Sold</span>
                         </button>
                         <button type="button" class="reason-card" data-reason="GIFT">
-                            <span class="reason-card-icon">&#127873;</span>
+                            <span class="reason-card-icon">🎁</span>
                             <span class="reason-card-label">Gifted</span>
                         </button>
                         <button type="button" class="reason-card" data-reason="OTHER">
-                            <span class="reason-card-icon">&#128230;</span>
+                            <span class="reason-card-icon">📦</span>
                             <span class="reason-card-label">Other</span>
                         </button>
                     </div>
@@ -1214,10 +1181,10 @@
 
                 <!-- Step 2: Details (hidden until reason picked) -->
                 <div id="remove-details" class="removal-details" style="display: none;">
-                    <button type="button" id="remove-back-btn" class="btn btn-link remove-back-btn">&larr; Change reason</button>
+                    <button type="button" id="remove-back-btn" class="btn btn-link remove-back-btn">← Change reason</button>
                     <div class="form-group">
                         <label for="remove-quantity">Quantity</label>
-                        <input type="number" id="remove-quantity" name="quantity" min="1" value="1" required>
+                        <input type="number" id="remove-quantity" name="quantity" min="1" value="1" required="" style="">
                         <span id="remove-available"></span>
                     </div>
 
@@ -1225,28 +1192,28 @@
                     <div id="remove-field-drink" class="removal-conditional-field" style="display: none;">
                         <div class="form-group">
                             <label for="remove-tasting-notes">Tasting notes (optional)</label>
-                            <textarea id="remove-tasting-notes" name="tasting_notes" rows="3" placeholder="How was it? Pair well with anything?"></textarea>
+                            <textarea id="remove-tasting-notes" name="tasting_notes" rows="3" placeholder="How was it? Pair well with anything?" style=""></textarea>
                         </div>
                     </div>
 
                     <div id="remove-field-sell" class="removal-conditional-field" style="display: none;">
                         <div class="form-group">
                             <label for="remove-sale-price">Sale price ($)</label>
-                            <input type="number" id="remove-sale-price" name="sale_price_usd" min="0" step="0.01" placeholder="0.00" required>
+                            <input type="number" id="remove-sale-price" name="sale_price_usd" min="0" step="0.01" placeholder="0.00" required="" style="">
                         </div>
                     </div>
 
                     <div id="remove-field-gift" class="removal-conditional-field" style="display: none;">
                         <div class="form-group">
                             <label for="remove-gift-recipient">Who did you give it to?</label>
-                            <input type="text" id="remove-gift-recipient" name="gift_recipient" maxlength="200" placeholder="Name" required>
+                            <input type="text" id="remove-gift-recipient" name="gift_recipient" maxlength="200" placeholder="Name" required="" style="">
                         </div>
                     </div>
 
                     <div id="remove-field-other" class="removal-conditional-field" style="display: none;">
                         <div class="form-group">
                             <label for="remove-removal-notes">What happened? (optional)</label>
-                            <textarea id="remove-removal-notes" name="removal_notes" rows="3" placeholder="Breakage, loss, spoilage..."></textarea>
+                            <textarea id="remove-removal-notes" name="removal_notes" rows="3" placeholder="Breakage, loss, spoilage..." style=""></textarea>
                         </div>
                     </div>
 
@@ -1262,7 +1229,7 @@
     <!-- Checkin Confirmation Modal -->
     <div id="checkin-confirm-modal" class="modal">
         <div class="modal-content modal-large">
-            <span class="modal-close">&times;</span>
+            <span class="modal-close">×</span>
             <div class="checkin-confirm">
                 <div class="checkin-confirm-header">
                     <h3>Confirm Wine Details</h3>
@@ -1274,39 +1241,39 @@
                         <div class="form-grid">
                             <div class="form-group">
                                 <label for="confirm-wine-name">Wine Name</label>
-                                <input type="text" id="confirm-wine-name" required>
+                                <input type="text" id="confirm-wine-name" required="" style="">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-winery">Winery</label>
-                                <input type="text" id="confirm-winery">
+                                <input type="text" id="confirm-winery" style="">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-vintage">Vintage</label>
-                                <input type="number" id="confirm-vintage" min="1900" max="2100">
+                                <input type="number" id="confirm-vintage" min="1900" max="2100" style="">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-grape-variety">Grape Variety</label>
-                                <input type="text" id="confirm-grape-variety">
+                                <input type="text" id="confirm-grape-variety" style="">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-region">Region</label>
-                                <input type="text" id="confirm-region">
+                                <input type="text" id="confirm-region" style="">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-sub-region">Sub-Region</label>
-                                <input type="text" id="confirm-sub-region">
+                                <input type="text" id="confirm-sub-region" style="">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-appellation">Appellation</label>
-                                <input type="text" id="confirm-appellation">
+                                <input type="text" id="confirm-appellation" style="">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-country">Country</label>
-                                <input type="text" id="confirm-country">
+                                <input type="text" id="confirm-country" style="">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-alcohol">Alcohol %</label>
-                                <input type="number" id="confirm-alcohol" min="0" max="100" step="0.1">
+                                <input type="number" id="confirm-alcohol" min="0" max="100" step="0.1" style="">
                             </div>
                             <!-- Quantity removed from confirmation: met wines have no quantity -->
                             <div class="form-group">
@@ -1323,7 +1290,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="confirm-classification">Classification</label>
-                                <input type="text" id="confirm-classification" placeholder="e.g., Grand Cru, DOCG">
+                                <input type="text" id="confirm-classification" placeholder="e.g., Grand Cru, DOCG" style="">
                             </div>
                             <div class="form-group">
                                 <label for="confirm-price-tier">Price Tier</label>
@@ -1354,7 +1321,7 @@
                         </div>
                         <div class="form-group full-width">
                             <label for="confirm-notes">Notes</label>
-                            <textarea id="confirm-notes" rows="2"></textarea>
+                            <textarea id="confirm-notes" rows="2" style=""></textarea>
                         </div>
                     </div>
                 </div>
@@ -1378,7 +1345,7 @@
                 </div>
                 <div id="confirm-quantity-section" class="form-group" style="display:none;margin:0 1.5rem;">
                     <label for="confirm-quantity">How many bottles?</label>
-                    <input type="number" id="confirm-quantity" min="1" max="9999" value="1" style="width:6rem;">
+                    <input type="number" id="confirm-quantity" min="1" max="9999" value="1" style="width: 6rem;">
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-primary" id="checkin-confirm-btn">Save</button>
@@ -1391,15 +1358,15 @@
     <!-- Delete Collection Confirmation Modal -->
     <div id="delete-collection-modal" class="modal">
         <div class="modal-content modal-small">
-            <span class="modal-close">&times;</span>
+            <span class="modal-close">×</span>
             <h3 style="color: var(--error-color);">Delete Entire Collection</h3>
             <p>This will permanently delete <strong>all your wines</strong>, transactions, label images, and import history. This action <strong>cannot be undone</strong>.</p>
             <div class="form-group" style="margin-top: 1rem;">
                 <label for="delete-confirm-input">Type <strong>DELETE</strong> to confirm:</label>
-                <input type="text" id="delete-confirm-input" placeholder="Type DELETE" autocomplete="off">
+                <input type="text" id="delete-confirm-input" placeholder="Type DELETE" autocomplete="off" style="">
             </div>
             <div class="form-actions">
-                <button type="button" class="btn btn-danger" id="confirm-delete-collection-btn" disabled>Delete Everything</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-collection-btn" disabled="">Delete Everything</button>
                 <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
             </div>
         </div>
@@ -1408,7 +1375,7 @@
     <!-- Delete Wine Confirmation Modal -->
     <div id="delete-wine-modal" class="modal">
         <div class="modal-content modal-small">
-            <span class="modal-close">&times;</span>
+            <span class="modal-close">×</span>
             <h3 style="color: var(--error-color);">Delete Wine</h3>
             <p>Are you sure you want to delete this wine and all its history? This action <strong>cannot be undone</strong>.</p>
             <div class="form-actions">
@@ -1421,7 +1388,7 @@
     <!-- Skipped Rows Modal -->
     <div id="skipped-rows-modal" class="modal">
         <div class="modal-content modal-large">
-            <span class="modal-close">&times;</span>
+            <span class="modal-close">×</span>
             <h3>Skipped Rows</h3>
             <div id="skipped-rows-content" style="max-height:60vh;overflow-y:auto;"></div>
         </div>
@@ -1430,7 +1397,7 @@
     <!-- Footer -->
     <footer id="app-footer">
         <div class="footer-content">
-            <span id="app-info">WineBox</span>
+            <span id="app-info">WineBox <span class="version">v0.6.96</span></span>
             <span class="footer-separator">|</span>
             <span id="data-credits">
                 Wine data powered by
@@ -1447,5 +1414,6 @@
 
     <script src="/static/js/papaparse.min.js?v=0.6.96"></script>
     <script src="/static/js/app.js?v=0.6.96"></script>
-</body>
-</html>
+
+
+</body></html>

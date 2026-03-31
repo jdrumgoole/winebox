@@ -20,7 +20,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/logos/favicon.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/static/logos/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/logos/apple-touch-icon.png">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.6.95">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.6.96">
     <script src="/static/js/chart.min.js"></script>
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
@@ -44,7 +44,7 @@
             </nav>
             <div id="user-info" class="user-info" style="display: flex;">
                 <a href="/admin" id="admin-link" class="nav-link" style="display: none;">Admin</a>
-                <a href="#" id="username-display" data-page="settings" class="username-link" title="Settings">e2e_demo_gw0@test.example.com</a>
+                <a href="#" id="username-display" data-page="settings" class="username-link" title="Settings">e2e_demo_gw1@test.example.com</a>
                 <a href="#" data-page="settings" class="nav-link settings-icon-link" title="Settings" aria-label="Settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                         <circle cx="12" cy="12" r="3"></circle>
@@ -229,65 +229,7 @@
 
     <main id="main-content">
         <!-- Dashboard Page -->
-        <section id="page-dashboard" class="page" aria-labelledby="page-dashboard-title">
-            <div class="dashboard-header" id="dashboard-header">
-                <h2 id="page-dashboard-title">Dashboard</h2>
-            </div>
-            <div class="stats-grid" id="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-total-bottles">0</div>
-                    <div class="stat-label">Bottles</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-unique-wines">0</div>
-                    <div class="stat-label">Wines</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-total-tracked">0</div>
-                    <div class="stat-label">Tracked</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-wines-met">0</div>
-                    <div class="stat-label">Met</div>
-                </div>
-            </div>
-
-            <div class="chart-grid">
-                <div class="chart-card">
-                    <h3>Wine Types</h3>
-                    <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-wine-type"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Price Range</h3>
-                    <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-price-tier"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card chart-card-wide">
-                    <h3>Top Countries</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="chart-country"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card chart-card-wide">
-                    <h3>Top Grape Varieties</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="chart-grape"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card chart-card-full">
-                    <h3>Vintages</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="chart-vintage"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <h3>Recent Activity</h3>
-            <div id="recent-activity" class="activity-list"><div class="empty-state">No recent activity</div></div>
-        </section>
+        <!-- Dashboard removed — analytics are now on the My Cellar page -->
 
         <!-- Check In Page -->
         <section id="page-checkin" class="page" aria-labelledby="page-checkin-title">
@@ -495,19 +437,19 @@
             <div id="cellar-demo-banner-container"></div>
             <div class="stats-grid" id="cellar-stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-total-bottles">-</div>
+                    <div class="stat-value" id="stat-total-bottles">0</div>
                     <div class="stat-label">Bottles</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-unique-wines">-</div>
+                    <div class="stat-value" id="stat-unique-wines">0</div>
                     <div class="stat-label">Wines</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-total-tracked">-</div>
+                    <div class="stat-value" id="stat-total-tracked">0</div>
                     <div class="stat-label">Tracked</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-wines-met">-</div>
+                    <div class="stat-value" id="stat-wines-met">0</div>
                     <div class="stat-label">Met</div>
                 </div>
             </div>
@@ -568,7 +510,7 @@
             </div>
             <div id="cellar-list" class="wine-grid"></div>
             <h3 id="cellar-activity-heading">Recent Activity</h3>
-            <div id="recent-activity" class="activity-list"></div>
+            <div id="recent-activity" class="activity-list"><div class="empty-state">No recent activity</div></div>
         </section>
 
         <!-- Wines I've Met Page -->
@@ -1489,7 +1431,7 @@
     <!-- Footer -->
     <footer id="app-footer">
         <div class="footer-content">
-            <span id="app-info">WineBox <span class="version">v0.6.95</span></span>
+            <span id="app-info">WineBox <span class="version">v0.6.96</span></span>
             <span class="footer-separator">|</span>
             <span id="data-credits">
                 Wine data powered by
@@ -1504,8 +1446,8 @@
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
-    <script src="/static/js/papaparse.min.js?v=0.6.95"></script>
-    <script src="/static/js/app.js?v=0.6.95"></script>
+    <script src="/static/js/papaparse.min.js?v=0.6.96"></script>
+    <script src="/static/js/app.js?v=0.6.96"></script>
 
 
 </body></html>

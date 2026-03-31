@@ -125,13 +125,11 @@ def _load_csv_data(csv_path: Path) -> tuple[list[str], list[dict[str, str]]]:
 
 
 def _navigate_to_import(page: Page) -> None:
-    """Navigate to the import wizard via My Cellar → + Add Wine → Import."""
+    """Navigate to the import wizard via My Cellar → Import from File card."""
     page.click("a[data-page='cellar']")
     page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
-    page.click("#cellar-add-wine-btn")
-    page.wait_for_selector("#page-add-to-cellar", state="visible", timeout=10000)
-    page.click(".entry-path-card[data-path='import']")
-    page.wait_for_selector("#import-step-upload", state="visible", timeout=5000)
+    page.click("#cellar-welcome-panel .entry-path-card[data-tab='import']")
+    page.wait_for_selector("#import-step-upload", state="visible", timeout=10000)
 
 
 def _upload_file(page: Page, csv_path: Path, timeout_ms: int = 60000) -> None:

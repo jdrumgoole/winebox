@@ -120,72 +120,58 @@ class TestDemoDataE2E:
             page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
             page.click("#cellar-demo-install-btn")
 
-            # Wait for the banner to appear (indicates install completed and cellar reloaded)
-            page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
-            expect(page.locator("#demo-banner")).to_be_visible()
-            expect(page.locator("#demo-banner")).to_contain_text("Sample wines")
+            # Wait for "Remove sample wines" button to appear (indicates install completed)
+            page.wait_for_selector("#cellar-demo-remove-btn", state="visible", timeout=60000)
+            expect(page.locator("#cellar-demo-remove-btn")).to_be_visible()
         except Exception:
             capture_artifacts(page, "demo_load_wines")
             raise
 
-    def test_demo_banner_shows_remove_button(self, authenticated_page: Page) -> None:
-        """After loading demo data, a banner with 'Remove' button appears."""
+    def test_demo_shows_remove_button(self, authenticated_page: Page) -> None:
+        """After loading demo data, welcome panel shows 'Remove sample wines'."""
         page = authenticated_page
-        # Ensure demo data is loaded
         _cleanup_demo_data(page)
         _navigate_to_cellar(page)
         page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
         page.click("#cellar-demo-install-btn")
-        page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
+        page.wait_for_selector("#cellar-demo-remove-btn", state="visible", timeout=60000)
 
         try:
-            expect(page.locator("#demo-remove-btn")).to_be_visible()
-            expect(page.locator("#demo-remove-btn")).to_have_text("Remove")
+            expect(page.locator("#cellar-demo-remove-btn")).to_have_text("Remove sample wines")
         except Exception:
-            capture_artifacts(page, "demo_banner_remove")
+            capture_artifacts(page, "demo_remove_button")
             raise
 
     def test_remove_sample_wines(self, authenticated_page: Page) -> None:
-        """Clicking 'Remove sample wines' clears demo data and shows welcome again."""
+        """Clicking 'Remove sample wines' clears demo data and shows install button again."""
         page = authenticated_page
-        # Load demo data first
         _cleanup_demo_data(page)
         _navigate_to_cellar(page)
         page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
         page.click("#cellar-demo-install-btn")
-        page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
+        page.wait_for_selector("#cellar-demo-remove-btn", state="visible", timeout=60000)
 
         try:
-            # Click remove
-            page.click("#demo-remove-btn")
-
-            # Wait for welcome prompt to reappear (demo data removed, cellar empty)
-            page.wait_for_selector("#demo-welcome", state="visible", timeout=15000)
-            expect(page.locator("#demo-welcome")).to_be_visible()
-
-            # Banner should be gone
-            expect(page.locator("#demo-banner")).not_to_be_attached()
+            page.click("#cellar-demo-remove-btn")
+            # Wait for "Load sample wines" button to reappear
+            page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=15000)
+            expect(page.locator("#cellar-demo-install-btn")).to_be_visible()
         except Exception:
             capture_artifacts(page, "demo_remove_wines")
             raise
 
-    def test_cellar_page_has_demo_wines_after_install(self, authenticated_page: Page) -> None:
+    def test_cellar_has_demo_wines_after_install(self, authenticated_page: Page) -> None:
         """After loading demo data, the cellar page shows wines."""
         page = authenticated_page
         _cleanup_demo_data(page)
         _navigate_to_cellar(page)
 
         try:
-            # Install demo data
             page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
             page.click("#cellar-demo-install-btn")
-            page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
+            page.wait_for_selector("#cellar-demo-remove-btn", state="visible", timeout=60000)
 
-            # Navigate to cellar
-            page.click("a[data-page='cellar']")
-            page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
-
-            # Should have wine cards
+            # Should have wine cards or rows
             page.wait_for_selector(".wine-card, .wine-row, tr[data-wine-id]", timeout=10000)
             wine_elements = page.locator(".wine-card, .wine-row, tr[data-wine-id]")
             count = wine_elements.count()

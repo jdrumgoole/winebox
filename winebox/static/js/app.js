@@ -999,9 +999,7 @@ function initForms() {
     document.getElementById('cellar-demo-install-btn')?.addEventListener('click', installDemoData);
 
     // Add Wine button on cellar page
-    document.getElementById('cellar-add-wine-btn')?.addEventListener('click', () => {
-        navigateTo('add-to-cellar');
-    });
+
 
     // Cellar view toggle
     document.getElementById('cellar-view-cards')?.addEventListener('click', () => setCellarViewMode('cards'));
@@ -1885,20 +1883,52 @@ async function loadCellar() {
         cellarLastWines = wines;
         renderCellarView();
 
-        // Show/hide welcome panel based on whether cellar has wines
-        const welcomePanel = document.getElementById('cellar-welcome-panel');
-        if (welcomePanel) {
-            welcomePanel.style.display = wines.length > 0 ? 'none' : '';
-        }
-
-        // Check demo data status and show/hide banner
-        checkDemoBanner();
+        // Update welcome panel — always show but swap button based on demo status
+        updateWelcomePanel();
 
         // Load analytics (stats, charts, activity)
         loadCellarAnalytics();
     } catch (error) {
         console.error('Failed to load cellar:', error);
     }
+}
+
+async function updateWelcomePanel() {
+    const panel = document.getElementById('cellar-welcome-panel');
+    if (!panel) return;
+
+    // Always show the panel (cards are always useful)
+    panel.style.display = '';
+
+    // Restore original HTML if it was replaced by progress bar
+    if (!panel.querySelector('.entry-path-cards')) {
+        // Panel was overwritten by installDemoData progress bar — page will reload
+        return;
+    }
+
+    // Swap the demo button based on whether demo data is installed
+    const btnContainer = panel.querySelector('.demo-welcome-content > div:last-child');
+    if (!btnContainer) return;
+
+    try {
+        const resp = await fetchWithAuth(`${API_BASE}/demo/status`);
+        if (!resp.ok) return;
+        const status = await resp.json();
+
+        if (status.installed && status.wine_count > 0) {
+            btnContainer.innerHTML = `
+                <button class="btn btn-outline btn-small" id="cellar-demo-remove-btn">Remove sample wines</button>
+                <p class="demo-hint">Sample wines (${status.wine_count} wines, ${status.bottle_count} bottles)</p>
+            `;
+            document.getElementById('cellar-demo-remove-btn')?.addEventListener('click', removeDemoData);
+        } else {
+            btnContainer.innerHTML = `
+                <button class="btn btn-outline btn-small" id="cellar-demo-install-btn">Load sample wines</button>
+                <p class="demo-hint">Sample wines can be removed at any time</p>
+            `;
+            document.getElementById('cellar-demo-install-btn')?.addEventListener('click', installDemoData);
+        }
+    } catch { /* ignore */ }
 }
 
 async function loadCellarAnalytics() {
@@ -5593,8 +5623,9 @@ async function installDemoData() {
         const btn = document.getElementById('cellar-demo-install-btn') || document.getElementById('demo-install-btn');
         if (btn) btn.disabled = true;
 
-        // Replace the welcome content with a progress bar
+        // Save original welcome content and replace with progress bar
         const welcome = document.getElementById('cellar-welcome-panel') || document.getElementById('demo-welcome');
+        const savedWelcomeHtml = welcome ? welcome.innerHTML : null;
         if (welcome) {
             welcome.innerHTML = `
                 <div class="demo-welcome-content">
@@ -5662,9 +5693,8 @@ async function installDemoData() {
                                 `Loaded ${data.created} sample wines (${data.bottles} bottles) from ${data.countries} countries`,
                                 'success'
                             );
-                            // Hide progress panel and reload everything
-                            const panel = document.getElementById('cellar-welcome-panel');
-                            if (panel) panel.style.display = 'none';
+                            // Restore welcome panel and reload cellar
+                            if (welcome && savedWelcomeHtml) welcome.innerHTML = savedWelcomeHtml;
                             loadCellar();
                             return;
                         } else if (data.phase === 'loading' && data.total > 0) {
@@ -5672,8 +5702,7 @@ async function installDemoData() {
                             if (bar) bar.style.width = pct + '%';
                             if (text) text.textContent = `Adding wines: ${data.created} of ${data.total}`;
                         } else if (data.phase === 'idle') {
-                            const idlePanel = document.getElementById('cellar-welcome-panel');
-                            if (idlePanel) idlePanel.style.display = 'none';
+                            if (welcome && savedWelcomeHtml) welcome.innerHTML = savedWelcomeHtml;
                             loadCellar();
                             return;
                         }
@@ -5697,7 +5726,7 @@ async function installDemoData() {
 
 async function removeDemoData() {
     try {
-        const btn = document.querySelector('.demo-banner .btn-outline');
+        const btn = document.getElementById('cellar-demo-remove-btn');
         if (btn) {
             btn.disabled = true;
             btn.textContent = 'Removing...';
@@ -5716,7 +5745,7 @@ async function removeDemoData() {
         loadCellar();
     } catch (error) {
         showToast(error.message, 'error');
-        const btn = document.querySelector('.demo-banner .btn-outline');
+        const btn = document.getElementById('cellar-demo-remove-btn');
         if (btn) {
             btn.disabled = false;
             btn.textContent = 'Remove sample wines';

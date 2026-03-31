@@ -69,7 +69,7 @@ class TestCoreNavigation:
         page = authenticated_page
         page.click("a[data-page='cellar']")
         expect(page.locator("#page-cellar")).to_be_visible()
-        expect(page.locator("#cellar-add-wine-btn")).to_be_visible()
+        expect(page.locator("#cellar-welcome-panel")).to_be_visible()
 
     def test_navigate_to_history(self, authenticated_page: Page) -> None:
         page = authenticated_page
@@ -103,14 +103,13 @@ class TestCoreNavigation:
         expect(page.locator("nav a[data-page='add-to-cellar']")).to_have_count(0)
         expect(page.locator("nav a[data-page='checkin']")).to_have_count(0)
 
-    def test_cellar_add_wine_button(self, authenticated_page: Page) -> None:
-        """Test that My Cellar has '+ Add Wine' button that opens the wizard."""
+    def test_cellar_entry_cards_navigate(self, authenticated_page: Page) -> None:
+        """Test that cellar entry-path cards navigate to add-to-cellar wizard."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
         expect(page.locator("#page-cellar")).to_be_visible()
-        page.click("#cellar-add-wine-btn")
+        page.click("#cellar-welcome-panel .entry-path-card[data-tab='scan']")
         expect(page.locator("#page-add-to-cellar")).to_be_visible()
-        expect(page.locator("#page-add-to-cellar #entry-path-cards")).to_be_visible()
 
     def test_record_wine_on_met_page(self, authenticated_page: Page) -> None:
         """Test that 'Record a Wine' button on Wines I've Met navigates to checkin form."""
