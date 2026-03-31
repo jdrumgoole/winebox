@@ -3449,23 +3449,48 @@ body.logged-out #user-info {
     background: var(--card-background);
     border: 2px dashed var(--primary-light);
     border-radius: 12px;
-    padding: 2rem;
-    margin: 1.5rem 0;
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
     text-align: center;
 }
 
 .demo-welcome h3 {
     color: var(--primary-color);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
     font-family: 'Playfair Display', serif;
-    font-size: 1.4rem;
+    font-size: 1.1rem;
 }
 
 .demo-welcome p {
     color: var(--text-muted);
     max-width: 500px;
-    margin: 0 auto 1rem;
-    line-height: 1.5;
+    margin: 0 auto 0.5rem;
+    line-height: 1.3;
+    font-size: 0.9rem;
+}
+
+.demo-welcome .entry-path-cards {
+    margin: 0.5rem 0;
+    gap: 0.75rem;
+}
+
+.demo-welcome .entry-path-card {
+    padding: 0.75rem 1rem;
+}
+
+.demo-welcome .entry-path-card h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+
+.demo-welcome .entry-path-card p {
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.demo-welcome .entry-path-icon svg {
+    width: 24px;
+    height: 24px;
 }
 
 .demo-welcome-actions {
@@ -3477,9 +3502,9 @@ body.logged-out #user-info {
 }
 
 .demo-hint {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
     margin-bottom: 0;
 }
 
