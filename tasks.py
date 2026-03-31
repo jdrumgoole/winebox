@@ -1484,7 +1484,6 @@ def test_e2e_oat(
             "tests/test_app_navigation_e2e.py "
             "tests/test_cellar_e2e.py "
             "tests/test_checkout_e2e.py "
-            "tests/test_dashboard_e2e.py "
             "tests/test_export_e2e.py "
             "tests/test_history_e2e.py "
             "tests/test_search_e2e.py "

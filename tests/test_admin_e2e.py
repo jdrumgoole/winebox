@@ -79,9 +79,9 @@ class TestAdminAccess:
     def test_admin_link_not_in_nav(self, authenticated_page: Page) -> None:
         """Admin link should not be visible for regular users."""
         page = authenticated_page
-        # Navigate to dashboard to ensure nav is loaded
-        page.click("a[data-page='dashboard']")
-        page.wait_for_selector("#page-dashboard", state="visible", timeout=5000)
+        # Navigate to cellar to ensure nav is loaded
+        page.click("a[data-page='cellar']")
+        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
         admin_link = page.locator("#admin-link")
         expect(admin_link).to_be_hidden()
 
@@ -96,7 +96,6 @@ class TestAdminAccess:
     def test_nav_has_correct_links(self, authenticated_page: Page) -> None:
         """Regular user nav has standard links but not admin."""
         page = authenticated_page
-        expect(page.locator("nav a[data-page='dashboard']")).to_be_visible()
         expect(page.locator("nav a[data-page='cellar']")).to_be_visible()
         expect(page.locator("nav a[data-page='history']")).to_be_visible()
         expect(page.locator("#admin-link")).to_be_hidden()

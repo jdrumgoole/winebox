@@ -43,9 +43,9 @@ def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
     return page
 
 
-def _navigate_to_dashboard(page: Page) -> None:
-    page.click("a[data-page='dashboard']")
-    page.wait_for_selector("#page-dashboard", state="visible", timeout=5000)
+def _navigate_to_cellar(page: Page) -> None:
+    page.click("a[data-page='cellar']")
+    page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
 
 
 def _cleanup_demo_data(page: Page) -> None:
@@ -79,7 +79,7 @@ class TestDemoDataE2E:
         """New user with empty cellar sees the demo welcome prompt."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_dashboard(page)
+        _navigate_to_cellar(page)
 
         try:
             # Wait for the demo welcome to appear
@@ -95,7 +95,7 @@ class TestDemoDataE2E:
         """Welcome screen shows entry-path cards for Scan, Enter Details, Import."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_dashboard(page)
+        _navigate_to_cellar(page)
 
         try:
             page.wait_for_selector("#demo-welcome", state="visible", timeout=10000)
@@ -113,7 +113,7 @@ class TestDemoDataE2E:
         """Clicking 'Load sample wines' populates the cellar."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_dashboard(page)
+        _navigate_to_cellar(page)
 
         try:
             # Wait for welcome and click install
@@ -140,7 +140,7 @@ class TestDemoDataE2E:
         page = authenticated_page
         # Ensure demo data is loaded
         _cleanup_demo_data(page)
-        _navigate_to_dashboard(page)
+        _navigate_to_cellar(page)
         page.wait_for_selector("#demo-install-btn", state="visible", timeout=10000)
         page.click("#demo-install-btn")
         page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
@@ -157,7 +157,7 @@ class TestDemoDataE2E:
         page = authenticated_page
         # Load demo data first
         _cleanup_demo_data(page)
-        _navigate_to_dashboard(page)
+        _navigate_to_cellar(page)
         page.wait_for_selector("#demo-install-btn", state="visible", timeout=10000)
         page.click("#demo-install-btn")
         page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
@@ -186,7 +186,7 @@ class TestDemoDataE2E:
         """After loading demo data, the cellar page shows wines."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_dashboard(page)
+        _navigate_to_cellar(page)
 
         try:
             # Install demo data
