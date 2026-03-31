@@ -1571,40 +1571,7 @@ function openModal(modalId) {
     document.getElementById(modalId).classList.add('active');
 }
 
-// Dashboard
-async function loadCellar() {
-    try {
-        // Load summary
-        const summaryResponse = await fetchWithAuth(`${API_BASE}/cellar/summary`);
-        const summary = await summaryResponse.json();
-
-        document.getElementById('stat-total-bottles').textContent = summary.total_bottles;
-        document.getElementById('stat-unique-wines').textContent = summary.unique_wines;
-        document.getElementById('stat-total-tracked').textContent = summary.total_wines_tracked;
-
-        // Check demo data status and show appropriate UI
-        await updateDemoBanner(summary.total_bottles);
-
-        // Render charts
-        renderDashboardCharts(summary);
-
-        // Load met summary
-        try {
-            const metResponse = await fetchWithAuth(`${API_BASE}/met/summary`);
-            const metSummary = await metResponse.json();
-            document.getElementById('stat-wines-met').textContent = metSummary.total_met;
-        } catch {
-            document.getElementById('stat-wines-met').textContent = '0';
-        }
-
-        // Load recent transactions
-        const transResponse = await fetchWithAuth(`${API_BASE}/transactions?limit=10`);
-        const transactions = await transResponse.json();
-        renderActivityList(transactions);
-    } catch (error) {
-        console.error('Failed to load dashboard:', error);
-    }
-}
+// (Dashboard removed — loadCellar at line ~1902 is the cellar loader)
 
 // Active Chart.js instances (destroy before re-creating)
 const _dashboardCharts = {};
