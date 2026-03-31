@@ -5626,17 +5626,15 @@ function showDemoWelcome() {
 }
 
 function showDemoBanner(wineCount, bottleCount) {
-    const header = document.getElementById('dashboard-header');
+    const container = document.getElementById('cellar-demo-banner-container');
+    if (!container) return;
 
-    const banner = document.createElement('div');
-    banner.id = 'demo-banner';
-    banner.className = 'demo-banner';
-    banner.innerHTML = `
-        <span>Sample wines (${wineCount} wines, ${bottleCount} bottles)</span>
-        <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove</button>
+    container.innerHTML = `
+        <div class="demo-banner" id="demo-banner">
+            <span>Sample wines (${wineCount} wines, ${bottleCount} bottles)</span>
+            <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove</button>
+        </div>
     `;
-
-    header.appendChild(banner);
     document.getElementById('demo-remove-btn').addEventListener('click', removeDemoData);
 }
 

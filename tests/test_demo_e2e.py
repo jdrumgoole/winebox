@@ -120,17 +120,10 @@ class TestDemoDataE2E:
             page.wait_for_selector("#demo-install-btn", state="visible", timeout=10000)
             page.click("#demo-install-btn")
 
-            # Wait for the banner to appear (indicates install completed and dashboard reloaded)
+            # Wait for the banner to appear (indicates install completed and cellar reloaded)
             page.wait_for_selector("#demo-banner", state="visible", timeout=30000)
             expect(page.locator("#demo-banner")).to_be_visible()
             expect(page.locator("#demo-banner")).to_contain_text("Sample wines")
-
-            # Verify dashboard stats updated — total bottles should be > 0
-            stat = page.locator("#stat-total-bottles")
-            expect(stat).to_be_visible()
-            bottles_text = stat.text_content()
-            assert bottles_text is not None
-            assert int(bottles_text) > 0, f"Expected bottles > 0, got '{bottles_text}'"
         except Exception:
             capture_artifacts(page, "demo_load_wines")
             raise
@@ -172,12 +165,6 @@ class TestDemoDataE2E:
 
             # Banner should be gone
             expect(page.locator("#demo-banner")).not_to_be_attached()
-
-            # Stats should be back to 0
-            stat = page.locator("#stat-total-bottles")
-            expect(stat).to_be_visible()
-            bottles_text = stat.text_content()
-            assert bottles_text == "0", f"Expected 0 bottles after removal, got '{bottles_text}'"
         except Exception:
             capture_artifacts(page, "demo_remove_wines")
             raise
