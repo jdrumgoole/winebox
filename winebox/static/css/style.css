@@ -1301,6 +1301,11 @@ details.advanced-fields .form-grid {
     justify-content: center;
 }
 
+/* Make demo welcome span full grid width when inside wine-grid */
+.wine-grid > .demo-welcome {
+    grid-column: 1 / -1;
+}
+
 /* Hamburger button - hidden on desktop */
 .hamburger-btn {
     display: none;
