@@ -83,8 +83,8 @@ class TestDemoDataE2E:
 
         try:
             # Wait for the demo welcome to appear
-            page.wait_for_selector("#demo-welcome", state="visible", timeout=10000)
-            expect(page.locator("#demo-welcome")).to_be_visible()
+            page.wait_for_selector("#cellar-welcome-panel", state="visible", timeout=10000)
+            expect(page.locator("#cellar-welcome-panel")).to_be_visible()
             expect(page.locator("#cellar-demo-install-btn")).to_be_visible()
             expect(page.locator("#cellar-demo-install-btn")).to_have_text("Load sample wines")
         except Exception:
@@ -98,8 +98,8 @@ class TestDemoDataE2E:
         _navigate_to_cellar(page)
 
         try:
-            page.wait_for_selector("#demo-welcome", state="visible", timeout=10000)
-            cards = page.locator('#demo-welcome .entry-path-card')
+            page.wait_for_selector("#cellar-welcome-panel", state="visible", timeout=10000)
+            cards = page.locator('#cellar-welcome-panel .entry-path-card')
             expect(cards).to_have_count(3)
             # First card navigates to add-to-cellar wizard
             cards.first.click()

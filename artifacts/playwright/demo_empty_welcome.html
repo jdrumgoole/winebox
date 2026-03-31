@@ -20,7 +20,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/logos/favicon.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/static/logos/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/logos/apple-touch-icon.png">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.6.96">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.6.97">
     <script src="/static/js/chart.min.js"></script>
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
@@ -387,10 +387,7 @@
 
         <!-- Cellar Page -->
         <section id="page-cellar" class="page active" aria-labelledby="page-cellar-title">
-            <div class="page-header" id="cellar-header">
-                <h2 id="page-cellar-title">My Cellar</h2>
-                <button class="btn btn-primary" id="cellar-add-wine-btn">+ Add Wine</button>
-            </div>
+            <h2 id="page-cellar-title">My Cellar</h2>
             <div class="demo-welcome" id="cellar-welcome-panel">
                 <div class="demo-welcome-content">
                     <h3>Welcome to WineBox</h3>
@@ -429,12 +426,11 @@
                         </a>
                     </div>
                     <div style="margin-top:1.5rem;">
-                        <button class="btn btn-outline btn-small" id="cellar-demo-install-btn">Load sample wines</button>
-                        <p class="demo-hint">Sample wines can be removed at any time</p>
-                    </div>
+                <button class="btn btn-outline btn-small" id="cellar-demo-install-btn">Load sample wines</button>
+                <p class="demo-hint">Sample wines can be removed at any time</p>
+            </div>
                 </div>
             </div>
-            <div id="cellar-demo-banner-container"></div>
             <div class="stats-grid" id="cellar-stats-grid">
                 <div class="stat-card">
                     <div class="stat-value" id="stat-total-bottles">0</div>
@@ -1431,7 +1427,7 @@
     <!-- Footer -->
     <footer id="app-footer">
         <div class="footer-content">
-            <span id="app-info">WineBox <span class="version">v0.6.96</span></span>
+            <span id="app-info">WineBox <span class="version">v0.6.97</span></span>
             <span class="footer-separator">|</span>
             <span id="data-credits">
                 Wine data powered by
@@ -1446,8 +1442,8 @@
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
-    <script src="/static/js/papaparse.min.js?v=0.6.96"></script>
-    <script src="/static/js/app.js?v=0.6.96"></script>
+    <script src="/static/js/papaparse.min.js?v=0.6.97"></script>
+    <script src="/static/js/app.js?v=0.6.97"></script>
 
 
 </body></html>

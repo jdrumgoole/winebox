@@ -51,7 +51,7 @@ class TestCellarPage:
         """Welcome panel or wine list is present."""
         _navigate_to_cellar(authenticated_page)
         # Either the welcome panel (empty cellar) or wine list (populated) should exist
-        expect(authenticated_page.locator("#cellar-welcome-panel, #cellar-list")).to_be_attached()
+        expect(authenticated_page.locator("#cellar-welcome-panel")).to_be_visible()
 
     def test_cellar_has_filter(self, authenticated_page: Page) -> None:
         """Filter dropdown is present."""
