@@ -12,6 +12,9 @@ from winebox.models.token_blacklist import RevokedToken
 from winebox.models.login_attempt import LoginAttempt
 from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.import_batch_row import RawUploadRow
+from winebox.models.case import Case
+from winebox.models.bottle import Bottle
+from winebox.models.bottle_event import BottleEvent, BottleEventType
 
 __all__ = [
     # Main documents
@@ -39,4 +42,9 @@ __all__ = [
     "ImportBatch",
     "ImportStatus",
     "RawUploadRow",
+    # Case & Bottle tracking
+    "Case",
+    "Bottle",
+    "BottleEvent",
+    "BottleEventType",
 ]

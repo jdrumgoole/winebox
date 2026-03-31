@@ -100,6 +100,24 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("xwines_id", ASCENDING), ("vintage", ASCENDING)], unique=True),
         IndexModel([("xwines_id", ASCENDING)]),  # For lookups without vintage
     ],
+    # Case & Bottle tracking
+    "cases": [
+        IndexModel([("owner_id", ASCENDING)]),
+        IndexModel([("wine_id", ASCENDING)]),
+        IndexModel([("owner_id", ASCENDING), ("wine_id", ASCENDING)]),
+    ],
+    "bottles": [
+        IndexModel([("owner_id", ASCENDING)]),
+        IndexModel([("wine_id", ASCENDING)]),
+        IndexModel([("case_id", ASCENDING)]),
+        IndexModel([("owner_id", ASCENDING), ("wine_id", ASCENDING)]),
+        IndexModel([("owner_id", ASCENDING), ("name", ASCENDING), ("vintage", ASCENDING)]),
+    ],
+    "bottle_events": [
+        IndexModel([("bottle_id", ASCENDING)]),
+        IndexModel([("bottle_id", ASCENDING), ("created_at", DESCENDING)]),
+        IndexModel([("owner_id", ASCENDING), ("event_type", ASCENDING)]),
+    ],
 }
 
 
