@@ -38,8 +38,7 @@
                 <span></span><span></span><span></span>
             </button>
             <nav id="main-nav">
-                <a href="#" data-page="dashboard" class="nav-link active" aria-current="page">Dashboard</a>
-                <a href="#" data-page="cellar" class="nav-link">My Cellar</a>
+                <a href="#" data-page="cellar" class="nav-link active" aria-current="page">My Cellar</a>
                 <a href="#" data-page="met" class="nav-link">Wines I've Met</a>
                 <a href="#" data-page="history" class="nav-link">History</a>
                 <a href="#" data-page="search" class="nav-link">Search</a>
@@ -449,10 +448,11 @@
 
         <!-- Cellar Page -->
         <section id="page-cellar" class="page" aria-labelledby="page-cellar-title">
-            <div class="page-header">
+            <div class="page-header" id="cellar-header">
                 <h2 id="page-cellar-title">My Cellar</h2>
                 <button class="btn btn-primary" id="cellar-add-wine-btn">+ Add Wine</button>
             </div>
+            <div id="cellar-demo-banner-container"></div>
             <div class="filter-bar">
                 <select id="cellar-filter">
                     <option value="all">All Wines</option>

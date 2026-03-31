@@ -421,6 +421,7 @@ function showLoginPage() {
 }
 
 const APP_PAGES = ['dashboard', 'import', 'checkin', 'cellar', 'met', 'add-to-cellar', 'history', 'search', 'xwines', 'settings'];
+// 'dashboard' kept in APP_PAGES for backward compat with old bookmarks — redirects to cellar
 
 async function showMainApp() {
     document.body.classList.remove('logged-out');
@@ -447,16 +448,15 @@ async function showMainApp() {
         return;
     }
 
-    // Always start on Dashboard — empty cellar state has a call-to-action
+    // Always start on My Cellar
 
-    // Only navigate to dashboard if user hasn't navigated elsewhere
+    // Only navigate to cellar if user hasn't navigated elsewhere
     const finalHash = window.location.hash.slice(1).split('?')[0];
     if (!finalHash || !APP_PAGES.includes(finalHash)) {
         isHandlingPopState = true;
-        navigateTo('dashboard');
+        navigateTo('cellar');
         isHandlingPopState = false;
-        // Set initial history entry with replaceState to avoid phantom extra entry
-        history.replaceState(null, '', '#dashboard');
+        history.replaceState(null, '', '#cellar');
     }
 }
 
@@ -860,6 +860,9 @@ function initNavigation() {
 }
 
 function navigateTo(page) {
+    // Redirect old dashboard bookmarks to cellar
+    if (page === 'dashboard') page = 'cellar';
+
     // Update nav links — highlight "My Cellar" when on add-to-cellar page
     document.querySelectorAll('.nav-link').forEach(link => {
         const isActive = link.dataset.page === page ||
@@ -889,9 +892,6 @@ function navigateTo(page) {
 
     // Load page data
     switch (page) {
-        case 'dashboard':
-            loadDashboard();
-            break;
         case 'cellar':
             loadCellar();
             break;
@@ -1531,7 +1531,7 @@ async function handleRemoval(e) {
         showToast(`${reasonLabels[reason] || 'Removed'}: ${wine.name}`, 'success');
         closeModals();
         loadCellar();
-        loadDashboard();
+        loadCellar();
     } catch (error) {
         showToast(error.message, 'error');
     }
@@ -1572,7 +1572,7 @@ function openModal(modalId) {
 }
 
 // Dashboard
-async function loadDashboard() {
+async function loadCellar() {
     try {
         // Load summary
         const summaryResponse = await fetchWithAuth(`${API_BASE}/cellar/summary`);
@@ -1926,9 +1926,33 @@ async function loadCellar() {
 
         cellarLastWines = wines;
         renderCellarView();
+
+        // Check demo data status and show/hide banner
+        checkDemoBanner();
     } catch (error) {
         console.error('Failed to load cellar:', error);
     }
+}
+
+async function checkDemoBanner() {
+    const container = document.getElementById('cellar-demo-banner-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    try {
+        const resp = await fetchWithAuth(`${API_BASE}/demo/status`);
+        if (!resp.ok) return;
+        const status = await resp.json();
+        if (status.has_demo_data && status.wine_count > 0) {
+            container.innerHTML = `
+                <div class="demo-banner" id="demo-banner">
+                    <span>Sample wines (${status.wine_count} wines, ${status.bottle_count} bottles)</span>
+                    <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove</button>
+                </div>
+            `;
+            document.getElementById('demo-remove-btn').addEventListener('click', removeDemoData);
+        }
+    } catch (e) { /* demo endpoint may not exist */ }
 }
 
 function renderCellarView() {
@@ -1964,41 +1988,47 @@ function setCellarViewMode(mode) {
 }
 
 function emptyCellarHtml() {
-    return `<div class="empty-state">
-        <h3>Your cellar is empty</h3>
-        <p>How would you like to add your first wine?</p>
-        <div class="entry-path-cards" style="margin-top:1.5rem;">
-            <a href="#" data-page="add-to-cellar" data-tab="scan" class="entry-path-card">
-                <div class="entry-path-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                        <circle cx="12" cy="13" r="4"></circle>
-                    </svg>
-                </div>
-                <h3>Scan a Label</h3>
-                <p>Take a photo to auto-detect wine details</p>
-            </a>
-            <a href="#" data-page="add-to-cellar" data-tab="manual" class="entry-path-card">
-                <div class="entry-path-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                </div>
-                <h3>Enter Details</h3>
-                <p>Type in the wine details manually</p>
-            </a>
-            <a href="#" data-page="add-to-cellar" data-tab="import" class="entry-path-card">
-                <div class="entry-path-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="17 8 12 3 7 8"></polyline>
-                        <line x1="12" y1="3" x2="12" y2="15"></line>
-                    </svg>
-                </div>
-                <h3>Import from File</h3>
-                <p>Upload a CSV or Excel spreadsheet</p>
-            </a>
+    return `<div class="demo-welcome" id="demo-welcome">
+        <div class="demo-welcome-content">
+            <h3>Welcome to WineBox</h3>
+            <p>Your cellar is empty. How would you like to get started?</p>
+            <div class="entry-path-cards" style="margin-top:1.5rem;">
+                <a href="#" data-page="add-to-cellar" data-tab="scan" class="entry-path-card">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                    </div>
+                    <h3>Scan a Label</h3>
+                    <p>Take a photo to auto-detect wine details</p>
+                </a>
+                <a href="#" data-page="add-to-cellar" data-tab="manual" class="entry-path-card">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </div>
+                    <h3>Enter Details</h3>
+                    <p>Type in the wine details manually</p>
+                </a>
+                <a href="#" data-page="add-to-cellar" data-tab="import" class="entry-path-card">
+                    <div class="entry-path-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <h3>Import from File</h3>
+                    <p>Upload a CSV or Excel spreadsheet</p>
+                </a>
+            </div>
+            <div style="margin-top:1.5rem;">
+                <button class="btn btn-outline btn-small" id="demo-install-btn">Load sample wines</button>
+                <p class="demo-hint">Sample wines can be removed at any time</p>
+            </div>
         </div>
     </div>`;
 }
@@ -2012,6 +2042,8 @@ function renderCellarTable(containerId, wines) {
             container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
         } else {
             container.innerHTML = emptyCellarHtml();
+            const installBtn = document.getElementById('demo-install-btn');
+            if (installBtn) installBtn.addEventListener('click', installDemoData);
         }
         return;
     }
@@ -2130,6 +2162,8 @@ function renderWineGrid(containerId, wines) {
             container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
         } else {
             container.innerHTML = emptyCellarHtml();
+            const installBtn = document.getElementById('demo-install-btn');
+            if (installBtn) installBtn.addEventListener('click', installDemoData);
         }
         return;
     }
@@ -2403,7 +2437,7 @@ function deleteWine(wineId) {
             if (!response.ok) throw new Error('Delete failed');
             showToast('Wine deleted', 'success');
             loadCellar();
-            loadDashboard();
+            loadCellar();
         } catch (error) {
             showToast('Failed to delete wine', 'error');
         }
@@ -2943,7 +2977,7 @@ async function handleDeleteCollection() {
         closeModals();
         showToast(`Deleted ${result.deleted_wines} wines, ${result.deleted_transactions} transactions`, 'success');
         loadCellar();
-        loadDashboard();
+        loadCellar();
         resetImportPage();
     } catch (error) {
         btn.disabled = false;
@@ -5647,7 +5681,7 @@ async function installDemoData() {
         if (!progressResponse.ok) {
             // Fallback: just wait and reload
             await new Promise(r => setTimeout(r, 5000));
-            loadDashboard();
+            loadCellar();
             return;
         }
 
@@ -5658,7 +5692,7 @@ async function installDemoData() {
         function readProgress() {
             reader.read().then(({ done, value }) => {
                 if (done) {
-                    loadDashboard();
+                    loadCellar();
                     return;
                 }
 
@@ -5682,14 +5716,14 @@ async function installDemoData() {
                                 `Loaded ${data.created} sample wines (${data.bottles} bottles) from ${data.countries} countries`,
                                 'success'
                             );
-                            setTimeout(() => loadDashboard(), 500);
+                            setTimeout(() => loadCellar(), 500);
                             return;
                         } else if (data.phase === 'loading' && data.total > 0) {
                             const pct = Math.round((data.created / data.total) * 100);
                             if (bar) bar.style.width = pct + '%';
                             if (text) text.textContent = `Adding wines: ${data.created} of ${data.total}`;
                         } else if (data.phase === 'idle') {
-                            loadDashboard();
+                            loadCellar();
                             return;
                         }
                     } catch (e) {
@@ -5699,14 +5733,14 @@ async function installDemoData() {
 
                 readProgress();
             }).catch(() => {
-                loadDashboard();
+                loadCellar();
             });
         }
 
         readProgress();
     } catch (error) {
         showToast(error.message, 'error');
-        loadDashboard();
+        loadCellar();
     }
 }
 
@@ -5728,7 +5762,7 @@ async function removeDemoData() {
 
         const result = await response.json();
         showToast(`Removed ${result.wines_removed} sample wines`, 'success');
-        loadDashboard();
+        loadCellar();
     } catch (error) {
         showToast(error.message, 'error');
         const btn = document.querySelector('.demo-banner .btn-outline');
