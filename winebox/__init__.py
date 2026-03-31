@@ -1,3 +1,3 @@
 """WineBox - Wine Cellar Management Application."""
 
-__version__ = "0.6.91"
+__version__ = "0.6.92"
