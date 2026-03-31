@@ -147,6 +147,13 @@ To re-deploy an existing version without making a new release:
 
     invoke deploy-only --version 0.5.8
 
+### Post-Deployment Production Smoke Test
+- **After EVERY production deploy**, run the production login smoke test:
+  `uv run python -m pytest tests/test_production_login.py -v`
+- This verifies health, login, and authenticated API access against https://booze.winebox.app
+- Requires `WINEBOX_PROD_TEST_USER` and `WINEBOX_PROD_TEST_PASSWORD` in `.env`
+- If this test fails after a deploy, the deploy has broken authentication — investigate immediately
+
 ### Deployment Rules (both environments)
 
 GitHub Actions only publishes to PyPI (no auto-deploy to production).
