@@ -196,6 +196,7 @@ def row_to_wine_data(
     wine_data["front_label_text"] = ""
     wine_data["inventory"] = InventoryInfo(
         quantity=quantity,
+        case_size=case_size if case_size else None,
         updated_at=datetime.now(timezone.utc),
     )
 

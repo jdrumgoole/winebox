@@ -20,7 +20,15 @@ class InventoryInfo(BaseModel):
     """Embedded subdocument for inventory information."""
 
     quantity: int = Field(default=0, ge=0)
+    case_size: Optional[int] = Field(default=None, ge=1)  # Bottles per case (None = single bottles)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def cases(self) -> float | None:
+        """Number of cases, or None if not case-based."""
+        if self.case_size and self.case_size > 0:
+            return self.quantity / self.case_size
+        return None
 
 
 class GrapeBlendEntry(BaseModel):

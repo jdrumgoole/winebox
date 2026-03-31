@@ -5183,6 +5183,18 @@ function initAddToCellarPage() {
 
     // Scan sub-wizard
     initScanCellarSubwizard();
+
+    // Cases toggle for scan and manual quantity fields
+    function setupCaseToggle(unitSelectId, caseSizeId) {
+        const unitSelect = document.getElementById(unitSelectId);
+        const caseSizeInput = document.getElementById(caseSizeId);
+        if (!unitSelect || !caseSizeInput) return;
+        unitSelect.addEventListener('change', () => {
+            caseSizeInput.style.display = unitSelect.value === 'cases' ? '' : 'none';
+        });
+    }
+    setupCaseToggle('scan-quantity-unit', 'scan-case-size');
+    setupCaseToggle('manual-quantity-unit', 'manual-case-size');
 }
 
 function resetAddToCellarWizard() {
@@ -5331,7 +5343,15 @@ async function handleScanCellarSubmit() {
     if (country) formData.append('country', country);
     const wineType = document.getElementById('scan-wine-type').value;
     if (wineType) formData.append('wine_type_id', wineType);
-    formData.append('quantity', document.getElementById('scan-quantity').value || '1');
+    let scanQty = parseInt(document.getElementById('scan-quantity').value) || 1;
+    const scanUnit = document.getElementById('scan-quantity-unit').value;
+    if (scanUnit === 'cases') {
+        const caseSize = parseInt(document.getElementById('scan-case-size').value) || 12;
+        formData.append('quantity', String(scanQty * caseSize));
+        formData.append('case_size', String(caseSize));
+    } else {
+        formData.append('quantity', String(scanQty));
+    }
 
     // Pass pre-scanned text to avoid re-scanning
     if (scanCellarResult?.ocr?.front_label_text) {
@@ -5397,7 +5417,15 @@ async function handleManualCellarSubmit(e) {
     if (country) formData.append('country', country);
     const wineType = document.getElementById('manual-wine-type').value;
     if (wineType) formData.append('wine_type_id', wineType);
-    formData.append('quantity', document.getElementById('manual-quantity').value || '1');
+    let manualQty = parseInt(document.getElementById('manual-quantity').value) || 1;
+    const manualUnit = document.getElementById('manual-quantity-unit').value;
+    if (manualUnit === 'cases') {
+        const caseSize = parseInt(document.getElementById('manual-case-size').value) || 12;
+        formData.append('quantity', String(manualQty * caseSize));
+        formData.append('case_size', String(caseSize));
+    } else {
+        formData.append('quantity', String(manualQty));
+    }
 
     try {
         const response = await fetchWithAuth(`${API_BASE}/wines/checkin`, {

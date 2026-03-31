@@ -74,6 +74,7 @@ class InventoryInfo(BaseModel):
     """Schema for inventory information."""
 
     quantity: int = Field(..., ge=0)
+    case_size: int | None = Field(None, ge=1, description="Bottles per case (None = single bottles)")
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

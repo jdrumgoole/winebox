@@ -649,8 +649,15 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="scan-quantity">Quantity (Bottles)</label>
-                                <input type="number" id="scan-quantity" min="1" value="1" required>
+                                <label>Quantity</label>
+                                <div style="display:flex;gap:0.5rem;align-items:center;">
+                                    <input type="number" id="scan-quantity" min="1" value="1" required style="width:5rem;">
+                                    <select id="scan-quantity-unit" style="width:auto;">
+                                        <option value="bottles">Bottles</option>
+                                        <option value="cases">Cases of</option>
+                                    </select>
+                                    <input type="number" id="scan-case-size" min="1" value="12" style="width:4rem;display:none;" placeholder="per case">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -703,8 +710,15 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="manual-quantity">Quantity (Bottles)</label>
-                            <input type="number" id="manual-quantity" name="quantity" min="1" value="1" required>
+                            <label>Quantity</label>
+                            <div style="display:flex;gap:0.5rem;align-items:center;">
+                                <input type="number" id="manual-quantity" name="quantity" min="1" value="1" required style="width:5rem;">
+                                <select id="manual-quantity-unit" style="width:auto;">
+                                    <option value="bottles">Bottles</option>
+                                    <option value="cases">Cases of</option>
+                                </select>
+                                <input type="number" id="manual-case-size" min="1" value="12" style="width:4rem;display:none;" placeholder="per case">
+                            </div>
                         </div>
                     </div>
                     <div class="form-actions">

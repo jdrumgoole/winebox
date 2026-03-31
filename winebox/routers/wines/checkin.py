@@ -36,6 +36,7 @@ async def checkin_wine(
     current_user: RequireAuth,
     front_label: Annotated[UploadFile, File(description="Front label image")],
     quantity: Annotated[int, Form(ge=1, le=10000, description="Number of bottles")] = 1,
+    case_size: Annotated[int | None, Form(ge=1, le=100, description="Bottles per case (if case-based)")] = None,
     back_label: Annotated[UploadFile | None, File(description="Back label image")] = None,
     name: Annotated[str | None, Form(max_length=MAX_NAME_LENGTH, description="Wine name (auto-detected if not provided)")] = None,
     winery: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
@@ -195,7 +196,7 @@ async def checkin_wine(
         xwines_id=xwines_id,
         custom_fields=parsed_custom_fields,
         custom_fields_text=custom_fields_text,
-        inventory=InventoryInfo(quantity=quantity, updated_at=datetime.now(timezone.utc)),
+        inventory=InventoryInfo(quantity=quantity, case_size=case_size, updated_at=datetime.now(timezone.utc)),
     )
     await wine.insert()
 
