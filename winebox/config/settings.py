@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # The production database name. Only the production server is allowed to use it.
 _PRODUCTION_DATABASE = "winebox"
-_PRODUCTION_HOSTS = {"104.248.46.96", "winebox-production"}
+_PRODUCTION_HOSTS = {"104.248.46.96", "winebox-production", "winebox-droplet"}
 
 
 def _check_database_safety(database_name: str, mongodb_url: str) -> None:

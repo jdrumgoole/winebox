@@ -994,7 +994,9 @@ function initForms() {
 
     // Cellar filter
     document.getElementById('cellar-filter').addEventListener('change', loadCellar);
-    document.getElementById('cellar-search').addEventListener('input', debounce(loadCellar, 300));
+
+    // Load sample wines button on cellar welcome panel
+    document.getElementById('cellar-demo-install-btn')?.addEventListener('click', installDemoData);
 
     // Add Wine button on cellar page
     document.getElementById('cellar-add-wine-btn')?.addEventListener('click', () => {
@@ -1868,7 +1870,6 @@ function renderActivityList(transactions) {
 // Cellar
 async function loadCellar() {
     const filter = document.getElementById('cellar-filter').value;
-    const search = document.getElementById('cellar-search').value;
 
     let url = `${API_BASE}/wines?`;
     if (filter === 'in-stock') {
@@ -1879,17 +1880,7 @@ async function loadCellar() {
 
     try {
         const response = await fetchWithAuth(url);
-        let wines = await response.json();
-
-        // Client-side search filter
-        if (search) {
-            const searchLower = search.toLowerCase();
-            wines = wines.filter(w =>
-                w.name.toLowerCase().includes(searchLower) ||
-                (w.winery && w.winery.toLowerCase().includes(searchLower)) ||
-                (w.grape_variety && w.grape_variety.toLowerCase().includes(searchLower))
-            );
-        }
+        const wines = await response.json();
 
         cellarLastWines = wines;
         renderCellarView();
@@ -2037,8 +2028,7 @@ function emptyCellarHtml() {
 function renderCellarTable(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        const hasFilters = document.getElementById('cellar-filter').value !== 'all' ||
-                          document.getElementById('cellar-search').value.trim() !== '';
+        const hasFilters = document.getElementById('cellar-filter').value !== 'all';
         if (hasFilters) {
             container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
         } else {
@@ -2157,8 +2147,7 @@ function renderCellarTable(containerId, wines) {
 function renderWineGrid(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        const hasFilters = document.getElementById('cellar-filter').value !== 'all' ||
-                          document.getElementById('cellar-search').value.trim() !== '';
+        const hasFilters = document.getElementById('cellar-filter').value !== 'all';
         if (hasFilters) {
             container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
         } else {
