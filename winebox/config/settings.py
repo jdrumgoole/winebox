@@ -24,9 +24,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# The production database name. Only the production server is allowed to use it.
+# The production database name. Only the production FQDN is allowed to use it.
+# Using FQDN (set via hostnamectl) rather than droplet names because:
+# - Droplet names can be changed in the DO dashboard by anyone
+# - Hostnames can be changed with a single hostnamectl command
+# - FQDNs are tied to DNS which requires deliberate infrastructure changes
 _PRODUCTION_DATABASE = "winebox"
-_PRODUCTION_HOSTS = {"104.248.46.96", "winebox-production", "winebox-droplet"}
+_PRODUCTION_FQDN = "booze.winebox.app"
 
 
 def _check_database_safety(database_name: str, mongodb_url: str) -> None:
@@ -35,6 +39,9 @@ def _check_database_safety(database_name: str, mongodb_url: str) -> None:
     This is a critical safety check to ensure that local development,
     test environments, and OAT never accidentally connect to the
     production 'winebox' database on Atlas.
+
+    Uses socket.getfqdn() to check the server's FQDN. Only
+    booze.winebox.app is allowed to connect to the production database.
 
     The check only triggers when connecting to a remote MongoDB (Atlas),
     not when using a local MongoDB instance (localhost/127.0.0.1).
@@ -53,14 +60,15 @@ def _check_database_safety(database_name: str, mongodb_url: str) -> None:
     if os.environ.get("WINEBOX_ALLOW_PRODUCTION_DB") == "1":
         return
 
-    # Check if we're running on a known production host
-    hostname = socket.gethostname()
-    if hostname in _PRODUCTION_HOSTS:
+    # Check FQDN — only the production server's FQDN is allowed
+    fqdn = socket.getfqdn()
+    if fqdn == _PRODUCTION_FQDN:
         return
 
     raise RuntimeError(
         f"SAFETY CHECK FAILED: Refusing to connect to production database "
-        f"'{_PRODUCTION_DATABASE}' on remote MongoDB from host '{hostname}'. "
+        f"'{_PRODUCTION_DATABASE}' on remote MongoDB from FQDN '{fqdn}'. "
+        f"Only '{_PRODUCTION_FQDN}' is allowed to use the production database. "
         f"Set WINEBOX_DATABASE to a different database name "
         f"(e.g. 'winebox-oat', 'winebox-dev'). "
         f"If this is genuinely production, set WINEBOX_ALLOW_PRODUCTION_DB=1."
