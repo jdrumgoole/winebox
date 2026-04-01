@@ -149,7 +149,8 @@ async def get_cellar_grouped(
         {"$match": {"status": BottleEventType.ADDED.value}},  # Only bottles in cellar
     ]
 
-    bottles_in_cellar = await bottle_col.aggregate(pipeline).to_list(length=None)
+    cursor = await bottle_col.aggregate(pipeline)
+    bottles_in_cellar = await cursor.to_list(length=None)
 
     # Group by wine_id
     wine_groups: dict[str, dict[str, Any]] = {}

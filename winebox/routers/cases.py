@@ -155,7 +155,8 @@ async def _count_bottles_in_cellar(query: dict[str, Any]) -> int:
         {"$match": {"latest_type": BottleEventType.ADDED.value}},
         {"$count": "count"},
     ]
-    result = await event_col.aggregate(pipeline).to_list(length=1)
+    cursor = await event_col.aggregate(pipeline)
+    result = await cursor.to_list(length=1)
     return result[0]["count"] if result else 0
 
 
