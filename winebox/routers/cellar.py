@@ -8,6 +8,7 @@ from winebox.models import Wine
 from winebox.models.bottle import Bottle
 from winebox.models.bottle_event import BottleEvent, BottleEventType
 from winebox.models.case import Case
+# Bottle/BottleEvent used by /grouped endpoint; Case used by /summary
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
@@ -99,40 +100,12 @@ async def get_cellar_summary(
     by_wine_type = {row["_id"]: row["count"] for row in facets.get("by_wine_type", [])}
     by_price_tier = {row["_id"]: row["count"] for row in facets.get("by_price_tier", [])}
 
-    # Bottle-based counts (if bottles collection is populated)
-    bottle_col = Bottle.get_pymongo_collection()
-    event_col = BottleEvent.get_pymongo_collection()
+    # Case count from cases collection
     case_col = Case.get_pymongo_collection()
-
-    total_bottles_from_bottles = 0
-    total_cases = 0
-
-    bottle_count = await bottle_col.count_documents({"owner_id": current_user.id})
-    if bottle_count > 0:
-        # Count bottles in cellar (latest event = added)
-        pipeline_in_cellar = [
-            {"$match": {"owner_id": current_user.id}},
-            {"$lookup": {
-                "from": "bottle_events",
-                "let": {"bid": "$_id"},
-                "pipeline": [
-                    {"$match": {"$expr": {"$eq": ["$bottle_id", "$$bid"]}}},
-                    {"$sort": {"created_at": -1}},
-                    {"$limit": 1},
-                ],
-                "as": "latest_event",
-            }},
-            {"$match": {"latest_event.0.event_type": BottleEventType.ADDED.value}},
-            {"$count": "count"},
-        ]
-        result_bottles = await bottle_col.aggregate(pipeline_in_cellar).to_list(1)
-        total_bottles_from_bottles = result_bottles[0]["count"] if result_bottles else 0
-
-        # Count non-empty cases
-        total_cases = await case_col.count_documents({"owner_id": current_user.id})
+    total_cases = await case_col.count_documents({"owner_id": current_user.id})
 
     return {
-        "total_bottles": total_bottles_from_bottles if bottle_count > 0 else total_bottles,
+        "total_bottles": total_bottles,
         "unique_wines": unique_wines,
         "total_wines_tracked": total_wines_tracked,
         "total_cases": total_cases,

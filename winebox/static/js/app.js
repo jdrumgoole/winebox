@@ -1872,13 +1872,19 @@ async function loadCellar() {
 
     try {
         // Try bottle-based grouped view first
+        let usedGrouped = false;
         const groupedResp = await fetchWithAuth(`${API_BASE}/cellar/grouped`);
         if (groupedResp.ok) {
             const grouped = await groupedResp.json();
-            cellarGroupedData = grouped;
-            renderGroupedCellar(grouped);
-        } else {
-            // Fallback to legacy wine-based view
+            if (grouped.total_bottles > 0) {
+                cellarGroupedData = grouped;
+                renderGroupedCellar(grouped);
+                usedGrouped = true;
+            }
+        }
+
+        if (!usedGrouped) {
+            // Fallback to legacy wine-based view (no bottle data or empty)
             let url = `${API_BASE}/wines?`;
             if (filter === 'in-stock') url += 'in_stock=true&';
             else if (filter === 'out-of-stock') url += 'in_stock=false&';
