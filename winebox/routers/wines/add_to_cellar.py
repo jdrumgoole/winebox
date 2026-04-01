@@ -93,6 +93,14 @@ async def add_met_wine_to_cellar(
     )
     await cellar_wine.insert()
 
+    # Create bottle records
+    from winebox.services.bottle_service import create_bottles_for_wine
+    await create_bottles_for_wine(
+        owner_id=current_user.id,
+        wine=cellar_wine,
+        quantity=quantity,
+    )
+
     # Create check-in transaction
     transaction = Transaction(
         owner_id=current_user.id,

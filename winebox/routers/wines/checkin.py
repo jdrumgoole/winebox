@@ -200,7 +200,16 @@ async def checkin_wine(
     )
     await wine.insert()
 
-    # Create transaction
+    # Create bottle records (event-sourced tracking)
+    from winebox.services.bottle_service import create_bottles_for_wine
+    await create_bottles_for_wine(
+        owner_id=current_user.id,
+        wine=wine,
+        quantity=quantity,
+        case_size=case_size,
+    )
+
+    # Create transaction (legacy — kept for backward compatibility)
     transaction = Transaction(
         owner_id=current_user.id,
         wine_id=wine.id,

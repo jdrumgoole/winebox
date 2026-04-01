@@ -227,6 +227,11 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
     if not chunk.wine_datas:
         return 0, []
 
+    from bson import ObjectId as _OID
+    # Pre-generate IDs so bottles can reference them after insert_many
+    for wd, _ in chunk.wine_datas:
+        if "_id" not in wd and "id" not in wd:
+            wd["id"] = _OID()
     wine_docs = [Wine(**wd) for wd, _ in chunk.wine_datas]
     errors: list[str] = []
     wines_created = 0
@@ -234,6 +239,19 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
     try:
         await Wine.insert_many(wine_docs)
         wines_created = len(wine_docs)
+
+        # Create bottle records for imported wines
+        from winebox.services.bottle_service import create_bottles_for_wine
+        for wine_doc in wine_docs:
+            qty = wine_doc.inventory.quantity if wine_doc.inventory else 1
+            cs = wine_doc.inventory.case_size if wine_doc.inventory else None
+            if qty > 0:
+                await create_bottles_for_wine(
+                    owner_id=wine_doc.owner_id,
+                    wine=wine_doc,
+                    quantity=qty,
+                    case_size=cs,
+                )
     except BulkWriteError as e:
         n_inserted = e.details.get("nInserted", 0)
         wines_created = n_inserted
