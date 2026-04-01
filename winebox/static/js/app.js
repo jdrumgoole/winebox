@@ -2032,7 +2032,7 @@ function renderGroupedCellar(data) {
             : '';
 
         return `
-            <div class="wine-card">
+            <div class="wine-card" data-wine-id="${wine.wine_id}">
                 <div class="wine-card-header">
                     <h3 class="wine-card-title">${escapeHtml(wine.name)}</h3>
                     ${wine.vintage ? `<span class="wine-card-vintage">${wine.vintage}</span>` : ''}
@@ -2056,6 +2056,13 @@ function renderGroupedCellar(data) {
     }).join('');
 
     container.innerHTML = cards;
+
+    // Wire up click handlers for wine detail modal
+    container.querySelectorAll('.wine-card[data-wine-id]').forEach(card => {
+        card.addEventListener('click', () => {
+            showWineDetail(card.dataset.wineId);
+        });
+    });
 }
 
 function setCellarViewMode(mode) {
