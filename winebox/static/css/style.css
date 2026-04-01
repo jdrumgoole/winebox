@@ -729,6 +729,87 @@ details.advanced-fields .form-grid {
     color: var(--text-muted);
 }
 
+/* Grouped cellar cards — case/bottle breakdown */
+.wine-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 1rem 1.25rem 0;
+}
+
+.wine-card-vintage {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    white-space: nowrap;
+}
+
+.wine-card-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.25rem 1.25rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.wine-card-meta span:not(:last-child)::after {
+    content: "·";
+    margin-left: 0.5rem;
+}
+
+.wine-type-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    margin: 0.25rem 1.25rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: var(--bg-secondary);
+    color: var(--primary-color);
+    width: fit-content;
+}
+
+.wine-card-bottles {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.wine-card-cases {
+    padding: 0 1.25rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.case-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.case-label {
+    font-weight: 600;
+    color: var(--primary-color);
+    min-width: 5rem;
+}
+
+.case-count {
+    color: var(--text-color);
+}
+
+.case-provenance {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-left: auto;
+}
+
 /* Modal */
 .modal {
     display: none;

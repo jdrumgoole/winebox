@@ -52,6 +52,7 @@ let currentUser = null;
 let lastScanResult = null;  // Store last scan result to avoid rescanning on checkin
 let cellarViewMode = 'cards';
 let cellarLastWines = [];
+let cellarGroupedData = null;
 let metViewMode = 'cards';
 let metLastWines = [];
 let selectedMetWineId = null;
@@ -1869,19 +1870,23 @@ function renderActivityList(transactions) {
 async function loadCellar() {
     const filter = document.getElementById('cellar-filter').value;
 
-    let url = `${API_BASE}/wines?`;
-    if (filter === 'in-stock') {
-        url += 'in_stock=true&';
-    } else if (filter === 'out-of-stock') {
-        url += 'in_stock=false&';
-    }
-
     try {
-        const response = await fetchWithAuth(url);
-        const wines = await response.json();
-
-        cellarLastWines = wines;
-        renderCellarView();
+        // Try bottle-based grouped view first
+        const groupedResp = await fetchWithAuth(`${API_BASE}/cellar/grouped`);
+        if (groupedResp.ok) {
+            const grouped = await groupedResp.json();
+            cellarGroupedData = grouped;
+            renderGroupedCellar(grouped);
+        } else {
+            // Fallback to legacy wine-based view
+            let url = `${API_BASE}/wines?`;
+            if (filter === 'in-stock') url += 'in_stock=true&';
+            else if (filter === 'out-of-stock') url += 'in_stock=false&';
+            const response = await fetchWithAuth(url);
+            const wines = await response.json();
+            cellarLastWines = wines;
+            renderCellarView();
+        }
 
         // Update welcome panel — always show but swap button based on demo status
         updateWelcomePanel();
@@ -1939,7 +1944,7 @@ async function loadCellarAnalytics() {
 
         document.getElementById('stat-total-bottles').textContent = summary.total_bottles;
         document.getElementById('stat-unique-wines').textContent = summary.unique_wines;
-        document.getElementById('stat-total-tracked').textContent = summary.total_wines_tracked;
+        document.getElementById('stat-total-cases').textContent = summary.total_cases || 0;
 
         // Render charts
         renderDashboardCharts(summary);
@@ -1994,6 +1999,57 @@ function renderCellarView() {
     if (exportBtn) {
         exportBtn.disabled = cellarLastWines.length === 0;
     }
+}
+
+function renderGroupedCellar(data) {
+    const container = document.getElementById('cellar-list');
+    if (!container) return;
+
+    if (!data.wines || data.wines.length === 0) {
+        container.innerHTML = emptyCellarHtml();
+        return;
+    }
+
+    const cards = data.wines.map(wine => {
+        const casesHtml = wine.cases.length > 0
+            ? wine.cases.map(c => `
+                <div class="case-row">
+                    <span class="case-label">Case (${c.case_size})</span>
+                    <span class="case-count">${c.bottles_remaining}/${c.case_size} bottles</span>
+                    ${c.provenance ? `<span class="case-provenance">${escapeHtml(c.provenance)}</span>` : ''}
+                </div>
+            `).join('')
+            : '';
+
+        const looseHtml = wine.loose_bottles > 0
+            ? `<div class="case-row"><span class="case-label">Loose</span><span class="case-count">${wine.loose_bottles} bottles</span></div>`
+            : '';
+
+        return `
+            <div class="wine-card">
+                <div class="wine-card-header">
+                    <h3 class="wine-card-title">${escapeHtml(wine.name)}</h3>
+                    ${wine.vintage ? `<span class="wine-card-vintage">${wine.vintage}</span>` : ''}
+                </div>
+                <div class="wine-card-meta">
+                    ${wine.winery ? `<span>${escapeHtml(wine.winery)}</span>` : ''}
+                    ${wine.region ? `<span>${escapeHtml(wine.region)}</span>` : ''}
+                    ${wine.country ? `<span>${escapeHtml(wine.country)}</span>` : ''}
+                </div>
+                ${wine.wine_type ? `<span class="wine-type-badge">${escapeHtml(wine.wine_type)}</span>` : ''}
+                <div class="wine-card-bottles">
+                    <strong>${wine.total_bottles} bottle${wine.total_bottles !== 1 ? 's' : ''}</strong>
+                    ${wine.cases.length > 0 ? ` (${wine.cases.length} case${wine.cases.length !== 1 ? 's' : ''})` : ''}
+                </div>
+                <div class="wine-card-cases">
+                    ${casesHtml}
+                    ${looseHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = cards;
 }
 
 function setCellarViewMode(mode) {
