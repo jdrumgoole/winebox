@@ -83,6 +83,6 @@ class TestCheckoutUI:
         page.click("a[data-page='cellar']")
         page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
         expect(page.locator("#remove-reason-picker")).to_be_attached()
-        # Four reason cards: DRINK, SELL, GIFT, OTHER
-        cards = page.locator(".reason-card")
+        # Four reason cards in the remove modal: DRINK, SELL, GIFT, OTHER
+        cards = page.locator("#remove-reason-picker .reason-card")
         expect(cards).to_have_count(4)
