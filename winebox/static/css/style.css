@@ -771,12 +771,6 @@ details.advanced-fields .form-grid {
     width: fit-content;
 }
 
-.wine-card-bottles {
-    padding: 0.5rem 1.25rem;
-    font-size: 0.95rem;
-    color: var(--text-color);
-}
-
 .wine-card-cases {
     padding: 0 1.25rem 1rem;
     display: flex;
@@ -786,10 +780,11 @@ details.advanced-fields .form-grid {
 
 .case-row {
     display: flex;
-    gap: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     align-items: center;
     font-size: 0.85rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.4rem 0.6rem;
     background: var(--bg-secondary);
     border-radius: 4px;
 }
@@ -797,17 +792,25 @@ details.advanced-fields .form-grid {
 .case-label {
     font-weight: 600;
     color: var(--primary-color);
-    min-width: 5rem;
+    white-space: nowrap;
 }
 
 .case-count {
-    color: var(--text-color);
+    color: var(--text-muted);
+    white-space: nowrap;
 }
 
 .case-provenance {
     color: var(--text-muted);
     font-size: 0.8rem;
+    font-style: italic;
+}
+
+.case-action-btn {
     margin-left: auto;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    white-space: nowrap;
 }
 
 /* Modal */

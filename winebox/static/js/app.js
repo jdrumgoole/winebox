@@ -2054,16 +2054,16 @@ function renderGroupedCellar(data) {
         const casesHtml = wine.cases.length > 0
             ? wine.cases.map(c => `
                 <div class="case-row">
-                    <span class="case-label">Case (${c.case_size})</span>
-                    <span class="case-count">${c.bottles_remaining}/${c.case_size} bottles</span>
+                    <span class="case-label">Case of ${c.case_size}</span>
+                    <span class="case-count">${c.bottles_remaining}/${c.case_size} remaining</span>
                     ${c.provenance ? `<span class="case-provenance">${escapeHtml(c.provenance)}</span>` : ''}
-                    ${c.bottles_remaining > 0 ? `<button class="btn btn-small btn-outline case-action-btn" data-case-id="${c.id}" data-remaining="${c.bottles_remaining}">Case Actions</button>` : ''}
+                    ${c.bottles_remaining > 0 ? `<button class="btn btn-small btn-outline case-action-btn" data-case-id="${c.id}" data-remaining="${c.bottles_remaining}">Sell / Gift</button>` : ''}
                 </div>
             `).join('')
             : '';
 
         const looseHtml = wine.loose_bottles > 0
-            ? `<div class="case-row"><span class="case-label">Loose</span><span class="case-count">${wine.loose_bottles} bottles</span></div>`
+            ? `<div class="case-row"><span class="case-label">Loose</span><span class="case-count">${wine.loose_bottles} bottle${wine.loose_bottles !== 1 ? 's' : ''}</span></div>`
             : '';
 
         return `
@@ -2078,16 +2078,12 @@ function renderGroupedCellar(data) {
                     ${wine.country ? `<span>${escapeHtml(wine.country)}</span>` : ''}
                 </div>
                 ${wine.wine_type ? `<span class="wine-type-badge">${escapeHtml(wine.wine_type)}</span>` : ''}
-                <div class="wine-card-bottles">
-                    <strong>${wine.total_bottles} bottle${wine.total_bottles !== 1 ? 's' : ''}</strong>
-                    ${wine.cases.length > 0 ? ` (${wine.cases.length} case${wine.cases.length !== 1 ? 's' : ''})` : ''}
-                </div>
                 <div class="wine-card-cases">
                     ${casesHtml}
                     ${looseHtml}
                 </div>
                 <div class="wine-card-footer">
-                    <span class="wine-quantity">${wine.total_bottles} bottle${wine.total_bottles !== 1 ? 's' : ''}</span>
+                    <span class="wine-quantity">${wine.total_bottles} bottle${wine.total_bottles !== 1 ? 's' : ''}${wine.cases.length > 0 ? ` (${wine.cases.length} case${wine.cases.length !== 1 ? 's' : ''})` : ''}</span>
                     ${wine.total_bottles > 0 ? `<button class="btn btn-small btn-primary remove-btn" data-wine-id="${wine.wine_id}" data-quantity="${wine.total_bottles}">Remove</button>` : ''}
                 </div>
             </div>
