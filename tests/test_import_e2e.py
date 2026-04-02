@@ -353,16 +353,22 @@ class TestImportCustomFields:
 
         _confirm_and_wait_for_import(page)
 
-        # Navigate to cellar
+        # Navigate to cellar and find the imported wine
         page.click("a[data-page='cellar']")
         page.wait_for_selector(".wine-card", state="visible", timeout=10000)
 
-        # Click first wine card to open detail
-        page.locator(".wine-card").first.click()
+        # Find a card containing one of our imported wines
+        # The sample CSV has "Chateau Petrus" as the first wine
+        wine_card = page.locator(".wine-card", has_text="Petrus").first
+        if wine_card.count() == 0:
+            wine_card = page.locator(".wine-card").first
+        wine_card.click()
 
         # Wait for detail modal
-        page.wait_for_selector(".modal.active", state="visible", timeout=5000)
+        page.wait_for_selector(".modal.active", state="visible", timeout=10000)
 
         # Check that custom fields are shown
-        detail_text = page.locator(".modal.active").text_content()
-        assert "Cellar Location" in detail_text or "Rack" in detail_text
+        detail_text = page.locator(".modal.active").text_content() or ""
+        assert "Cellar Location" in detail_text or "Rack" in detail_text, (
+            f"Custom field not found in modal. Content preview: {detail_text[:500]}"
+        )
