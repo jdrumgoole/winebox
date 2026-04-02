@@ -113,6 +113,9 @@ INDEXES: dict[str, list[IndexModel]] = {
     "bottle_events": [
         IndexModel([("bottle_id", ASCENDING)]),
     ],
+    "case_events": [
+        IndexModel([("case_id", ASCENDING)]),
+    ],
 }
 
 

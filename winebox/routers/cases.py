@@ -10,8 +10,9 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from winebox.models.bottle import Bottle
-from winebox.models.bottle_event import BottleEvent, BottleEventType
+from winebox.models.wine_event import WineEvent, WineEventType, BottleEvent, BottleEventType
 from winebox.models.case import Case
+from winebox.models.case_event import CaseEvent, CaseEventType
 from winebox.models.wine import Wine
 from winebox.services.auth import RequireAuth
 
@@ -57,12 +58,23 @@ class AddBottlesRequest(BaseModel):
 
 
 class AddEventRequest(BaseModel):
-    """Request to record a bottle event."""
+    """Request to record a bottle (wine) event."""
 
-    event_type: BottleEventType
+    event_type: WineEventType
     event_date: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=2000)
     tasting_notes: Optional[str] = Field(None, max_length=2000)
+    sale_price: Optional[float] = Field(None, ge=0)
+    buyer: Optional[str] = Field(None, max_length=500)
+    gift_recipient: Optional[str] = Field(None, max_length=500)
+
+
+class AddCaseEventRequest(BaseModel):
+    """Request to record a case-level event (sold, gifted, etc.)."""
+
+    event_type: CaseEventType
+    event_date: Optional[datetime] = None
+    notes: Optional[str] = Field(None, max_length=2000)
     sale_price: Optional[float] = Field(None, ge=0)
     buyer: Optional[str] = Field(None, max_length=500)
     gift_recipient: Optional[str] = Field(None, max_length=500)
@@ -307,4 +319,88 @@ async def get_case(case_id: str, current_user: RequireAuth) -> dict:
         "purchase_price": case.purchase_price,
         "provenance": case.provenance,
         "created_at": case.created_at.isoformat(),
+    }
+
+
+@router.post("/{case_id}/events")
+async def add_case_event(
+    case_id: str,
+    request: AddCaseEventRequest,
+    current_user: RequireAuth,
+) -> dict:
+    """Record a case-level event (sold, gifted, etc.).
+
+    This creates a CaseEvent AND creates corresponding WineEvents for
+    all bottles still in the case, so their individual state is updated.
+    """
+    try:
+        oid = ObjectId(case_id)
+    except InvalidId:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    case = await Case.find_one({"_id": oid, "owner_id": current_user.id})
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    now = request.event_date or datetime.now(timezone.utc)
+
+    # Create case event
+    case_event = CaseEvent(
+        case_id=case.id,
+        owner_id=current_user.id,
+        event_type=request.event_type,
+        event_date=now,
+        notes=request.notes,
+        sale_price=request.sale_price,
+        buyer=request.buyer,
+        gift_recipient=request.gift_recipient,
+    )
+    await case_event.insert()
+
+    # Map case event type to wine event type
+    wine_event_map = {
+        CaseEventType.SOLD: WineEventType.SOLD,
+        CaseEventType.GIFTED: WineEventType.GIFTED,
+        CaseEventType.BREAKAGE: WineEventType.BREAKAGE,
+        CaseEventType.OTHER: WineEventType.OTHER,
+    }
+    wine_event_type = wine_event_map.get(request.event_type)
+
+    bottles_affected = 0
+    if wine_event_type:
+        # Create wine events for all bottles still in cellar
+        bottles = await Bottle.find({"case_id": case.id}).to_list()
+        event_col = WineEvent.get_pymongo_collection()
+
+        wine_events = []
+        for bottle in bottles:
+            latest = await event_col.find_one(
+                {"bottle_id": bottle.id}, sort=[("created_at", -1)]
+            )
+            if latest and latest["event_type"] == WineEventType.ADDED.value:
+                wine_events.append(WineEvent(
+                    bottle_id=bottle.id,
+                    owner_id=current_user.id,
+                    event_type=wine_event_type,
+                    event_date=now,
+                    notes=request.notes,
+                    sale_price=request.sale_price,
+                    buyer=request.buyer,
+                    gift_recipient=request.gift_recipient,
+                ))
+                bottles_affected += 1
+
+        if wine_events:
+            await WineEvent.insert_many(wine_events)
+
+    logger.info(
+        "Case %s event: %s (%d bottles affected, user %s)",
+        case_id, request.event_type.value, bottles_affected, current_user.id,
+    )
+
+    return {
+        "event_id": str(case_event.id),
+        "case_id": case_id,
+        "event_type": request.event_type.value,
+        "bottles_affected": bottles_affected,
     }

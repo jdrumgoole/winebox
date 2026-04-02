@@ -9,7 +9,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException
 
 from winebox.models.bottle import Bottle
-from winebox.models.bottle_event import BottleEvent, BottleEventType
+from winebox.models.wine_event import BottleEvent, BottleEventType
 from winebox.models.wine import Wine
 from winebox.routers.cases import AddBottlesRequest, AddEventRequest, _find_or_create_wine, _bottle_dict
 from winebox.services.auth import RequireAuth

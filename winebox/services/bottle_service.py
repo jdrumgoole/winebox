@@ -12,7 +12,7 @@ from bson import ObjectId
 
 from winebox.db import PyObjectId
 from winebox.models.bottle import Bottle
-from winebox.models.bottle_event import BottleEvent, BottleEventType
+from winebox.models.wine_event import BottleEvent, BottleEventType
 from winebox.models.case import Case
 from winebox.models.wine import Wine
 

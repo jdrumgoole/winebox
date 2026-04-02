@@ -1528,10 +1528,39 @@ async function handleRemoval(e) {
 
         const wine = await response.json();
         const reason = document.getElementById('remove-reason').value;
-        const reasonLabels = { DRINK: 'Recorded', SELL: 'Sale recorded', GIFT: 'Gift recorded', OTHER: 'Removal recorded' };
+        const qty = parseInt(formData.get('quantity')) || 1;
+
+        // Create bottle events for removed bottles
+        const eventType = { DRINK: 'drunk', SELL: 'sold', GIFT: 'gifted', BREAKAGE: 'breakage', OTHER: 'other' }[reason] || 'other';
+        try {
+            // Get bottles for this wine that are still in cellar
+            const bottlesResp = await fetchWithAuth(`${API_BASE}/bottles?wine_id=${wineId}`);
+            if (bottlesResp.ok) {
+                const bottlesData = await bottlesResp.json();
+                const inCellar = bottlesData.bottles.filter(b => b.in_cellar);
+                const toRemove = inCellar.slice(0, qty);
+
+                for (const bottle of toRemove) {
+                    await fetchWithAuth(`${API_BASE}/bottles/${bottle.id}/events`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            event_type: eventType,
+                            tasting_notes: formData.get('tasting_notes') || null,
+                            sale_price: formData.get('sale_price_usd') ? parseFloat(formData.get('sale_price_usd')) : null,
+                            gift_recipient: formData.get('gift_recipient') || null,
+                            notes: formData.get('removal_notes') || null,
+                        }),
+                    });
+                }
+            }
+        } catch (bottleErr) {
+            console.warn('Failed to create bottle events:', bottleErr);
+        }
+
+        const reasonLabels = { DRINK: 'Recorded', SELL: 'Sale recorded', GIFT: 'Gift recorded', BREAKAGE: 'Breakage recorded', OTHER: 'Removal recorded' };
         showToast(`${reasonLabels[reason] || 'Removed'}: ${wine.name}`, 'success');
         closeModals();
-        loadCellar();
         loadCellar();
     } catch (error) {
         showToast(error.message, 'error');

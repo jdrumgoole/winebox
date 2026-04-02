@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 from winebox.models import Wine
 from winebox.models.bottle import Bottle
-from winebox.models.bottle_event import BottleEvent, BottleEventType
+from winebox.models.wine_event import BottleEvent, BottleEventType
 from winebox.models.case import Case
 # Bottle/BottleEvent used by /grouped endpoint; Case used by /summary
 from winebox.models.wine import WineCollection

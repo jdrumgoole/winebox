@@ -242,7 +242,7 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
 
         # Create bottle records in batch (one insert_many for all bottles in chunk)
         from winebox.models.bottle import Bottle
-        from winebox.models.bottle_event import BottleEvent, BottleEventType
+        from winebox.models.wine_event import BottleEvent, BottleEventType
         bottle_batch = []
         event_batch = []
         for wine_doc in wine_docs:

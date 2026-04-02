@@ -265,7 +265,7 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
 
             # Create bottle records for each wine in the batch
             from winebox.models.bottle import Bottle
-            from winebox.models.bottle_event import BottleEvent, BottleEventType
+            from winebox.models.wine_event import BottleEvent, BottleEventType
             bottle_docs = []
             event_docs = []
             for w, (q, ca) in zip(wine_batch, batch_meta):
