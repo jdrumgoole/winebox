@@ -23,8 +23,11 @@ from starlette.responses import StreamingResponse
 
 from winebox.database import get_database
 from winebox.db import PyObjectId
+from winebox.models.bottle import Bottle
+from winebox.models.case import Case
 from winebox.models.transaction import Transaction, TransactionType
 from winebox.models.wine import InventoryInfo, Wine
+from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
 from winebox.services.auth import RequireAuth
 
 logger = logging.getLogger(__name__)
@@ -73,6 +76,22 @@ _CHECKOUT_NOTES = [
     "Celebration dinner",
     "Weekend lunch",
     "Just because",
+]
+
+# Provenance sources for demo cases
+_PROVENANCE_SOURCES = [
+    "Berry Bros & Rudd",
+    "Majestic Wine",
+    "The Wine Society",
+    "Laithwaites",
+    "Corney & Barrow",
+    "Justerini & Brooks",
+    "Tanners Wines",
+    "Averys of Bristol",
+    "Lay & Wheeler",
+    "Direct from winery",
+    "Auction",
+    "Wine fair",
 ]
 
 # In-memory progress tracking per user (keyed by str(owner_id))
@@ -155,7 +174,16 @@ async def _select_demo_wines() -> list[dict[str, Any]]:
         for doc in chosen:
             vintages = _parse_vintages(doc.get("vintages"))
             vintage = random.choice(vintages) if vintages else None
-            quantity = random.choices([1, 2, 3, 4, 6], weights=[30, 25, 20, 15, 10])[0]
+            quantity = random.choices([1, 2, 3, 6, 12], weights=[30, 25, 20, 15, 10])[0]
+
+            # Wines with quantity 6 or 12 become cases
+            case_size = None
+            provenance = None
+            purchase_price = None
+            if quantity in (6, 12):
+                case_size = quantity
+                provenance = random.choice(_PROVENANCE_SOURCES)
+                purchase_price = round(random.uniform(40, 300), 2)
 
             wine_data: dict[str, Any] = {
                 "name": doc["name"],
@@ -168,6 +196,9 @@ async def _select_demo_wines() -> list[dict[str, Any]]:
                 "wine_type_id": _TYPE_MAP.get(wine_type, "red"),
                 "xwines_id": doc.get("xwines_id"),
                 "quantity": quantity,
+                "case_size": case_size,
+                "provenance": provenance,
+                "purchase_price": purchase_price,
             }
             selected.append(wine_data)
 
@@ -193,6 +224,68 @@ async def _select_demo_wines() -> list[dict[str, Any]]:
     return selected[:DEMO_WINE_COUNT]
 
 
+async def _flush_wine_batch(
+    owner_id: PyObjectId,
+    wine_batch: list[Wine],
+    batch_meta: list[tuple[int, datetime, int | None, str | None, float | None]],
+) -> None:
+    """Insert a batch of wines with their transactions, bottles, cases, and events."""
+    await Wine.insert_many(wine_batch)
+
+    txn_batch = [
+        Transaction(
+            owner_id=owner_id,
+            wine_id=w.id,
+            transaction_type=TransactionType.CHECK_IN,
+            quantity=q,
+            transaction_date=ca,
+            created_at=ca,
+        )
+        for w, (q, ca, _cs, _prov, _pp) in zip(wine_batch, batch_meta)
+    ]
+    await Transaction.insert_many(txn_batch)
+
+    bottle_docs: list[Bottle] = []
+    event_docs: list[WineEvent] = []
+    case_docs: list[Case] = []
+
+    for w, (q, ca, case_size, provenance, purchase_price) in zip(wine_batch, batch_meta):
+        case_id = None
+
+        if case_size and case_size > 0:
+            case_id = ObjectId()
+            case_docs.append(Case(
+                id=case_id,
+                owner_id=owner_id,
+                wine_id=w.id,
+                case_size=case_size,
+                purchase_date=ca,
+                purchase_price=purchase_price,
+                provenance=provenance,
+                created_at=ca,
+            ))
+
+        for _ in range(q):
+            bid = ObjectId()
+            bottle_docs.append(Bottle(
+                id=bid, owner_id=owner_id, wine_id=w.id, case_id=case_id,
+                name=w.name, winery=w.winery, vintage=w.vintage,
+                grape_variety=w.grape_variety, country=w.country,
+                region=w.region, wine_type=w.wine_type_id, created_at=ca,
+            ))
+            event_docs.append(WineEvent(
+                scope=WineEventScope.BOTTLE,
+                bottle_id=bid, owner_id=owner_id,
+                event_type=WineEventType.ADDED, event_date=ca, created_at=ca,
+            ))
+
+    if case_docs:
+        await Case.insert_many(case_docs)
+    if bottle_docs:
+        await Bottle.insert_many(bottle_docs)
+        await WineEvent.insert_many(event_docs)
+
+
 async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) -> None:
     """Background task: insert demo wines and update progress."""
     owner_str = str(owner_id)
@@ -210,15 +303,17 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
         "total": total,
     }
 
-    # Batch insert for speed — collect wines in chunks, insert, then create transactions
     BATCH_SIZE = 50
     wine_batch: list[Wine] = []
-    batch_meta: list[tuple[int, datetime]] = []  # (quantity, created_at) per wine
+    batch_meta: list[tuple[int, datetime, int | None, str | None, float | None]] = []
 
     for i, wine_data in enumerate(sample_wines):
         data = dict(wine_data)
         quantity = data.pop("quantity", 1)
         xwines_id = data.pop("xwines_id", None)
+        case_size = data.pop("case_size", None)
+        provenance = data.pop("provenance", None)
+        purchase_price = data.pop("purchase_price", None)
 
         days_ago = total - i
         created_at = now - timedelta(days=days_ago)
@@ -235,7 +330,7 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
             **data,
         )
         wine_batch.append(wine)
-        batch_meta.append((quantity, created_at))
+        batch_meta.append((quantity, created_at, case_size, provenance, purchase_price))
 
         total_bottles += quantity
         if data.get("country"):
@@ -248,43 +343,7 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
 
         # Flush batch
         if len(wine_batch) >= BATCH_SIZE:
-            await Wine.insert_many(wine_batch)
-            # Now wine.id is set — create transactions
-            txn_batch = [
-                Transaction(
-                    owner_id=owner_id,
-                    wine_id=w.id,
-                    transaction_type=TransactionType.CHECK_IN,
-                    quantity=q,
-                    transaction_date=ca,
-                    created_at=ca,
-                )
-                for w, (q, ca) in zip(wine_batch, batch_meta)
-            ]
-            await Transaction.insert_many(txn_batch)
-
-            # Create bottle records for each wine in the batch
-            from winebox.models.bottle import Bottle
-            from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
-            bottle_docs = []
-            event_docs = []
-            for w, (q, ca) in zip(wine_batch, batch_meta):
-                for _ in range(q):
-                    bid = ObjectId()
-                    bottle_docs.append(Bottle(
-                        id=bid, owner_id=owner_id, wine_id=w.id, case_id=None,
-                        name=w.name, winery=w.winery, vintage=w.vintage,
-                        grape_variety=w.grape_variety, country=w.country,
-                        region=w.region, wine_type=w.wine_type_id, created_at=ca,
-                    ))
-                    event_docs.append(WineEvent(scope=WineEventScope.BOTTLE, 
-                        bottle_id=bid, owner_id=owner_id,
-                        event_type=WineEventType.ADDED, event_date=ca, created_at=ca,
-                    ))
-            if bottle_docs:
-                await Bottle.insert_many(bottle_docs)
-                await WineEvent.insert_many(event_docs)
-
+            await _flush_wine_batch(owner_id, wine_batch, batch_meta)
             wines_created += len(wine_batch)
             wine_batch.clear()
             batch_meta.clear()
@@ -297,39 +356,7 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
 
     # Flush remaining
     if wine_batch:
-        await Wine.insert_many(wine_batch)
-        txn_batch = [
-            Transaction(
-                owner_id=owner_id,
-                wine_id=w.id,
-                transaction_type=TransactionType.CHECK_IN,
-                quantity=q,
-                transaction_date=ca,
-                created_at=ca,
-            )
-            for w, (q, ca) in zip(wine_batch, batch_meta)
-        ]
-        await Transaction.insert_many(txn_batch)
-
-        # Create bottle records for remaining batch
-        bottle_docs = []
-        event_docs = []
-        for w, (q, ca) in zip(wine_batch, batch_meta):
-            for _ in range(q):
-                bid = ObjectId()
-                bottle_docs.append(Bottle(
-                    id=bid, owner_id=owner_id, wine_id=w.id, case_id=None,
-                    name=w.name, winery=w.winery, vintage=w.vintage,
-                    grape_variety=w.grape_variety, country=w.country,
-                    region=w.region, wine_type=w.wine_type_id, created_at=ca,
-                ))
-                event_docs.append(WineEvent(scope=WineEventScope.BOTTLE, 
-                    bottle_id=bid, owner_id=owner_id,
-                    event_type=WineEventType.ADDED, event_date=ca, created_at=ca,
-                ))
-        if bottle_docs:
-            await Bottle.insert_many(bottle_docs)
-            await WineEvent.insert_many(event_docs)
+        await _flush_wine_batch(owner_id, wine_batch, batch_meta)
         wines_created += len(wine_batch)
 
     # Create checkout transactions in batch
@@ -486,6 +513,30 @@ async def remove_demo(current_user: RequireAuth) -> DemoRemoveResponse:
 
     demo_wine_ids = [w.id for w in demo_wines]
 
+    # Delete bottles and their events for demo wines
+    demo_bottles = await Bottle.find(
+        {"owner_id": current_user.id, "wine_id": {"$in": demo_wine_ids}}
+    ).to_list()
+    demo_bottle_ids = [b.id for b in demo_bottles]
+
+    if demo_bottle_ids:
+        await WineEvent.get_pymongo_collection().delete_many(
+            {"owner_id": current_user.id, "bottle_id": {"$in": demo_bottle_ids}}
+        )
+        await Bottle.get_pymongo_collection().delete_many(
+            {"owner_id": current_user.id, "wine_id": {"$in": demo_wine_ids}}
+        )
+
+    # Delete cases and case-level events for demo wines
+    demo_case_ids = list({b.case_id for b in demo_bottles if b.case_id})
+    if demo_case_ids:
+        await WineEvent.get_pymongo_collection().delete_many(
+            {"owner_id": current_user.id, "case_id": {"$in": demo_case_ids}}
+        )
+    await Case.get_pymongo_collection().delete_many(
+        {"owner_id": current_user.id, "wine_id": {"$in": demo_wine_ids}}
+    )
+
     txn_result = await Transaction.get_pymongo_collection().delete_many(
         {"owner_id": current_user.id, "wine_id": {"$in": demo_wine_ids}}
     )
@@ -495,8 +546,9 @@ async def remove_demo(current_user: RequireAuth) -> DemoRemoveResponse:
     )
 
     logger.info(
-        "Demo data removed for user %s: %d wines, %d transactions",
+        "Demo data removed for user %s: %d wines, %d transactions, %d bottles, %d cases",
         current_user.id, wine_result.deleted_count, txn_result.deleted_count,
+        len(demo_bottle_ids), len(demo_case_ids),
     )
 
     return DemoRemoveResponse(
