@@ -4,7 +4,7 @@
 For each Wine record with quantity > 0:
 - If case_size is set: create a Case + N Bottles linked to it
 - If no case_size: create N loose Bottles
-- Create 'added' BottleEvent for each Bottle
+- Create 'added' WineEvent for each Bottle
 
 This is idempotent — wines that already have bottles are skipped.
 
@@ -44,7 +44,7 @@ async def migrate(database: str, dry_run: bool = False) -> None:
     wines_col = db["wines"]
     cases_col = db["cases"]
     bottles_col = db["bottles"]
-    events_col = db["bottle_events"]
+    events_col = db["wine_events"]
 
     # Find wines with quantity > 0 that don't already have bottles
     wines_cursor = wines_col.find({"inventory.quantity": {"$gt": 0}})
@@ -120,6 +120,7 @@ async def migrate(database: str, dry_run: bool = False) -> None:
                 "_id": ObjectId(),
                 "bottle_id": bottle_id,
                 "owner_id": owner_id,
+                "scope": "bottle",
                 "event_type": "added",
                 "event_date": now,
                 "created_at": now,

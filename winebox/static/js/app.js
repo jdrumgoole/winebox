@@ -2002,27 +2002,6 @@ async function loadCellarAnalytics() {
     }
 }
 
-async function checkDemoBanner() {
-    const container = document.getElementById('cellar-demo-banner-container');
-    if (!container) return;
-    container.innerHTML = '';
-
-    try {
-        const resp = await fetchWithAuth(`${API_BASE}/demo/status`);
-        if (!resp.ok) return;
-        const status = await resp.json();
-        if (status.installed && status.wine_count > 0) {
-            container.innerHTML = `
-                <div class="demo-banner" id="demo-banner">
-                    <span>Sample wines (${status.wine_count} wines, ${status.bottle_count} bottles)</span>
-                    <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove</button>
-                </div>
-            `;
-            document.getElementById('demo-remove-btn').addEventListener('click', removeDemoData);
-        }
-    } catch (e) { /* demo endpoint may not exist */ }
-}
-
 function renderCellarView() {
     if (cellarViewMode === 'table') {
         renderCellarTable('cellar-list', cellarLastWines);
@@ -2080,6 +2059,10 @@ function renderGroupedCellar(data) {
                     ${casesHtml}
                     ${looseHtml}
                 </div>
+                <div class="wine-card-footer">
+                    <span class="wine-quantity">${wine.total_bottles} bottle${wine.total_bottles !== 1 ? 's' : ''}</span>
+                    ${wine.total_bottles > 0 ? `<button class="btn btn-small btn-primary remove-btn" data-wine-id="${wine.wine_id}" data-quantity="${wine.total_bottles}">Remove</button>` : ''}
+                </div>
             </div>
         `;
     }).join('');
@@ -2088,8 +2071,85 @@ function renderGroupedCellar(data) {
 
     // Wire up click handlers for wine detail modal
     container.querySelectorAll('.wine-card[data-wine-id]').forEach(card => {
-        card.addEventListener('click', () => {
-            showWineDetail(card.dataset.wineId);
+        card.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('remove-btn')) {
+                showWineDetail(card.dataset.wineId);
+            }
+        });
+    });
+
+    // Wire up remove buttons
+    container.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openRemoveModal(btn.dataset.wineId, btn.dataset.quantity);
+        });
+    });
+}
+
+function renderGroupedCellarTable(data) {
+    const container = document.getElementById('cellar-list');
+    if (!container) return;
+
+    if (!data.wines || data.wines.length === 0) {
+        container.innerHTML = emptyCellarHtml();
+        return;
+    }
+
+    const rows = data.wines.map(wine => {
+        const caseInfo = wine.cases.length > 0
+            ? wine.cases.map(c => `${c.bottles_remaining}/${c.case_size}${c.provenance ? ' (' + escapeHtml(c.provenance) + ')' : ''}`).join(', ')
+            : '';
+        const looseInfo = wine.loose_bottles > 0 ? `${wine.loose_bottles} loose` : '';
+        const breakdown = [caseInfo, looseInfo].filter(Boolean).join(' + ');
+
+        return `
+            <tr class="cellar-table-row" data-wine-id="${wine.wine_id}">
+                <td>${escapeHtml(wine.name)}</td>
+                <td>${wine.vintage || '\u2014'}</td>
+                <td>${wine.wine_type ? escapeHtml(wine.wine_type) : '\u2014'}</td>
+                <td>${wine.country ? escapeHtml(wine.country) : '\u2014'}</td>
+                <td>${wine.total_bottles}</td>
+                <td>${breakdown}</td>
+                <td>
+                    ${wine.total_bottles > 0 ? `<button class="btn btn-small btn-primary remove-btn" data-wine-id="${wine.wine_id}" data-quantity="${wine.total_bottles}">Remove</button>` : ''}
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <table class="cellar-table">
+            <thead>
+                <tr>
+                    <th>Wine</th>
+                    <th>Vintage</th>
+                    <th>Type</th>
+                    <th>Country</th>
+                    <th>Bottles</th>
+                    <th>Breakdown</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+
+    // Wire up click handlers for wine detail modal
+    container.querySelectorAll('.cellar-table-row[data-wine-id]').forEach(row => {
+        row.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('remove-btn')) {
+                showWineDetail(row.dataset.wineId);
+            }
+        });
+        row.style.cursor = 'pointer';
+    });
+
+    // Wire up remove buttons
+    container.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openRemoveModal(btn.dataset.wineId, btn.dataset.quantity);
         });
     });
 }
@@ -2108,7 +2168,14 @@ function setCellarViewMode(mode) {
         cellarList.classList.add('wine-grid');
     }
 
-    if (cellarLastWines.length > 0) {
+    // Re-render with whichever data source we have
+    if (cellarGroupedData && cellarGroupedData.total_bottles > 0) {
+        if (mode === 'table') {
+            renderGroupedCellarTable(cellarGroupedData);
+        } else {
+            renderGroupedCellar(cellarGroupedData);
+        }
+    } else if (cellarLastWines.length > 0) {
         renderCellarView();
     }
 }
@@ -2514,7 +2581,6 @@ function deleteWine(wineId) {
             });
             if (!response.ok) throw new Error('Delete failed');
             showToast('Wine deleted', 'success');
-            loadCellar();
             loadCellar();
         } catch (error) {
             showToast('Failed to delete wine', 'error');
@@ -3054,7 +3120,6 @@ async function handleDeleteCollection() {
         const result = await response.json();
         closeModals();
         showToast(`Deleted ${result.deleted_wines} wines, ${result.deleted_transactions} transactions`, 'success');
-        loadCellar();
         loadCellar();
         resetImportPage();
     } catch (error) {
