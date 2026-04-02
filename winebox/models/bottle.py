@@ -1,7 +1,7 @@
 """Bottle model — an individual, immutable wine bottle.
 
 Each bottle is a write-once record representing a physical bottle of wine.
-The bottle never changes — its lifecycle state is tracked via BottleEvent
+The bottle never changes — its lifecycle state is tracked via WineEvent
 records (event sourcing). Wine metadata is denormalised at creation time
 so the cellar can be rendered without joining to the Wine collection.
 """

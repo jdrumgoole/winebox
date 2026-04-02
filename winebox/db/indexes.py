@@ -110,10 +110,8 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("case_id", ASCENDING)]),
         IndexModel([("owner_id", ASCENDING), ("wine_id", ASCENDING)]),
     ],
-    "bottle_events": [
+    "wine_events": [
         IndexModel([("bottle_id", ASCENDING)]),
-    ],
-    "case_events": [
         IndexModel([("case_id", ASCENDING)]),
     ],
 }

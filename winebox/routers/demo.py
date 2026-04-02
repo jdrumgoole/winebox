@@ -265,7 +265,7 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
 
             # Create bottle records for each wine in the batch
             from winebox.models.bottle import Bottle
-            from winebox.models.wine_event import BottleEvent, BottleEventType
+            from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
             bottle_docs = []
             event_docs = []
             for w, (q, ca) in zip(wine_batch, batch_meta):
@@ -277,13 +277,13 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
                         grape_variety=w.grape_variety, country=w.country,
                         region=w.region, wine_type=w.wine_type_id, created_at=ca,
                     ))
-                    event_docs.append(BottleEvent(
+                    event_docs.append(WineEvent(scope=WineEventScope.BOTTLE, 
                         bottle_id=bid, owner_id=owner_id,
-                        event_type=BottleEventType.ADDED, event_date=ca, created_at=ca,
+                        event_type=WineEventType.ADDED, event_date=ca, created_at=ca,
                     ))
             if bottle_docs:
                 await Bottle.insert_many(bottle_docs)
-                await BottleEvent.insert_many(event_docs)
+                await WineEvent.insert_many(event_docs)
 
             wines_created += len(wine_batch)
             wine_batch.clear()
@@ -323,13 +323,13 @@ async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) 
                     grape_variety=w.grape_variety, country=w.country,
                     region=w.region, wine_type=w.wine_type_id, created_at=ca,
                 ))
-                event_docs.append(BottleEvent(
+                event_docs.append(WineEvent(scope=WineEventScope.BOTTLE, 
                     bottle_id=bid, owner_id=owner_id,
-                    event_type=BottleEventType.ADDED, event_date=ca, created_at=ca,
+                    event_type=WineEventType.ADDED, event_date=ca, created_at=ca,
                 ))
         if bottle_docs:
             await Bottle.insert_many(bottle_docs)
-            await BottleEvent.insert_many(event_docs)
+            await WineEvent.insert_many(event_docs)
         wines_created += len(wine_batch)
 
     # Create checkout transactions in batch

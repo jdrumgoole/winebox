@@ -1,7 +1,7 @@
 """Bottle creation service — shared logic for all wine addition paths.
 
 Whenever wine bottles enter the cellar (checkin, import, demo, met-to-cellar),
-this service creates the corresponding Bottle + BottleEvent records.
+this service creates the corresponding Bottle + WineEvent records.
 """
 
 import logging
@@ -12,7 +12,7 @@ from bson import ObjectId
 
 from winebox.db import PyObjectId
 from winebox.models.bottle import Bottle
-from winebox.models.wine_event import BottleEvent, BottleEventType
+from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
 from winebox.models.case import Case
 from winebox.models.wine import Wine
 
@@ -30,7 +30,7 @@ async def create_bottles_for_wine(
     provenance: Optional[str] = None,
     created_at: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """Create Bottle and BottleEvent records for wine entering the cellar.
+    """Create Bottle and WineEvent records for wine entering the cellar.
 
     Args:
         owner_id: Owner's ID.
@@ -86,16 +86,16 @@ async def create_bottles_for_wine(
             await Bottle.insert_many(bottles)
 
             events = [
-                BottleEvent(
+                WineEvent(scope=WineEventScope.BOTTLE, 
                     bottle_id=bid,
                     owner_id=owner_id,
-                    event_type=BottleEventType.ADDED,
+                    event_type=WineEventType.ADDED,
                     event_date=now,
                     created_at=now,
                 )
                 for bid in bottle_ids
             ]
-            await BottleEvent.insert_many(events)
+            await WineEvent.insert_many(events)
             all_bottle_ids.extend(bottle_ids)
     else:
         # Create loose bottles
@@ -120,16 +120,16 @@ async def create_bottles_for_wine(
         await Bottle.insert_many(bottles)
 
         events = [
-            BottleEvent(
+            WineEvent(scope=WineEventScope.BOTTLE, 
                 bottle_id=bid,
                 owner_id=owner_id,
-                event_type=BottleEventType.ADDED,
+                event_type=WineEventType.ADDED,
                 event_date=now,
                 created_at=now,
             )
             for bid in bottle_ids
         ]
-        await BottleEvent.insert_many(events)
+        await WineEvent.insert_many(events)
         all_bottle_ids.extend(bottle_ids)
 
     total_bottles = len(all_bottle_ids)

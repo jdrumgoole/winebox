@@ -96,7 +96,7 @@ async def test_bottle_is_immutable(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_remove_bottle_from_case(client: AsyncClient) -> None:
-    """Removing a bottle creates a BottleEvent and decrements case count."""
+    """Removing a bottle creates a WineEvent and decrements case count."""
     # Create a case
     case_resp = await client.post("/api/cases", json={
         "name": "Test Case Wine",

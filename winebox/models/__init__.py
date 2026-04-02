@@ -14,8 +14,7 @@ from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.import_batch_row import RawUploadRow
 from winebox.models.case import Case
 from winebox.models.bottle import Bottle
-from winebox.models.wine_event import WineEvent, WineEventType, BottleEvent, BottleEventType
-from winebox.models.case_event import CaseEvent, CaseEventType
+from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
 
 __all__ = [
     # Main documents
@@ -48,8 +47,5 @@ __all__ = [
     "Bottle",
     "WineEvent",
     "WineEventType",
-    "BottleEvent",      # backward-compatible alias for WineEvent
-    "BottleEventType",  # backward-compatible alias for WineEventType
-    "CaseEvent",
-    "CaseEventType",
+    "WineEventScope",
 ]

@@ -242,7 +242,7 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
 
         # Create bottle records in batch (one insert_many for all bottles in chunk)
         from winebox.models.bottle import Bottle
-        from winebox.models.wine_event import BottleEvent, BottleEventType
+        from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
         bottle_batch = []
         event_batch = []
         for wine_doc in wine_docs:
@@ -258,13 +258,13 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
                     country=wine_doc.country, region=wine_doc.region,
                     wine_type=wine_doc.wine_type_id,
                 ))
-                event_batch.append(BottleEvent(
+                event_batch.append(WineEvent(scope=WineEventScope.BOTTLE, 
                     bottle_id=bid, owner_id=wine_doc.owner_id,
-                    event_type=BottleEventType.ADDED,
+                    event_type=WineEventType.ADDED,
                 ))
         if bottle_batch:
             await Bottle.insert_many(bottle_batch)
-            await BottleEvent.insert_many(event_batch)
+            await WineEvent.insert_many(event_batch)
     except BulkWriteError as e:
         n_inserted = e.details.get("nInserted", 0)
         wines_created = n_inserted

@@ -10,9 +10,9 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from winebox.models.bottle import Bottle
-from winebox.models.wine_event import WineEvent, WineEventType, BottleEvent, BottleEventType
+from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
 from winebox.models.case import Case
-from winebox.models.case_event import CaseEvent, CaseEventType
+
 from winebox.models.wine import Wine
 from winebox.services.auth import RequireAuth
 
@@ -72,7 +72,7 @@ class AddEventRequest(BaseModel):
 class AddCaseEventRequest(BaseModel):
     """Request to record a case-level event (sold, gifted, etc.)."""
 
-    event_type: CaseEventType
+    event_type: WineEventType
     event_date: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=2000)
     sale_price: Optional[float] = Field(None, ge=0)
@@ -138,9 +138,9 @@ def _bottle_dict(
     }
 
 
-async def _get_latest_event(bottle_id: Any) -> BottleEvent | None:
+async def _get_latest_event(bottle_id: Any) -> WineEvent | None:
     """Get the most recent event for a bottle."""
-    events = await BottleEvent.find(
+    events = await WineEvent.find(
         {"bottle_id": bottle_id}
     ).sort([("created_at", -1)]).limit(1).to_list()
     return events[0] if events else None
@@ -150,7 +150,7 @@ async def _count_bottles_in_cellar(query: dict[str, Any]) -> int:
     """Count bottles whose latest event is 'added' (still in cellar)."""
     # Get all bottle IDs matching the query
     bottle_col = Bottle.get_pymongo_collection()
-    event_col = BottleEvent.get_pymongo_collection()
+    event_col = WineEvent.get_pymongo_collection()
 
     bottle_ids = [
         doc["_id"]
@@ -164,7 +164,7 @@ async def _count_bottles_in_cellar(query: dict[str, Any]) -> int:
         {"$match": {"bottle_id": {"$in": bottle_ids}}},
         {"$sort": {"created_at": -1}},
         {"$group": {"_id": "$bottle_id", "latest_type": {"$first": "$event_type"}}},
-        {"$match": {"latest_type": BottleEventType.ADDED.value}},
+        {"$match": {"latest_type": WineEventType.ADDED.value}},
         {"$count": "count"},
     ]
     cursor = await event_col.aggregate(pipeline)
@@ -217,16 +217,16 @@ async def add_cases(request: AddCaseRequest, current_user: RequireAuth) -> dict:
 
         # Create 'added' events
         events = [
-            BottleEvent(
+            WineEvent(scope=WineEventScope.BOTTLE, 
                 bottle_id=bid,
                 owner_id=current_user.id,
-                event_type=BottleEventType.ADDED,
+                event_type=WineEventType.ADDED,
                 event_date=now,
                 created_at=now,
             )
             for bid in bottle_ids
         ]
-        await BottleEvent.insert_many(events)
+        await WineEvent.insert_many(events)
 
         total_bottles += request.case_size
         cases_created.append({
@@ -285,7 +285,7 @@ async def get_case(case_id: str, current_user: RequireAuth) -> dict:
 
     # Get all bottles in this case
     bottles = await Bottle.find({"case_id": case.id}).to_list()
-    event_col = BottleEvent.get_pymongo_collection()
+    event_col = WineEvent.get_pymongo_collection()
 
     bottle_list = []
     bottles_remaining = 0
@@ -296,7 +296,7 @@ async def get_case(case_id: str, current_user: RequireAuth) -> dict:
             sort=[("created_at", -1)],
         )
         status = latest["event_type"] if latest else "unknown"
-        in_cellar = status == BottleEventType.ADDED.value
+        in_cellar = status == WineEventType.ADDED.value
 
         if in_cellar:
             bottles_remaining += 1
@@ -345,7 +345,7 @@ async def add_case_event(
     now = request.event_date or datetime.now(timezone.utc)
 
     # Create case event
-    case_event = CaseEvent(
+    case_event = WineEvent(scope=WineEventScope.CASE, 
         case_id=case.id,
         owner_id=current_user.id,
         event_type=request.event_type,
@@ -359,10 +359,10 @@ async def add_case_event(
 
     # Map case event type to wine event type
     wine_event_map = {
-        CaseEventType.SOLD: WineEventType.SOLD,
-        CaseEventType.GIFTED: WineEventType.GIFTED,
-        CaseEventType.BREAKAGE: WineEventType.BREAKAGE,
-        CaseEventType.OTHER: WineEventType.OTHER,
+        WineEventType.SOLD: WineEventType.SOLD,
+        WineEventType.GIFTED: WineEventType.GIFTED,
+        WineEventType.BREAKAGE: WineEventType.BREAKAGE,
+        WineEventType.OTHER: WineEventType.OTHER,
     }
     wine_event_type = wine_event_map.get(request.event_type)
 

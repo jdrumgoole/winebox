@@ -9,7 +9,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException
 
 from winebox.models.bottle import Bottle
-from winebox.models.wine_event import BottleEvent, BottleEventType
+from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
 from winebox.models.wine import Wine
 from winebox.routers.cases import AddBottlesRequest, AddEventRequest, _find_or_create_wine, _bottle_dict
 from winebox.services.auth import RequireAuth
@@ -42,16 +42,16 @@ async def add_loose_bottles(request: AddBottlesRequest, current_user: RequireAut
     await Bottle.insert_many(bottles)
 
     events = [
-        BottleEvent(
+        WineEvent(scope=WineEventScope.BOTTLE, 
             bottle_id=bid,
             owner_id=current_user.id,
-            event_type=BottleEventType.ADDED,
+            event_type=WineEventType.ADDED,
             event_date=now,
             created_at=now,
         )
         for bid in bottle_ids
     ]
-    await BottleEvent.insert_many(events)
+    await WineEvent.insert_many(events)
 
     logger.info(
         "Created %d loose bottles of %s for user %s",
@@ -78,7 +78,7 @@ async def list_bottles(
             raise HTTPException(status_code=400, detail="Invalid wine_id")
 
     bottles = await Bottle.find(query).sort([("created_at", -1)]).to_list()
-    event_col = BottleEvent.get_pymongo_collection()
+    event_col = WineEvent.get_pymongo_collection()
 
     result = []
     for bottle in bottles:
@@ -100,7 +100,7 @@ async def list_bottles(
             "region": bottle.region,
             "wine_type": bottle.wine_type,
             "status": latest_type,
-            "in_cellar": latest_type == BottleEventType.ADDED.value,
+            "in_cellar": latest_type == WineEventType.ADDED.value,
             "created_at": bottle.created_at.isoformat(),
         })
 
@@ -128,13 +128,13 @@ async def add_bottle_event(
         raise HTTPException(status_code=404, detail="Bottle not found")
 
     # Don't allow 'added' events via this endpoint (use add_cases/add_loose_bottles)
-    if request.event_type == BottleEventType.ADDED:
+    if request.event_type == WineEventType.ADDED:
         raise HTTPException(
             status_code=400,
             detail="Cannot manually add 'added' events. Use the add cases/bottles endpoints.",
         )
 
-    event = BottleEvent(
+    event = WineEvent(scope=WineEventScope.BOTTLE, 
         bottle_id=bottle.id,
         owner_id=current_user.id,
         event_type=request.event_type,
@@ -161,7 +161,7 @@ async def add_bottle_event(
 
 
 @router.get("/{bottle_id}/events")
-async def get_bottle_events(
+async def get_wine_events(
     bottle_id: str,
     current_user: RequireAuth,
 ) -> dict:
@@ -175,7 +175,7 @@ async def get_bottle_events(
     if not bottle:
         raise HTTPException(status_code=404, detail="Bottle not found")
 
-    events = await BottleEvent.find(
+    events = await WineEvent.find(
         {"bottle_id": bottle.id}
     ).sort([("created_at", -1)]).to_list()
 

@@ -6,9 +6,9 @@ from fastapi import APIRouter
 
 from winebox.models import Wine
 from winebox.models.bottle import Bottle
-from winebox.models.wine_event import BottleEvent, BottleEventType
+from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
 from winebox.models.case import Case
-# Bottle/BottleEvent used by /grouped endpoint; Case used by /summary
+# Bottle/WineEvent used by /grouped endpoint; Case used by /summary
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
@@ -127,14 +127,14 @@ async def get_cellar_grouped(
     the bottles collection (event-sourced state).
     """
     bottle_col = Bottle.get_pymongo_collection()
-    event_col = BottleEvent.get_pymongo_collection()
+    event_col = WineEvent.get_pymongo_collection()
     case_col = Case.get_pymongo_collection()
 
     # Get all bottles for this user with their latest event
     pipeline = [
         {"$match": {"owner_id": current_user.id}},
         {"$lookup": {
-            "from": "bottle_events",
+            "from": "wine_events",
             "let": {"bid": "$_id"},
             "pipeline": [
                 {"$match": {"$expr": {"$eq": ["$bottle_id", "$$bid"]}}},
@@ -146,7 +146,7 @@ async def get_cellar_grouped(
         {"$addFields": {
             "status": {"$ifNull": [{"$arrayElemAt": ["$latest_event.event_type", 0]}, "unknown"]},
         }},
-        {"$match": {"status": BottleEventType.ADDED.value}},  # Only bottles in cellar
+        {"$match": {"status": WineEventType.ADDED.value}},  # Only bottles in cellar
     ]
 
     cursor = await bottle_col.aggregate(pipeline)
