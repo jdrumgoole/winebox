@@ -985,10 +985,29 @@ function initForms() {
     // Remove form
     document.getElementById('remove-form').addEventListener('submit', handleRemoval);
 
-    // Reason picker cards
-    document.querySelectorAll('.reason-card').forEach(card => {
+    // Reason picker cards (remove modal only — not case action cards)
+    document.querySelectorAll('#remove-reason-picker .reason-card').forEach(card => {
         card.addEventListener('click', () => selectRemovalReason(card.dataset.reason));
     });
+
+    // Case action reason cards
+    document.querySelectorAll('.case-reason-card').forEach(card => {
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.case-reason-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            // Show/hide context fields based on reason
+            document.querySelectorAll('.case-action-context').forEach(el => el.style.display = 'none');
+            const reason = card.dataset.reason;
+            if (reason === 'sold') {
+                document.getElementById('case-action-sold-fields').style.display = 'block';
+            } else if (reason === 'gifted') {
+                document.getElementById('case-action-gifted-fields').style.display = 'block';
+            }
+        });
+    });
+
+    // Case action confirm button
+    document.getElementById('case-action-confirm-btn')?.addEventListener('click', handleCaseAction);
 
     // Back button in remove modal
     document.getElementById('remove-back-btn').addEventListener('click', resetRemovalPicker);
@@ -1900,20 +1919,27 @@ async function loadCellar() {
     const filter = document.getElementById('cellar-filter').value;
 
     try {
-        // Try bottle-based grouped view first
+        // "out-of-stock" filter: skip grouped view (it only has in-cellar bottles)
         let usedGrouped = false;
-        const groupedResp = await fetchWithAuth(`${API_BASE}/cellar/grouped`);
-        if (groupedResp.ok) {
-            const grouped = await groupedResp.json();
-            if (grouped.total_bottles > 0) {
-                cellarGroupedData = grouped;
-                renderGroupedCellar(grouped);
-                usedGrouped = true;
+        if (filter !== 'out-of-stock') {
+            const groupedResp = await fetchWithAuth(`${API_BASE}/cellar/grouped`);
+            if (groupedResp.ok) {
+                const grouped = await groupedResp.json();
+                if (grouped.total_bottles > 0) {
+                    cellarGroupedData = grouped;
+                    if (cellarViewMode === 'table') {
+                        renderGroupedCellarTable(grouped);
+                    } else {
+                        renderGroupedCellar(grouped);
+                    }
+                    usedGrouped = true;
+                }
             }
         }
 
         if (!usedGrouped) {
-            // Fallback to legacy wine-based view (no bottle data or empty)
+            // Fallback to legacy wine-based view
+            cellarGroupedData = null;
             let url = `${API_BASE}/wines?`;
             if (filter === 'in-stock') url += 'in_stock=true&';
             else if (filter === 'out-of-stock') url += 'in_stock=false&';
@@ -2031,6 +2057,7 @@ function renderGroupedCellar(data) {
                     <span class="case-label">Case (${c.case_size})</span>
                     <span class="case-count">${c.bottles_remaining}/${c.case_size} bottles</span>
                     ${c.provenance ? `<span class="case-provenance">${escapeHtml(c.provenance)}</span>` : ''}
+                    ${c.bottles_remaining > 0 ? `<button class="btn btn-small btn-outline case-action-btn" data-case-id="${c.id}" data-remaining="${c.bottles_remaining}">Case Actions</button>` : ''}
                 </div>
             `).join('')
             : '';
@@ -2072,7 +2099,7 @@ function renderGroupedCellar(data) {
     // Wire up click handlers for wine detail modal
     container.querySelectorAll('.wine-card[data-wine-id]').forEach(card => {
         card.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('remove-btn')) {
+            if (!e.target.classList.contains('remove-btn') && !e.target.classList.contains('case-action-btn')) {
                 showWineDetail(card.dataset.wineId);
             }
         });
@@ -2083,6 +2110,14 @@ function renderGroupedCellar(data) {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             openRemoveModal(btn.dataset.wineId, btn.dataset.quantity);
+        });
+    });
+
+    // Wire up case action buttons
+    container.querySelectorAll('.case-action-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openCaseActionModal(btn.dataset.caseId, btn.dataset.remaining);
         });
     });
 }
@@ -2412,6 +2447,75 @@ async function showWineDetail(wineId) {
         const enrichedFields = wine.enriched_fields || [];
         const enrichedClass = (fieldKey) => enrichedFields.includes(fieldKey) ? ' enriched' : '';
 
+        // Fetch bottle/case data for this wine
+        let bottleInfo = null;
+        try {
+            const bottlesResp = await fetchWithAuth(`${API_BASE}/bottles?wine_id=${wineId}`);
+            if (bottlesResp.ok) {
+                bottleInfo = await bottlesResp.json();
+            }
+        } catch { /* bottles endpoint may not be available */ }
+
+        // Build case/bottle breakdown HTML
+        let bottleBreakdownHtml = '';
+        if (bottleInfo && bottleInfo.bottles && bottleInfo.bottles.length > 0) {
+            const bottles = bottleInfo.bottles;
+            const inCellar = bottles.filter(b => b.in_cellar);
+            const totalInCellar = inCellar.length;
+
+            // Group by case
+            const caseMap = {};
+            let looseCount = 0;
+            for (const b of inCellar) {
+                if (b.case_id) {
+                    if (!caseMap[b.case_id]) caseMap[b.case_id] = { bottles: [], case_id: b.case_id };
+                    caseMap[b.case_id].bottles.push(b);
+                } else {
+                    looseCount++;
+                }
+            }
+
+            // Fetch case details for provenance/size
+            const caseRows = [];
+            for (const [caseId, caseData] of Object.entries(caseMap)) {
+                let caseSize = caseData.bottles.length;
+                let provenance = '';
+                let purchasePrice = '';
+                try {
+                    const caseResp = await fetchWithAuth(`${API_BASE}/cases/${caseId}`);
+                    if (caseResp.ok) {
+                        const caseDetail = await caseResp.json();
+                        caseSize = caseDetail.case_size || caseSize;
+                        provenance = caseDetail.provenance || '';
+                        purchasePrice = caseDetail.purchase_price ? `\u00a3${caseDetail.purchase_price.toFixed(2)}` : '';
+                    }
+                } catch { /* case detail not available */ }
+
+                caseRows.push(`
+                    <div class="wine-detail-case-row">
+                        <span class="case-label">Case of ${caseSize}</span>
+                        <span class="case-count">${caseData.bottles.length}/${caseSize} remaining</span>
+                        ${provenance ? `<span class="case-provenance">from ${escapeHtml(provenance)}</span>` : ''}
+                        ${purchasePrice ? `<span class="case-price">${purchasePrice}</span>` : ''}
+                    </div>
+                `);
+            }
+
+            const looseHtml = looseCount > 0
+                ? `<div class="wine-detail-case-row"><span class="case-label">Loose</span><span class="case-count">${looseCount} bottle${looseCount !== 1 ? 's' : ''}</span></div>`
+                : '';
+
+            bottleBreakdownHtml = `
+                <div class="wine-detail-bottles">
+                    <div class="label">Cellar Breakdown</div>
+                    <div class="wine-detail-bottle-list">
+                        ${caseRows.join('')}
+                        ${looseHtml}
+                    </div>
+                </div>
+            `;
+        }
+
         document.getElementById('wine-detail').innerHTML = `
             <div class="wine-detail-images">
                 ${wine.front_label_image_path
@@ -2435,6 +2539,8 @@ async function showWineDetail(wineId) {
                         <div class="label">In Stock</div>
                         <div class="value">${quantity} bottle${quantity !== 1 ? 's' : ''}</div>
                     </div>
+
+                    ${bottleBreakdownHtml}
 
                     ${wine.grape_variety ? `
                         <div class="wine-detail-field">
@@ -2567,6 +2673,69 @@ function openRemoveModal(wineId, availableQuantity) {
     document.getElementById('remove-removal-notes').value = '';
     resetRemovalPicker();
     openModal('remove-modal');
+}
+
+function openCaseActionModal(caseId, remaining) {
+    const modal = document.getElementById('case-action-modal');
+    if (!modal) return;
+
+    document.getElementById('case-action-case-id').value = caseId;
+    document.getElementById('case-action-remaining').textContent = `${remaining} bottle${remaining != 1 ? 's' : ''} remaining`;
+    document.getElementById('case-action-notes').value = '';
+    document.getElementById('case-action-sale-price').value = '';
+    document.getElementById('case-action-buyer').value = '';
+    document.getElementById('case-action-recipient').value = '';
+
+    // Hide all context fields initially
+    document.querySelectorAll('.case-action-context').forEach(el => el.style.display = 'none');
+
+    // Reset reason selection
+    document.querySelectorAll('.case-reason-card').forEach(card => card.classList.remove('selected'));
+
+    openModal('case-action-modal');
+}
+
+async function handleCaseAction() {
+    const caseId = document.getElementById('case-action-case-id').value;
+    const selectedCard = document.querySelector('.case-reason-card.selected');
+    if (!selectedCard) {
+        showToast('Please select a reason', 'error');
+        return;
+    }
+
+    const eventType = selectedCard.dataset.reason;
+    const body = {
+        event_type: eventType,
+        notes: document.getElementById('case-action-notes').value || null,
+    };
+
+    if (eventType === 'sold') {
+        const price = document.getElementById('case-action-sale-price').value;
+        body.sale_price = price ? parseFloat(price) : null;
+        body.buyer = document.getElementById('case-action-buyer').value || null;
+    } else if (eventType === 'gifted') {
+        body.gift_recipient = document.getElementById('case-action-recipient').value || null;
+    }
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/cases/${caseId}/events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to process case action');
+        }
+
+        const result = await response.json();
+        closeModals();
+        showToast(`${result.bottles_affected} bottle${result.bottles_affected !== 1 ? 's' : ''} ${eventType}`, 'success');
+        loadCellar();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
 }
 
 function deleteWine(wineId) {
@@ -5717,97 +5886,6 @@ async function handleAddMetToCellar() {
 // =============================================================================
 // Demo / Sample Data
 // =============================================================================
-
-async function updateDemoBanner(totalBottles) {
-    const existingBanner = document.getElementById('demo-banner');
-    if (existingBanner) existingBanner.remove();
-
-    const existingWelcome = document.getElementById('demo-welcome');
-    if (existingWelcome) existingWelcome.remove();
-
-    try {
-        const response = await fetchWithAuth(`${API_BASE}/demo/status`);
-        const status = await response.json();
-
-        if (totalBottles === 0 && !status.installed) {
-            // Empty cellar, no demo data — show welcome prompt
-            showDemoWelcome();
-        } else if (status.installed) {
-            // Demo data present — show removable banner
-            showDemoBanner(status.wine_count, status.bottle_count);
-        }
-    } catch {
-        // Demo endpoint not available — skip silently
-    }
-}
-
-function showDemoWelcome() {
-    const dashboard = document.getElementById('page-dashboard');
-    const statsGrid = document.getElementById('stats-grid');
-
-    const welcome = document.createElement('div');
-    welcome.id = 'demo-welcome';
-    welcome.className = 'demo-welcome';
-    welcome.innerHTML = `
-        <div class="demo-welcome-content">
-            <h3>Welcome to WineBox</h3>
-            <p>Your cellar is empty. How would you like to get started?</p>
-            <div class="entry-path-cards" style="margin-top:1.5rem;">
-                <a href="#" data-page="add-to-cellar" data-tab="scan" class="entry-path-card">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                            <circle cx="12" cy="13" r="4"></circle>
-                        </svg>
-                    </div>
-                    <h3>Scan a Label</h3>
-                    <p>Take a photo to auto-detect wine details</p>
-                </a>
-                <a href="#" data-page="add-to-cellar" data-tab="manual" class="entry-path-card">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </div>
-                    <h3>Enter Details</h3>
-                    <p>Type in the wine details manually</p>
-                </a>
-                <a href="#" data-page="add-to-cellar" data-tab="import" class="entry-path-card">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                    </div>
-                    <h3>Import from File</h3>
-                    <p>Upload a CSV or Excel spreadsheet</p>
-                </a>
-            </div>
-            <div style="margin-top:1.5rem;">
-                <button class="btn btn-outline btn-small" id="demo-install-btn">Load sample wines</button>
-                <p class="demo-hint">Sample wines can be removed at any time</p>
-            </div>
-        </div>
-    `;
-
-    dashboard.insertBefore(welcome, statsGrid.nextSibling);
-    document.getElementById('demo-install-btn').addEventListener('click', installDemoData);
-}
-
-function showDemoBanner(wineCount, bottleCount) {
-    const container = document.getElementById('cellar-demo-banner-container');
-    if (!container) return;
-
-    container.innerHTML = `
-        <div class="demo-banner" id="demo-banner">
-            <span>Sample wines (${wineCount} wines, ${bottleCount} bottles)</span>
-            <button class="btn btn-sm btn-outline" id="demo-remove-btn">Remove</button>
-        </div>
-    `;
-    document.getElementById('demo-remove-btn').addEventListener('click', removeDemoData);
-}
 
 async function installDemoData() {
     try {

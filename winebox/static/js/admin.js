@@ -170,6 +170,57 @@ async function refreshData() {
     ]);
 }
 
+// Show admin toast notification
+function showAdminToast(message, type = 'success') {
+    let container = document.getElementById('admin-toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'admin-toast-container';
+        container.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:10000;display:flex;flex-direction:column;gap:0.5rem;';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `admin-toast admin-toast-${type}`;
+    toast.textContent = message;
+    toast.style.cssText = `padding:0.75rem 1.5rem;border-radius:6px;color:#fff;font-size:0.9rem;max-width:400px;box-shadow:0 2px 8px rgba(0,0,0,0.2);animation:fadeIn 0.3s;background:${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#6c757d'};`;
+    container.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 4000);
+}
+
+// Show confirm modal (replaces browser confirm())
+function showAdminConfirm(message, onConfirm) {
+    let overlay = document.getElementById('admin-confirm-overlay');
+    if (overlay) overlay.remove();
+
+    overlay = document.createElement('div');
+    overlay.id = 'admin-confirm-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText = 'background:#fff;border-radius:8px;padding:2rem;max-width:420px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+    dialog.innerHTML = `
+        <h3 style="margin:0 0 1rem;color:#dc3545;">Confirm Action</h3>
+        <p style="margin:0 0 1.5rem;line-height:1.5;">${escapeHtml(message)}</p>
+        <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+            <button class="btn-admin btn-admin-danger" id="admin-confirm-yes">Confirm</button>
+            <button class="btn-admin btn-admin-outline" id="admin-confirm-no">Cancel</button>
+        </div>
+    `;
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    document.getElementById('admin-confirm-yes').addEventListener('click', () => {
+        overlay.remove();
+        onConfirm();
+    });
+    document.getElementById('admin-confirm-no').addEventListener('click', () => {
+        overlay.remove();
+    });
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+}
+
 // Delegated click handler for user management actions (CSP-compliant)
 async function handleAdminAction(e) {
     const btn = e.target.closest('button[data-action]');
@@ -180,27 +231,45 @@ async function handleAdminAction(e) {
     const email = btn.dataset.userEmail || '';
 
     if (action === 'delete') {
-        if (!confirm(`Delete user ${email} and ALL their data?\n\nThis cannot be undone.`)) return;
-        try {
-            const resp = await apiRequest(`/admin/api/users/${userId}`, { method: 'DELETE' });
-            if (!resp.ok) {
-                const err = await resp.json();
-                alert(err.detail || 'Failed to delete user');
-                return;
+        showAdminConfirm(`Delete user ${email} and ALL their data?\n\nThis cannot be undone.`, async () => {
+            try {
+                const resp = await apiRequest(`/admin/api/users/${userId}`, { method: 'DELETE' });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    showAdminToast(err.detail || 'Failed to delete user', 'error');
+                    return;
+                }
+                const result = await resp.json();
+                showAdminToast(`Deleted ${email}: ${result.wines_deleted} wines, ${result.transactions_deleted} transactions removed.`);
+            } catch (e) {
+                console.error(e);
+                showAdminToast('Error deleting user', 'error');
             }
-            const result = await resp.json();
-            alert(`Deleted ${email}: ${result.wines_deleted} wines, ${result.transactions_deleted} transactions removed.`);
-        } catch (e) { console.error(e); return; }
+            await refreshData();
+        });
+        return;  // Don't refreshData here — the confirm callback handles it
     } else {
         // activate, deactivate, make-admin, remove-admin, verify
         try {
             const resp = await apiRequest(`/admin/api/users/${userId}/${action}`, { method: 'PATCH' });
             if (!resp.ok) {
                 const err = await resp.json();
-                alert(err.detail || `Failed: ${action}`);
+                showAdminToast(err.detail || `Failed: ${action}`, 'error');
                 return;
             }
-        } catch (e) { console.error(e); return; }
+            const labels = {
+                'activate': 'User enabled',
+                'deactivate': 'User disabled',
+                'make-admin': 'Admin role granted',
+                'remove-admin': 'Admin role removed',
+                'verify': 'User verified',
+            };
+            showAdminToast(labels[action] || `Action ${action} completed`);
+        } catch (e) {
+            console.error(e);
+            showAdminToast(`Error: ${action}`, 'error');
+            return;
+        }
     }
 
     await refreshData();

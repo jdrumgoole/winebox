@@ -4,9 +4,12 @@ import re
 from datetime import datetime
 from typing import Annotated
 
+from bson import ObjectId
 from fastapi import APIRouter, Query
 
 from winebox.models import Transaction, TransactionType, Wine
+from winebox.models.bottle import Bottle
+from winebox.models.case import Case
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
 
@@ -32,6 +35,8 @@ async def search_wines(
     checked_out_before: Annotated[datetime | None, Query(description="Checked out before date")] = None,
     in_stock: Annotated[bool | None, Query(description="Only wines currently in stock")] = None,
     collection: Annotated[str | None, Query(description="Filter by collection: cellar or met")] = None,
+    storage: Annotated[str | None, Query(description="Storage type: 'case' or 'loose'")] = None,
+    provenance: Annotated[str | None, Query(description="Case provenance (where purchased)", max_length=MAX_QUERY_LENGTH)] = None,
     skip: int = 0,
     limit: int = 100,
 ) -> list[WineWithInventory]:
@@ -94,6 +99,42 @@ async def search_wines(
         conditions["inventory.quantity"] = {"$gt": 0}
     elif in_stock is False:
         conditions["inventory.quantity"] = {"$lte": 0}
+
+    # Filter by storage type (case/loose) via bottles collection
+    if storage or provenance:
+        bottle_col = Bottle.get_pymongo_collection()
+        bottle_query: dict = {"owner_id": current_user.id}
+
+        if storage == "case":
+            bottle_query["case_id"] = {"$ne": None}
+        elif storage == "loose":
+            bottle_query["case_id"] = None
+
+        if provenance:
+            # Find case IDs matching provenance, then filter bottles by those cases
+            case_col = Case.get_pymongo_collection()
+            prov_pattern = re.compile(re.escape(provenance), re.IGNORECASE)
+            matching_cases = await case_col.find(
+                {"owner_id": current_user.id, "provenance": {"$regex": prov_pattern}},
+                {"_id": 1},
+            ).to_list(length=None)
+            matching_case_ids = [c["_id"] for c in matching_cases]
+            if not matching_case_ids:
+                return []
+            bottle_query["case_id"] = {"$in": matching_case_ids}
+
+        matching_bottles = await bottle_col.find(
+            bottle_query, {"wine_id": 1}
+        ).to_list(length=None)
+        matching_wine_ids = {b["wine_id"] for b in matching_bottles}
+        if not matching_wine_ids:
+            return []
+        if "_id" in conditions and "$in" in conditions["_id"]:
+            # Intersect with existing ID filter
+            existing = set(conditions["_id"]["$in"])
+            conditions["_id"] = {"$in": list(existing & matching_wine_ids)}
+        else:
+            conditions["_id"] = {"$in": list(matching_wine_ids)}
 
     # Get wine IDs filtered by transaction dates
     wine_ids_from_transactions = None
