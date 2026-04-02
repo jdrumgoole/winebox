@@ -218,3 +218,192 @@ async def test_breakage_event(client: AsyncClient) -> None:
     # Bottle's latest event should be breakage
     events = (await client.get(f"/api/bottles/{bottle_id}/events")).json()["events"]
     assert events[0]["event_type"] == "breakage"
+
+
+# =========================================================================
+# Case-level event tests
+# =========================================================================
+
+
+@pytest.mark.asyncio
+async def test_sell_entire_case(client: AsyncClient) -> None:
+    """Selling a case creates a case event and marks all bottles as sold."""
+    case_resp = await client.post("/api/cases", json={
+        "name": "Case Sale Wine",
+        "winery": "Test Winery",
+        "vintage": 2020,
+        "case_size": 6,
+        "num_cases": 1,
+        "purchase_price": 120.0,
+        "provenance": "Wine Merchant",
+    })
+    case_id = case_resp.json()["cases"][0]["id"]
+
+    # Verify 6 bottles in cellar
+    case_detail = (await client.get(f"/api/cases/{case_id}")).json()
+    assert case_detail["bottles_remaining"] == 6
+
+    # Sell the entire case
+    event_resp = await client.post(f"/api/cases/{case_id}/events", json={
+        "event_type": "sold",
+        "sale_price": 180.0,
+        "buyer": "Restaurant ABC",
+        "notes": "Sold at 50% markup",
+    })
+    assert event_resp.status_code == 200
+    result = event_resp.json()
+    assert result["event_type"] == "sold"
+    assert result["bottles_affected"] == 6
+
+    # Case should now be empty
+    case_detail2 = (await client.get(f"/api/cases/{case_id}")).json()
+    assert case_detail2["bottles_remaining"] == 0
+    assert case_detail2["case_size"] == 6  # Case still exists
+
+
+@pytest.mark.asyncio
+async def test_gift_entire_case(client: AsyncClient) -> None:
+    """Gifting a case marks all bottles as gifted with recipient."""
+    case_resp = await client.post("/api/cases", json={
+        "name": "Gift Case Wine",
+        "case_size": 3,
+        "num_cases": 1,
+    })
+    case_id = case_resp.json()["cases"][0]["id"]
+
+    event_resp = await client.post(f"/api/cases/{case_id}/events", json={
+        "event_type": "gifted",
+        "gift_recipient": "Birthday Friend",
+    })
+    assert event_resp.status_code == 200
+    assert event_resp.json()["bottles_affected"] == 3
+
+    # All bottles should be gone
+    case_detail = (await client.get(f"/api/cases/{case_id}")).json()
+    assert case_detail["bottles_remaining"] == 0
+
+
+@pytest.mark.asyncio
+async def test_case_breakage(client: AsyncClient) -> None:
+    """Case dropped/destroyed marks all bottles as breakage."""
+    case_resp = await client.post("/api/cases", json={
+        "name": "Fragile Case Wine",
+        "case_size": 12,
+        "num_cases": 1,
+    })
+    case_id = case_resp.json()["cases"][0]["id"]
+
+    event_resp = await client.post(f"/api/cases/{case_id}/events", json={
+        "event_type": "breakage",
+        "notes": "Dropped during delivery",
+    })
+    assert event_resp.status_code == 200
+    assert event_resp.json()["bottles_affected"] == 12
+
+    case_detail = (await client.get(f"/api/cases/{case_id}")).json()
+    assert case_detail["bottles_remaining"] == 0
+
+
+@pytest.mark.asyncio
+async def test_sell_partial_case(client: AsyncClient) -> None:
+    """Sell a case after removing some bottles — only remaining bottles affected."""
+    case_resp = await client.post("/api/cases", json={
+        "name": "Partial Case Wine",
+        "case_size": 6,
+        "num_cases": 1,
+    })
+    case_id = case_resp.json()["cases"][0]["id"]
+
+    # Drink 2 bottles individually
+    case_detail = (await client.get(f"/api/cases/{case_id}")).json()
+    for bottle in case_detail["bottles"][:2]:
+        await client.post(f"/api/bottles/{bottle['id']}/events", json={
+            "event_type": "drunk",
+            "tasting_notes": "Nice",
+        })
+
+    # Verify 4 remaining
+    case_detail2 = (await client.get(f"/api/cases/{case_id}")).json()
+    assert case_detail2["bottles_remaining"] == 4
+
+    # Sell the rest of the case
+    event_resp = await client.post(f"/api/cases/{case_id}/events", json={
+        "event_type": "sold",
+        "sale_price": 80.0,
+        "buyer": "Wine Shop",
+    })
+    assert event_resp.json()["bottles_affected"] == 4  # Only the 4 remaining
+
+    # Case fully empty now
+    case_detail3 = (await client.get(f"/api/cases/{case_id}")).json()
+    assert case_detail3["bottles_remaining"] == 0
+
+
+@pytest.mark.asyncio
+async def test_case_with_provenance(client: AsyncClient) -> None:
+    """Case stores purchase info and provenance."""
+    case_resp = await client.post("/api/cases", json={
+        "name": "Provenance Wine",
+        "winery": "Chateau Test",
+        "vintage": 2018,
+        "case_size": 12,
+        "num_cases": 1,
+        "purchase_price": 240.0,
+        "provenance": "Berry Bros & Rudd",
+    })
+    case_id = case_resp.json()["cases"][0]["id"]
+
+    case_detail = (await client.get(f"/api/cases/{case_id}")).json()
+    assert case_detail["case_size"] == 12
+    assert case_detail["purchase_price"] == 240.0
+    assert case_detail["provenance"] == "Berry Bros & Rudd"
+
+
+@pytest.mark.asyncio
+async def test_sell_empty_case_no_effect(client: AsyncClient) -> None:
+    """Selling an already-empty case affects 0 bottles."""
+    case_resp = await client.post("/api/cases", json={
+        "name": "Empty Case Wine",
+        "case_size": 2,
+        "num_cases": 1,
+    })
+    case_id = case_resp.json()["cases"][0]["id"]
+
+    # Gift all bottles first
+    await client.post(f"/api/cases/{case_id}/events", json={
+        "event_type": "gifted",
+        "gift_recipient": "Someone",
+    })
+
+    # Now try to sell the empty case
+    event_resp = await client.post(f"/api/cases/{case_id}/events", json={
+        "event_type": "sold",
+        "sale_price": 0,
+    })
+    assert event_resp.status_code == 200
+    assert event_resp.json()["bottles_affected"] == 0
+
+
+@pytest.mark.asyncio
+async def test_multiple_cases_independent(client: AsyncClient) -> None:
+    """Two cases of the same wine are tracked independently."""
+    case_resp = await client.post("/api/cases", json={
+        "name": "Multi Case Wine",
+        "case_size": 6,
+        "num_cases": 2,
+    })
+    cases = case_resp.json()["cases"]
+    case1_id = cases[0]["id"]
+    case2_id = cases[1]["id"]
+
+    # Sell case 1
+    await client.post(f"/api/cases/{case1_id}/events", json={
+        "event_type": "sold",
+        "sale_price": 100.0,
+    })
+
+    # Case 1 empty, case 2 full
+    c1 = (await client.get(f"/api/cases/{case1_id}")).json()
+    c2 = (await client.get(f"/api/cases/{case2_id}")).json()
+    assert c1["bottles_remaining"] == 0
+    assert c2["bottles_remaining"] == 6
