@@ -78,7 +78,7 @@ async def test_import_enriches_empty_fields(init_test_db) -> None:
     )
     await batch.insert()
 
-    result = await process_import_batch(batch, owner_id)
+    result = await process_import_batch(batch, owner_id, skip_enrichment=False)
 
     assert result.status == ImportStatus.COMPLETED
     assert result.wines_created == 1
@@ -126,7 +126,7 @@ async def test_import_preserves_csv_values(init_test_db) -> None:
     )
     await batch.insert()
 
-    result = await process_import_batch(batch, owner_id)
+    result = await process_import_batch(batch, owner_id, skip_enrichment=False)
 
     assert result.wines_created == 1
 
