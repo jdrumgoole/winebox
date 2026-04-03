@@ -4559,8 +4559,11 @@ async function showImportDashboard(batchId, filename, importResult) {
         const data = await response.json();
 
         // Title
+        const caseText = summary.total_cases > 0
+            ? ` (${summary.total_cases} case${summary.total_cases !== 1 ? 's' : ''})`
+            : '';
         document.getElementById('import-dashboard-title').textContent =
-            `You just added ${data.summary.wines_created} wines from ${escapeHtml(filename)}`;
+            `You just added ${data.summary.wines_created} wines${caseText} from ${escapeHtml(filename)}`;
 
         // Summary cards
         const summary = data.summary;
@@ -4568,7 +4571,17 @@ async function showImportDashboard(batchId, filename, importResult) {
             <div class="stat-card">
                 <div class="stat-value">${summary.total_bottles}</div>
                 <div class="stat-label">Bottles Added</div>
-            </div>
+            </div>`;
+
+        if (summary.total_cases > 0) {
+            summaryHtml += `
+            <div class="stat-card">
+                <div class="stat-value">${summary.total_cases}</div>
+                <div class="stat-label">Cases</div>
+            </div>`;
+        }
+
+        summaryHtml += `
             <div class="stat-card">
                 <div class="stat-value">${summary.wines_created}</div>
                 <div class="stat-label">Unique Wines</div>
