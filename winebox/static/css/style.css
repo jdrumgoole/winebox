@@ -774,9 +774,11 @@ details.advanced-fields .form-grid {
 /* Grouped cellar table view */
 .cellar-table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
+    border-collapse: collapse;
     font-size: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
 }
 
 .cellar-table thead th {
@@ -786,23 +788,25 @@ details.advanced-fields .form-grid {
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-muted);
-    border-bottom: 2px solid var(--primary-color);
-    position: sticky;
-    top: 0;
-    background: var(--background-color);
+    color: #fff;
+    background: var(--primary-color);
+    border-bottom: none;
 }
 
 .cellar-table tbody tr {
     transition: background 0.15s;
 }
 
-.cellar-table tbody tr:hover {
+.cellar-table tbody tr:nth-child(even) {
     background: var(--bg-secondary);
 }
 
+.cellar-table tbody tr:hover {
+    background: rgba(139, 26, 74, 0.08);
+}
+
 .cellar-table tbody td {
-    padding: 0.6rem 1rem;
+    padding: 0.65rem 1rem;
     border-bottom: 1px solid var(--border-color);
     vertical-align: middle;
 }
@@ -3160,7 +3164,7 @@ body.logged-out #user-info {
 
 .xwines-table th:hover,
 .wine-table th:hover {
-    background: var(--hover-background, #f0ebe5);
+    background: var(--primary-dark, #6b1439);
 }
 
 .sort-indicator {
@@ -3214,19 +3218,22 @@ body.logged-out #user-info {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.95rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
 }
 
 .wine-table th,
 .wine-table td {
-    padding: 0.875rem 1rem;
+    padding: 0.75rem 1rem;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
 }
 
 .wine-table th {
-    background: var(--background-color);
+    background: var(--primary-color);
     font-weight: 600;
-    color: var(--text-color);
+    color: #fff;
     white-space: nowrap;
     position: sticky;
     cursor: pointer;
@@ -3239,8 +3246,12 @@ body.logged-out #user-info {
     transition: background-color 0.15s;
 }
 
+.wine-table tbody tr:nth-child(even) {
+    background: var(--bg-secondary);
+}
+
 .wine-table tbody tr:hover {
-    background-color: var(--background-color);
+    background: rgba(139, 26, 74, 0.08);
 }
 
 .wine-table tbody tr:last-child td {
