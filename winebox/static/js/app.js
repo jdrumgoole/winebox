@@ -4433,7 +4433,10 @@ async function showAugmentUI(batchId) {
             classification:      { label: 'Classification', group: 'details' },
             alcohol_percentage:  { label: 'Alcohol (ABV)', group: 'details' },
             price_tier:          { label: 'Price Range', group: 'details' },
-            quantity:            { label: 'Bottles', group: 'details' },
+            quantity:            { label: 'Total Bottles', group: 'details' },
+            num_cases:           { label: 'Number of Cases', group: 'details' },
+            case_size:           { label: 'Bottles per Case', group: 'details' },
+            purchase_date:       { label: 'Date Purchased', group: 'details' },
             notes:               { label: 'Tasting Notes', group: 'details' },
         };
 

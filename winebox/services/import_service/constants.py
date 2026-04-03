@@ -94,7 +94,8 @@ HEADER_ALIASES: dict[str, str] = {
     "bottles per case": "case_size",
     "bottles_per_case": "case_size",
     # cases (number of cases — maps to quantity)
-    "cases": "quantity",
+    "cases": "num_cases",
+    "number of cases": "num_cases",
     # notes (for transactions)
     "notes": "notes",
     "note": "notes",
@@ -106,7 +107,7 @@ HEADER_ALIASES: dict[str, str] = {
 VALID_WINE_FIELDS = {
     "name", "winery", "vintage", "grape_variety", "region", "sub_region",
     "appellation", "country", "alcohol_percentage", "wine_type_id",
-    "classification", "price_tier", "quantity", "case_size", "purchase_date",
+    "classification", "price_tier", "quantity", "num_cases", "case_size", "purchase_date",
     "notes",
 }
 
@@ -127,8 +128,9 @@ WINE_FIELD_DESCRIPTIONS: dict[str, str] = {
     "wine_type_id": "The wine type: red, white, rosé, sparkling, fortified, or dessert",
     "classification": "Quality classification (e.g. Grand Cru, Reserva, DOCG)",
     "price_tier": "Price or price tier",
-    "quantity": "Number of bottles (integer)",
-    "case_size": "Bottles per case (e.g. 6 or 12) — multiplied by quantity to get total bottles",
+    "quantity": "Total number of bottles (integer)",
+    "num_cases": "Number of cases — multiplied by case_size to get total bottles",
+    "case_size": "Bottles per case (e.g. 6 or 12)",
     "purchase_date": "When you bought the wine (e.g. 2024-03-15, 15/03/2024)",
     "notes": "Tasting notes, description, or general notes",
 }

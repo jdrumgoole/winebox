@@ -300,24 +300,39 @@ def test_row_to_wine_quantity_from_row() -> None:
     assert result["inventory"].quantity == 6
 
 
-def test_row_to_wine_case_size_multiplies_quantity() -> None:
-    """Test case_size multiplies quantity to compute total bottles."""
+def test_row_to_wine_num_cases_multiplies_case_size() -> None:
+    """Test num_cases × case_size = total bottles."""
     from bson import ObjectId
 
     row = {"Name": "Test", "Cases": "2", "Size": "12"}
-    mapping = {"Name": "name", "Cases": "quantity", "Size": "case_size"}
+    mapping = {"Name": "name", "Cases": "num_cases", "Size": "case_size"}
     result = row_to_wine_data(row, mapping, ObjectId())
-    assert result["inventory"].quantity == 24  # 2 cases * 12 bottles
+    assert result["inventory"].quantity == 24  # 2 cases × 12 bottles
+    assert result["_num_cases"] == 2
+    assert result["_case_size"] == 12
+
+
+def test_row_to_wine_quantity_with_case_size_derives_cases() -> None:
+    """Test quantity (total bottles) + case_size derives case count."""
+    from bson import ObjectId
+
+    row = {"Name": "Test", "Qty": "12", "Size": "6"}
+    mapping = {"Name": "name", "Qty": "quantity", "Size": "case_size"}
+    result = row_to_wine_data(row, mapping, ObjectId())
+    assert result["inventory"].quantity == 12  # Quantity IS total bottles
+    assert result["_num_cases"] == 2  # 12 / 6 = 2 cases
+    assert result["_case_size"] == 6
 
 
 def test_row_to_wine_case_size_without_quantity() -> None:
-    """Test case_size with default quantity of 1."""
+    """Test case_size with default quantity of 1 — not enough for a case."""
     from bson import ObjectId
 
     row = {"Name": "Test", "Bottles per Case": "6"}
     mapping = {"Name": "name", "Bottles per Case": "case_size"}
     result = row_to_wine_data(row, mapping, ObjectId())
-    assert result["inventory"].quantity == 6  # 1 (default) * 6
+    assert result["inventory"].quantity == 1  # default=1, less than case_size
+    assert result["_num_cases"] == 0  # Can't form a case with 1 bottle
 
 
 def test_row_to_wine_purchase_date() -> None:

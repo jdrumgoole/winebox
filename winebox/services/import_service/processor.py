@@ -265,6 +265,8 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
             if meta:
                 # Wine has case structure — create Case records with linked bottles
                 num_cases, case_size = meta
+                loose_remainder = qty - (num_cases * case_size)
+
                 for _ in range(num_cases):
                     case_id = _OID()
                     case_batch.append(Case(
@@ -289,6 +291,22 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
                             bottle_id=bid, owner_id=wine_doc.owner_id,
                             event_type=WineEventType.ADDED, event_date=now, created_at=now,
                         ))
+
+                # Create loose bottles for any remainder
+                for _ in range(max(0, loose_remainder)):
+                    bid = _OID()
+                    bottle_batch.append(Bottle(
+                        id=bid, owner_id=wine_doc.owner_id, wine_id=wine_doc.id,
+                        case_id=None, name=wine_doc.name, winery=wine_doc.winery,
+                        vintage=wine_doc.vintage, grape_variety=wine_doc.grape_variety,
+                        country=wine_doc.country, region=wine_doc.region,
+                        wine_type=wine_doc.wine_type_id, created_at=now,
+                    ))
+                    event_batch.append(WineEvent(
+                        scope=WineEventScope.BOTTLE,
+                        bottle_id=bid, owner_id=wine_doc.owner_id,
+                        event_type=WineEventType.ADDED, event_date=now, created_at=now,
+                    ))
             else:
                 # Loose bottles — no case
                 for _ in range(qty):

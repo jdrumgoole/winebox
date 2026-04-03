@@ -149,6 +149,7 @@ def row_to_wine_data(
     wine_data: dict[str, Any] = {}
     custom_fields: dict[str, str] = {}
     quantity = default_quantity
+    explicit_num_cases: int | None = None  # From "num_cases" mapping (Cases column)
     case_size: int | None = None
 
     for header, field in mapping.items():
@@ -173,6 +174,10 @@ def row_to_wine_data(
             coerced = _coerce_int(value)
             if coerced is not None and coerced > 0:
                 quantity = coerced
+        elif field == "num_cases":
+            coerced = _coerce_int(value)
+            if coerced is not None and coerced > 0:
+                explicit_num_cases = coerced
         elif field == "case_size":
             coerced = _coerce_int(value)
             if coerced is not None and coerced > 0:
@@ -184,15 +189,30 @@ def row_to_wine_data(
         elif field in VALID_WINE_FIELDS:
             wine_data[field] = value
 
-    # Compute total bottles from quantity and case_size
-    # quantity = number of cases (or loose bottles if no case_size)
-    # case_size = bottles per case (e.g. 6, 12)
-    # total_bottles = quantity * case_size (if cases) or quantity (if loose)
+    # Compute total bottles and case count.
+    #
+    # Two modes depending on which columns are mapped:
+    #
+    # 1. "num_cases" + "case_size" → quantity is NUMBER OF CASES
+    #    total_bottles = num_cases × case_size
+    #    Example: Cases=2, Case Size=12 → 2 cases, 24 bottles
+    #
+    # 2. "quantity" + "case_size" → quantity is TOTAL BOTTLES
+    #    num_cases = quantity / case_size (integer division)
+    #    Example: Quantity in Bottles=12, Case Size=6 → 2 cases, 12 bottles
+    #
+    # 3. "quantity" only → all loose bottles, no cases
     num_cases = 0
-    if case_size is not None and case_size > 0:
-        num_cases = quantity
-        total_bottles = quantity * case_size
+    if explicit_num_cases is not None and case_size is not None and case_size > 0:
+        # Mode 1: "Cases" column — multiply to get total bottles
+        num_cases = explicit_num_cases
+        total_bottles = explicit_num_cases * case_size
+    elif case_size is not None and case_size > 0 and quantity >= case_size:
+        # Mode 2: "Quantity in Bottles" + "Case Size" — derive case count
+        total_bottles = quantity
+        num_cases = quantity // case_size
     else:
+        # Mode 3: just bottles, no cases
         total_bottles = quantity
 
     # Name is required
