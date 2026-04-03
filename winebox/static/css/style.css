@@ -1910,6 +1910,39 @@ details.advanced-fields .form-grid {
     }
 }
 
+/* Enrichment status indicator on import dashboard */
+.enrichment-status {
+    padding: 0.75rem 1rem;
+    background: rgba(139, 26, 74, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.enrichment-spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+.enrichment-status.done {
+    background: rgba(40, 167, 69, 0.08);
+    border-color: rgba(40, 167, 69, 0.3);
+    color: #28a745;
+}
+
+.enrichment-status.done .enrichment-spinner {
+    display: none;
+}
+
 .btn-full {
     width: 100%;
     margin-top: 0.5rem;

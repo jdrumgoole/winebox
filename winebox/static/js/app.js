@@ -4324,12 +4324,7 @@ async function handleAutoImport(data) {
 
         const result = await readImportStream(processResponse);
 
-        // Start enrichment progress if triggered
-        if (result.enrichment_started) {
-            startEnrichmentProgress();
-        }
-
-        // Navigate to import dashboard instead of results
+        // Navigate to import dashboard (enrichment countdown handled there)
         showImportDashboard(currentImportBatchId, data.filename, result);
     } catch (error) {
         showToast(error.message, 'error');
@@ -4626,6 +4621,11 @@ async function showImportDashboard(batchId, filename, importResult) {
 
         // Render mini charts for wine type and country
         _renderImportDashboardCharts(summary);
+
+        // Start enrichment countdown if background enrichment was triggered
+        if (importResult && importResult.enrichment_started) {
+            startDashboardEnrichmentProgress(batchId);
+        }
 
     } catch (error) {
         console.error('Failed to load import dashboard:', error);
@@ -5055,14 +5055,11 @@ async function handleConfirmMapping() {
         document.getElementById('import-progress-text').textContent = '0 / 0 rows';
         document.getElementById('import-progress-percent').textContent = '0%';
 
-        const skipEnrichmentCheckbox = document.getElementById('import-skip-enrichment');
-        const skipEnrichment = !!skipEnrichmentCheckbox && skipEnrichmentCheckbox.checked;
-
-        // Stream processing with progress
+        // Stream processing with progress (enrichment always runs in background after)
         const processResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/process-stream`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1, skip_enrichment: skipEnrichment })
+            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1, skip_enrichment: true })
         });
 
         if (!processResponse.ok) {
@@ -5072,12 +5069,7 @@ async function handleConfirmMapping() {
 
         const result = await readImportStream(processResponse);
 
-        // Start enrichment progress if triggered
-        if (result.enrichment_started) {
-            startEnrichmentProgress();
-        }
-
-        // Show import dashboard for richer post-import experience
+        // Show import dashboard (enrichment countdown handled there)
         const filename = currentImportData ? currentImportData.filename : 'your file';
         showImportDashboard(currentImportBatchId, filename, result);
     } catch (error) {
@@ -5258,6 +5250,82 @@ function startEnrichmentProgress() {
         read();
     }).catch(() => {
         toast.remove();
+    });
+}
+
+function startDashboardEnrichmentProgress(batchId) {
+    const container = document.getElementById('import-dashboard-enrichment');
+    const textEl = document.getElementById('import-dashboard-enrichment-text');
+    const statusDiv = container?.querySelector('.enrichment-status');
+    if (!container || !textEl) return;
+
+    container.style.display = 'block';
+
+    const token = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
+
+    fetch(`${API_BASE}/wines/enrichment-progress`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+    }).then(response => {
+        if (!response.ok) {
+            container.style.display = 'none';
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        function read() {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    container.style.display = 'none';
+                    return;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop();
+
+                for (const part of parts) {
+                    const trimmed = part.trim();
+                    if (!trimmed.startsWith('data: ')) continue;
+
+                    try {
+                        const data = JSON.parse(trimmed.slice(6));
+
+                        if (data.phase === 'done') {
+                            if (statusDiv) statusDiv.classList.add('done');
+                            textEl.textContent = `All ${data.enriched} wines enriched \u2713`;
+                            // Refresh dashboard wine cards with enriched data
+                            if (batchId) {
+                                fetchWithAuth(`${API_BASE}/import/${batchId}/wines`).then(r => r.json()).then(d => {
+                                    if (d.wines && d.wines.length > 0) {
+                                        renderWineGrid('import-dashboard-wines', d.wines);
+                                    }
+                                }).catch(() => {});
+                            }
+                            return;
+                        } else if (data.phase === 'enriching') {
+                            const remaining = data.total - data.enriched;
+                            textEl.textContent = `Enriching wine details: ${remaining} remaining...`;
+                        } else if (data.phase === 'idle') {
+                            container.style.display = 'none';
+                            return;
+                        }
+                    } catch (e) {
+                        // Ignore parse errors
+                    }
+                }
+
+                read();
+            }).catch(() => {
+                container.style.display = 'none';
+            });
+        }
+
+        read();
+    }).catch(() => {
+        container.style.display = 'none';
     });
 }
 

@@ -532,7 +532,7 @@ async def _process_chunks(
     skip_non_wine: bool = True,
     default_quantity: int = 1,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
-    skip_enrichment: bool = False,
+    skip_enrichment: bool = True,
     skip_duplicates: bool = False,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Process import rows using a pipelined async architecture.
@@ -702,7 +702,7 @@ async def process_import_batch(
     owner_id: PyObjectId,
     skip_non_wine: bool = True,
     default_quantity: int = 1,
-    skip_enrichment: bool = False,
+    skip_enrichment: bool = True,
     skip_duplicates: bool = False,
 ) -> ImportBatch:
     """Process an import batch: create Wine documents from mapped rows.
@@ -744,7 +744,7 @@ async def process_import_batch_streaming(
     owner_id: PyObjectId,
     skip_non_wine: bool = True,
     default_quantity: int = 1,
-    skip_enrichment: bool = False,
+    skip_enrichment: bool = True,
     skip_duplicates: bool = False,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Process an import batch, yielding progress after each chunk.

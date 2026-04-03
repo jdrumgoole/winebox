@@ -59,6 +59,10 @@ async def enrich_unenriched_wines(
     Queries for unenriched wines belonging to the owner, batches them,
     runs Atlas Search + Claude re-ranking, and updates matched documents.
 
+    Enrichment operates on Wine records, not Bottles. A wine with a case
+    (multiple bottles) has a single Wine document — enriching it once
+    automatically applies to all bottles referencing that wine.
+
     Args:
         owner_id: The owner whose wines to enrich.
         progress_callback: Optional callback(enriched_so_far, total) called

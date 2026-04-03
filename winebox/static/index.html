@@ -841,12 +841,6 @@
                                 <span id="import-progress-skipped">0 rows skipped</span>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-top:0.75rem;">
-                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
-                                <input type="checkbox" id="import-skip-enrichment" checked>
-                                <span>Look up wine details in background (faster import — details are filled in after)</span>
-                            </label>
-                        </div>
                     </div>
                 </div>
 
@@ -893,6 +887,12 @@
                     <div class="form-section">
                         <h3 id="import-dashboard-title">Just Added</h3>
                         <div id="import-dashboard-summary" class="stats-grid" style="margin-bottom:1.5rem;"></div>
+                        <div id="import-dashboard-enrichment" style="display:none;margin-bottom:1rem;">
+                            <div class="enrichment-status">
+                                <span class="enrichment-spinner" id="enrichment-spinner"></span>
+                                <span id="import-dashboard-enrichment-text">Enriching wine details...</span>
+                            </div>
+                        </div>
                         <div id="import-dashboard-unmapped-notice" style="display:none;margin-bottom:1rem;"></div>
                     </div>
                     <div class="form-section">
