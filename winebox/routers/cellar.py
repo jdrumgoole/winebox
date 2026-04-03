@@ -130,27 +130,23 @@ async def get_cellar_grouped(
     event_col = WineEvent.get_pymongo_collection()
     case_col = Case.get_pymongo_collection()
 
-    # Get all bottles for this user with their latest event
-    pipeline = [
-        {"$match": {"owner_id": current_user.id}},
-        {"$lookup": {
-            "from": "wine_events",
-            "let": {"bid": "$_id"},
-            "pipeline": [
-                {"$match": {"$expr": {"$eq": ["$bottle_id", "$$bid"]}}},
-                {"$sort": {"created_at": -1}},
-                {"$limit": 1},
-            ],
-            "as": "latest_event",
-        }},
-        {"$addFields": {
-            "status": {"$ifNull": [{"$arrayElemAt": ["$latest_event.event_type", 0]}, "unknown"]},
-        }},
-        {"$match": {"status": WineEventType.ADDED.value}},  # Only bottles in cellar
-    ]
+    # Find bottles that have been removed (have a non-"added" event)
+    # This is much faster than $lookup per bottle — one query to get removed IDs,
+    # then exclude them from the bottle query.
+    removal_types = [t.value for t in WineEventType if t != WineEventType.ADDED]
+    removed_docs = await event_col.find(
+        {"owner_id": current_user.id, "event_type": {"$in": removal_types}, "bottle_id": {"$ne": None}},
+        {"bottle_id": 1},
+    ).to_list(length=None)
+    removed_bottle_ids = {doc["bottle_id"] for doc in removed_docs}
 
-    cursor = await bottle_col.aggregate(pipeline)
-    bottles_in_cellar = await cursor.to_list(length=None)
+    # Get all bottles NOT removed
+    bottle_query: dict[str, Any] = {"owner_id": current_user.id}
+    if removed_bottle_ids:
+        bottle_query["_id"] = {"$nin": list(removed_bottle_ids)}
+
+    bottles_cursor = bottle_col.find(bottle_query)
+    bottles_in_cellar = await bottles_cursor.to_list(length=None)
 
     # Group by wine_id
     wine_groups: dict[str, dict[str, Any]] = {}

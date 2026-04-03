@@ -78,16 +78,23 @@ async def list_bottles(
             raise HTTPException(status_code=400, detail="Invalid wine_id")
 
     bottles = await Bottle.find(query).sort([("created_at", -1)]).to_list()
+    if not bottles:
+        return {"bottles": [], "total": 0}
+
+    # Batch-fetch latest event for all bottles in one aggregation
+    bottle_ids = [b.id for b in bottles]
     event_col = WineEvent.get_pymongo_collection()
+    pipeline = [
+        {"$match": {"bottle_id": {"$in": bottle_ids}}},
+        {"$sort": {"created_at": -1}},
+        {"$group": {"_id": "$bottle_id", "event_type": {"$first": "$event_type"}}},
+    ]
+    cursor = await event_col.aggregate(pipeline)
+    latest_events = {doc["_id"]: doc["event_type"] for doc in await cursor.to_list(length=None)}
 
     result = []
     for bottle in bottles:
-        latest = await event_col.find_one(
-            {"bottle_id": bottle.id},
-            sort=[("created_at", -1)],
-        )
-        latest_type = latest["event_type"] if latest else "unknown"
-
+        latest_type = latest_events.get(bottle.id, "unknown")
         result.append({
             "id": str(bottle.id),
             "wine_id": str(bottle.wine_id),
