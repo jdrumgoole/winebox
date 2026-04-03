@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#5C0A2D">
+    <title>WineBox Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/static/logos/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/logos/favicon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/logos/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+    <!-- Login Section -->
+    <section id="login-section" class="admin-container">
+        <div class="login-container">
+            <img src="/static/logos/logo-compact-dark.svg" alt="WineBox" height="48" class="login-logo">
+            <h1>Admin Panel</h1>
+            <p class="login-subtitle">Sign in with your admin account</p>
+            <div id="login-error" style="display: none;" class="error-message"></div>
+            <form id="login-form">
+                <div class="login-form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" required>
+                </div>
+                <div class="login-form-group login-form-group-last">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <button type="submit" class="login-submit">Sign In</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Admin Content (hidden until authenticated) -->
+    <div id="admin-content" style="display: none;">
+        <header>
+            <div class="header-content">
+                <img src="/static/logos/logo-compact-dark.svg" alt="WineBox" class="header-logo" height="32">
+            </div>
+        </header>
+
+        <main class="admin-container">
+            <div class="admin-header">
+                <h1>Admin Panel</h1>
+                <nav class="admin-nav">
+                    <a id="refresh-link" href="#">Refresh</a>
+                    <a id="logout-link" href="#">Logout</a>
+                </nav>
+            </div>
+
+            <!-- Stats Overview -->
+            <section class="stats-overview" id="stats-overview">
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-total-users">-</div>
+                    <div class="stat-label">Total Users</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-active-users">-</div>
+                    <div class="stat-label">Active Users</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-verified-users">-</div>
+                    <div class="stat-label">Verified Users</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-total-wines">-</div>
+                    <div class="stat-label">Total Wines</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-total-bottles">-</div>
+                    <div class="stat-label">Total Bottles</div>
+                </div>
+            </section>
+
+            <!-- Users List -->
+            <section class="users-section">
+                <h2>Users</h2>
+                <div id="users-container">
+                    <div class="loading">Loading users...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer id="app-footer">
+            <div class="footer-content">
+                <span>WineBox Admin Panel</span>
+            </div>
+            <div class="footer-feedback">
+                See a problem? Got feedback? Contact <a href="mailto:support@winebox.app?subject=Feedback">support@winebox.app</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>

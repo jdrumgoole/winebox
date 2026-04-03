@@ -1,17 +1,31 @@
 /**
- * WineBox Admin Panel JavaScript
+ * WineBox Admin Panel JavaScript (Standalone)
  */
 
 // Get auth token from localStorage
 function getAuthToken() {
-    return localStorage.getItem('winebox_token');
+    return localStorage.getItem('winebox_admin_token');
+}
+
+// Show admin panel, hide login
+function showAdminPanel() {
+    document.getElementById('login-section').style.display = 'none';
+    document.getElementById('admin-content').style.display = 'block';
+    refreshData();
+}
+
+// Show login form, hide admin panel
+function showLoginForm() {
+    localStorage.removeItem('winebox_admin_token');
+    document.getElementById('login-section').style.display = 'block';
+    document.getElementById('admin-content').style.display = 'none';
 }
 
 // Check if user is authenticated
 async function checkAuth() {
     const token = getAuthToken();
     if (!token) {
-        window.location.href = '/';
+        showLoginForm();
         return false;
     }
     return true;
@@ -31,8 +45,7 @@ async function apiRequest(endpoint, options = {}) {
     });
 
     if (response.status === 401 || response.status === 403) {
-        // Not authenticated or not admin
-        window.location.href = '/';
+        showLoginForm();
         throw new Error('Not authorized');
     }
 
@@ -55,7 +68,7 @@ function formatDate(dateString) {
 // Load admin stats
 async function loadStats() {
     try {
-        const response = await apiRequest('/admin/api/stats');
+        const response = await apiRequest('/api/stats');
         if (!response.ok) throw new Error('Failed to load stats');
 
         const data = await response.json();
@@ -75,7 +88,7 @@ async function loadUsers() {
     const container = document.getElementById('users-container');
 
     try {
-        const response = await apiRequest('/admin/api/users');
+        const response = await apiRequest('/api/users');
         if (!response.ok) throw new Error('Failed to load users');
 
         const data = await response.json();
@@ -233,7 +246,7 @@ async function handleAdminAction(e) {
     if (action === 'delete') {
         showAdminConfirm(`Delete user ${email} and ALL their data?\n\nThis cannot be undone.`, async () => {
             try {
-                const resp = await apiRequest(`/admin/api/users/${userId}`, { method: 'DELETE' });
+                const resp = await apiRequest(`/api/users/${userId}`, { method: 'DELETE' });
                 if (!resp.ok) {
                     const err = await resp.json();
                     showAdminToast(err.detail || 'Failed to delete user', 'error');
@@ -251,7 +264,7 @@ async function handleAdminAction(e) {
     } else {
         // activate, deactivate, make-admin, remove-admin, verify
         try {
-            const resp = await apiRequest(`/admin/api/users/${userId}/${action}`, { method: 'PATCH' });
+            const resp = await apiRequest(`/api/users/${userId}/${action}`, { method: 'PATCH' });
             if (!resp.ok) {
                 const err = await resp.json();
                 showAdminToast(err.detail || `Failed: ${action}`, 'error');
@@ -275,14 +288,81 @@ async function handleAdminAction(e) {
     await refreshData();
 }
 
+// Login form handler
+function setupLoginForm() {
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', email);
+                formData.append('password', password);
+
+                const resp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData,
+                });
+
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    errorEl.textContent = data.detail || 'Login failed';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+
+                const data = await resp.json();
+                localStorage.setItem('winebox_admin_token', data.access_token);
+                errorEl.style.display = 'none';
+                showAdminPanel();
+            } catch (err) {
+                errorEl.textContent = 'Network error. Please try again.';
+                errorEl.style.display = 'block';
+            }
+        });
+    }
+}
+
+// Setup nav event handlers
+function setupNavHandlers() {
+    const refreshLink = document.getElementById('refresh-link');
+    if (refreshLink) {
+        refreshLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            refreshData();
+        });
+    }
+
+    const logoutLink = document.getElementById('logout-link');
+    if (logoutLink) {
+        logoutLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                await apiRequest('/api/auth/logout', { method: 'POST' });
+            } catch (err) {
+                // Ignore errors on logout — we clear the token regardless
+            }
+            showLoginForm();
+        });
+    }
+}
+
 // Initialize admin panel
 async function init() {
+    setupLoginForm();
+    setupNavHandlers();
+
     // Check authentication
     const isAuth = await checkAuth();
     if (!isAuth) return;
 
     // Load data
-    await refreshData();
+    showAdminPanel();
 
     // Auto-refresh every 30 seconds so cellar sizes stay current
     setInterval(refreshData, 30000);

@@ -6,9 +6,7 @@ from typing import Any
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import FileResponse
-from pathlib import Path
+from fastapi import APIRouter, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -22,19 +20,7 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
-@router.get("", response_model=None)
-async def admin_panel() -> FileResponse:
-    """Serve the admin panel HTML page.
-
-    Auth is not checked here because the token lives in localStorage and is not
-    sent on full-page navigation. The admin page (admin.js) reads the token,
-    calls /admin/api/* with it, and redirects to login if missing or 401/403.
-    """
-    static_path = Path(__file__).parent.parent / "static" / "admin.html"
-    return FileResponse(static_path, media_type="text/html")
-
-
-@router.get("/api/users")
+@router.get("/users")
 @limiter.limit("30/minute")
 async def list_users(
     request: Request,
@@ -88,7 +74,7 @@ async def list_users(
     }
 
 
-@router.get("/api/stats")
+@router.get("/stats")
 @limiter.limit("30/minute")
 async def get_admin_stats(
     request: Request,
@@ -175,7 +161,7 @@ def _check_not_self(admin: User, target: User, action: str) -> None:
         )
 
 
-@router.patch("/api/users/{user_id}/activate")
+@router.patch("/users/{user_id}/activate")
 async def activate_user(user_id: str, admin: RequireAdmin) -> dict:
     """Activate a user account."""
     user = await _get_user(user_id)
@@ -184,7 +170,7 @@ async def activate_user(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "activated", "user_id": user_id}
 
 
-@router.patch("/api/users/{user_id}/deactivate")
+@router.patch("/users/{user_id}/deactivate")
 async def deactivate_user(user_id: str, admin: RequireAdmin) -> dict:
     """Deactivate a user account."""
     user = await _get_user(user_id)
@@ -194,7 +180,7 @@ async def deactivate_user(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "deactivated", "user_id": user_id}
 
 
-@router.patch("/api/users/{user_id}/make-admin")
+@router.patch("/users/{user_id}/make-admin")
 async def make_admin(user_id: str, admin: RequireAdmin) -> dict:
     """Grant admin privileges to a user."""
     user = await _get_user(user_id)
@@ -203,7 +189,7 @@ async def make_admin(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "admin_granted", "user_id": user_id}
 
 
-@router.patch("/api/users/{user_id}/remove-admin")
+@router.patch("/users/{user_id}/remove-admin")
 async def remove_admin(user_id: str, admin: RequireAdmin) -> dict:
     """Remove admin privileges from a user."""
     user = await _get_user(user_id)
@@ -213,7 +199,7 @@ async def remove_admin(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "admin_removed", "user_id": user_id}
 
 
-@router.patch("/api/users/{user_id}/verify")
+@router.patch("/users/{user_id}/verify")
 async def verify_user(user_id: str, admin: RequireAdmin) -> dict:
     """Manually verify a user's email address."""
     user = await _get_user(user_id)
@@ -222,7 +208,7 @@ async def verify_user(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "verified", "user_id": user_id}
 
 
-@router.delete("/api/users/{user_id}")
+@router.delete("/users/{user_id}")
 async def delete_user(user_id: str, admin: RequireAdmin) -> dict:
     """Delete a user and all their data (wines, transactions, import batches)."""
     user = await _get_user(user_id)
