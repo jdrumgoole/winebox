@@ -2605,7 +2605,7 @@ async function showWineDetail(wineId) {
 
                 ${wine.front_label_text ? `
                     <div class="wine-detail-label-text collapsible">
-                        <div class="collapsible-header" onclick="toggleWineDetailLabelText(this)">
+                        <div class="collapsible-header" data-action="toggle-label-text">
                             <span class="label">Show Raw Label Text</span>
                             <span class="collapse-icon">+</span>
                         </div>
@@ -2627,8 +2627,8 @@ async function showWineDetail(wineId) {
                 ` : ''}
 
                 <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
-                    ${quantity > 0 ? `<button class="btn btn-primary" onclick="openRemoveModal('${wine.id}', ${quantity})">Remove</button>` : ''}
-                    <button class="btn btn-danger" onclick="deleteWine('${wine.id}')">Delete Wine</button>
+                    ${quantity > 0 ? `<button class="btn btn-primary detail-remove-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Remove</button>` : ''}
+                    <button class="btn btn-danger detail-delete-btn" data-wine-id="${wine.id}">Delete Wine</button>
                 </div>
             </div>
 
@@ -2656,6 +2656,27 @@ async function showWineDetail(wineId) {
         `;
 
         openModal('wine-modal');
+
+        // Wire up action buttons (CSP-compliant — no inline onclick)
+        const detailEl = document.getElementById('wine-detail');
+        detailEl.querySelector('.detail-remove-btn')?.addEventListener('click', (e) => {
+            openRemoveModal(e.target.dataset.wineId, e.target.dataset.quantity);
+        });
+        detailEl.querySelector('.detail-delete-btn')?.addEventListener('click', (e) => {
+            deleteWine(e.target.dataset.wineId);
+        });
+        detailEl.querySelector('[data-action="toggle-label-text"]')?.addEventListener('click', (e) => {
+            const header = e.target.closest('[data-action="toggle-label-text"]');
+            const content = header.nextElementSibling;
+            const icon = header.querySelector('.collapse-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.textContent = '−';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '+';
+            }
+        });
     } catch (error) {
         showToast('Failed to load wine details', 'error');
     }
@@ -4573,8 +4594,11 @@ async function showImportDashboard(batchId, filename, importResult) {
             unmappedNotice.innerHTML = `
                 <div style="padding:1rem;background:rgba(139,26,74,0.05);border:1px solid var(--border-color);border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
                     <span>Some columns weren't imported: <strong>${data.unmapped_headers.map(h => escapeHtml(h)).join(', ')}</strong></span>
-                    <button type="button" class="btn btn-small btn-primary" onclick="showAugmentUI('${escapeHtml(batchId)}')">Add these details</button>
+                    <button type="button" class="btn btn-small btn-primary import-augment-btn" data-batch-id="${escapeHtml(batchId)}">Add these details</button>
                 </div>`;
+            unmappedNotice.querySelector('.import-augment-btn').addEventListener('click', (e) => {
+                showAugmentUI(e.target.dataset.batchId);
+            });
         } else {
             unmappedNotice.style.display = 'none';
         }
@@ -5103,7 +5127,7 @@ function showImportResults(result) {
     window._lastSkippedRows = result.skipped_rows || [];
 
     const skippedValue = (result.rows_skipped > 0 && window._lastSkippedRows.length > 0)
-        ? `<a href="#" onclick="showSkippedRows(); return false;" style="color:var(--primary-color);text-decoration:underline;">${result.rows_skipped}</a>`
+        ? `<a href="#" class="skipped-rows-link" style="color:var(--primary-color);text-decoration:underline;">${result.rows_skipped}</a>`
         : `${result.rows_skipped}`;
 
     let html = `
@@ -5131,6 +5155,12 @@ function showImportResults(result) {
     }
 
     document.getElementById('import-results-content').innerHTML = html;
+
+    // Wire up skipped rows link (CSP-compliant)
+    document.querySelector('.skipped-rows-link')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showSkippedRows();
+    });
 
     if (result.wines_created > 0) {
         showToast(`Successfully imported ${result.wines_created} wines!`, 'success');
