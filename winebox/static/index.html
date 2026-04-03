@@ -815,8 +815,19 @@
                         <h3>Your data (first 5 rows)</h3>
                         <div id="import-preview-container" style="overflow-x:auto;"></div>
                     </div>
-                    <div id="import-quantity-notice" class="form-note" style="display:none;padding:0.75rem 1rem;background:var(--bg-secondary);border-radius:var(--radius);border-left:3px solid var(--wine-gold);">
-                        No quantity column matched — each wine will be added as <strong>1 bottle</strong>.
+                    <div id="import-summary-panel" style="display:none;margin-top:1rem;padding:1rem;background:var(--bg-secondary);border-radius:var(--radius);border-left:3px solid var(--primary-color);">
+                        <div id="import-summary-text"></div>
+                        <div id="import-case-size-prompt" style="display:none;margin-top:0.75rem;">
+                            <p style="font-weight:600;margin-bottom:0.5rem;">How many bottles are in each case?</p>
+                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                                <button type="button" class="btn btn-small btn-outline case-size-option" data-size="6">6 bottles</button>
+                                <button type="button" class="btn btn-small btn-outline case-size-option" data-size="12">12 bottles</button>
+                                <div style="display:flex;align-items:center;gap:0.25rem;">
+                                    <input type="number" id="import-custom-case-size" min="1" max="100" placeholder="Other" style="width:70px;padding:0.3rem 0.5rem;border:1px solid var(--border-color);border-radius:var(--radius);">
+                                    <button type="button" class="btn btn-small btn-outline" id="import-custom-case-size-btn">Set</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" id="import-confirm-mapping-btn">Looks Good — Import My Wines</button>
@@ -852,7 +863,7 @@
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" id="import-new-btn">Import Another File</button>
-                        <button type="button" class="btn btn-secondary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                        <button type="button" class="btn btn-secondary import-go-to-cellar-btn">Go to Cellar</button>
                     </div>
                 </div>
 
@@ -907,7 +918,7 @@
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="button" class="btn btn-primary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                        <button type="button" class="btn btn-primary import-go-to-cellar-btn">Go to Cellar</button>
                         <button type="button" class="btn btn-secondary" id="import-dashboard-new-btn">Import Another File</button>
                         <button type="button" class="btn btn-danger btn-small" id="import-undo-btn" style="margin-left:auto;">Undo This Import</button>
                     </div>

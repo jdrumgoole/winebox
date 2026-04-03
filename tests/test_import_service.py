@@ -325,14 +325,15 @@ def test_row_to_wine_quantity_with_case_size_derives_cases() -> None:
 
 
 def test_row_to_wine_case_size_without_quantity() -> None:
-    """Test case_size with default quantity of 1 — not enough for a case."""
+    """Test case_size with default quantity of 1 — treated as 1 case."""
     from bson import ObjectId
 
     row = {"Name": "Test", "Bottles per Case": "6"}
     mapping = {"Name": "name", "Bottles per Case": "case_size"}
     result = row_to_wine_data(row, mapping, ObjectId())
-    assert result["inventory"].quantity == 1  # default=1, less than case_size
-    assert result["_num_cases"] == 0  # Can't form a case with 1 bottle
+    # Mode 2b: quantity (1) < case_size (6) → treat 1 as number of cases
+    assert result["inventory"].quantity == 6  # 1 case × 6 bottles
+    assert result["_num_cases"] == 1
 
 
 def test_row_to_wine_purchase_date() -> None:

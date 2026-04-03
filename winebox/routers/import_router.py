@@ -410,6 +410,7 @@ async def process_batch(
         default_quantity=opts.default_quantity,
         skip_enrichment=opts.skip_enrichment,
         skip_duplicates=opts.skip_duplicates,
+        default_case_size=opts.default_case_size,
     )
 
     return ImportResultResponse(
@@ -452,6 +453,7 @@ async def process_batch_stream(
             default_quantity=opts.default_quantity,
             skip_enrichment=opts.skip_enrichment,
             skip_duplicates=opts.skip_duplicates,
+            default_case_size=opts.default_case_size,
         ):
             yield f"data: {json.dumps(progress)}\n\n"
 

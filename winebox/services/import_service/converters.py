@@ -130,6 +130,7 @@ def row_to_wine_data(
     mapping: dict[str, str],
     owner_id: PyObjectId,
     default_quantity: int = 1,
+    default_case_size: int | None = None,
     existing_wines: set[tuple[str, ...]] | None = None,
 ) -> dict[str, Any] | None:
     """Convert a spreadsheet row to Wine constructor kwargs.
@@ -202,6 +203,11 @@ def row_to_wine_data(
     #    Example: Quantity in Bottles=12, Case Size=6 → 2 cases, 12 bottles
     #
     # 3. "quantity" only → all loose bottles, no cases
+    # Apply default_case_size when cases are present but case_size is missing
+    if case_size is None and default_case_size is not None:
+        if explicit_num_cases is not None:
+            case_size = default_case_size
+
     num_cases = 0
     if explicit_num_cases is not None and case_size is not None and case_size > 0:
         # Mode 1: "Cases" column — multiply to get total bottles
@@ -211,6 +217,10 @@ def row_to_wine_data(
         # Mode 2: "Quantity in Bottles" + "Case Size" — derive case count
         total_bottles = quantity
         num_cases = quantity // case_size
+    elif case_size is not None and case_size > 0:
+        # Mode 2b: quantity < case_size — treat quantity as number of cases
+        num_cases = quantity
+        total_bottles = quantity * case_size
     else:
         # Mode 3: just bottles, no cases
         total_bottles = quantity

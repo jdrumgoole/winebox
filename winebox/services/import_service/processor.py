@@ -104,6 +104,7 @@ def _convert_chunk_from_rows(
     batch_id: PyObjectId | None = None,
     existing_wines: set[tuple[str, ...]] | None = None,
     skip_duplicates: bool = False,
+    default_case_size: int | None = None,
 ) -> _Chunk:
     """Phase 1 helper: Convert raw row dicts to wine dicts (sync, fast)."""
     chunk_rows = rows
@@ -126,6 +127,7 @@ def _convert_chunk_from_rows(
 
             wine_data = row_to_wine_data(
                 row, column_mapping, owner_id, default_quantity,
+                default_case_size=default_case_size,
                 existing_wines=existing_wines,
             )
             if wine_data is None:
@@ -171,6 +173,7 @@ def _convert_chunk(
     default_quantity: int,
     existing_wines: set[tuple[str, ...]] | None = None,
     skip_duplicates: bool = False,
+    default_case_size: int | None = None,
 ) -> _Chunk:
     """Phase 1: Convert raw rows from ImportBatch.rows (backwards compatible path)."""
     chunk_rows = batch.rows[chunk_start:chunk_end]
@@ -185,6 +188,7 @@ def _convert_chunk(
         batch_id=batch.id,
         existing_wines=existing_wines,
         skip_duplicates=skip_duplicates,
+        default_case_size=default_case_size,
     )
 
 
@@ -477,6 +481,7 @@ async def _feeder(
                 default_quantity,
                 existing_wines,
                 skip_duplicates,
+                default_case_size,
             )
             await enrichment_queue.put(chunk)
     else:
@@ -506,6 +511,7 @@ async def _feeder(
                 batch_id=batch.id,
                 existing_wines=existing_wines,
                 skip_duplicates=skip_duplicates,
+                default_case_size=default_case_size,
             )
             await enrichment_queue.put(chunk)
 
@@ -552,6 +558,7 @@ async def _process_chunks(
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     skip_enrichment: bool = True,
     skip_duplicates: bool = False,
+    default_case_size: int | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Process import rows using a pipelined async architecture.
 
@@ -722,19 +729,9 @@ async def process_import_batch(
     default_quantity: int = 1,
     skip_enrichment: bool = True,
     skip_duplicates: bool = False,
+    default_case_size: int | None = None,
 ) -> ImportBatch:
-    """Process an import batch: create Wine documents from mapped rows.
-
-    Args:
-        batch: The ImportBatch document with rows and mapping.
-        owner_id: Owner's ID for created wines.
-        skip_non_wine: Whether to skip non-wine rows.
-        default_quantity: Default bottle quantity.
-        skip_duplicates: Whether to skip wines already in cellar.
-
-    Returns:
-        Updated ImportBatch with processing results.
-    """
+    """Process an import batch: create Wine documents from mapped rows."""
     if not batch.column_mapping:
         batch.status = ImportStatus.FAILED
         batch.errors.append("No column mapping set")
@@ -751,8 +748,9 @@ async def process_import_batch(
         default_quantity,
         skip_enrichment=skip_enrichment,
         skip_duplicates=skip_duplicates,
+        default_case_size=default_case_size,
     ):
-        pass  # Consume all progress; batch is saved inside _process_chunks
+        pass
 
     return batch
 
@@ -764,6 +762,7 @@ async def process_import_batch_streaming(
     default_quantity: int = 1,
     skip_enrichment: bool = True,
     skip_duplicates: bool = False,
+    default_case_size: int | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Process an import batch, yielding progress after each chunk.
 
@@ -802,5 +801,6 @@ async def process_import_batch_streaming(
         default_quantity,
         skip_enrichment=skip_enrichment,
         skip_duplicates=skip_duplicates,
+        default_case_size=default_case_size,
     ):
         yield progress
