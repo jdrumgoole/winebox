@@ -4552,16 +4552,16 @@ async function showImportDashboard(batchId, filename, importResult) {
         }
 
         const data = await response.json();
+        const summary = data.summary;
 
         // Title
         const caseText = summary.total_cases > 0
             ? ` (${summary.total_cases} case${summary.total_cases !== 1 ? 's' : ''})`
             : '';
         document.getElementById('import-dashboard-title').textContent =
-            `You just added ${data.summary.wines_created} wines${caseText} from ${escapeHtml(filename)}`;
+            `You just added ${summary.wines_created} wines${caseText} from ${escapeHtml(filename)}`;
 
         // Summary cards
-        const summary = data.summary;
         let summaryHtml = `
             <div class="stat-card">
                 <div class="stat-value">${summary.total_bottles}</div>
