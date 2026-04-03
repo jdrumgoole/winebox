@@ -29,6 +29,13 @@ async def enrichment_progress(current_user: RequireAuth) -> StreamingResponse:
         max_polls = 600  # 5 minutes at 0.5s intervals
         polls = 0
 
+        # Wait briefly for the background enrichment task to initialise
+        # (it may not have set progress yet if we connect immediately)
+        for _ in range(6):  # Up to 3 seconds
+            if get_enrichment_progress(owner_str) is not None:
+                break
+            await asyncio.sleep(0.5)
+
         while polls < max_polls:
             progress = get_enrichment_progress(owner_str)
 

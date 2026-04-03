@@ -73,6 +73,13 @@ async def enrich_unenriched_wines(
     """
     owner_str = str(owner_id)
 
+    # Set progress immediately so the SSE endpoint knows enrichment is starting
+    _enrichment_progress[owner_str] = {
+        "phase": "enriching",
+        "enriched": 0,
+        "total": 0,  # Will be updated after query
+    }
+
     # Find all unenriched wines for this owner
     unenriched = await Wine.find(
         {"owner_id": owner_id, "xwines_id": None},
@@ -80,9 +87,14 @@ async def enrich_unenriched_wines(
 
     total = len(unenriched)
     if total == 0:
+        _enrichment_progress[owner_str] = {
+            "phase": "done",
+            "enriched": 0,
+            "total": 0,
+        }
         return {"total": 0, "enriched": 0, "failed": 0}
 
-    # Update progress store
+    # Update progress with actual total
     _enrichment_progress[owner_str] = {
         "phase": "enriching",
         "enriched": 0,
