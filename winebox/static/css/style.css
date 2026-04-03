@@ -771,6 +771,72 @@ details.advanced-fields .form-grid {
     width: fit-content;
 }
 
+/* Grouped cellar table view */
+.cellar-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+}
+
+.cellar-table thead th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--primary-color);
+    position: sticky;
+    top: 0;
+    background: var(--background-color);
+}
+
+.cellar-table tbody tr {
+    transition: background 0.15s;
+}
+
+.cellar-table tbody tr:hover {
+    background: var(--bg-secondary);
+}
+
+.cellar-table tbody td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.cellar-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.cellar-table .wine-type-cell {
+    text-transform: capitalize;
+}
+
+.breakdown-case, .breakdown-loose {
+    display: inline-block;
+    font-size: 0.8rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    margin: 0.1rem 0.25rem 0.1rem 0;
+}
+
+.breakdown-case {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.breakdown-loose {
+    color: var(--text-muted);
+}
+
+.text-muted {
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
 .wine-card-cases {
     padding: 0 1.25rem 1rem;
     display: flex;

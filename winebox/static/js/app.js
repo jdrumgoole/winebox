@@ -1492,7 +1492,7 @@ function selectRemovalReason(reason) {
     });
 
     // Show the relevant conditional field
-    const fieldMap = { DRINK: 'drink', SELL: 'sell', GIFT: 'gift', OTHER: 'other' };
+    const fieldMap = { DRINK: 'drink', SELL: 'sell', GIFT: 'gift', BREAKAGE: 'breakage', OTHER: 'other' };
     const fieldId = `remove-field-${fieldMap[reason]}`;
     const field = document.getElementById(fieldId);
     if (field) {
@@ -1506,7 +1506,7 @@ function selectRemovalReason(reason) {
     }
 
     // Update submit button text
-    const btnLabels = { DRINK: 'Record', SELL: 'Record Sale', GIFT: 'Record Gift', OTHER: 'Record' };
+    const btnLabels = { DRINK: 'Record', SELL: 'Record Sale', GIFT: 'Record Gift', BREAKAGE: 'Record Breakage', OTHER: 'Record' };
     document.getElementById('remove-submit-btn').textContent = btnLabels[reason] || 'Record';
 
     // Highlight selected reason card
@@ -2129,19 +2129,23 @@ function renderGroupedCellarTable(data) {
 
     const rows = data.wines.map(wine => {
         const caseInfo = wine.cases.length > 0
-            ? wine.cases.map(c => `${c.bottles_remaining}/${c.case_size}${c.provenance ? ' (' + escapeHtml(c.provenance) + ')' : ''}`).join(', ')
+            ? wine.cases.map(c => {
+                const prov = c.provenance ? ` <span class="text-muted">(${escapeHtml(c.provenance)})</span>` : '';
+                return `<span class="breakdown-case">${c.bottles_remaining}/${c.case_size} case${prov}</span>`;
+            }).join('')
             : '';
-        const looseInfo = wine.loose_bottles > 0 ? `${wine.loose_bottles} loose` : '';
-        const breakdown = [caseInfo, looseInfo].filter(Boolean).join(' + ');
+        const looseInfo = wine.loose_bottles > 0
+            ? `<span class="breakdown-loose">${wine.loose_bottles} loose</span>`
+            : '';
 
         return `
             <tr class="cellar-table-row" data-wine-id="${wine.wine_id}">
-                <td>${escapeHtml(wine.name)}</td>
+                <td><strong>${escapeHtml(wine.name)}</strong>${wine.winery ? `<br><span class="text-muted">${escapeHtml(wine.winery)}</span>` : ''}</td>
                 <td>${wine.vintage || '\u2014'}</td>
-                <td>${wine.wine_type ? escapeHtml(wine.wine_type) : '\u2014'}</td>
+                <td class="wine-type-cell">${wine.wine_type ? `<span class="wine-type-badge">${escapeHtml(wine.wine_type)}</span>` : '\u2014'}</td>
                 <td>${wine.country ? escapeHtml(wine.country) : '\u2014'}</td>
-                <td>${wine.total_bottles}</td>
-                <td>${breakdown}</td>
+                <td><strong>${wine.total_bottles}</strong></td>
+                <td>${caseInfo}${looseInfo}</td>
                 <td>
                     ${wine.total_bottles > 0 ? `<button class="btn btn-small btn-primary remove-btn" data-wine-id="${wine.wine_id}" data-quantity="${wine.total_bottles}">Remove</button>` : ''}
                 </td>

@@ -1231,6 +1231,10 @@
                             <span class="reason-card-icon">&#127873;</span>
                             <span class="reason-card-label">Gifted</span>
                         </button>
+                        <button type="button" class="reason-card" data-reason="BREAKAGE">
+                            <span class="reason-card-icon">&#128148;</span>
+                            <span class="reason-card-label">Breakage</span>
+                        </button>
                         <button type="button" class="reason-card" data-reason="OTHER">
                             <span class="reason-card-icon">&#128230;</span>
                             <span class="reason-card-label">Other</span>
@@ -1269,10 +1273,17 @@
                         </div>
                     </div>
 
+                    <div id="remove-field-breakage" class="removal-conditional-field" style="display: none;">
+                        <div class="form-group">
+                            <label for="remove-breakage-notes">What happened?</label>
+                            <textarea id="remove-breakage-notes" name="removal_notes" rows="3" placeholder="Dropped, cork failure, storage damage..."></textarea>
+                        </div>
+                    </div>
+
                     <div id="remove-field-other" class="removal-conditional-field" style="display: none;">
                         <div class="form-group">
                             <label for="remove-removal-notes">What happened? (optional)</label>
-                            <textarea id="remove-removal-notes" name="removal_notes" rows="3" placeholder="Breakage, loss, spoilage..."></textarea>
+                            <textarea id="remove-removal-notes" name="removal_notes" rows="3" placeholder="Loss, spoilage, other reason..."></textarea>
                         </div>
                     </div>
 
