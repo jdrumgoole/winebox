@@ -185,8 +185,15 @@ def row_to_wine_data(
             wine_data[field] = value
 
     # Compute total bottles from quantity and case_size
-    if case_size is not None:
-        quantity = quantity * case_size
+    # quantity = number of cases (or loose bottles if no case_size)
+    # case_size = bottles per case (e.g. 6, 12)
+    # total_bottles = quantity * case_size (if cases) or quantity (if loose)
+    num_cases = 0
+    if case_size is not None and case_size > 0:
+        num_cases = quantity
+        total_bottles = quantity * case_size
+    else:
+        total_bottles = quantity
 
     # Name is required
     if "name" not in wine_data:
@@ -195,10 +202,13 @@ def row_to_wine_data(
     wine_data["owner_id"] = owner_id
     wine_data["front_label_text"] = ""
     wine_data["inventory"] = InventoryInfo(
-        quantity=quantity,
+        quantity=total_bottles,
         case_size=case_size if case_size else None,
         updated_at=datetime.now(timezone.utc),
     )
+    # Store case info for the processor to create Case records
+    wine_data["_num_cases"] = num_cases
+    wine_data["_case_size"] = case_size
 
     if custom_fields:
         wine_data["custom_fields"] = custom_fields

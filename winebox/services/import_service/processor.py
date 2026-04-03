@@ -12,6 +12,7 @@ writing chunk N, and multiple enrichment tasks run concurrently.
 import asyncio
 import logging
 from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
 from typing import Any
 
 from pymongo.errors import BulkWriteError
@@ -228,10 +229,16 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
         return 0, []
 
     from bson import ObjectId as _OID
-    # Pre-generate IDs so bottles can reference them after insert_many
+    # Extract case metadata before Wine construction (not valid Wine fields)
+    case_meta: dict[Any, tuple[int, int]] = {}  # wine_id → (num_cases, case_size)
     for wd, _ in chunk.wine_datas:
         if "_id" not in wd and "id" not in wd:
             wd["id"] = _OID()
+        num_cases = wd.pop("_num_cases", 0)
+        case_size = wd.pop("_case_size", None)
+        if num_cases and case_size:
+            case_meta[wd["id"]] = (num_cases, case_size)
+
     wine_docs = [Wine(**wd) for wd, _ in chunk.wine_datas]
     errors: list[str] = []
     wines_created = 0
@@ -240,28 +247,67 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
         await Wine.insert_many(wine_docs)
         wines_created = len(wine_docs)
 
-        # Create bottle records in batch (one insert_many for all bottles in chunk)
+        # Create bottles, cases, and events
         from winebox.models.bottle import Bottle
+        from winebox.models.case import Case
         from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
-        bottle_batch = []
-        event_batch = []
+        bottle_batch: list[Bottle] = []
+        event_batch: list[WineEvent] = []
+        case_batch: list[Case] = []
+        now = datetime.now(timezone.utc)
+
         for wine_doc in wine_docs:
             qty = wine_doc.inventory.quantity if wine_doc.inventory else 1
             if qty <= 0:
                 continue
-            for _ in range(qty):
-                bid = _OID()
-                bottle_batch.append(Bottle(
-                    id=bid, owner_id=wine_doc.owner_id, wine_id=wine_doc.id,
-                    case_id=None, name=wine_doc.name, winery=wine_doc.winery,
-                    vintage=wine_doc.vintage, grape_variety=wine_doc.grape_variety,
-                    country=wine_doc.country, region=wine_doc.region,
-                    wine_type=wine_doc.wine_type_id,
-                ))
-                event_batch.append(WineEvent(scope=WineEventScope.BOTTLE, 
-                    bottle_id=bid, owner_id=wine_doc.owner_id,
-                    event_type=WineEventType.ADDED,
-                ))
+
+            meta = case_meta.get(wine_doc.id)
+            if meta:
+                # Wine has case structure — create Case records with linked bottles
+                num_cases, case_size = meta
+                for _ in range(num_cases):
+                    case_id = _OID()
+                    case_batch.append(Case(
+                        id=case_id,
+                        owner_id=wine_doc.owner_id,
+                        wine_id=wine_doc.id,
+                        case_size=case_size,
+                        purchase_date=getattr(wine_doc, 'purchase_date', None),
+                        created_at=now,
+                    ))
+                    for _ in range(case_size):
+                        bid = _OID()
+                        bottle_batch.append(Bottle(
+                            id=bid, owner_id=wine_doc.owner_id, wine_id=wine_doc.id,
+                            case_id=case_id, name=wine_doc.name, winery=wine_doc.winery,
+                            vintage=wine_doc.vintage, grape_variety=wine_doc.grape_variety,
+                            country=wine_doc.country, region=wine_doc.region,
+                            wine_type=wine_doc.wine_type_id, created_at=now,
+                        ))
+                        event_batch.append(WineEvent(
+                            scope=WineEventScope.BOTTLE,
+                            bottle_id=bid, owner_id=wine_doc.owner_id,
+                            event_type=WineEventType.ADDED, event_date=now, created_at=now,
+                        ))
+            else:
+                # Loose bottles — no case
+                for _ in range(qty):
+                    bid = _OID()
+                    bottle_batch.append(Bottle(
+                        id=bid, owner_id=wine_doc.owner_id, wine_id=wine_doc.id,
+                        case_id=None, name=wine_doc.name, winery=wine_doc.winery,
+                        vintage=wine_doc.vintage, grape_variety=wine_doc.grape_variety,
+                        country=wine_doc.country, region=wine_doc.region,
+                        wine_type=wine_doc.wine_type_id, created_at=now,
+                    ))
+                    event_batch.append(WineEvent(
+                        scope=WineEventScope.BOTTLE,
+                        bottle_id=bid, owner_id=wine_doc.owner_id,
+                        event_type=WineEventType.ADDED, event_date=now, created_at=now,
+                    ))
+
+        if case_batch:
+            await Case.insert_many(case_batch)
         if bottle_batch:
             await Bottle.insert_many(bottle_batch)
             await WineEvent.insert_many(event_batch)

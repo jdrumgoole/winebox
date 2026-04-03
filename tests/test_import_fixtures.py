@@ -532,3 +532,80 @@ async def test_undo_standard_collection(client: AsyncClient) -> None:
     # Cellar should be empty
     wines_resp = await client.get("/api/wines")
     assert len(wines_resp.json()) == 0
+
+
+# =========================================================================
+# Case-Aware Import — rows with case_size create Case + linked Bottles
+# =========================================================================
+
+
+@pytest.mark.asyncio
+async def test_case_import_creates_cases(client: AsyncClient) -> None:
+    """Import with case_size creates Case records and links bottles to them."""
+    result = await _upload_and_map(client, "case_import.csv", {
+        "Wine Name": "name",
+        "Producer": "winery",
+        "Vintage": "vintage",
+        "Country": "country",
+        "Type": "wine_type_id",
+        "Quantity": "quantity",
+        "Case Size": "case_size",
+        "Purchase Date": "purchase_date",
+    })
+
+    assert result["wines_created"] == 5
+
+    # Check that cases were created
+    cases_resp = await client.get("/api/cases")
+    assert cases_resp.status_code == 200
+    cases = cases_resp.json()["cases"]
+
+    # Margaux: 2 cases of 6, Opus One: 1 case of 12, Dom Perignon: 1 case of 6
+    # = 4 cases total
+    assert len(cases) == 4
+
+    # Verify case sizes
+    case_sizes = sorted([c["case_size"] for c in cases])
+    assert case_sizes == [6, 6, 6, 12]  # 2×6 (Margaux) + 1×12 (Opus) + 1×6 (Dom)
+
+    # Verify total bottles
+    bottles_resp = await client.get("/api/bottles")
+    assert bottles_resp.status_code == 200
+    all_bottles = bottles_resp.json()["bottles"]
+
+    # Margaux: 2×6=12, Opus: 1×12=12, Cloudy Bay: 3 loose, Dom: 1×6=6, Barolo: 4 loose
+    # Total: 12 + 12 + 3 + 6 + 4 = 37
+    assert len(all_bottles) == 37
+
+    # Verify loose bottles have no case_id
+    loose_bottles = [b for b in all_bottles if b["case_id"] is None]
+    assert len(loose_bottles) == 7  # 3 Cloudy Bay + 4 Barolo
+
+    # Verify cased bottles have case_ids
+    cased_bottles = [b for b in all_bottles if b["case_id"] is not None]
+    assert len(cased_bottles) == 30  # 12 + 12 + 6
+
+
+@pytest.mark.asyncio
+async def test_case_import_bottles_per_case(client: AsyncClient) -> None:
+    """Each case has exactly case_size bottles linked to it."""
+    await _upload_and_map(client, "case_import.csv", {
+        "Wine Name": "name",
+        "Producer": "winery",
+        "Vintage": "vintage",
+        "Country": "country",
+        "Type": "wine_type_id",
+        "Quantity": "quantity",
+        "Case Size": "case_size",
+    })
+
+    cases_resp = await client.get("/api/cases")
+    cases = cases_resp.json()["cases"]
+
+    for case in cases:
+        case_detail = await client.get(f"/api/cases/{case['id']}")
+        detail = case_detail.json()
+        assert detail["bottles_remaining"] == detail["case_size"], (
+            f"Case {case['id']} has {detail['bottles_remaining']} bottles "
+            f"but case_size is {detail['case_size']}"
+        )
