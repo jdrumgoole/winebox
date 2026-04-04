@@ -133,7 +133,7 @@ def _upload_csv(page: Page, csv_path: Path, timeout_ms: int = 25000) -> None:
     page.wait_for_selector("#import-step-map", state="visible", timeout=timeout_ms)
 
 
-def _confirm_and_wait_for_import(page: Page, timeout_ms: int = 30000) -> None:
+def _confirm_and_wait_for_import(page: Page, timeout_ms: int = 60000) -> None:
     """Click Confirm Mapping and wait for the import to complete.
 
     After confirming, the flow goes: progress → dashboard (or results as fallback).

@@ -464,6 +464,7 @@ async def _feeder(
     num_workers: int,
     existing_wines: set[tuple[str, ...]] | None = None,
     skip_duplicates: bool = False,
+    default_case_size: int | None = None,
 ) -> None:
     """Feed chunks into the pipeline and manage orderly shutdown."""
     # Convert and enqueue all chunks
@@ -666,6 +667,7 @@ async def _process_chunks(
             num_workers,
             existing_wines=existing_wines,
             skip_duplicates=skip_duplicates,
+            default_case_size=default_case_size,
         )
     )
 
