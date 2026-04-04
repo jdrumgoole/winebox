@@ -114,6 +114,13 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("bottle_id", ASCENDING)]),
         IndexModel([("case_id", ASCENDING)]),
     ],
+    "price_captures": [
+        IndexModel([("owner_id", ASCENDING)]),
+        IndexModel([("owner_id", ASCENDING), ("captured_at", DESCENDING)]),
+        IndexModel([("location.country", ASCENDING)]),
+        IndexModel([("location.shop_name", ASCENDING)]),
+        IndexModel([("wine_name", ASCENDING)]),
+    ],
 }
 
 
