@@ -445,17 +445,28 @@ async def process_batch_stream(
 
     opts = request or ImportProcessRequest()
 
+    user_id = current_user.id
+
     async def event_generator():
+        last_progress = {}
         async for progress in process_import_batch_streaming(
             batch=batch,
-            owner_id=current_user.id,
+            owner_id=user_id,
             skip_non_wine=opts.skip_non_wine,
             default_quantity=opts.default_quantity,
             skip_enrichment=opts.skip_enrichment,
             skip_duplicates=opts.skip_duplicates,
             default_case_size=opts.default_case_size,
         ):
+            last_progress = progress
             yield f"data: {json.dumps(progress)}\n\n"
+
+        # Trigger background enrichment after stream completes
+        # (doing this here instead of inside the generator ensures
+        # the task is created in the response's event loop context)
+        if last_progress.get("enrichment_started"):
+            from winebox.services.background_enrichment import enrich_unenriched_wines
+            asyncio.create_task(enrich_unenriched_wines(user_id))
 
     return StreamingResponse(
         event_generator(),

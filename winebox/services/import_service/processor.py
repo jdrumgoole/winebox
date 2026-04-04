@@ -702,13 +702,9 @@ async def _process_chunks(
     batch.status = ImportStatus.COMPLETED
     await batch.save()
 
-    # Start background enrichment if wines were created and inline enrichment was skipped
-    if wines_created > 0 and skip_enrichment:
-        asyncio.create_task(enrich_unenriched_wines(owner_id))
-        logger.info(
-            "Started background enrichment for %d new wines (owner %s)",
-            wines_created, owner_id,
-        )
+    # Note: background enrichment is triggered by the router after the stream
+    # completes, not here inside the generator (asyncio.create_task inside a
+    # generator doesn't reliably persist after the response closes).
 
     # Final yield with done=True
     yield {
