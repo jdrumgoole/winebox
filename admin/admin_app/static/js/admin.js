@@ -2,77 +2,72 @@
  * WineBox Admin Panel JavaScript (Standalone)
  */
 
-// Get auth token from localStorage
+// ---------------------------------------------------------------------------
+// Auth helpers
+// ---------------------------------------------------------------------------
+
 function getAuthToken() {
     return localStorage.getItem('winebox_admin_token');
 }
 
-// Show admin panel, hide login
 function showAdminPanel() {
     document.getElementById('login-section').style.display = 'none';
     document.getElementById('admin-content').style.display = 'block';
     refreshData();
 }
 
-// Show login form, hide admin panel
 function showLoginForm() {
     localStorage.removeItem('winebox_admin_token');
     document.getElementById('login-section').style.display = 'block';
     document.getElementById('admin-content').style.display = 'none';
 }
 
-// Check if user is authenticated
 async function checkAuth() {
     const token = getAuthToken();
-    if (!token) {
-        showLoginForm();
-        return false;
-    }
+    if (!token) { showLoginForm(); return false; }
     return true;
 }
 
-// Make authenticated API request
 async function apiRequest(endpoint, options = {}) {
     const token = getAuthToken();
-    const headers = {
-        'Authorization': `Bearer ${token}`,
-        ...options.headers
-    };
-
-    const response = await fetch(endpoint, {
-        ...options,
-        headers
-    });
-
+    const headers = { 'Authorization': `Bearer ${token}`, ...options.headers };
+    const response = await fetch(endpoint, { ...options, headers });
     if (response.status === 401 || response.status === 403) {
         showLoginForm();
         throw new Error('Not authorized');
     }
-
     return response;
 }
 
-// Format date for display
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
 function formatDate(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
     });
 }
 
-// Load admin stats
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Stats
+// ---------------------------------------------------------------------------
+
 async function loadStats() {
     try {
         const response = await apiRequest('/api/stats');
         if (!response.ok) throw new Error('Failed to load stats');
-
         const data = await response.json();
-
         document.getElementById('stat-total-users').textContent = data.users.total;
         document.getElementById('stat-active-users').textContent = data.users.active;
         document.getElementById('stat-verified-users').textContent = data.users.verified;
@@ -83,107 +78,161 @@ async function loadStats() {
     }
 }
 
-// Load users list
+// ---------------------------------------------------------------------------
+// Users — read-only tab
+// ---------------------------------------------------------------------------
+
+function renderReadonlyTable(users) {
+    if (users.length === 0) return '<p>No users found.</p>';
+    return `
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th>Last Login</th>
+                    <th>Cellar</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${users.map(user => `
+                    <tr>
+                        <td>
+                            <strong>${escapeHtml(user.email)}</strong>
+                            ${user.full_name ? `<br><span class="timestamp">${escapeHtml(user.full_name)}</span>` : ''}
+                        </td>
+                        <td>
+                            ${user.is_active
+                                ? '<span class="badge badge-success">Active</span>'
+                                : '<span class="badge badge-danger">Inactive</span>'}
+                            ${user.is_verified
+                                ? '<span class="badge badge-success">Verified</span>'
+                                : '<span class="badge badge-warning">Unverified</span>'}
+                        </td>
+                        <td>
+                            ${user.is_superuser
+                                ? '<span class="badge badge-primary">Admin</span>'
+                                : '<span class="badge">User</span>'}
+                        </td>
+                        <td class="timestamp">${formatDate(user.created_at)}</td>
+                        <td class="timestamp">${formatDate(user.last_login)}</td>
+                        <td class="cellar-size">${user.cellar_size} bottles</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+// ---------------------------------------------------------------------------
+// Users — manage tab
+// ---------------------------------------------------------------------------
+
+function renderManageTable(users) {
+    if (users.length === 0) return '<p>No users found.</p>';
+    return `
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Role</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${users.map(user => `
+                    <tr>
+                        <td><strong>${escapeHtml(user.email)}</strong></td>
+                        <td>
+                            ${user.is_active
+                                ? '<span class="badge badge-success">Active</span>'
+                                : '<span class="badge badge-danger">Inactive</span>'}
+                            ${user.is_verified
+                                ? '<span class="badge badge-success">Verified</span>'
+                                : '<span class="badge badge-warning">Unverified</span>'}
+                        </td>
+                        <td>
+                            ${user.is_superuser
+                                ? '<span class="badge badge-primary">Admin</span>'
+                                : '<span class="badge">User</span>'}
+                        </td>
+                        <td class="actions-cell">
+                            ${user.is_active
+                                ? `<button class="btn-admin btn-admin-outline" data-action="deactivate" data-user-id="${user.id}">Disable</button>`
+                                : `<button class="btn-admin btn-admin-success" data-action="activate" data-user-id="${user.id}">Enable</button>`}
+                            ${user.is_superuser
+                                ? `<button class="btn-admin btn-admin-outline" data-action="remove-admin" data-user-id="${user.id}">Remove Admin</button>`
+                                : `<button class="btn-admin btn-admin-outline" data-action="make-admin" data-user-id="${user.id}">Make Admin</button>`}
+                            ${!user.is_verified
+                                ? `<button class="btn-admin btn-admin-success" data-action="verify" data-user-id="${user.id}">Verify</button>`
+                                : ''}
+                            <button class="btn-admin btn-admin-danger" data-action="delete" data-user-id="${user.id}" data-user-email="${escapeHtml(user.email)}">Delete User</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+// ---------------------------------------------------------------------------
+// Load users into both tabs
+// ---------------------------------------------------------------------------
+
+let _cachedUsers = [];
+
 async function loadUsers() {
-    const container = document.getElementById('users-container');
+    const readonlyContainer = document.getElementById('users-readonly-container');
+    const manageContainer = document.getElementById('users-manage-container');
 
     try {
         const response = await apiRequest('/api/users');
         if (!response.ok) throw new Error('Failed to load users');
-
         const data = await response.json();
-        const users = data.users;
+        _cachedUsers = data.users;
 
-        if (users.length === 0) {
-            container.innerHTML = '<p>No users found.</p>';
-            return;
-        }
+        readonlyContainer.innerHTML = renderReadonlyTable(_cachedUsers);
+        manageContainer.innerHTML = renderManageTable(_cachedUsers);
 
-        const tableHtml = `
-            <table class="users-table">
-                <thead>
-                    <tr>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th>Role</th>
-                        <th>Created</th>
-                        <th>Last Login</th>
-                        <th>Cellar Size</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${users.map(user => `
-                        <tr>
-                            <td>
-                                <strong>${escapeHtml(user.email)}</strong>
-                                ${user.full_name ? `<br><span class="timestamp">${escapeHtml(user.full_name)}</span>` : ''}
-                            </td>
-                            <td>
-                                ${user.is_active
-                                    ? '<span class="badge badge-success">Active</span>'
-                                    : '<span class="badge badge-danger">Inactive</span>'}
-                                ${user.is_verified
-                                    ? '<span class="badge badge-success">Verified</span>'
-                                    : '<span class="badge badge-warning">Unverified</span>'}
-                            </td>
-                            <td>
-                                ${user.is_superuser
-                                    ? '<span class="badge badge-primary">Admin</span>'
-                                    : '<span class="badge">User</span>'}
-                            </td>
-                            <td class="timestamp">${formatDate(user.created_at)}</td>
-                            <td class="timestamp">${formatDate(user.last_login)}</td>
-                            <td class="cellar-size">${user.cellar_size} bottles</td>
-                            <td class="actions-cell">
-                                ${user.is_active
-                                    ? `<button class="btn-admin btn-admin-outline" data-action="deactivate" data-user-id="${user.id}">Disable</button>`
-                                    : `<button class="btn-admin btn-admin-success" data-action="activate" data-user-id="${user.id}">Enable</button>`}
-                                ${user.is_superuser
-                                    ? `<button class="btn-admin btn-admin-outline" data-action="remove-admin" data-user-id="${user.id}">Remove Admin</button>`
-                                    : `<button class="btn-admin btn-admin-outline" data-action="make-admin" data-user-id="${user.id}">Make Admin</button>`}
-                                ${!user.is_verified
-                                    ? `<button class="btn-admin btn-admin-success" data-action="verify" data-user-id="${user.id}">Verify</button>`
-                                    : ''}
-                                <button class="btn-admin btn-admin-danger" data-action="delete" data-user-id="${user.id}" data-user-email="${escapeHtml(user.email)}">Delete</button>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-
-        container.innerHTML = tableHtml;
-
-        // Attach click handlers via delegation (CSP blocks inline onclick)
-        container.addEventListener('click', handleAdminAction);
+        // Attach delegated click handler for manage tab actions
+        manageContainer.addEventListener('click', handleAdminAction);
     } catch (error) {
         console.error('Error loading users:', error);
-        container.innerHTML = `
-            <div class="error-message">
-                Failed to load users. Make sure you have admin privileges.
-            </div>
-        `;
+        const errHtml = '<div class="error-message">Failed to load users.</div>';
+        readonlyContainer.innerHTML = errHtml;
+        manageContainer.innerHTML = errHtml;
     }
 }
 
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Refresh all admin data (stats + users)
 async function refreshData() {
-    await Promise.all([
-        loadStats(),
-        loadUsers()
-    ]);
+    await Promise.all([loadStats(), loadUsers()]);
 }
 
-// Show admin toast notification
+// ---------------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------------
+
+function setupTabs() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Deactivate all
+            tabBtns.forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            // Activate clicked
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab).classList.add('active');
+        });
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Toast & Confirm
+// ---------------------------------------------------------------------------
+
 function showAdminToast(message, type = 'success') {
     let container = document.getElementById('admin-toast-container');
     if (!container) {
@@ -193,14 +242,13 @@ function showAdminToast(message, type = 'success') {
         document.body.appendChild(container);
     }
     const toast = document.createElement('div');
-    toast.className = `admin-toast admin-toast-${type}`;
     toast.textContent = message;
-    toast.style.cssText = `padding:0.75rem 1.5rem;border-radius:6px;color:#fff;font-size:0.9rem;max-width:400px;box-shadow:0 2px 8px rgba(0,0,0,0.2);animation:fadeIn 0.3s;background:${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#6c757d'};`;
+    const bg = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#6c757d';
+    toast.style.cssText = `padding:0.75rem 1.5rem;border-radius:6px;color:#fff;font-size:0.9rem;max-width:400px;box-shadow:0 2px 8px rgba(0,0,0,0.2);background:${bg};`;
     container.appendChild(toast);
     setTimeout(() => { toast.remove(); }, 4000);
 }
 
-// Show confirm modal (replaces browser confirm())
 function showAdminConfirm(message, onConfirm) {
     let overlay = document.getElementById('admin-confirm-overlay');
     if (overlay) overlay.remove();
@@ -212,29 +260,25 @@ function showAdminConfirm(message, onConfirm) {
     const dialog = document.createElement('div');
     dialog.style.cssText = 'background:#fff;border-radius:8px;padding:2rem;max-width:420px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
     dialog.innerHTML = `
-        <h3 style="margin:0 0 1rem;color:#dc3545;">Confirm Action</h3>
+        <h3 style="margin:0 0 1rem;color:#dc3545;font-family:Playfair Display,serif;">Confirm Action</h3>
         <p style="margin:0 0 1.5rem;line-height:1.5;">${escapeHtml(message)}</p>
         <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-            <button class="btn-admin btn-admin-danger" id="admin-confirm-yes">Confirm</button>
             <button class="btn-admin btn-admin-outline" id="admin-confirm-no">Cancel</button>
+            <button class="btn-admin btn-admin-danger" id="admin-confirm-yes">Confirm</button>
         </div>
     `;
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
 
-    document.getElementById('admin-confirm-yes').addEventListener('click', () => {
-        overlay.remove();
-        onConfirm();
-    });
-    document.getElementById('admin-confirm-no').addEventListener('click', () => {
-        overlay.remove();
-    });
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) overlay.remove();
-    });
+    document.getElementById('admin-confirm-yes').addEventListener('click', () => { overlay.remove(); onConfirm(); });
+    document.getElementById('admin-confirm-no').addEventListener('click', () => { overlay.remove(); });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
-// Delegated click handler for user management actions (CSP-compliant)
+// ---------------------------------------------------------------------------
+// Admin actions (manage tab)
+// ---------------------------------------------------------------------------
+
 async function handleAdminAction(e) {
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
@@ -255,118 +299,159 @@ async function handleAdminAction(e) {
                 const result = await resp.json();
                 showAdminToast(`Deleted ${email}: ${result.wines_deleted} wines, ${result.transactions_deleted} transactions removed.`);
             } catch (e) {
-                console.error(e);
                 showAdminToast('Error deleting user', 'error');
             }
             await refreshData();
         });
-        return;  // Don't refreshData here — the confirm callback handles it
-    } else {
-        // activate, deactivate, make-admin, remove-admin, verify
-        try {
-            const resp = await apiRequest(`/api/users/${userId}/${action}`, { method: 'PATCH' });
-            if (!resp.ok) {
-                const err = await resp.json();
-                showAdminToast(err.detail || `Failed: ${action}`, 'error');
-                return;
-            }
-            const labels = {
-                'activate': 'User enabled',
-                'deactivate': 'User disabled',
-                'make-admin': 'Admin role granted',
-                'remove-admin': 'Admin role removed',
-                'verify': 'User verified',
-            };
-            showAdminToast(labels[action] || `Action ${action} completed`);
-        } catch (e) {
-            console.error(e);
-            showAdminToast(`Error: ${action}`, 'error');
-            return;
-        }
+        return;
     }
 
+    try {
+        const resp = await apiRequest(`/api/users/${userId}/${action}`, { method: 'PATCH' });
+        if (!resp.ok) {
+            const err = await resp.json();
+            showAdminToast(err.detail || `Failed: ${action}`, 'error');
+            return;
+        }
+        const labels = {
+            'activate': 'User enabled',
+            'deactivate': 'User disabled',
+            'make-admin': 'Admin role granted',
+            'remove-admin': 'Admin role removed',
+            'verify': 'User verified',
+        };
+        showAdminToast(labels[action] || `Action ${action} completed`);
+    } catch (e) {
+        showAdminToast(`Error: ${action}`, 'error');
+        return;
+    }
     await refreshData();
 }
 
-// Login form handler
-function setupLoginForm() {
-    const loginForm = document.getElementById('login-form');
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const errorEl = document.getElementById('login-error');
+// ---------------------------------------------------------------------------
+// Add User form
+// ---------------------------------------------------------------------------
 
-            try {
-                const formData = new URLSearchParams();
-                formData.append('username', email);
-                formData.append('password', password);
+function setupAddUserForm() {
+    const form = document.getElementById('add-user-form');
+    if (!form) return;
 
-                const resp = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData,
-                });
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errorEl = document.getElementById('add-user-error');
+        const successEl = document.getElementById('add-user-success');
+        errorEl.style.display = 'none';
+        successEl.style.display = 'none';
 
-                if (!resp.ok) {
-                    const data = await resp.json();
-                    errorEl.textContent = data.detail || 'Login failed';
-                    errorEl.style.display = 'block';
-                    return;
-                }
+        const email = document.getElementById('new-user-email').value.trim();
+        const password = document.getElementById('new-user-password').value;
+        const isAdmin = document.getElementById('new-user-admin').checked;
 
-                const data = await resp.json();
-                localStorage.setItem('winebox_admin_token', data.access_token);
-                errorEl.style.display = 'none';
-                showAdminPanel();
-            } catch (err) {
-                errorEl.textContent = 'Network error. Please try again.';
+        try {
+            const resp = await apiRequest('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, is_admin: isAdmin }),
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json();
+                errorEl.textContent = err.detail || 'Failed to create user';
                 errorEl.style.display = 'block';
+                return;
             }
-        });
-    }
+
+            const result = await resp.json();
+            successEl.textContent = `User ${result.email} created successfully.`;
+            successEl.style.display = 'block';
+            form.reset();
+            showAdminToast(`User ${result.email} created`);
+            await refreshData();
+        } catch (err) {
+            errorEl.textContent = 'Network error. Please try again.';
+            errorEl.style.display = 'block';
+        }
+    });
 }
 
-// Setup nav event handlers
+// ---------------------------------------------------------------------------
+// Login
+// ---------------------------------------------------------------------------
+
+function setupLoginForm() {
+    const loginForm = document.getElementById('login-form');
+    if (!loginForm) return;
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const errorEl = document.getElementById('login-error');
+
+        try {
+            const formData = new URLSearchParams();
+            formData.append('username', email);
+            formData.append('password', password);
+
+            const resp = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData,
+            });
+
+            if (!resp.ok) {
+                const data = await resp.json();
+                errorEl.textContent = data.detail || 'Login failed';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            const data = await resp.json();
+            localStorage.setItem('winebox_admin_token', data.access_token);
+            errorEl.style.display = 'none';
+            showAdminPanel();
+        } catch (err) {
+            errorEl.textContent = 'Network error. Please try again.';
+            errorEl.style.display = 'block';
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Nav handlers
+// ---------------------------------------------------------------------------
+
 function setupNavHandlers() {
     const refreshLink = document.getElementById('refresh-link');
     if (refreshLink) {
-        refreshLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            refreshData();
-        });
+        refreshLink.addEventListener('click', (e) => { e.preventDefault(); refreshData(); });
     }
 
     const logoutLink = document.getElementById('logout-link');
     if (logoutLink) {
         logoutLink.addEventListener('click', async (e) => {
             e.preventDefault();
-            try {
-                await apiRequest('/api/auth/logout', { method: 'POST' });
-            } catch (err) {
-                // Ignore errors on logout — we clear the token regardless
-            }
+            try { await apiRequest('/api/auth/logout', { method: 'POST' }); } catch (err) { /* ignore */ }
             showLoginForm();
         });
     }
 }
 
-// Initialize admin panel
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+
 async function init() {
     setupLoginForm();
     setupNavHandlers();
+    setupTabs();
+    setupAddUserForm();
 
-    // Check authentication
     const isAuth = await checkAuth();
     if (!isAuth) return;
 
-    // Load data
     showAdminPanel();
-
-    // Auto-refresh every 30 seconds so cellar sizes stay current
     setInterval(refreshData, 30000);
 }
 
-// Run on page load
 document.addEventListener('DOMContentLoaded', init);

@@ -76,11 +76,54 @@
                 </div>
             </section>
 
-            <!-- Users List -->
+            <!-- Users Section with Tabs -->
             <section class="users-section">
-                <h2>Users</h2>
-                <div id="users-container">
-                    <div class="loading">Loading users...</div>
+                <div class="users-header">
+                    <div class="tab-bar">
+                        <button class="tab-btn active" data-tab="users-tab">Users</button>
+                        <button class="tab-btn" data-tab="manage-tab">Manage</button>
+                        <button class="tab-btn" data-tab="add-user-tab">Add User</button>
+                    </div>
+                </div>
+
+                <!-- Tab: Users (read-only) -->
+                <div id="users-tab" class="tab-panel active">
+                    <div id="users-readonly-container">
+                        <div class="loading">Loading users...</div>
+                    </div>
+                </div>
+
+                <!-- Tab: Manage (edit actions) -->
+                <div id="manage-tab" class="tab-panel">
+                    <div id="users-manage-container">
+                        <div class="loading">Loading users...</div>
+                    </div>
+                </div>
+
+                <!-- Tab: Add User -->
+                <div id="add-user-tab" class="tab-panel">
+                    <div class="add-user-form-container">
+                        <h2>Create New User</h2>
+                        <div id="add-user-error" style="display: none;" class="error-message"></div>
+                        <div id="add-user-success" style="display: none;" class="success-message"></div>
+                        <form id="add-user-form">
+                            <div class="form-row">
+                                <label for="new-user-email">Email</label>
+                                <input type="email" id="new-user-email" required placeholder="user@example.com">
+                            </div>
+                            <div class="form-row">
+                                <label for="new-user-password">Password</label>
+                                <input type="password" id="new-user-password" required minlength="8" placeholder="Minimum 8 characters">
+                            </div>
+                            <div class="form-row form-row-checkbox">
+                                <label>
+                                    <input type="checkbox" id="new-user-admin">
+                                    Grant admin privileges
+                                </label>
+                            </div>
+                            <button type="submit" class="btn-create-user">Create User</button>
+                        </form>
+                    </div>
                 </div>
             </section>
         </main>

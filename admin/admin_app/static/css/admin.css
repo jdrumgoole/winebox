@@ -250,14 +250,23 @@ footer a {
 }
 
 .actions-cell {
-    display: flex;
-    gap: 0.25rem;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.375rem;
+    min-width: 180px;
+}
+
+.actions-cell .btn-admin {
+    text-align: center;
+}
+
+.actions-cell .btn-admin-danger {
+    grid-column: 1 / -1;
 }
 
 .btn-admin {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8rem;
     border-radius: 4px;
     border: 1px solid var(--border-color);
     background: white;
@@ -356,6 +365,122 @@ footer a {
 }
 
 .login-logo {
+    margin-bottom: 1rem;
+}
+
+/* Tabs */
+.users-header {
+    margin-bottom: 1.5rem;
+}
+
+.tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.tab-btn {
+    padding: 0.75rem 1.5rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.tab-btn:hover {
+    color: var(--burgundy-light);
+}
+
+.tab-btn.active {
+    color: var(--burgundy-light);
+    border-bottom-color: var(--burgundy-light);
+}
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+/* Add User form */
+.add-user-form-container {
+    max-width: 480px;
+    background: var(--card-background);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: var(--shadow);
+}
+
+.add-user-form-container h2 {
+    margin-bottom: 1.5rem;
+}
+
+.form-row {
+    margin-bottom: 1rem;
+}
+
+.form-row label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.form-row input[type="email"],
+.form-row input[type="password"] {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.form-row-checkbox {
+    margin-bottom: 1.5rem;
+}
+
+.form-row-checkbox label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.form-row-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--burgundy-light);
+}
+
+.btn-create-user {
+    padding: 0.75rem 2rem;
+    background: var(--burgundy-light);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-create-user:hover {
+    background: var(--burgundy);
+}
+
+.success-message {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 1rem;
+    border-radius: 8px;
     margin-bottom: 1rem;
 }
 

@@ -10,9 +10,11 @@ from fastapi import APIRouter, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from pydantic import BaseModel, EmailStr
+
 from winebox.models import ImportBatch, Transaction, User, Wine
 from winebox.models.import_batch_row import RawUploadRow
-from winebox.services.auth import RequireAdmin
+from winebox.services.auth import RequireAdmin, get_password_hash
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +141,52 @@ async def get_admin_stats(
 # ---------------------------------------------------------------------------
 # User management endpoints
 # ---------------------------------------------------------------------------
+
+
+class CreateUserRequest(BaseModel):
+    """Request body for creating a new user."""
+    email: EmailStr
+    password: str
+    is_admin: bool = False
+
+
+@router.post("/users", status_code=status.HTTP_201_CREATED)
+async def create_user(
+    request: Request,
+    body: CreateUserRequest,
+    admin: RequireAdmin,
+) -> dict:
+    """Create a new user account."""
+    email = body.email.lower()
+
+    existing = await User.find_one({"email": email})
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Email '{email}' is already in use",
+        )
+
+    if len(body.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 8 characters",
+        )
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        email=email,
+        hashed_password=get_password_hash(body.password),
+        is_superuser=body.is_admin,
+        is_active=True,
+        is_verified=True,
+        created_at=now,
+        updated_at=now,
+    )
+    await user.insert()
+
+    logger.info("Admin %s created user %s (admin=%s)", admin.email, email, body.is_admin)
+    return {"status": "created", "user_id": str(user.id), "email": email}
+
 
 async def _get_user(user_id: str) -> User:
     """Fetch a user by ID or raise 404."""
