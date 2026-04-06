@@ -99,8 +99,9 @@ HEADER_ALIASES: dict[str, str] = {
     # notes (for transactions)
     "notes": "notes",
     "note": "notes",
-    "description": "notes",
     "tasting notes": "notes",
+    # "description" intentionally omitted — ambiguous (could be wine name or
+    # tasting notes depending on the source). Let AI mapping or user decide.
 }
 
 # Valid wine field names that can be mapped to
