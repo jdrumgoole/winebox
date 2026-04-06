@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#5C0A2D">
+    <meta name="description" content="Capture wine prices on the go. Snap a photo, record the price, and track where you found it.">
+    <title>WineBox Price Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/static/logos/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/logos/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/price-tracker.css?v=0.7.17">
+</head>
+<body>
+    <!-- ─── Login Overlay ───────────────────────────────────────────── -->
+    <div id="login-overlay" class="login-overlay" style="display: none;">
+        <div class="login-box">
+            <img src="/static/logos/logo-compact-dark.svg" alt="WineBox">
+            <h2>Price Tracker</h2>
+            <p>Sign in with your WineBox account</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email" inputmode="email">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="Your password" required autocomplete="current-password">
+                </div>
+                <div id="login-error" class="error-msg"></div>
+                <div class="submit-bar" style="padding: 16px 0 0;">
+                    <button type="submit" id="login-btn" class="btn btn-primary">Sign In</button>
+                </div>
+            </form>
+            <p style="margin-top: 16px;"><a href="/" class="back-link">&larr; Back to WineBox</a></p>
+        </div>
+    </div>
+
+    <!-- ─── Header ──────────────────────────────────────────────────── -->
+    <header class="pt-header">
+        <div class="logo-area">
+            <img src="/static/logos/logo-compact-dark.svg" alt="WineBox">
+            <h1>Price Tracker</h1>
+        </div>
+        <div class="header-actions">
+            <a href="/" class="back-link">WineBox</a>
+        </div>
+    </header>
+
+    <!-- ─── Capture Page ────────────────────────────────────────────── -->
+    <div id="page-capture" class="page capture-page active">
+
+        <!-- Capture type toggle -->
+        <div class="capture-type-toggle">
+            <button data-type="bottle" class="active">Single Bottle</button>
+            <button data-type="shelf">Shelf / Display</button>
+        </div>
+
+        <!-- Photo -->
+        <div class="photo-area">
+            <div id="photo-preview" class="photo-preview">
+                <img id="photo-img" src="" alt="Captured photo">
+                <div class="placeholder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    <p>Tap to take a photo</p>
+                </div>
+            </div>
+            <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
+            <div class="photo-actions">
+                <button id="btn-clear-photo" class="btn btn-secondary btn-small">Clear photo</button>
+            </div>
+        </div>
+
+        <!-- Wine details -->
+        <h2 class="section-title">Wine Details</h2>
+        <div class="form-group">
+            <label for="wine-name">Wine Name</label>
+            <input type="text" id="wine-name" placeholder="e.g. Ch&acirc;teau Margaux 2015" maxlength="500">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="wine-vintage">Vintage</label>
+                <input type="number" id="wine-vintage" placeholder="2020" min="1900" max="2100" inputmode="numeric">
+            </div>
+            <div class="form-group">
+                <label for="wine-type">Type</label>
+                <select id="wine-type">
+                    <option value="">Select</option>
+                    <option value="Red">Red</option>
+                    <option value="White">White</option>
+                    <option value="Ros&eacute;">Ros&eacute;</option>
+                    <option value="Sparkling">Sparkling</option>
+                    <option value="Dessert">Dessert</option>
+                    <option value="Fortified">Fortified</option>
+                    <option value="Orange">Orange</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Price -->
+        <h2 class="section-title">Price</h2>
+        <div class="price-section">
+            <div class="price-input-row">
+                <div class="form-group currency-group">
+                    <label for="price-currency">Currency</label>
+                    <select id="price-currency">
+                        <option value="EUR">&euro; EUR</option>
+                        <option value="GBP">&pound; GBP</option>
+                        <option value="USD">$ USD</option>
+                        <option value="CHF">CHF</option>
+                        <option value="AUD">$ AUD</option>
+                        <option value="NZD">$ NZD</option>
+                        <option value="CAD">$ CAD</option>
+                        <option value="JPY">&yen; JPY</option>
+                        <option value="ZAR">R ZAR</option>
+                    </select>
+                </div>
+                <div class="form-group price-group">
+                    <label for="price-amount">Price</label>
+                    <input type="number" id="price-amount" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
+                </div>
+            </div>
+        </div>
+
+        <!-- Location -->
+        <h2 class="section-title">Where Did You Find It?</h2>
+        <div class="location-section">
+            <div class="location-auto">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                </svg>
+                <span id="coords-display" class="coords">Tap to get GPS location</span>
+                <button id="locate-btn" class="btn btn-secondary btn-small">Locate</button>
+            </div>
+            <div class="form-group">
+                <label for="shop-name">Shop Name</label>
+                <input type="text" id="shop-name" placeholder="e.g. Tesco, Lidl, Nicolas" maxlength="200">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="town-city">Town / City</label>
+                    <input type="text" id="town-city" placeholder="e.g. Dublin" maxlength="200">
+                </div>
+                <div class="form-group">
+                    <label for="state-county">State / County</label>
+                    <input type="text" id="state-county" placeholder="e.g. Co. Dublin" maxlength="200">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="country">Country</label>
+                <input type="text" id="country" placeholder="e.g. Ireland" maxlength="100">
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group">
+            <label for="notes">Notes</label>
+            <textarea id="notes" placeholder="Any extra details (e.g. on special offer, vintage display)" maxlength="2000"></textarea>
+        </div>
+
+        <!-- Submit -->
+        <div class="submit-bar">
+            <button id="submit-capture" class="btn btn-primary">Save Price</button>
+        </div>
+    </div>
+
+    <!-- ─── History Page ────────────────────────────────────────────── -->
+    <div id="page-history" class="page history-page">
+        <h2 class="section-title" style="margin-bottom: 16px;">Recent Captures</h2>
+
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                <rect x="9" y="3" width="6" height="4" rx="1"/>
+                <path d="M9 14l2 2 4-4"/>
+            </svg>
+            <h3>No prices yet</h3>
+            <p>Start capturing wine prices to build your price index.</p>
+        </div>
+
+        <ul id="captures-list" class="captures-list"></ul>
+    </div>
+
+    <!-- ─── Bottom Navigation ───────────────────────────────────────── -->
+    <nav class="bottom-nav">
+        <button id="nav-capture" class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+            </svg>
+            Capture
+        </button>
+        <button id="nav-history">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            History
+        </button>
+        <button id="nav-logout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign Out
+        </button>
+    </nav>
+
+    <script src="/static/js/price-tracker.js?v=0.7.17"></script>
+</body>
+</html>

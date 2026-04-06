@@ -4013,6 +4013,29 @@ function initImportPage() {
     document.getElementById('import-use-different-file-btn').addEventListener('click', resetImportPage);
     document.getElementById('import-new-btn').addEventListener('click', resetImportPage);
 
+    // Go to Cellar buttons (CSP-compliant)
+    document.querySelectorAll('.import-go-to-cellar-btn').forEach(btn => {
+        btn.addEventListener('click', () => navigateTo('cellar'));
+    });
+
+    // Case size prompt buttons
+    document.querySelectorAll('.case-size-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            importDefaultCaseSize = parseInt(btn.dataset.size);
+            document.querySelectorAll('.case-size-option').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            updateImportSummary();
+        });
+    });
+    document.getElementById('import-custom-case-size-btn')?.addEventListener('click', () => {
+        const val = parseInt(document.getElementById('import-custom-case-size').value);
+        if (val > 0 && val <= 100) {
+            importDefaultCaseSize = val;
+            document.querySelectorAll('.case-size-option').forEach(b => b.classList.remove('active'));
+            updateImportSummary();
+        }
+    });
+
     // Duplicate step buttons
     document.getElementById('import-duplicate-augment-btn')?.addEventListener('click', handleDuplicateAugment);
     document.getElementById('import-duplicate-reimport-btn')?.addEventListener('click', handleDuplicateReimport);
@@ -4309,7 +4332,7 @@ async function handleAutoImport(data) {
         const processResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/process-stream`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1, skip_enrichment: true })
+            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1, skip_enrichment: true, default_case_size: importDefaultCaseSize })
         });
 
         if (!processResponse.ok) {
@@ -4319,12 +4342,7 @@ async function handleAutoImport(data) {
 
         const result = await readImportStream(processResponse);
 
-        // Start enrichment progress if triggered
-        if (result.enrichment_started) {
-            startEnrichmentProgress();
-        }
-
-        // Navigate to import dashboard instead of results
+        // Navigate to import dashboard (enrichment countdown handled there)
         showImportDashboard(currentImportBatchId, data.filename, result);
     } catch (error) {
         showToast(error.message, 'error');
@@ -4433,7 +4451,10 @@ async function showAugmentUI(batchId) {
             classification:      { label: 'Classification', group: 'details' },
             alcohol_percentage:  { label: 'Alcohol (ABV)', group: 'details' },
             price_tier:          { label: 'Price Range', group: 'details' },
-            quantity:            { label: 'Bottles', group: 'details' },
+            quantity:            { label: 'Total Bottles', group: 'details' },
+            num_cases:           { label: 'Number of Cases', group: 'details' },
+            case_size:           { label: 'Bottles per Case', group: 'details' },
+            purchase_date:       { label: 'Date Purchased', group: 'details' },
             notes:               { label: 'Tasting Notes', group: 'details' },
         };
 
@@ -4552,18 +4573,31 @@ async function showImportDashboard(batchId, filename, importResult) {
         }
 
         const data = await response.json();
+        const summary = data.summary;
 
         // Title
+        const caseText = summary.total_cases > 0
+            ? ` (${summary.total_cases} case${summary.total_cases !== 1 ? 's' : ''})`
+            : '';
         document.getElementById('import-dashboard-title').textContent =
-            `You just added ${data.summary.wines_created} wines from ${escapeHtml(filename)}`;
+            `You just added ${summary.wines_created} wines${caseText} from ${escapeHtml(filename)}`;
 
         // Summary cards
-        const summary = data.summary;
         let summaryHtml = `
             <div class="stat-card">
                 <div class="stat-value">${summary.total_bottles}</div>
                 <div class="stat-label">Bottles Added</div>
-            </div>
+            </div>`;
+
+        if (summary.total_cases > 0) {
+            summaryHtml += `
+            <div class="stat-card">
+                <div class="stat-value">${summary.total_cases}</div>
+                <div class="stat-label">Cases</div>
+            </div>`;
+        }
+
+        summaryHtml += `
             <div class="stat-card">
                 <div class="stat-value">${summary.wines_created}</div>
                 <div class="stat-label">Unique Wines</div>
@@ -4608,6 +4642,11 @@ async function showImportDashboard(batchId, filename, importResult) {
 
         // Render mini charts for wine type and country
         _renderImportDashboardCharts(summary);
+
+        // Start enrichment countdown if background enrichment was triggered
+        if (importResult && importResult.enrichment_started) {
+            startDashboardEnrichmentProgress(batchId);
+        }
 
     } catch (error) {
         console.error('Failed to load import dashboard:', error);
@@ -4687,8 +4726,9 @@ function renderMappingStep(data) {
         classification:      { label: 'Classification',       hint: 'Quality ranking, e.g. "Grand Cru", "Reserva", "First Growth"', group: 'details' },
         alcohol_percentage:  { label: 'Alcohol (ABV)',        hint: 'Alcohol by volume as a number, e.g. "13.5"', group: 'details' },
         price_tier:          { label: 'Price Range',          hint: 'Budget, Mid-range, Premium, or Luxury', group: 'details' },
-        quantity:            { label: 'Bottles',              hint: 'How many bottles you have of this wine', group: 'details' },
-        case_size:           { label: 'Bottles per Case',     hint: 'Number of bottles in each case (e.g. 6 or 12) — multiplied by quantity', group: 'details' },
+        quantity:            { label: 'Total Bottles',         hint: 'The total number of bottles (not cases)', group: 'details' },
+        num_cases:           { label: 'Number of Cases',      hint: 'How many cases — we\'ll calculate bottles from case size', group: 'details' },
+        case_size:           { label: 'Bottles per Case',     hint: 'How many bottles in each case (usually 6 or 12)', group: 'details' },
         purchase_date:       { label: 'Date Purchased',      hint: 'When you bought the wine (e.g. 2024-03-15)', group: 'details' },
         notes:               { label: 'Tasting Notes',       hint: 'Your personal notes about the wine', group: 'details' },
     };
@@ -4969,17 +5009,101 @@ async function handleUndoImport() {
     }
 }
 
-function updateQuantityNotice() {
-    const notice = document.getElementById('import-quantity-notice');
-    if (!notice) return;
-    let hasQuantity = false;
+// Module-level default case size (set by user via prompt)
+let importDefaultCaseSize = null;
+
+function updateImportSummary() {
+    const panel = document.getElementById('import-summary-panel');
+    const textEl = document.getElementById('import-summary-text');
+    const caseSizePrompt = document.getElementById('import-case-size-prompt');
+    if (!panel || !textEl) return;
+
+    // Collect current mapping
+    const mapping = {};
     document.querySelectorAll('.import-mapping-row').forEach(row => {
         const skipBtn = row.querySelector('.import-skip-btn');
         if (skipBtn && skipBtn.classList.contains('active')) return;
         const sel = row.querySelector('.import-mapping-select');
-        if (sel && sel.value === 'quantity') hasQuantity = true;
+        if (sel && sel.value) mapping[row.dataset.header] = sel.value;
     });
-    notice.style.display = hasQuantity ? 'none' : 'block';
+
+    // Determine which quantity-related fields are mapped
+    const hasQuantity = Object.values(mapping).includes('quantity');
+    const hasNumCases = Object.values(mapping).includes('num_cases');
+    const hasCaseSize = Object.values(mapping).includes('case_size');
+
+    // Get the mapped column headers for each field
+    const quantityHeader = Object.entries(mapping).find(([,v]) => v === 'quantity')?.[0];
+    const numCasesHeader = Object.entries(mapping).find(([,v]) => v === 'num_cases')?.[0];
+    const caseSizeHeader = Object.entries(mapping).find(([,v]) => v === 'case_size')?.[0];
+
+    // Compute totals from ALL available rows (pendingCsvRows or currentImportData)
+    const rows = pendingCsvRows || (currentImportData && currentImportData.rows) || [];
+    const previewRows = (currentImportData && currentImportData.preview_rows) || [];
+    const dataRows = rows.length > 0 ? rows : previewRows;
+    const wineCount = dataRows.length || (currentImportData && currentImportData.row_count) || 0;
+
+    let totalBottles = 0;
+    let totalCases = 0;
+    let looseBottles = 0;
+
+    for (const row of dataRows) {
+        const qty = quantityHeader ? parseInt(row[quantityHeader]) || 0 : 0;
+        const cases = numCasesHeader ? parseInt(row[numCasesHeader]) || 0 : 0;
+        const cs = caseSizeHeader ? parseInt(row[caseSizeHeader]) || 0 : (importDefaultCaseSize || 0);
+
+        if (hasNumCases && cs > 0) {
+            // Mode 1: Cases × case_size
+            totalCases += cases;
+            totalBottles += cases * cs;
+        } else if (hasNumCases && cs === 0) {
+            // Cases without case_size — can't compute yet
+            totalCases += cases;
+        } else if (hasQuantity && cs > 0 && qty >= cs) {
+            // Mode 2: Bottles ÷ case_size
+            const numC = Math.floor(qty / cs);
+            const loose = qty % cs;
+            totalCases += numC;
+            totalBottles += qty;
+            looseBottles += loose;
+        } else if (hasQuantity) {
+            // Mode 3: Just bottles
+            totalBottles += qty || 1;
+        } else {
+            totalBottles += 1;
+        }
+    }
+
+    // Build summary text
+    panel.style.display = 'block';
+    caseSizePrompt.style.display = 'none';
+
+    if (hasNumCases && hasCaseSize) {
+        textEl.innerHTML = `Your spreadsheet has case counts and case sizes. We'll create <strong>${totalCases} cases</strong> containing <strong>${totalBottles} bottles</strong> across <strong>${wineCount} wines</strong>.`;
+    } else if (hasNumCases && !hasCaseSize) {
+        if (importDefaultCaseSize) {
+            const bottles = totalCases * importDefaultCaseSize;
+            textEl.innerHTML = `Your spreadsheet has case counts. Using <strong>${importDefaultCaseSize} bottles per case</strong>, we'll create <strong>${totalCases} cases</strong> containing <strong>${bottles} bottles</strong>.`;
+        } else {
+            textEl.innerHTML = `Your spreadsheet has a case count but no case size column.`;
+            caseSizePrompt.style.display = 'block';
+        }
+    } else if (hasQuantity && hasCaseSize) {
+        const casedBottles = totalBottles - looseBottles;
+        let msg = `Your spreadsheet has bottle counts and case sizes. We'll organise <strong>${totalBottles} bottles</strong> into <strong>${totalCases} cases</strong>`;
+        if (looseBottles > 0) msg += ` with <strong>${looseBottles} loose bottles</strong>`;
+        msg += ` across <strong>${wineCount} wines</strong>.`;
+        textEl.innerHTML = msg;
+    } else if (hasQuantity) {
+        textEl.innerHTML = `Your spreadsheet has a bottle count per wine. We'll add <strong>${totalBottles} bottles</strong> across <strong>${wineCount} wines</strong> — all as individual bottles (no cases).`;
+    } else {
+        textEl.innerHTML = `No quantity columns matched — each wine will be added as <strong>1 bottle</strong>. Total: <strong>${wineCount} bottles</strong>.`;
+    }
+}
+
+// Legacy alias — called from existing code
+function updateQuantityNotice() {
+    updateImportSummary();
 }
 
 async function handleConfirmMapping() {
@@ -5037,14 +5161,11 @@ async function handleConfirmMapping() {
         document.getElementById('import-progress-text').textContent = '0 / 0 rows';
         document.getElementById('import-progress-percent').textContent = '0%';
 
-        const skipEnrichmentCheckbox = document.getElementById('import-skip-enrichment');
-        const skipEnrichment = !!skipEnrichmentCheckbox && skipEnrichmentCheckbox.checked;
-
-        // Stream processing with progress
+        // Stream processing with progress (enrichment always runs in background after)
         const processResponse = await fetchWithAuth(`${API_BASE}/import/${currentImportBatchId}/process-stream`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1, skip_enrichment: skipEnrichment })
+            body: JSON.stringify({ skip_non_wine: true, default_quantity: 1, skip_enrichment: true, default_case_size: importDefaultCaseSize })
         });
 
         if (!processResponse.ok) {
@@ -5054,12 +5175,7 @@ async function handleConfirmMapping() {
 
         const result = await readImportStream(processResponse);
 
-        // Start enrichment progress if triggered
-        if (result.enrichment_started) {
-            startEnrichmentProgress();
-        }
-
-        // Show import dashboard for richer post-import experience
+        // Show import dashboard (enrichment countdown handled there)
         const filename = currentImportData ? currentImportData.filename : 'your file';
         showImportDashboard(currentImportBatchId, filename, result);
     } catch (error) {
@@ -5240,6 +5356,82 @@ function startEnrichmentProgress() {
         read();
     }).catch(() => {
         toast.remove();
+    });
+}
+
+function startDashboardEnrichmentProgress(batchId) {
+    const container = document.getElementById('import-dashboard-enrichment');
+    const textEl = document.getElementById('import-dashboard-enrichment-text');
+    const statusDiv = container?.querySelector('.enrichment-status');
+    if (!container || !textEl) return;
+
+    container.style.display = 'block';
+
+    const token = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
+
+    fetch(`${API_BASE}/wines/enrichment-progress`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+    }).then(response => {
+        if (!response.ok) {
+            container.style.display = 'none';
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        function read() {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    container.style.display = 'none';
+                    return;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop();
+
+                for (const part of parts) {
+                    const trimmed = part.trim();
+                    if (!trimmed.startsWith('data: ')) continue;
+
+                    try {
+                        const data = JSON.parse(trimmed.slice(6));
+
+                        if (data.phase === 'done') {
+                            if (statusDiv) statusDiv.classList.add('done');
+                            textEl.textContent = `All ${data.enriched} wines enriched \u2713`;
+                            // Refresh dashboard wine cards with enriched data
+                            if (batchId) {
+                                fetchWithAuth(`${API_BASE}/import/${batchId}/wines`).then(r => r.json()).then(d => {
+                                    if (d.wines && d.wines.length > 0) {
+                                        renderWineGrid('import-dashboard-wines', d.wines);
+                                    }
+                                }).catch(() => {});
+                            }
+                            return;
+                        } else if (data.phase === 'enriching') {
+                            const remaining = data.total - data.enriched;
+                            textEl.textContent = `Enriching wine details: ${remaining} remaining...`;
+                        } else if (data.phase === 'idle') {
+                            container.style.display = 'none';
+                            return;
+                        }
+                    } catch (e) {
+                        // Ignore parse errors
+                    }
+                }
+
+                read();
+            }).catch(() => {
+                container.style.display = 'none';
+            });
+        }
+
+        read();
+    }).catch(() => {
+        container.style.display = 'none';
     });
 }
 

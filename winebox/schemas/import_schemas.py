@@ -52,6 +52,12 @@ class ImportProcessRequest(BaseModel):
         False,
         description="Skip wines that already exist in your cellar (matched by name, winery, vintage)",
     )
+    default_case_size: int | None = Field(
+        None,
+        ge=1,
+        le=100,
+        description="Default case size when cases are mapped but case_size column is missing",
+    )
 
 
 class ImportResultResponse(BaseModel):

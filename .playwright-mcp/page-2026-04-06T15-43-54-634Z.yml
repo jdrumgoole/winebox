@@ -1,0 +1,143 @@
+- generic [ref=e15]:
+  - banner [ref=e16]:
+    - img "WineBox" [ref=e18]
+  - main [ref=e19]:
+    - generic [ref=e20]:
+      - heading "Admin Panel" [level=1] [ref=e21]
+      - navigation [ref=e22]:
+        - link "Refresh" [ref=e23] [cursor=pointer]:
+          - /url: "#"
+        - link "Logout" [ref=e24] [cursor=pointer]:
+          - /url: "#"
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e27]: "8"
+        - generic [ref=e28]: Total Users
+      - generic [ref=e29]:
+        - generic [ref=e30]: "8"
+        - generic [ref=e31]: Active Users
+      - generic [ref=e32]:
+        - generic [ref=e33]: "7"
+        - generic [ref=e34]: Verified Users
+      - generic [ref=e35]:
+        - generic [ref=e36]: "3141"
+        - generic [ref=e37]: Total Wines
+      - generic [ref=e38]:
+        - generic [ref=e39]: "24664"
+        - generic [ref=e40]: Total Bottles
+    - generic [ref=e41]:
+      - generic [ref=e43]:
+        - button "Users" [ref=e44] [cursor=pointer]
+        - button "Manage" [active] [ref=e45] [cursor=pointer]
+        - button "Add User" [ref=e46] [cursor=pointer]
+      - table [ref=e153]:
+        - rowgroup [ref=e154]:
+          - row "Email Status Role Actions" [ref=e155]:
+            - columnheader "Email" [ref=e156]
+            - columnheader "Status" [ref=e157]
+            - columnheader "Role" [ref=e158]
+            - columnheader "Actions" [ref=e159]
+        - rowgroup [ref=e160]:
+          - row "joe+test@joedrumgoole.com Active Verified Admin Disable Remove Admin Delete User" [ref=e161]:
+            - cell "joe+test@joedrumgoole.com" [ref=e162]:
+              - strong [ref=e163]: joe+test@joedrumgoole.com
+            - cell "Active Verified" [ref=e164]:
+              - generic [ref=e165]: Active
+              - generic [ref=e166]: Verified
+            - cell "Admin" [ref=e167]:
+              - generic [ref=e168]: Admin
+            - cell "Disable Remove Admin Delete User" [ref=e169]:
+              - button "Disable" [ref=e170] [cursor=pointer]
+              - button "Remove Admin" [ref=e171] [cursor=pointer]
+              - button "Delete User" [ref=e172] [cursor=pointer]
+          - row "claude-test@example.com Active Unverified User Disable Make Admin Verify Delete User" [ref=e173]:
+            - cell "claude-test@example.com" [ref=e174]:
+              - strong [ref=e175]: claude-test@example.com
+            - cell "Active Unverified" [ref=e176]:
+              - generic [ref=e177]: Active
+              - generic [ref=e178]: Unverified
+            - cell "User" [ref=e179]:
+              - generic [ref=e180]: User
+            - cell "Disable Make Admin Verify Delete User" [ref=e181]:
+              - button "Disable" [ref=e182] [cursor=pointer]
+              - button "Make Admin" [ref=e183] [cursor=pointer]
+              - button "Verify" [ref=e184] [cursor=pointer]
+              - button "Delete User" [ref=e185] [cursor=pointer]
+          - row "oat-test@example.com Active Verified User Disable Make Admin Delete User" [ref=e186]:
+            - cell "oat-test@example.com" [ref=e187]:
+              - strong [ref=e188]: oat-test@example.com
+            - cell "Active Verified" [ref=e189]:
+              - generic [ref=e190]: Active
+              - generic [ref=e191]: Verified
+            - cell "User" [ref=e192]:
+              - generic [ref=e193]: User
+            - cell "Disable Make Admin Delete User" [ref=e194]:
+              - button "Disable" [ref=e195] [cursor=pointer]
+              - button "Make Admin" [ref=e196] [cursor=pointer]
+              - button "Delete User" [ref=e197] [cursor=pointer]
+          - row "test@example.com Active Verified User Disable Make Admin Delete User" [ref=e198]:
+            - cell "test@example.com" [ref=e199]:
+              - strong [ref=e200]: test@example.com
+            - cell "Active Verified" [ref=e201]:
+              - generic [ref=e202]: Active
+              - generic [ref=e203]: Verified
+            - cell "User" [ref=e204]:
+              - generic [ref=e205]: User
+            - cell "Disable Make Admin Delete User" [ref=e206]:
+              - button "Disable" [ref=e207] [cursor=pointer]
+              - button "Make Admin" [ref=e208] [cursor=pointer]
+              - button "Delete User" [ref=e209] [cursor=pointer]
+          - row "joe+oat@joedrumgoole.com Active Verified User Disable Make Admin Delete User" [ref=e210]:
+            - cell "joe+oat@joedrumgoole.com" [ref=e211]:
+              - strong [ref=e212]: joe+oat@joedrumgoole.com
+            - cell "Active Verified" [ref=e213]:
+              - generic [ref=e214]: Active
+              - generic [ref=e215]: Verified
+            - cell "User" [ref=e216]:
+              - generic [ref=e217]: User
+            - cell "Disable Make Admin Delete User" [ref=e218]:
+              - button "Disable" [ref=e219] [cursor=pointer]
+              - button "Make Admin" [ref=e220] [cursor=pointer]
+              - button "Delete User" [ref=e221] [cursor=pointer]
+          - row "joe@joedrumgoole.com Active Verified Admin Disable Remove Admin Delete User" [ref=e222]:
+            - cell "joe@joedrumgoole.com" [ref=e223]:
+              - strong [ref=e224]: joe@joedrumgoole.com
+            - cell "Active Verified" [ref=e225]:
+              - generic [ref=e226]: Active
+              - generic [ref=e227]: Verified
+            - cell "Admin" [ref=e228]:
+              - generic [ref=e229]: Admin
+            - cell "Disable Remove Admin Delete User" [ref=e230]:
+              - button "Disable" [ref=e231] [cursor=pointer]
+              - button "Remove Admin" [ref=e232] [cursor=pointer]
+              - button "Delete User" [ref=e233] [cursor=pointer]
+          - row "verify@test.com Active Verified User Disable Make Admin Delete User" [ref=e234]:
+            - cell "verify@test.com" [ref=e235]:
+              - strong [ref=e236]: verify@test.com
+            - cell "Active Verified" [ref=e237]:
+              - generic [ref=e238]: Active
+              - generic [ref=e239]: Verified
+            - cell "User" [ref=e240]:
+              - generic [ref=e241]: User
+            - cell "Disable Make Admin Delete User" [ref=e242]:
+              - button "Disable" [ref=e243] [cursor=pointer]
+              - button "Make Admin" [ref=e244] [cursor=pointer]
+              - button "Delete User" [ref=e245] [cursor=pointer]
+          - row "test@test.com Active Verified User Disable Make Admin Delete User" [ref=e246]:
+            - cell "test@test.com" [ref=e247]:
+              - strong [ref=e248]: test@test.com
+            - cell "Active Verified" [ref=e249]:
+              - generic [ref=e250]: Active
+              - generic [ref=e251]: Verified
+            - cell "User" [ref=e252]:
+              - generic [ref=e253]: User
+            - cell "Disable Make Admin Delete User" [ref=e254]:
+              - button "Disable" [ref=e255] [cursor=pointer]
+              - button "Make Admin" [ref=e256] [cursor=pointer]
+              - button "Delete User" [ref=e257] [cursor=pointer]
+  - contentinfo [ref=e147]:
+    - generic [ref=e148]: WineBox Admin Panel
+    - generic [ref=e149]:
+      - text: See a problem? Got feedback? Contact
+      - link "support@winebox.app" [ref=e150] [cursor=pointer]:
+        - /url: mailto:support@winebox.app?subject=Feedback

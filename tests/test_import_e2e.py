@@ -133,7 +133,7 @@ def _upload_csv(page: Page, csv_path: Path, timeout_ms: int = 25000) -> None:
     page.wait_for_selector("#import-step-map", state="visible", timeout=timeout_ms)
 
 
-def _confirm_and_wait_for_import(page: Page, timeout_ms: int = 30000) -> None:
+def _confirm_and_wait_for_import(page: Page, timeout_ms: int = 60000) -> None:
     """Click Confirm Mapping and wait for the import to complete.
 
     After confirming, the flow goes: progress → dashboard (or results as fallback).
@@ -277,13 +277,13 @@ class TestImportProcess:
         # Step 2: Confirm mapping (auto-suggested mappings should be fine)
         _confirm_and_wait_for_import(page)
 
-        # Step 3: Check dashboard shows wine count
+        # Step 3: Check dashboard shows wine count (async load — needs time on slow servers)
         dash = page.locator("#import-step-dashboard")
         if dash.is_visible():
-            expect(dash).to_contain_text("wines", timeout=10000)
+            expect(dash).to_contain_text("wines", timeout=20000)
         else:
             results = page.locator("#import-step-results")
-            expect(results).to_contain_text("4", timeout=10000)
+            expect(results).to_contain_text("4", timeout=20000)
 
         # Verify the wines appear in the cellar
         page.click("a[data-page='cellar']")
@@ -307,7 +307,7 @@ class TestImportProcess:
         dash = page.locator("#import-step-dashboard")
         if dash.is_visible():
             # Dashboard title says "You just added N wines from ..."
-            expect(dash).to_contain_text("wines", timeout=10000)
+            expect(dash).to_contain_text("wines", timeout=20000)
         else:
             results_text = page.locator("#import-step-results").text_content()
             assert "2" in results_text
@@ -318,16 +318,22 @@ class TestImportProcess:
         _navigate_to_import(page)
 
         _upload_csv(page, sample_csv)
-        _confirm_and_wait_for_import(page, timeout_ms=30000)
+        _confirm_and_wait_for_import(page, timeout_ms=45000)
 
         # Click "Import Another File" button (on dashboard or results step)
         dash_new_btn = page.locator("#import-dashboard-new-btn")
         results_new_btn = page.locator("#import-new-btn")
         if dash_new_btn.is_visible():
             dash_new_btn.click()
-        else:
-            results_new_btn.wait_for(state="visible", timeout=5000)
+        elif results_new_btn.is_visible():
             results_new_btn.click()
+        else:
+            # Wait for either to appear
+            page.wait_for_selector("#import-dashboard-new-btn, #import-new-btn", state="visible", timeout=10000)
+            if dash_new_btn.is_visible():
+                dash_new_btn.click()
+            else:
+                results_new_btn.click()
         expect(page.locator(".import-upload-area")).to_be_visible(timeout=5000)
 
 

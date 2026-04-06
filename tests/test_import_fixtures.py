@@ -188,7 +188,7 @@ async def test_case_quantities_multiplication(client: AsyncClient) -> None:
         "Winery": "winery",
         "Vintage": "vintage",
         "Country": "country",
-        "Cases": "quantity",
+        "Cases": "num_cases",
         "Case Size": "case_size",
         "Region": "region",
         "Purchase Price per Case": "custom:Price per Case",
@@ -486,7 +486,7 @@ async def test_auto_mapping_case_quantities(client: AsyncClient) -> None:
     data = upload_resp.json()
 
     suggested = data["suggested_mapping"]
-    assert suggested["Cases"] == "quantity"  # "cases" maps to quantity (number of cases)
+    assert suggested["Cases"] == "num_cases"  # "cases" maps to num_cases (number of cases)
     assert suggested["Case Size"] == "case_size"  # "case size" maps to bottles per case
 
 
@@ -560,7 +560,9 @@ async def test_case_import_creates_cases(client: AsyncClient) -> None:
     assert cases_resp.status_code == 200
     cases = cases_resp.json()["cases"]
 
-    # Margaux: 2 cases of 6, Opus One: 1 case of 12, Dom Perignon: 1 case of 6
+    # Margaux: 12 bottles / case_size 6 = 2 cases
+    # Opus One: 12 bottles / case_size 12 = 1 case
+    # Dom Perignon: 6 bottles / case_size 6 = 1 case
     # = 4 cases total
     assert len(cases) == 4
 

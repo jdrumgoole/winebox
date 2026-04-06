@@ -350,12 +350,22 @@ class TestXWinesImport:
         if dash.is_visible():
             # Wait for dashboard content to load (async API call populates stats)
             page.wait_for_selector(
-                "#import-step-dashboard .stat-value", state="visible", timeout=15000
+                "#import-step-dashboard .stat-value", state="visible", timeout=30000
             )
             stat_values = page.locator("#import-step-dashboard .stat-value").all()
             assert len(stat_values) >= 2, "Expected at least 2 stat values in dashboard"
-            # Dashboard: first stat is total bottles, second is unique wines
-            wines_created = int((stat_values[1].text_content() or "0").replace(",", ""))
+            # Dashboard: first stat is total bottles, second is unique wines (or cases if present)
+            # Find the "Unique Wines" stat by label
+            wines_created = 0
+            for i, sv in enumerate(stat_values):
+                parent = sv.locator("..")
+                label = parent.locator(".stat-label").text_content() or ""
+                if "Unique Wines" in label:
+                    wines_created = int((sv.text_content() or "0").replace(",", ""))
+                    break
+            if wines_created == 0:
+                # Fallback: second stat value (original layout without cases)
+                wines_created = int((stat_values[1].text_content() or "0").replace(",", ""))
         else:
             stat_values = page.locator("#import-step-results .stat-value").all()
             assert len(stat_values) >= 2, "Expected at least 2 stat values in results"

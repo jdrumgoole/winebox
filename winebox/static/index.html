@@ -9,10 +9,18 @@
     <meta name="description" content="AI-powered wine cellar management. Scan wine labels with your phone, track your cellar inventory, discover tasting notes, and explore over 100,000 wines from around the world.">
     <meta property="og:title" content="WineBox - Smart Wine Cellar Management">
     <meta property="og:description" content="AI-powered wine cellar management. Scan wine labels with your phone, track your cellar inventory, discover tasting notes, and explore over 100,000 wines from around the world.">
-    <meta property="og:image" content="https://winebox.app/static/logos/og-social.png">
-    <meta property="og:url" content="https://winebox.app">
+    <meta property="og:image" content="https://booze.winebox.app/static/logos/og-social.png">
+    <meta property="og:image:width" content="2400">
+    <meta property="og:image:height" content="1254">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:url" content="https://booze.winebox.app">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="WineBox">
+    <!-- Twitter Card tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="WineBox - Smart Wine Cellar Management">
+    <meta name="twitter:description" content="AI-powered wine cellar management. Scan wine labels with your phone, track your cellar inventory, discover tasting notes, and explore over 100,000 wines.">
+    <meta name="twitter:image" content="https://booze.winebox.app/static/logos/og-social.png">
     <meta name="author" content="Joe Drumgoole">
     <title>WineBox - Wine Cellar Management</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +30,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/logos/favicon.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/static/logos/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/logos/apple-touch-icon.png">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.7.9">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.7.19">
     <script src="/static/js/chart.min.js"></script>
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
@@ -815,8 +823,19 @@
                         <h3>Your data (first 5 rows)</h3>
                         <div id="import-preview-container" style="overflow-x:auto;"></div>
                     </div>
-                    <div id="import-quantity-notice" class="form-note" style="display:none;padding:0.75rem 1rem;background:var(--bg-secondary);border-radius:var(--radius);border-left:3px solid var(--wine-gold);">
-                        No quantity column matched — each wine will be added as <strong>1 bottle</strong>.
+                    <div id="import-summary-panel" style="display:none;margin-top:1rem;padding:1rem;background:var(--bg-secondary);border-radius:var(--radius);border-left:3px solid var(--primary-color);">
+                        <div id="import-summary-text"></div>
+                        <div id="import-case-size-prompt" style="display:none;margin-top:0.75rem;">
+                            <p style="font-weight:600;margin-bottom:0.5rem;">How many bottles are in each case?</p>
+                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                                <button type="button" class="btn btn-small btn-outline case-size-option" data-size="6">6 bottles</button>
+                                <button type="button" class="btn btn-small btn-outline case-size-option" data-size="12">12 bottles</button>
+                                <div style="display:flex;align-items:center;gap:0.25rem;">
+                                    <input type="number" id="import-custom-case-size" min="1" max="100" placeholder="Other" style="width:70px;padding:0.3rem 0.5rem;border:1px solid var(--border-color);border-radius:var(--radius);">
+                                    <button type="button" class="btn btn-small btn-outline" id="import-custom-case-size-btn">Set</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" id="import-confirm-mapping-btn">Looks Good — Import My Wines</button>
@@ -841,12 +860,6 @@
                                 <span id="import-progress-skipped">0 rows skipped</span>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-top:0.75rem;">
-                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;">
-                                <input type="checkbox" id="import-skip-enrichment">
-                                <span>Skip automatic detail lookup (faster, but missing details like region or grape won't be filled in)</span>
-                            </label>
-                        </div>
                     </div>
                 </div>
 
@@ -858,7 +871,7 @@
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" id="import-new-btn">Import Another File</button>
-                        <button type="button" class="btn btn-secondary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                        <button type="button" class="btn btn-secondary import-go-to-cellar-btn">Go to Cellar</button>
                     </div>
                 </div>
 
@@ -893,6 +906,12 @@
                     <div class="form-section">
                         <h3 id="import-dashboard-title">Just Added</h3>
                         <div id="import-dashboard-summary" class="stats-grid" style="margin-bottom:1.5rem;"></div>
+                        <div id="import-dashboard-enrichment" style="display:none;margin-bottom:1rem;">
+                            <div class="enrichment-status">
+                                <span class="enrichment-spinner" id="enrichment-spinner"></span>
+                                <span id="import-dashboard-enrichment-text">Enriching wine details...</span>
+                            </div>
+                        </div>
                         <div id="import-dashboard-unmapped-notice" style="display:none;margin-bottom:1rem;"></div>
                     </div>
                     <div class="form-section">
@@ -907,7 +926,7 @@
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="button" class="btn btn-primary" onclick="navigateTo('cellar')">Go to Cellar</button>
+                        <button type="button" class="btn btn-primary import-go-to-cellar-btn">Go to Cellar</button>
                         <button type="button" class="btn btn-secondary" id="import-dashboard-new-btn">Import Another File</button>
                         <button type="button" class="btn btn-danger btn-small" id="import-undo-btn" style="margin-left:auto;">Undo This Import</button>
                     </div>
@@ -1535,7 +1554,7 @@
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
-    <script src="/static/js/papaparse.min.js?v=0.7.9"></script>
-    <script src="/static/js/app.js?v=0.7.9"></script>
+    <script src="/static/js/papaparse.min.js?v=0.7.19"></script>
+    <script src="/static/js/app.js?v=0.7.19"></script>
 </body>
 </html>

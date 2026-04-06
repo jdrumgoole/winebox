@@ -410,6 +410,7 @@ async def process_batch(
         default_quantity=opts.default_quantity,
         skip_enrichment=opts.skip_enrichment,
         skip_duplicates=opts.skip_duplicates,
+        default_case_size=opts.default_case_size,
     )
 
     return ImportResultResponse(
@@ -444,16 +445,28 @@ async def process_batch_stream(
 
     opts = request or ImportProcessRequest()
 
+    user_id = current_user.id
+
     async def event_generator():
+        last_progress = {}
         async for progress in process_import_batch_streaming(
             batch=batch,
-            owner_id=current_user.id,
+            owner_id=user_id,
             skip_non_wine=opts.skip_non_wine,
             default_quantity=opts.default_quantity,
             skip_enrichment=opts.skip_enrichment,
             skip_duplicates=opts.skip_duplicates,
+            default_case_size=opts.default_case_size,
         ):
+            last_progress = progress
             yield f"data: {json.dumps(progress)}\n\n"
+
+        # Trigger background enrichment after stream completes
+        # (doing this here instead of inside the generator ensures
+        # the task is created in the response's event loop context)
+        if last_progress.get("enrichment_started"):
+            from winebox.services.background_enrichment import enrich_unenriched_wines
+            asyncio.create_task(enrich_unenriched_wines(user_id))
 
     return StreamingResponse(
         event_generator(),
@@ -758,6 +771,15 @@ async def get_batch_wines(
         (w.inventory.quantity if w.inventory else 0) for w in wines
     )
 
+    # Count cases created for this batch's wines
+    from winebox.models.case import Case
+    wine_ids = [w.id for w in wines]
+    total_cases = 0
+    if wine_ids:
+        total_cases = await Case.get_pymongo_collection().count_documents(
+            {"owner_id": current_user.id, "wine_id": {"$in": wine_ids}}
+        )
+
     return {
         "batch_id": str(batch.id),
         "filename": batch.filename,
@@ -765,6 +787,7 @@ async def get_batch_wines(
         "summary": {
             "wines_created": len(wines),
             "total_bottles": total_bottles,
+            "total_cases": total_cases,
             "by_wine_type": wine_types,
             "by_country": countries,
             "by_grape_variety": grapes,

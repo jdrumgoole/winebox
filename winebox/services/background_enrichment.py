@@ -59,6 +59,10 @@ async def enrich_unenriched_wines(
     Queries for unenriched wines belonging to the owner, batches them,
     runs Atlas Search + Claude re-ranking, and updates matched documents.
 
+    Enrichment operates on Wine records, not Bottles. A wine with a case
+    (multiple bottles) has a single Wine document — enriching it once
+    automatically applies to all bottles referencing that wine.
+
     Args:
         owner_id: The owner whose wines to enrich.
         progress_callback: Optional callback(enriched_so_far, total) called
@@ -69,6 +73,13 @@ async def enrich_unenriched_wines(
     """
     owner_str = str(owner_id)
 
+    # Set progress immediately so the SSE endpoint knows enrichment is starting
+    _enrichment_progress[owner_str] = {
+        "phase": "enriching",
+        "enriched": 0,
+        "total": 0,  # Will be updated after query
+    }
+
     # Find all unenriched wines for this owner
     unenriched = await Wine.find(
         {"owner_id": owner_id, "xwines_id": None},
@@ -76,9 +87,14 @@ async def enrich_unenriched_wines(
 
     total = len(unenriched)
     if total == 0:
+        _enrichment_progress[owner_str] = {
+            "phase": "done",
+            "enriched": 0,
+            "total": 0,
+        }
         return {"total": 0, "enriched": 0, "failed": 0}
 
-    # Update progress store
+    # Update progress with actual total
     _enrichment_progress[owner_str] = {
         "phase": "enriching",
         "enriched": 0,
