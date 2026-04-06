@@ -36,5 +36,5 @@ class TestSecurityHeaders:
         response = await unauthenticated_client.get("/health")
         pp = response.headers.get("permissions-policy")
         assert pp is not None
-        assert "camera=()" in pp
+        assert "camera=(self)" in pp
         assert "microphone=()" in pp
