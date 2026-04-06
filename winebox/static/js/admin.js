@@ -52,6 +52,20 @@ function formatDate(dateString) {
     });
 }
 
+// Load server info
+async function loadInfo() {
+    try {
+        const response = await apiRequest('/admin/api/info');
+        if (!response.ok) throw new Error('Failed to load info');
+        const data = await response.json();
+        document.getElementById('info-database').textContent = data.database;
+        document.getElementById('info-db-server').textContent = data.db_server;
+        document.getElementById('info-app-url').textContent = data.app_url;
+    } catch (error) {
+        console.error('Error loading info:', error);
+    }
+}
+
 // Load admin stats
 async function loadStats() {
     try {
@@ -123,16 +137,20 @@ async function loadUsers() {
                             <td class="timestamp">${formatDate(user.last_login)}</td>
                             <td class="cellar-size">${user.cellar_size} bottles</td>
                             <td class="actions-cell">
-                                ${user.is_active
-                                    ? `<button class="btn-admin btn-admin-outline" data-action="deactivate" data-user-id="${user.id}">Disable</button>`
-                                    : `<button class="btn-admin btn-admin-success" data-action="activate" data-user-id="${user.id}">Enable</button>`}
-                                ${user.is_superuser
-                                    ? `<button class="btn-admin btn-admin-outline" data-action="remove-admin" data-user-id="${user.id}">Remove Admin</button>`
-                                    : `<button class="btn-admin btn-admin-outline" data-action="make-admin" data-user-id="${user.id}">Make Admin</button>`}
-                                ${!user.is_verified
-                                    ? `<button class="btn-admin btn-admin-success" data-action="verify" data-user-id="${user.id}">Verify</button>`
-                                    : ''}
-                                <button class="btn-admin btn-admin-danger" data-action="delete" data-user-id="${user.id}" data-user-email="${escapeHtml(user.email)}">Delete</button>
+                                <button class="actions-menu-btn" data-toggle="actions-menu">Actions</button>
+                                <div class="actions-dropdown">
+                                    ${user.is_active
+                                        ? `<button data-action="deactivate" data-user-id="${user.id}">Disable Account</button>`
+                                        : `<button data-action="activate" data-user-id="${user.id}">Enable Account</button>`}
+                                    ${user.is_superuser
+                                        ? `<button data-action="remove-admin" data-user-id="${user.id}">Remove Admin</button>`
+                                        : `<button data-action="make-admin" data-user-id="${user.id}">Make Admin</button>`}
+                                    ${!user.is_verified
+                                        ? `<button data-action="verify" data-user-id="${user.id}">Verify Email</button>`
+                                        : ''}
+                                    <div class="dropdown-divider"></div>
+                                    <button class="action-danger" data-action="delete" data-user-id="${user.id}" data-user-email="${escapeHtml(user.email)}">Delete User</button>
+                                </div>
                             </td>
                         </tr>
                     `).join('')}
@@ -144,6 +162,19 @@ async function loadUsers() {
 
         // Attach click handlers via delegation (CSP blocks inline onclick)
         container.addEventListener('click', handleAdminAction);
+
+        // Dropdown toggle handler
+        container.addEventListener('click', function(e) {
+            const toggleBtn = e.target.closest('[data-toggle="actions-menu"]');
+            if (!toggleBtn) return;
+            e.stopPropagation();
+            const dropdown = toggleBtn.nextElementSibling;
+            // Close all other open dropdowns first
+            document.querySelectorAll('.actions-dropdown.open').forEach(d => {
+                if (d !== dropdown) d.classList.remove('open');
+            });
+            dropdown.classList.toggle('open');
+        });
     } catch (error) {
         console.error('Error loading users:', error);
         container.innerHTML = `
@@ -281,7 +312,13 @@ async function init() {
     const isAuth = await checkAuth();
     if (!isAuth) return;
 
-    // Load data
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.actions-dropdown.open').forEach(d => d.classList.remove('open'));
+    });
+
+    // Load server info (once) and data
+    loadInfo();
     await refreshData();
 
     // Auto-refresh every 30 seconds so cellar sizes stay current

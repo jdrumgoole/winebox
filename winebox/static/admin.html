@@ -195,9 +195,61 @@
         }
 
         .actions-cell {
-            display: flex;
-            gap: 0.25rem;
-            flex-wrap: wrap;
+            position: relative;
+        }
+
+        .actions-menu-btn {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            border: 1px solid var(--burgundy-light);
+            color: var(--burgundy-light);
+            background: white;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s;
+        }
+        .actions-menu-btn:hover { background: #fdf0f0; }
+        .actions-menu-btn::after {
+            content: ' \25BE';
+            font-size: 0.7rem;
+        }
+
+        .actions-dropdown {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            z-index: 100;
+            min-width: 160px;
+            background: #fff;
+            border: 1px solid rgba(139, 26, 74, 0.15);
+            border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            padding: 0.25rem 0;
+            margin-top: 2px;
+        }
+        .actions-dropdown.open { display: block; }
+
+        .actions-dropdown button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: #333;
+            transition: background 0.15s;
+        }
+        .actions-dropdown button:hover { background: #f8f4f5; }
+        .actions-dropdown button.action-danger { color: #dc3545; }
+        .actions-dropdown button.action-danger:hover { background: #fde8ea; }
+        .actions-dropdown .dropdown-divider {
+            height: 1px;
+            background: #eee;
+            margin: 0.25rem 0;
         }
 
         .btn-admin {
@@ -220,6 +272,14 @@
 
         .btn-admin-danger { border-color: #dc3545; color: #dc3545; }
         .btn-admin-danger:hover { background: #fde8ea; }
+
+        .admin-info {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 0.25rem;
+        }
+        .admin-info span { margin-right: 1.5rem; }
+        .admin-info .info-label { color: #666; font-weight: 500; }
 
         @media (max-width: 768px) {
             .admin-container {
@@ -252,7 +312,14 @@
 
     <main class="admin-container">
         <div class="admin-header">
-            <h1>Admin Panel</h1>
+            <div>
+                <h1>Admin Panel</h1>
+                <div class="admin-info" id="admin-info">
+                    <span><span class="info-label">Database:</span> <span id="info-database">-</span></span>
+                    <span><span class="info-label">Server:</span> <span id="info-db-server">-</span></span>
+                    <span><span class="info-label">App URL:</span> <span id="info-app-url">-</span></span>
+                </div>
+            </div>
             <nav class="admin-nav">
                 <a href="#" onclick="refreshData(); return false;">Refresh</a>
                 <a href="/static/index.html">Back to App</a>
@@ -301,6 +368,6 @@
         </div>
     </footer>
 
-    <script src="/static/js/admin.js?v=0.7.16"></script>
+    <script src="/static/js/admin.js?v=0.7.17"></script>
 </body>
 </html>
