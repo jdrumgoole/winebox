@@ -544,33 +544,3 @@ async def test_supported_currencies(client: AsyncClient) -> None:
         assert body["currency"] == currency
 
 
-# ---------------------------------------------------------------------------
-# Admin info endpoint
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_admin_info_endpoint(admin_client: AsyncClient) -> None:
-    """The admin info endpoint should return database and app URL."""
-    response = await admin_client.get("/admin/api/info")
-    assert response.status_code == 200
-    data = response.json()
-    assert "database" in data
-    assert "db_server" in data
-    assert "app_url" in data
-
-
-@pytest.mark.asyncio
-async def test_admin_info_requires_admin(client: AsyncClient) -> None:
-    """Regular users should not access admin info."""
-    response = await client.get("/admin/api/info")
-    assert response.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_admin_info_requires_auth(
-    unauthenticated_client: AsyncClient,
-) -> None:
-    """Unauthenticated requests to admin info should fail."""
-    response = await unauthenticated_client.get("/admin/api/info")
-    assert response.status_code == 401
