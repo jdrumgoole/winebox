@@ -13,6 +13,7 @@ function getAuthToken() {
 function showAdminPanel() {
     document.getElementById('login-section').style.display = 'none';
     document.getElementById('admin-content').style.display = 'block';
+    loadInfo();
     refreshData();
 }
 
@@ -57,6 +58,23 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Server info
+// ---------------------------------------------------------------------------
+
+async function loadInfo() {
+    try {
+        const response = await apiRequest('/api/info');
+        if (!response.ok) throw new Error('Failed to load info');
+        const data = await response.json();
+        document.getElementById('info-database').textContent = data.database;
+        document.getElementById('info-db-server').textContent = data.db_server;
+        document.getElementById('info-app-url').textContent = data.app_url;
+    } catch (error) {
+        console.error('Error loading info:', error);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -160,16 +178,20 @@ function renderManageTable(users) {
                                 : '<span class="badge">User</span>'}
                         </td>
                         <td class="actions-cell">
-                            ${user.is_active
-                                ? `<button class="btn-admin btn-admin-outline" data-action="deactivate" data-user-id="${user.id}">Disable</button>`
-                                : `<button class="btn-admin btn-admin-success" data-action="activate" data-user-id="${user.id}">Enable</button>`}
-                            ${user.is_superuser
-                                ? `<button class="btn-admin btn-admin-outline" data-action="remove-admin" data-user-id="${user.id}">Remove Admin</button>`
-                                : `<button class="btn-admin btn-admin-outline" data-action="make-admin" data-user-id="${user.id}">Make Admin</button>`}
-                            ${!user.is_verified
-                                ? `<button class="btn-admin btn-admin-success" data-action="verify" data-user-id="${user.id}">Verify</button>`
-                                : ''}
-                            <button class="btn-admin btn-admin-danger" data-action="delete" data-user-id="${user.id}" data-user-email="${escapeHtml(user.email)}">Delete User</button>
+                            <button class="actions-menu-btn" data-toggle="actions-menu">Actions</button>
+                            <div class="actions-dropdown">
+                                ${user.is_active
+                                    ? `<button data-action="deactivate" data-user-id="${user.id}">Disable Account</button>`
+                                    : `<button data-action="activate" data-user-id="${user.id}">Enable Account</button>`}
+                                ${user.is_superuser
+                                    ? `<button data-action="remove-admin" data-user-id="${user.id}">Remove Admin</button>`
+                                    : `<button data-action="make-admin" data-user-id="${user.id}">Make Admin</button>`}
+                                ${!user.is_verified
+                                    ? `<button data-action="verify" data-user-id="${user.id}">Verify Email</button>`
+                                    : ''}
+                                <div class="dropdown-divider"></div>
+                                <button class="action-danger" data-action="delete" data-user-id="${user.id}" data-user-email="${escapeHtml(user.email)}">Delete User</button>
+                            </div>
                         </td>
                     </tr>
                 `).join('')}
@@ -183,6 +205,7 @@ function renderManageTable(users) {
 // ---------------------------------------------------------------------------
 
 let _cachedUsers = [];
+let _manageListenersAttached = false;
 
 async function loadUsers() {
     const readonlyContainer = document.getElementById('users-readonly-container');
@@ -195,10 +218,30 @@ async function loadUsers() {
         _cachedUsers = data.users;
 
         readonlyContainer.innerHTML = renderReadonlyTable(_cachedUsers);
-        manageContainer.innerHTML = renderManageTable(_cachedUsers);
 
-        // Attach delegated click handler for manage tab actions
-        manageContainer.addEventListener('click', handleAdminAction);
+        // Skip manage table re-render if a dropdown is currently open
+        const hasOpenDropdown = manageContainer.querySelector('.actions-dropdown.open');
+        if (!hasOpenDropdown) {
+            manageContainer.innerHTML = renderManageTable(_cachedUsers);
+        }
+
+        // Attach delegated listeners once (they survive innerHTML changes via delegation)
+        if (!_manageListenersAttached) {
+            _manageListenersAttached = true;
+
+            manageContainer.addEventListener('click', handleAdminAction);
+
+            manageContainer.addEventListener('click', function(e) {
+                const toggleBtn = e.target.closest('[data-toggle="actions-menu"]');
+                if (!toggleBtn) return;
+                e.stopPropagation();
+                const dropdown = toggleBtn.nextElementSibling;
+                document.querySelectorAll('.actions-dropdown.open').forEach(d => {
+                    if (d !== dropdown) d.classList.remove('open');
+                });
+                dropdown.classList.toggle('open');
+            });
+        }
     } catch (error) {
         console.error('Error loading users:', error);
         const errHtml = '<div class="error-message">Failed to load users.</div>';
@@ -446,6 +489,11 @@ async function init() {
     setupNavHandlers();
     setupTabs();
     setupAddUserForm();
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.actions-dropdown.open').forEach(d => d.classList.remove('open'));
+    });
 
     const isAuth = await checkAuth();
     if (!isAuth) return;

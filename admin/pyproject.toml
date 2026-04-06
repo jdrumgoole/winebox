@@ -16,3 +16,6 @@ winebox-admin-server = "admin_app.cli:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["admin_app"]

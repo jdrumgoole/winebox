@@ -12,6 +12,7 @@ from slowapi.util import get_remote_address
 
 from pydantic import BaseModel, EmailStr
 
+from winebox.config.settings import settings
 from winebox.models import ImportBatch, Transaction, User, Wine
 from winebox.models.import_batch_row import RawUploadRow
 from winebox.services.auth import RequireAdmin, get_password_hash
@@ -20,6 +21,28 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+
+
+@router.get("/info")
+@limiter.limit("30/minute")
+async def get_admin_info(
+    request: Request,
+    admin: RequireAdmin,
+) -> dict[str, Any]:
+    """Return server info for the admin panel header."""
+    from urllib.parse import urlparse
+
+    mongodb_url = settings.mongodb_url
+    parsed = urlparse(mongodb_url)
+    db_server = parsed.hostname or "unknown"
+
+    app_url = str(request.base_url).rstrip("/")
+
+    return {
+        "database": settings.mongodb_database,
+        "db_server": db_server,
+        "app_url": app_url,
+    }
 
 
 @router.get("/users")
