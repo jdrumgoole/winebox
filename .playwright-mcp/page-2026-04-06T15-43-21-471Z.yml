@@ -1,0 +1,12 @@
+- generic [ref=e3]:
+  - img "WineBox" [ref=e4]
+  - heading "Admin Panel" [level=1] [ref=e5]
+  - paragraph [ref=e6]: Sign in with your admin account
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]: Email
+      - textbox "Email" [ref=e10]
+    - generic [ref=e11]:
+      - generic [ref=e12]: Password
+      - textbox "Password" [ref=e13]
+    - button "Sign In" [ref=e14] [cursor=pointer]
