@@ -1688,17 +1688,10 @@ def push_secrets(ctx: Context) -> None:
             continue
 
         result = ctx.run(
-            f"gh secret set {key} --repo jdrumgoole/winebox",
+            f'printf "%s" "$GH_SECRET_VALUE" | gh secret set {key} --repo jdrumgoole/winebox',
             hide=True,
             warn=True,
-            in_stream=False,
             env={"GH_SECRET_VALUE": value},
-        )
-        # gh secret set reads from stdin if no --body, use --body
-        result = ctx.run(
-            f'echo "{value}" | gh secret set {key} --repo jdrumgoole/winebox',
-            hide=True,
-            warn=True,
         )
         if result and result.ok:
             print(f"  {key}: pushed")

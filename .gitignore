@@ -68,5 +68,8 @@ temp/
 # Planning docs
 PLAN.md
 
-# Claude Code
-.claude/
+# Claude Code — commit settings.json, ignore machine-specific files
+.claude/settings.local.json
+.claude/worktrees/
+.claude/agents/
+.claude/commands/
