@@ -4632,17 +4632,6 @@ async function showImportDashboard(batchId, filename, importResult) {
             unmappedNotice.style.display = 'none';
         }
 
-        // Render wine cards (reuse cellar grid rendering)
-        const winesContainer = document.getElementById('import-dashboard-wines');
-        if (data.wines.length > 0) {
-            renderWineGrid('import-dashboard-wines', data.wines);
-        } else {
-            winesContainer.innerHTML = '<p style="color:var(--text-muted);">No wines were created.</p>';
-        }
-
-        // Render mini charts for wine type and country
-        _renderImportDashboardCharts(summary);
-
         // Start enrichment countdown if background enrichment was triggered
         if (importResult && importResult.enrichment_started) {
             startDashboardEnrichmentProgress(batchId);
@@ -5403,13 +5392,6 @@ function startDashboardEnrichmentProgress(batchId) {
                             if (statusDiv) statusDiv.classList.add('done');
                             textEl.textContent = `All ${data.enriched} wines enriched \u2713`;
                             // Refresh dashboard wine cards with enriched data
-                            if (batchId) {
-                                fetchWithAuth(`${API_BASE}/import/${batchId}/wines`).then(r => r.json()).then(d => {
-                                    if (d.wines && d.wines.length > 0) {
-                                        renderWineGrid('import-dashboard-wines', d.wines);
-                                    }
-                                }).catch(() => {});
-                            }
                             return;
                         } else if (data.phase === 'enriching') {
                             const remaining = data.total - data.enriched;

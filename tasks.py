@@ -1519,3 +1519,191 @@ def test_e2e_oat(
         test_cmd += " -v"
 
     ctx.run(test_cmd, pty=True)
+
+
+# ---------------------------------------------------------------------------
+# Environment validation & secrets management
+# ---------------------------------------------------------------------------
+
+# Secrets required for local development
+_LOCAL_DEV_SECRETS = [
+    "WINEBOX_MONGODB_URL",
+    "WINEBOX_SECRET_KEY",
+    "WINEBOX_ANTHROPIC_API_KEY",
+]
+
+# Secrets required for deployment
+_DEPLOY_SECRETS = [
+    "WINEBOX_MONGODB_URL",
+    "WINEBOX_SECRET_KEY",
+    "WINEBOX_ANTHROPIC_API_KEY",
+    "WINEBOX_DO_TOKEN",
+    "WINEBOX_POSTHOG_API_KEY",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+]
+
+# All secrets that should be in GitHub Secrets
+_GITHUB_SECRETS = [
+    "WINEBOX_MONGODB_URL",
+    "WINEBOX_SECRET_KEY",
+    "WINEBOX_ANTHROPIC_API_KEY",
+    "WINEBOX_POSTHOG_API_KEY",
+    "WINEBOX_POSTHOG_ENABLED",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_REGION",
+    "WINEBOX_DO_TOKEN",
+    "BRAVE_API_KEY",
+    "WINEBOX_PROD_TEST_USER",
+    "WINEBOX_PROD_TEST_PASSWORD",
+    "WINEBOX_TEST_USER",
+    "WINEBOX_TEST_PASSWORD",
+]
+
+
+@task(name="check-env")
+def check_env(ctx: Context, deploy: bool = False) -> None:
+    """Verify the development environment is ready.
+
+    Checks that required tools, secrets, and services are available.
+
+    Args:
+        deploy: Also check deployment secrets (default: False)
+    """
+    from dotenv import dotenv_values
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    # 1. Check tools
+    print("Checking tools...")
+    for tool, check_cmd in [
+        ("uv", "uv --version"),
+        ("git", "git --version"),
+        ("gh", "gh --version"),
+    ]:
+        result = ctx.run(check_cmd, hide=True, warn=True)
+        if result and result.ok:
+            version = result.stdout.strip().split("\n")[0]
+            print(f"  {tool}: {version}")
+        else:
+            warnings.append(f"{tool} not found")
+            print(f"  {tool}: NOT FOUND")
+
+    # 2. Check Python
+    print("\nChecking Python...")
+    result = ctx.run("uv run python --version", hide=True, warn=True)
+    if result and result.ok:
+        print(f"  {result.stdout.strip()}")
+    else:
+        errors.append("Python not available via uv")
+
+    # 3. Check .env and secrets
+    print("\nChecking secrets (.env)...")
+    env_file = Path(".env")
+    if not env_file.exists():
+        errors.append(".env file not found — copy from another dev machine or create manually")
+        print("  .env: NOT FOUND")
+    else:
+        env_values = dotenv_values(".env")
+        required = _DEPLOY_SECRETS if deploy else _LOCAL_DEV_SECRETS
+        for key in required:
+            if env_values.get(key):
+                masked = env_values[key][:4] + "..."
+                print(f"  {key}: {masked}")
+            else:
+                errors.append(f"Missing secret: {key}")
+                print(f"  {key}: MISSING")
+
+    # 4. Check MongoDB
+    print("\nChecking MongoDB...")
+    mongo_check = ctx.run(
+        "uv run python -c \""
+        "from dotenv import load_dotenv; load_dotenv(); "
+        "import os; from pymongo import MongoClient; "
+        "c = MongoClient(os.environ.get('WINEBOX_MONGODB_URL', ''), serverSelectionTimeoutMS=5000); "
+        "info = c.server_info(); "
+        "print(f'Connected: MongoDB {info.get(chr(118)+chr(101)+chr(114)+chr(115)+chr(105)+chr(111)+chr(110), chr(63))}')"
+        "\"",
+        hide=True,
+        warn=True,
+    )
+    if mongo_check and mongo_check.ok:
+        print(f"  {mongo_check.stdout.strip()}")
+    else:
+        errors.append("Cannot connect to MongoDB — check WINEBOX_MONGODB_URL")
+        print("  MongoDB: CONNECTION FAILED")
+
+    # 5. Check GitHub auth
+    print("\nChecking GitHub...")
+    gh_check = ctx.run("gh auth status", hide=True, warn=True)
+    if gh_check and gh_check.ok:
+        print("  GitHub CLI: authenticated")
+    else:
+        warnings.append("gh not authenticated — run 'gh auth login'")
+        print("  GitHub CLI: NOT AUTHENTICATED")
+
+    # Summary
+    print("\n" + "=" * 50)
+    if errors:
+        print(f"ERRORS ({len(errors)}):")
+        for e in errors:
+            print(f"  - {e}")
+    if warnings:
+        print(f"WARNINGS ({len(warnings)}):")
+        for w in warnings:
+            print(f"  - {w}")
+    if not errors and not warnings:
+        print("Environment is ready.")
+    elif not errors:
+        print("Environment is ready (with warnings).")
+    else:
+        print("Environment has issues — fix errors above.")
+        sys.exit(1)
+
+
+@task(name="push-secrets")
+def push_secrets(ctx: Context) -> None:
+    """Push local .env secrets to GitHub Secrets for CI and other machines.
+
+    Reads secrets from .env and uploads them to GitHub Secrets.
+    """
+    from dotenv import dotenv_values
+
+    env_file = Path(".env")
+    if not env_file.exists():
+        print("Error: .env file not found")
+        sys.exit(1)
+
+    env_values = dotenv_values(".env")
+    pushed = 0
+    skipped = 0
+
+    for key in _GITHUB_SECRETS:
+        value = env_values.get(key)
+        if not value:
+            print(f"  {key}: skipped (not in .env)")
+            skipped += 1
+            continue
+
+        result = ctx.run(
+            f"gh secret set {key} --repo jdrumgoole/winebox",
+            hide=True,
+            warn=True,
+            in_stream=False,
+            env={"GH_SECRET_VALUE": value},
+        )
+        # gh secret set reads from stdin if no --body, use --body
+        result = ctx.run(
+            f'echo "{value}" | gh secret set {key} --repo jdrumgoole/winebox',
+            hide=True,
+            warn=True,
+        )
+        if result and result.ok:
+            print(f"  {key}: pushed")
+            pushed += 1
+        else:
+            print(f"  {key}: FAILED")
+
+    print(f"\nPushed {pushed} secrets, skipped {skipped}.")

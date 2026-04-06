@@ -69,9 +69,10 @@ jobs:
           WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
           WINEBOX_DATABASE: "winebox-oat"
           WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
+          WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
           WINEBOX_USE_CLAUDE_VISION: "false"
-          WINEBOX_TEST_USER: ""
-          WINEBOX_TEST_PASSWORD: ""
+          WINEBOX_TEST_USER: ${{ secrets.WINEBOX_TEST_USER }}
+          WINEBOX_TEST_PASSWORD: ${{ secrets.WINEBOX_TEST_PASSWORD }}
         run: uv run python -m invoke test-e2e-fast --verbose
 
   lint:
