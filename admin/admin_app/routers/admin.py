@@ -6,16 +6,16 @@ from typing import Any
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import FileResponse
-from pathlib import Path
+from fastapi import APIRouter, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
+from pydantic import BaseModel, EmailStr
 
 from winebox.config.settings import settings
 from winebox.models import ImportBatch, Transaction, User, Wine
 from winebox.models.import_batch_row import RawUploadRow
-from winebox.services.auth import RequireAdmin
+from winebox.services.auth import RequireAdmin, get_password_hash
 
 logger = logging.getLogger(__name__)
 
@@ -23,19 +23,7 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
-@router.get("", response_model=None)
-async def admin_panel() -> FileResponse:
-    """Serve the admin panel HTML page.
-
-    Auth is not checked here because the token lives in localStorage and is not
-    sent on full-page navigation. The admin page (admin.js) reads the token,
-    calls /admin/api/* with it, and redirects to login if missing or 401/403.
-    """
-    static_path = Path(__file__).parent.parent / "static" / "admin.html"
-    return FileResponse(static_path, media_type="text/html")
-
-
-@router.get("/api/info")
+@router.get("/info")
 @limiter.limit("30/minute")
 async def get_admin_info(
     request: Request,
@@ -46,7 +34,6 @@ async def get_admin_info(
 
     mongodb_url = settings.mongodb_url
     parsed = urlparse(mongodb_url)
-    # Show host only (no credentials)
     db_server = parsed.hostname or "unknown"
 
     app_url = str(request.base_url).rstrip("/")
@@ -58,7 +45,7 @@ async def get_admin_info(
     }
 
 
-@router.get("/api/users")
+@router.get("/users")
 @limiter.limit("30/minute")
 async def list_users(
     request: Request,
@@ -112,7 +99,7 @@ async def list_users(
     }
 
 
-@router.get("/api/stats")
+@router.get("/stats")
 @limiter.limit("30/minute")
 async def get_admin_stats(
     request: Request,
@@ -178,6 +165,52 @@ async def get_admin_stats(
 # User management endpoints
 # ---------------------------------------------------------------------------
 
+
+class CreateUserRequest(BaseModel):
+    """Request body for creating a new user."""
+    email: EmailStr
+    password: str
+    is_admin: bool = False
+
+
+@router.post("/users", status_code=status.HTTP_201_CREATED)
+async def create_user(
+    request: Request,
+    body: CreateUserRequest,
+    admin: RequireAdmin,
+) -> dict:
+    """Create a new user account."""
+    email = body.email.lower()
+
+    existing = await User.find_one({"email": email})
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Email '{email}' is already in use",
+        )
+
+    if len(body.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 8 characters",
+        )
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        email=email,
+        hashed_password=get_password_hash(body.password),
+        is_superuser=body.is_admin,
+        is_active=True,
+        is_verified=True,
+        created_at=now,
+        updated_at=now,
+    )
+    await user.insert()
+
+    logger.info("Admin %s created user %s (admin=%s)", admin.email, email, body.is_admin)
+    return {"status": "created", "user_id": str(user.id), "email": email}
+
+
 async def _get_user(user_id: str) -> User:
     """Fetch a user by ID or raise 404."""
     try:
@@ -199,7 +232,7 @@ def _check_not_self(admin: User, target: User, action: str) -> None:
         )
 
 
-@router.patch("/api/users/{user_id}/activate")
+@router.patch("/users/{user_id}/activate")
 async def activate_user(user_id: str, admin: RequireAdmin) -> dict:
     """Activate a user account."""
     user = await _get_user(user_id)
@@ -208,7 +241,7 @@ async def activate_user(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "activated", "user_id": user_id}
 
 
-@router.patch("/api/users/{user_id}/deactivate")
+@router.patch("/users/{user_id}/deactivate")
 async def deactivate_user(user_id: str, admin: RequireAdmin) -> dict:
     """Deactivate a user account."""
     user = await _get_user(user_id)
@@ -218,7 +251,7 @@ async def deactivate_user(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "deactivated", "user_id": user_id}
 
 
-@router.patch("/api/users/{user_id}/make-admin")
+@router.patch("/users/{user_id}/make-admin")
 async def make_admin(user_id: str, admin: RequireAdmin) -> dict:
     """Grant admin privileges to a user."""
     user = await _get_user(user_id)
@@ -227,7 +260,7 @@ async def make_admin(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "admin_granted", "user_id": user_id}
 
 
-@router.patch("/api/users/{user_id}/remove-admin")
+@router.patch("/users/{user_id}/remove-admin")
 async def remove_admin(user_id: str, admin: RequireAdmin) -> dict:
     """Remove admin privileges from a user."""
     user = await _get_user(user_id)
@@ -237,7 +270,7 @@ async def remove_admin(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "admin_removed", "user_id": user_id}
 
 
-@router.patch("/api/users/{user_id}/verify")
+@router.patch("/users/{user_id}/verify")
 async def verify_user(user_id: str, admin: RequireAdmin) -> dict:
     """Manually verify a user's email address."""
     user = await _get_user(user_id)
@@ -246,7 +279,7 @@ async def verify_user(user_id: str, admin: RequireAdmin) -> dict:
     return {"status": "verified", "user_id": user_id}
 
 
-@router.delete("/api/users/{user_id}")
+@router.delete("/users/{user_id}")
 async def delete_user(user_id: str, admin: RequireAdmin) -> dict:
     """Delete a user and all their data (wines, transactions, import batches)."""
     user = await _get_user(user_id)
