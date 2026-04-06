@@ -8,8 +8,32 @@ import logging
 
 from pymongo import ASCENDING, DESCENDING, TEXT, IndexModel
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.operations import SearchIndexModel
 
 logger = logging.getLogger(__name__)
+
+# Atlas Search index definitions.
+# These require MongoDB Atlas (not available on standalone mongod).
+ATLAS_SEARCH_INDEXES: dict[str, list[SearchIndexModel]] = {
+    "xwines_wines": [
+        SearchIndexModel(
+            definition={
+                "mappings": {
+                    "dynamic": False,
+                    "fields": {
+                        "name": {"type": "string", "analyzer": "lucene.standard"},
+                        "winery_name": {"type": "string", "analyzer": "lucene.standard"},
+                        "wine_type": {"type": "string", "analyzer": "lucene.keyword"},
+                        "country_code": {"type": "string", "analyzer": "lucene.keyword"},
+                        "region_name": {"type": "string", "analyzer": "lucene.standard"},
+                        "rating_count": {"type": "number"},
+                    },
+                },
+            },
+            name="xwines_search",
+        ),
+    ],
+}
 
 # Index definitions per collection.
 # Each entry is a list of pymongo.IndexModel objects.
@@ -187,3 +211,25 @@ async def ensure_indexes(db: AsyncDatabase) -> None:
                 logger.exception("Failed to create indexes for %s", collection_name)
         except Exception:
             logger.exception("Failed to create indexes for %s", collection_name)
+
+    # --- Atlas Search indexes (only available on MongoDB Atlas) ---
+    for collection_name, search_models in ATLAS_SEARCH_INDEXES.items():
+        collection = db[collection_name]
+        for model in search_models:
+            search_name = model.document.get("name", "unknown")
+            try:
+                # Check if the search index already exists
+                existing = []
+                async for idx in await collection.list_search_indexes(name=search_name):
+                    existing.append(idx)
+                if existing:
+                    logger.debug("Atlas Search index '%s' already exists on %s", search_name, collection_name)
+                    continue
+                await collection.create_search_index(model)
+                logger.info("Created Atlas Search index '%s' on %s", search_name, collection_name)
+            except Exception as e:
+                # Silently skip on non-Atlas deployments (e.g. local mongod, CI)
+                logger.debug(
+                    "Atlas Search index '%s' on %s skipped (not Atlas?): %s",
+                    search_name, collection_name, e,
+                )
