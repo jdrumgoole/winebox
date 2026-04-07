@@ -64,6 +64,7 @@ temp/
 
 # Screenshots (working artifacts)
 *.png
+!winebox/static/logos/*.png
 
 # Planning docs
 PLAN.md
