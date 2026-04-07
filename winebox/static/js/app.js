@@ -5305,7 +5305,7 @@ function startEnrichmentProgress() {
 
                         if (data.phase === 'done') {
                             toast.className = 'toast success';
-                            toast.textContent = `Enrichment complete: ${data.enriched}/${data.total} wines matched`;
+                            toast.textContent = `${data.enriched} wines augmented`;
                             setTimeout(() => toast.remove(), 5000);
                             // Refresh cellar to show enriched data
                             loadCellar();
@@ -5375,7 +5375,7 @@ function startDashboardEnrichmentProgress(batchId) {
 
                         if (data.phase === 'done') {
                             if (statusDiv) statusDiv.classList.add('done');
-                            textEl.textContent = `All ${data.enriched} wines enriched \u2713`;
+                            textEl.textContent = `${data.enriched} wines augmented \u2713`;
                             // Refresh dashboard wine cards with enriched data
                             return;
                         } else if (data.phase === 'enriching') {

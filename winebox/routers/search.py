@@ -37,6 +37,9 @@ async def search_wines(
     collection: Annotated[str | None, Query(description="Filter by collection: cellar or met")] = None,
     storage: Annotated[str | None, Query(description="Storage type: 'case' or 'loose'")] = None,
     provenance: Annotated[str | None, Query(description="Case provenance (where purchased)", max_length=MAX_QUERY_LENGTH)] = None,
+    wine_type: Annotated[str | None, Query(description="Wine type: red, white, rosé, sparkling, etc.", max_length=MAX_QUERY_LENGTH)] = None,
+    price_tier: Annotated[str | None, Query(description="Price tier: budget, value, mid_range, premium, luxury, ultra_premium", max_length=MAX_QUERY_LENGTH)] = None,
+    enriched: Annotated[str | None, Query(description="Enrichment filter: 'yes' for enriched, 'no' for unenriched")] = None,
     skip: int = 0,
     limit: int = 100,
 ) -> list[WineWithInventory]:
@@ -93,6 +96,17 @@ async def search_wines(
 
     if country:
         conditions["country"] = {"$regex": re.compile(re.escape(country), re.IGNORECASE)}
+
+    if wine_type:
+        conditions["wine_type_id"] = wine_type
+
+    if price_tier:
+        conditions["price_tier"] = price_tier
+
+    if enriched == "yes":
+        conditions["xwines_id"] = {"$ne": None}
+    elif enriched == "no":
+        conditions["xwines_id"] = None
 
     # Stock filter
     if in_stock is True:
