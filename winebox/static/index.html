@@ -491,30 +491,10 @@
                     </div>
                 </div>
             </div>
-            <div class="filter-bar">
-                <select id="cellar-filter">
-                    <option value="all">All Wines</option>
-                    <option value="in-stock">In Stock Only</option>
-                    <option value="out-of-stock">Out of Stock</option>
-                </select>
-                <div class="export-dropdown" id="cellar-export-dropdown">
-                    <button class="btn btn-secondary export-dropdown-btn" id="cellar-export-btn">
-                        Export
-                        <span class="dropdown-arrow">&#9662;</span>
-                    </button>
-                    <div class="export-dropdown-menu">
-                        <a href="#" data-format="csv" data-type="wines">CSV</a>
-                        <a href="#" data-format="xlsx" data-type="wines">Excel</a>
-                        <a href="#" data-format="yaml" data-type="wines">YAML</a>
-                        <a href="#" data-format="json" data-type="wines">JSON</a>
-                    </div>
-                </div>
-                <div class="view-toggle">
-                    <button id="cellar-view-cards" class="active" title="Card view">Cards</button>
-                    <button id="cellar-view-table" title="Table view">Table</button>
-                </div>
+            <div class="cellar-value-panel" id="cellar-value-panel">
+                <h3>Cellar Value by Wine Type</h3>
+                <div class="value-grid" id="cellar-value-grid"></div>
             </div>
-            <div id="cellar-list" class="wine-grid"></div>
             <h3 id="cellar-activity-heading">Recent Activity</h3>
             <div id="recent-activity" class="activity-list"></div>
         </section>

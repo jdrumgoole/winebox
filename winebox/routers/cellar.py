@@ -79,6 +79,38 @@ async def get_cellar_summary(
                 {"$group": {"_id": "$price_tier", "count": {"$sum": "$inventory.quantity"}}},
                 {"$sort": {"count": -1}},
             ],
+            "value_by_wine_type": [
+                {"$addFields": {
+                    "estimated_price_mid": {
+                        "$cond": {
+                            "if": {"$and": [
+                                {"$ne": ["$estimated_price_low", None]},
+                                {"$ne": ["$estimated_price_high", None]},
+                            ]},
+                            "then": {"$divide": [
+                                {"$add": ["$estimated_price_low", "$estimated_price_high"]},
+                                2,
+                            ]},
+                            "else": {"$cond": {
+                                "if": {"$ne": ["$estimated_price_low", None]},
+                                "then": "$estimated_price_low",
+                                "else": "$estimated_price_high",
+                            }},
+                        }
+                    },
+                }},
+                {"$group": {
+                    "_id": {"$ifNull": ["$wine_type_id", "other"]},
+                    "bottles": {"$sum": "$inventory.quantity"},
+                    "total_value": {"$sum": {
+                        "$multiply": [
+                            {"$ifNull": ["$estimated_price_mid", 0]},
+                            "$inventory.quantity",
+                        ]
+                    }},
+                }},
+                {"$sort": {"total_value": -1}},
+            ],
         }},
     ]
 
@@ -99,6 +131,14 @@ async def get_cellar_summary(
     by_grape = {row["_id"]: row["count"] for row in facets.get("by_grape", [])}
     by_wine_type = {row["_id"]: row["count"] for row in facets.get("by_wine_type", [])}
     by_price_tier = {row["_id"]: row["count"] for row in facets.get("by_price_tier", [])}
+    value_by_wine_type = [
+        {
+            "wine_type": row["_id"],
+            "bottles": row["bottles"],
+            "total_value": round(row["total_value"], 2),
+        }
+        for row in facets.get("value_by_wine_type", [])
+    ]
 
     # Case count from cases collection
     case_col = Case.get_pymongo_collection()
@@ -114,6 +154,7 @@ async def get_cellar_summary(
         "by_grape_variety": by_grape,
         "by_wine_type": by_wine_type,
         "by_price_tier": by_price_tier,
+        "value_by_wine_type": value_by_wine_type,
     }
 
 

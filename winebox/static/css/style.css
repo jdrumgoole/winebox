@@ -262,6 +262,85 @@ h3 {
     }
 }
 
+/* Cellar Value Panel */
+.cellar-value-panel {
+    margin-bottom: 2rem;
+}
+
+.cellar-value-panel h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    color: var(--text-muted);
+    margin: 0 0 1rem;
+}
+
+.value-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.value-card {
+    background: var(--card-background);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    display: flex;
+    overflow: hidden;
+}
+
+.value-card-color {
+    width: 6px;
+    flex-shrink: 0;
+}
+
+.value-card-content {
+    padding: 0.75rem 1rem;
+}
+
+.value-card-type {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.value-card-amount {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    line-height: 1.2;
+}
+
+.value-card-bottles {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+}
+
+.value-total {
+    grid-column: 1 / -1;
+    text-align: right;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+    margin-top: 0.25rem;
+}
+
+.empty-hint {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .value-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 /* Activity List */
 .activity-list {
     background: var(--card-background);

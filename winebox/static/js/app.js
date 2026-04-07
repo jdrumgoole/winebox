@@ -1007,18 +1007,8 @@ function initForms() {
     // Back button in remove modal
     document.getElementById('remove-back-btn').addEventListener('click', resetRemovalPicker);
 
-    // Cellar filter
-    document.getElementById('cellar-filter').addEventListener('change', loadCellar);
-
     // Load sample wines button on cellar welcome panel
     document.getElementById('cellar-demo-install-btn')?.addEventListener('click', installDemoData);
-
-    // Add Wine button on cellar page
-
-
-    // Cellar view toggle
-    document.getElementById('cellar-view-cards')?.addEventListener('click', () => setCellarViewMode('cards'));
-    document.getElementById('cellar-view-table')?.addEventListener('click', () => setCellarViewMode('table'));
 
     // History filter
     document.getElementById('history-filter').addEventListener('change', loadHistory);
@@ -1911,43 +1901,11 @@ function renderActivityList(transactions) {
 
 // Cellar
 async function loadCellar() {
-    const filter = document.getElementById('cellar-filter').value;
-
     try {
-        // "out-of-stock" filter: skip grouped view (it only has in-cellar bottles)
-        let usedGrouped = false;
-        if (filter !== 'out-of-stock') {
-            const groupedResp = await fetchWithAuth(`${API_BASE}/cellar/grouped`);
-            if (groupedResp.ok) {
-                const grouped = await groupedResp.json();
-                if (grouped.total_bottles > 0) {
-                    cellarGroupedData = grouped;
-                    if (cellarViewMode === 'table') {
-                        renderGroupedCellarTable(grouped);
-                    } else {
-                        renderGroupedCellar(grouped);
-                    }
-                    usedGrouped = true;
-                }
-            }
-        }
-
-        if (!usedGrouped) {
-            // Fallback to legacy wine-based view
-            cellarGroupedData = null;
-            let url = `${API_BASE}/wines?`;
-            if (filter === 'in-stock') url += 'in_stock=true&';
-            else if (filter === 'out-of-stock') url += 'in_stock=false&';
-            const response = await fetchWithAuth(url);
-            const wines = await response.json();
-            cellarLastWines = wines;
-            renderCellarView();
-        }
-
         // Update welcome panel — always show but swap button based on demo status
         updateWelcomePanel();
 
-        // Load analytics (stats, charts, activity)
+        // Load analytics (stats, charts, activity, value panel)
         loadCellarAnalytics();
     } catch (error) {
         console.error('Failed to load cellar:', error);
@@ -2005,6 +1963,9 @@ async function loadCellarAnalytics() {
         // Render charts
         renderDashboardCharts(summary);
 
+        // Render value by wine type panel
+        renderCellarValuePanel(summary.value_by_wine_type || []);
+
         // Load met count
         try {
             const metResponse = await fetchWithAuth(`${API_BASE}/met/summary`);
@@ -2021,6 +1982,65 @@ async function loadCellarAnalytics() {
     } catch (error) {
         console.error('Failed to load cellar analytics:', error);
     }
+}
+
+function renderCellarValuePanel(valueData) {
+    const grid = document.getElementById('cellar-value-grid');
+    if (!grid) return;
+
+    const typeLabels = {
+        'red': 'Red',
+        'white': 'White',
+        'rose': 'Rosé',
+        'rosé': 'Rosé',
+        'sparkling': 'Sparkling',
+        'dessert': 'Dessert',
+        'fortified': 'Fortified',
+        'other': 'Other',
+    };
+
+    const typeColors = {
+        'red': '#722f37',
+        'white': '#f5e6a8',
+        'rose': '#f4a6b8',
+        'rosé': '#f4a6b8',
+        'sparkling': '#d4af37',
+        'dessert': '#c8956e',
+        'fortified': '#8b4513',
+        'other': '#888888',
+    };
+
+    if (!valueData || valueData.length === 0) {
+        grid.innerHTML = '<p class="empty-hint">No wine value data available yet.</p>';
+        return;
+    }
+
+    const totalValue = valueData.reduce((sum, item) => sum + item.total_value, 0);
+    const totalBottles = valueData.reduce((sum, item) => sum + item.bottles, 0);
+
+    const cards = valueData.map(item => {
+        const label = typeLabels[item.wine_type] || item.wine_type || 'Other';
+        const color = typeColors[item.wine_type] || typeColors['other'];
+        const value = item.total_value > 0
+            ? `$${item.total_value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`
+            : 'No price data';
+        return `
+            <div class="value-card">
+                <div class="value-card-color" style="background-color: ${color}"></div>
+                <div class="value-card-content">
+                    <div class="value-card-type">${escapeHtml(label)}</div>
+                    <div class="value-card-amount">${value}</div>
+                    <div class="value-card-bottles">${item.bottles} bottle${item.bottles !== 1 ? 's' : ''}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const totalHtml = totalValue > 0
+        ? `<div class="value-total">Total estimated value: $${totalValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} (${totalBottles} bottles)</div>`
+        : `<div class="value-total">${totalBottles} bottles total</div>`;
+
+    grid.innerHTML = cards + totalHtml;
 }
 
 function renderCellarView() {
@@ -2186,28 +2206,6 @@ function renderGroupedCellarTable(data) {
 
 function setCellarViewMode(mode) {
     cellarViewMode = mode;
-
-    document.getElementById('cellar-view-cards').classList.toggle('active', mode === 'cards');
-    document.getElementById('cellar-view-table').classList.toggle('active', mode === 'table');
-
-    // Toggle wine-grid class: cards need the grid layout, table needs full width
-    const cellarList = document.getElementById('cellar-list');
-    if (mode === 'table') {
-        cellarList.classList.remove('wine-grid');
-    } else {
-        cellarList.classList.add('wine-grid');
-    }
-
-    // Re-render with whichever data source we have
-    if (cellarGroupedData && cellarGroupedData.total_bottles > 0) {
-        if (mode === 'table') {
-            renderGroupedCellarTable(cellarGroupedData);
-        } else {
-            renderGroupedCellar(cellarGroupedData);
-        }
-    } else if (cellarLastWines.length > 0) {
-        renderCellarView();
-    }
 }
 
 function emptyCellarHtml() {
@@ -2217,12 +2215,7 @@ function emptyCellarHtml() {
 function renderCellarTable(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        const hasFilters = document.getElementById('cellar-filter').value !== 'all';
-        if (hasFilters) {
-            container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
-        } else {
-            container.innerHTML = emptyCellarHtml();
-        }
+        container.innerHTML = emptyCellarHtml();
         return;
     }
 
@@ -2334,12 +2327,7 @@ function renderCellarTable(containerId, wines) {
 function renderWineGrid(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        const hasFilters = document.getElementById('cellar-filter').value !== 'all';
-        if (hasFilters) {
-            container.innerHTML = '<div class="empty-state"><h3>No wines found</h3><p>Try adjusting your filters</p></div>';
-        } else {
-            container.innerHTML = emptyCellarHtml();
-        }
+        container.innerHTML = emptyCellarHtml();
         return;
     }
 
@@ -3316,9 +3304,6 @@ async function handleDeleteCollection() {
 
 // Export Dropdowns
 function initExportDropdowns() {
-    // Initialize cellar export dropdown
-    initExportDropdown('cellar-export-dropdown', 'cellar-export-btn');
-
     // Initialize history export dropdown
     initExportDropdown('history-export-dropdown', 'history-export-btn');
 
