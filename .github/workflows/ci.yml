@@ -39,6 +39,8 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run unit tests (exclude E2E)
+        env:
+          WINEBOX_USE_CLAUDE_VISION: "false"
         run: uv run python -m pytest -v -m "not e2e"
 
   e2e-fast:

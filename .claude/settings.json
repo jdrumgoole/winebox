@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(uv sync *)",
+      "Bash(uv pip *)",
+      "Bash(uv build *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git fetch *)",
+      "Bash(git stash *)",
+      "Bash(git worktree *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git tag *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git rm *)",
+      "Bash(gh *)",
+      "Bash(invoke *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(curl *)",
+      "Bash(lsof *)",
+      "Bash(kill *)",
+      "Bash(ls *)",
+      "Bash(wc *)",
+      "Bash(source *)",
+      "Bash(WINEBOX_* *)",
+      "WebSearch",
+      "WebFetch(domain:booze.winebox.app)",
+      "WebFetch(domain:oat.winebox.app)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Skill(schedule)"
+    ]
+  }
+}

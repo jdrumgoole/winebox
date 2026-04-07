@@ -1,0 +1,83 @@
+name: Deploy to OAT
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version to deploy (leave empty for latest)"
+        required: false
+        default: ""
+      release:
+        description: "Run full release pipeline (bump version, publish to PyPI)"
+        required: false
+        type: boolean
+        default: false
+      skip_tests:
+        description: "Skip test suite (only with release)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy-oat:
+    name: Deploy to OAT
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.OAT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.OAT_DROPLET_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to OAT
+        env:
+          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
+          WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
+          WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
+          WINEBOX_POSTHOG_API_KEY: ${{ secrets.WINEBOX_POSTHOG_API_KEY }}
+          WINEBOX_POSTHOG_ENABLED: ${{ secrets.WINEBOX_POSTHOG_ENABLED }}
+          WINEBOX_DO_TOKEN: ${{ secrets.WINEBOX_DO_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          WINEBOX_TEST_USER: ${{ secrets.WINEBOX_TEST_USER }}
+          WINEBOX_TEST_PASSWORD: ${{ secrets.WINEBOX_TEST_PASSWORD }}
+        run: |
+          ARGS="--host ${{ secrets.OAT_DROPLET_IP }}"
+          if [ -n "${{ inputs.version }}" ]; then
+            ARGS="$ARGS --version ${{ inputs.version }}"
+          fi
+          if [ "${{ inputs.release }}" = "true" ]; then
+            ARGS="$ARGS --release"
+          fi
+          if [ "${{ inputs.skip_tests }}" = "true" ]; then
+            ARGS="$ARGS --skip-tests"
+          fi
+          uv run python -m invoke deploy-oat $ARGS
+
+      - name: Run E2E smoke tests against OAT
+        env:
+          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
+          WINEBOX_DATABASE: "winebox-oat"
+          WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
+          WINEBOX_USE_CLAUDE_VISION: "false"
+          WINEBOX_TEST_USER: ${{ secrets.WINEBOX_TEST_USER }}
+          WINEBOX_TEST_PASSWORD: ${{ secrets.WINEBOX_TEST_PASSWORD }}
+        run: |
+          uv run playwright install --with-deps
+          uv run python -m invoke test-e2e-oat --verbose

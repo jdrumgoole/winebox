@@ -50,12 +50,18 @@ def get_env_config(
     Returns:
         DeployConfig with all settings resolved.
     """
-    # Load .env file
+    # Load secrets: prefer .env file, fall back to environment variables
+    # (GitHub Actions sets secrets as env vars directly)
     env_file = Path(__file__).parent.parent / ".env"
     env_values: dict[str, str | None] = {}
     if env_file.exists():
         load_dotenv(env_file)
         env_values = dotenv_values(env_file)
+    else:
+        # No .env file — pull from environment (e.g. GitHub Actions secrets)
+        for key in os.environ:
+            if key.startswith(("WINEBOX_", "AWS_", "BRAVE_")):
+                env_values[key] = os.environ[key]
 
     return DeployConfig(
         host=host or os.environ.get("WINEBOX_DROPLET_IP"),
