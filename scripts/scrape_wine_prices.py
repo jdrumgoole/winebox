@@ -14,7 +14,6 @@ Examples:
 """
 
 import argparse
-import asyncio
 import logging
 import os
 import re
@@ -138,30 +137,73 @@ def was_recently_scraped(db, wine: WineQuery) -> bool:
 
 
 def store_price(db, wine: WineQuery, scraped: ScrapedPrice) -> None:
-    """Store a scraped price using the async add_price_entry service."""
-    from winebox.models.price_capture import ShopLocation
-    from winebox.models.wine_price import PriceEntry, PriceSource
-    from winebox.services.price_service import add_price_entry
+    """Store a scraped price directly via pymongo (sync).
 
-    entry = PriceEntry(
-        timestamp=datetime.now(timezone.utc),
-        source=PriceSource.WEB_SCRAPER,
-        price=scraped.price,
-        currency=scraped.currency,
-        owner_id=None,
-        location=ShopLocation(
-            shop_name=scraped.retailer_name,
-            country=scraped.retailer_country,
-        ),
-        notes=f"Scraped from {scraped.product_url}",
+    Uses the same logic as add_price_entry but with sync pymongo
+    to avoid asyncio.run() issues in the script context.
+    """
+    now = datetime.now(timezone.utc)
+    col = db["wine_prices"]
+    history_col = db["wine_prices_history"]
+
+    entry_doc = {
+        "timestamp": now,
+        "source": "web_scraper",
+        "price": scraped.price,
+        "currency": scraped.currency,
+        "owner_id": None,
+        "location": {
+            "shop_name": scraped.retailer_name,
+            "town_city": None,
+            "state_county": None,
+            "country": scraped.retailer_country,
+        },
+        "coordinates": None,
+        "notes": f"Scraped from {scraped.product_url}",
+        "photo_path": None,
+        "capture_type": None,
+    }
+
+    wine_filter = {
+        "wine_name": wine.name,
+        "vintage": wine.vintage,
+        "wine_type": wine.wine_type,
+    }
+
+    doc = col.find_one(wine_filter)
+
+    if doc is None:
+        col.insert_one({
+            **wine_filter,
+            "prices": [entry_doc],
+            "created_at": now,
+            "updated_at": now,
+        })
+        return
+
+    prices = doc.get("prices", [])
+    prices.append(entry_doc)
+
+    # Overflow: archive oldest beyond 20
+    if len(prices) > 20:
+        overflow_count = len(prices) - 20
+        overflow = prices[:overflow_count]
+        prices = prices[overflow_count:]
+
+        history_docs = [
+            {
+                **wine_filter,
+                **entry,
+                "archived_at": now,
+            }
+            for entry in overflow
+        ]
+        history_col.insert_many(history_docs)
+
+    col.update_one(
+        {"_id": doc["_id"]},
+        {"$set": {"prices": prices, "updated_at": now}},
     )
-
-    asyncio.run(add_price_entry(
-        wine_name=wine.name,
-        vintage=wine.vintage,
-        wine_type=wine.wine_type,
-        entry=entry,
-    ))
 
 
 # ---------------------------------------------------------------------------
@@ -512,16 +554,6 @@ def main() -> int:
     client = MongoClient(mongodb_url)
     db = client[args.database]
 
-    # Initialise async database for add_price_entry
-    if not args.dry_run:
-        from pymongo import AsyncMongoClient
-        from winebox.database import init_db
-        async_client = AsyncMongoClient(mongodb_url)
-        asyncio.run(init_db(
-            mongo_client=async_client,
-            mongodb_database=args.database,
-            skip_indexes=True,
-        ))
 
     # Fetch wines
     wines = get_wines_to_scrape(db, max_wines=args.max_wines)
