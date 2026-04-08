@@ -1,13 +1,15 @@
 """Wine price tracker API endpoints.
 
-Provides CRUD operations for price captures — individual bottle or shelf
-observations with photo, price, and location data.
+Provides CRUD operations for wine prices — each wine (identified by
+name + vintage + type) accumulates a list of price observations from
+multiple sources.
 """
 
 import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from bson import ObjectId
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
@@ -17,11 +19,22 @@ from winebox.config import settings
 from winebox.models.price_capture import (
     CaptureType,
     GeoCoordinates,
-    PriceCapture,
     ShopLocation,
 )
-from winebox.schemas.price_capture import PriceCaptureOut
+from winebox.models.wine_price import (
+    PriceEntry,
+    PriceSource,
+    WinePrice,
+    WinePriceHistory,
+)
+from winebox.schemas.wine_price import (
+    PriceEntryOut,
+    WinePriceHistoryEntryOut,
+    WinePriceOut,
+    WinePriceSummaryOut,
+)
 from winebox.services.auth import RequireAuth
+from winebox.services.price_service import add_price_entry
 
 logger = logging.getLogger(__name__)
 
@@ -38,43 +51,68 @@ def _photo_storage_path() -> Path:
     return path
 
 
-def _capture_to_out(capture: PriceCapture) -> PriceCaptureOut:
-    """Convert a PriceCapture document to the API output schema."""
+def _entry_to_out(entry: PriceEntry) -> PriceEntryOut:
+    """Convert a PriceEntry to the API output schema."""
     photo_url = None
-    if capture.photo_path:
-        photo_url = f"/api/prices/photos/{capture.photo_path}"
+    if entry.photo_path:
+        photo_url = f"/api/prices/photos/{entry.photo_path}"
 
     coords = None
-    if capture.coordinates:
+    if entry.coordinates:
         coords = {
-            "latitude": capture.coordinates.latitude,
-            "longitude": capture.coordinates.longitude,
-            "accuracy_metres": capture.coordinates.accuracy_metres,
+            "latitude": entry.coordinates.latitude,
+            "longitude": entry.coordinates.longitude,
+            "accuracy_metres": entry.coordinates.accuracy_metres,
         }
 
-    return PriceCaptureOut(
-        id=str(capture.id),
-        capture_type=capture.capture_type.value,
-        wine_name=capture.wine_name,
-        vintage=capture.vintage,
-        wine_type=capture.wine_type,
-        price=capture.price,
-        currency=capture.currency,
-        notes=capture.notes,
-        photo_url=photo_url,
+    return PriceEntryOut(
+        timestamp=entry.timestamp,
+        source=entry.source.value,
+        price=entry.price,
+        currency=entry.currency,
+        owner_id=str(entry.owner_id) if entry.owner_id else None,
         location={
-            "shop_name": capture.location.shop_name,
-            "town_city": capture.location.town_city,
-            "state_county": capture.location.state_county,
-            "country": capture.location.country,
+            "shop_name": entry.location.shop_name,
+            "town_city": entry.location.town_city,
+            "state_county": entry.location.state_county,
+            "country": entry.location.country,
         },
         coordinates=coords,
-        captured_at=capture.captured_at,
-        created_at=capture.created_at,
+        notes=entry.notes,
+        photo_url=photo_url,
+        capture_type=entry.capture_type.value if entry.capture_type else None,
     )
 
 
-@router.post("", response_model=PriceCaptureOut, status_code=status.HTTP_201_CREATED)
+def _wine_price_to_out(doc: WinePrice) -> WinePriceOut:
+    """Convert a WinePrice document to the API output schema."""
+    return WinePriceOut(
+        id=str(doc.id),
+        wine_name=doc.wine_name,
+        vintage=doc.vintage,
+        wine_type=doc.wine_type,
+        prices=[_entry_to_out(e) for e in doc.prices],
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
+    )
+
+
+def _wine_price_to_summary(doc: WinePrice) -> WinePriceSummaryOut:
+    """Convert a WinePrice document to a summary."""
+    latest = doc.prices[-1] if doc.prices else None
+    return WinePriceSummaryOut(
+        id=str(doc.id),
+        wine_name=doc.wine_name,
+        vintage=doc.vintage,
+        wine_type=doc.wine_type,
+        price_count=len(doc.prices),
+        latest_price=latest.price if latest else None,
+        latest_currency=latest.currency if latest else None,
+        latest_timestamp=latest.timestamp if latest else None,
+    )
+
+
+@router.post("", response_model=WinePriceOut, status_code=status.HTTP_201_CREATED)
 async def create_price_capture(
     current_user: RequireAuth,
     capture_type: str = Form("bottle"),
@@ -93,11 +131,12 @@ async def create_price_capture(
     accuracy_metres: float | None = Form(None),
     captured_at: str | None = Form(None),
     photo: UploadFile | None = File(None),
-) -> PriceCaptureOut:
-    """Create a new price capture with optional photo upload.
+) -> WinePriceOut:
+    """Create a new price observation for a wine.
 
     Accepts multipart form data so the photo can be uploaded in the same
-    request as the metadata.
+    request as the metadata. The price is added to the wine's price
+    history, creating the wine document if it doesn't exist yet.
     """
     # Validate capture type
     if capture_type not in ("bottle", "shelf"):
@@ -112,14 +151,20 @@ async def create_price_capture(
     if notes and len(notes) > 2000:
         raise HTTPException(status_code=422, detail="Notes too long (max 2000 characters).")
 
+    # Wine name is required for grouping
+    if not wine_name:
+        raise HTTPException(status_code=422, detail="Wine name is required.")
+
+    # Price is required
+    if price is None:
+        raise HTTPException(status_code=422, detail="Price is required.")
+
     # Save photo if provided
     photo_path = None
     if photo and photo.filename:
-        # Validate content type
         if photo.content_type not in ("image/jpeg", "image/png", "image/webp", "image/heic"):
             raise HTTPException(status_code=422, detail="Photo must be JPEG, PNG, WebP, or HEIC.")
 
-        # Read with size limit (10 MB)
         content = await photo.read()
         if len(content) > 10 * 1024 * 1024:
             raise HTTPException(status_code=422, detail="Photo too large (max 10 MB).")
@@ -145,18 +190,14 @@ async def create_price_capture(
         try:
             capture_time = datetime.fromisoformat(captured_at)
         except ValueError:
-            pass  # Fall back to now
+            pass
 
-    capture = PriceCapture(
-        owner_id=current_user.id,
-        capture_type=CaptureType(capture_type),
-        wine_name=wine_name,
-        vintage=vintage,
-        wine_type=wine_type,
+    entry = PriceEntry(
+        timestamp=capture_time,
+        source=PriceSource.PRICE_CAPTURE_APP,
         price=price,
         currency=currency,
-        notes=notes,
-        photo_path=photo_path,
+        owner_id=current_user.id,
         location=ShopLocation(
             shop_name=shop_name,
             town_city=town_city,
@@ -164,64 +205,141 @@ async def create_price_capture(
             country=country,
         ),
         coordinates=coordinates,
-        captured_at=capture_time,
+        notes=notes,
+        photo_path=photo_path,
+        capture_type=CaptureType(capture_type),
     )
-    await capture.insert()
-    return _capture_to_out(capture)
+
+    doc = await add_price_entry(
+        wine_name=wine_name,
+        vintage=vintage,
+        wine_type=wine_type,
+        entry=entry,
+    )
+    return _wine_price_to_out(doc)
 
 
-@router.get("", response_model=list[PriceCaptureOut])
-async def list_price_captures(
+@router.get("", response_model=list[WinePriceSummaryOut])
+async def list_wine_prices(
     current_user: RequireAuth,
     skip: int = 0,
     limit: int = 50,
-) -> list[PriceCaptureOut]:
-    """List the current user's price captures, newest first."""
+) -> list[WinePriceSummaryOut]:
+    """List wines where the current user has contributed prices."""
     if limit > 200:
         limit = 200
-    captures = (
-        await PriceCapture.find({"owner_id": current_user.id})
-        .sort([("captured_at", -1)])
+    docs = (
+        await WinePrice.find({"prices.owner_id": current_user.id})
+        .sort([("updated_at", -1)])
         .skip(skip)
         .limit(limit)
         .to_list()
     )
-    return [_capture_to_out(c) for c in captures]
+    return [_wine_price_to_summary(d) for d in docs]
 
 
-@router.get("/{capture_id}", response_model=PriceCaptureOut)
-async def get_price_capture(
-    capture_id: str,
+@router.get("/{wine_price_id}", response_model=WinePriceOut)
+async def get_wine_price(
+    wine_price_id: str,
     current_user: RequireAuth,
-) -> PriceCaptureOut:
-    """Get a single price capture by ID."""
-    capture = await PriceCapture.find_one(
-        {"_id": ObjectId(capture_id), "owner_id": current_user.id}
-    )
-    if not capture:
-        raise HTTPException(status_code=404, detail="Price capture not found.")
-    return _capture_to_out(capture)
+) -> WinePriceOut:
+    """Get a wine's full price history."""
+    doc = await WinePrice.find_one({"_id": ObjectId(wine_price_id)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Wine price not found.")
+    return _wine_price_to_out(doc)
 
 
-@router.delete("/{capture_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_price_capture(
-    capture_id: str,
+@router.delete(
+    "/{wine_price_id}/entries/{entry_index}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_price_entry(
+    wine_price_id: str,
+    entry_index: int,
     current_user: RequireAuth,
 ) -> None:
-    """Delete a price capture and its photo."""
-    capture = await PriceCapture.find_one(
-        {"_id": ObjectId(capture_id), "owner_id": current_user.id}
-    )
-    if not capture:
-        raise HTTPException(status_code=404, detail="Price capture not found.")
+    """Delete a specific price entry from a wine's price history.
 
-    # Remove photo file
-    if capture.photo_path:
-        photo_file = _photo_storage_path() / capture.photo_path
+    Only the user who created the entry can delete it. If the prices
+    array becomes empty, the entire wine document is removed.
+    """
+    doc = await WinePrice.find_one({"_id": ObjectId(wine_price_id)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Wine price not found.")
+
+    if entry_index < 0 or entry_index >= len(doc.prices):
+        raise HTTPException(status_code=404, detail="Price entry not found.")
+
+    entry = doc.prices[entry_index]
+    if entry.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only delete your own price entries.")
+
+    # Remove photo file if present
+    if entry.photo_path:
+        photo_file = _photo_storage_path() / entry.photo_path
         if photo_file.exists():
             photo_file.unlink()
 
-    await capture.delete()
+    doc.prices.pop(entry_index)
+    doc.updated_at = datetime.now(timezone.utc)
+
+    if not doc.prices:
+        await doc.delete()
+    else:
+        await doc.save()
+
+
+@router.get(
+    "/{wine_price_id}/history",
+    response_model=list[WinePriceHistoryEntryOut],
+)
+async def get_wine_price_history(
+    wine_price_id: str,
+    current_user: RequireAuth,
+    skip: int = 0,
+    limit: int = 50,
+) -> list[WinePriceHistoryEntryOut]:
+    """Get archived price history for a wine."""
+    doc = await WinePrice.find_one({"_id": ObjectId(wine_price_id)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Wine price not found.")
+
+    if limit > 200:
+        limit = 200
+
+    history = (
+        await WinePriceHistory.find({
+            "wine_name": doc.wine_name,
+            "vintage": doc.vintage,
+            "wine_type": doc.wine_type,
+        })
+        .sort([("archived_at", -1)])
+        .skip(skip)
+        .limit(limit)
+        .to_list()
+    )
+    return [
+        WinePriceHistoryEntryOut(
+            id=str(h.id),
+            wine_name=h.wine_name,
+            vintage=h.vintage,
+            wine_type=h.wine_type,
+            timestamp=h.timestamp,
+            source=h.source.value,
+            price=h.price,
+            currency=h.currency,
+            location={
+                "shop_name": h.location.shop_name,
+                "town_city": h.location.town_city,
+                "state_county": h.location.state_county,
+                "country": h.location.country,
+            },
+            notes=h.notes,
+            archived_at=h.archived_at,
+        )
+        for h in history
+    ]
 
 
 @router.get("/photos/{filename}")
@@ -231,17 +349,22 @@ async def get_price_photo(
 ) -> FileResponse:
     """Serve a price capture photo.
 
-    Only serves photos belonging to captures owned by the current user.
+    Only serves photos belonging to price entries owned by the current user.
     """
     # Prevent path traversal
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename.")
 
-    # Verify the photo belongs to the current user
-    capture = await PriceCapture.find_one(
-        {"photo_path": filename, "owner_id": current_user.id}
-    )
-    if not capture:
+    # Find any wine_prices document containing this photo for this user
+    doc = await WinePrice.find_one({
+        "prices": {
+            "$elemMatch": {
+                "photo_path": filename,
+                "owner_id": current_user.id,
+            }
+        }
+    })
+    if not doc:
         raise HTTPException(status_code=404, detail="Photo not found.")
 
     photo_file = _photo_storage_path() / filename

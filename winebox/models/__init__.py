@@ -15,7 +15,8 @@ from winebox.models.import_batch_row import RawUploadRow
 from winebox.models.case import Case
 from winebox.models.bottle import Bottle
 from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
-from winebox.models.price_capture import PriceCapture, CaptureType, ShopLocation, GeoCoordinates
+from winebox.models.price_capture import CaptureType, ShopLocation, GeoCoordinates
+from winebox.models.wine_price import WinePrice, WinePriceHistory, PriceEntry, PriceSource
 
 __all__ = [
     # Main documents
@@ -50,7 +51,10 @@ __all__ = [
     "WineEventType",
     "WineEventScope",
     # Price tracker
-    "PriceCapture",
+    "WinePrice",
+    "WinePriceHistory",
+    "PriceEntry",
+    "PriceSource",
     "CaptureType",
     "ShopLocation",
     "GeoCoordinates",

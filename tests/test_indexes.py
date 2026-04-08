@@ -57,6 +57,7 @@ def test_expected_collections_present() -> None:
         "cases",
         "bottles",
         "wine_events",
-        "price_captures",
+        "wine_prices",
+        "wine_prices_history",
     }
     assert set(INDEXES.keys()) == expected

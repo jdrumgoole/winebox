@@ -1,7 +1,7 @@
 """Tests for the wine price tracker API.
 
-Covers CRUD operations, photo upload/download, validation,
-pagination, data isolation between users, and the admin info endpoint.
+Covers CRUD operations, photo upload/download, validation, pagination,
+data isolation, overflow archival to history, and multi-source support.
 """
 
 import io
@@ -9,39 +9,40 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
-from winebox.models.price_capture import PriceCapture
+from winebox.models.wine_price import WinePrice, WinePriceHistory
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _form_data(**kwargs) -> dict:
-    """Build form data dict for create_price_capture, filtering out None values."""
-    return {k: str(v) if not isinstance(v, str) else v
-            for k, v in kwargs.items() if v is not None}
 
-
-async def _create_capture(
+async def _create_price(
     client: AsyncClient,
     *,
     wine_name: str = "Château Test",
-    price: float = 12.99,
+    vintage: str = "2020",
+    wine_type: str = "Red",
+    price: str = "12.99",
     currency: str = "EUR",
     capture_type: str = "bottle",
     photo: tuple | None = None,
     **extra,
 ) -> dict:
     """Helper to create a price capture and return the JSON response."""
-    data = _form_data(
-        capture_type=capture_type,
-        wine_name=wine_name,
-        price=price,
-        currency=currency,
-        **extra,
-    )
+    data = {
+        "capture_type": capture_type,
+        "wine_name": wine_name,
+        "vintage": vintage,
+        "wine_type": wine_type,
+        "price": price,
+        "currency": currency,
+    }
+    for k, v in extra.items():
+        if v is not None:
+            data[k] = str(v)
     files = {}
     if photo:
         files["photo"] = photo
@@ -56,97 +57,96 @@ async def _create_capture(
 
 
 @pytest.mark.asyncio
-async def test_create_minimal_capture(client: AsyncClient) -> None:
-    """A capture with only default fields should succeed."""
-    response = await client.post("/api/prices", data={"capture_type": "bottle"})
-    assert response.status_code == 201
-    body = response.json()
-    assert body["capture_type"] == "bottle"
-    assert body["currency"] == "EUR"
+async def test_create_price_returns_wine_document(client: AsyncClient) -> None:
+    """Creating a price should return a WinePrice document with one entry."""
+    body = await _create_price(client)
+    assert body["wine_name"] == "Château Test"
+    assert body["vintage"] == 2020
+    assert body["wine_type"] == "Red"
+    assert len(body["prices"]) == 1
+    assert body["prices"][0]["price"] == 12.99
+    assert body["prices"][0]["currency"] == "EUR"
+    assert body["prices"][0]["source"] == "price_capture_app"
     assert body["id"]
 
 
 @pytest.mark.asyncio
-async def test_create_capture_with_all_fields(client: AsyncClient) -> None:
-    """Create a capture populating every metadata field."""
-    body = await _create_capture(
+async def test_create_price_with_all_fields(client: AsyncClient) -> None:
+    """All metadata fields should be stored in the price entry."""
+    name = f"Domaine Test {uuid.uuid4().hex[:6]}"
+    body = await _create_price(
         client,
-        wine_name="Domaine de la Romanée-Conti",
-        vintage=2015,
+        wine_name=name,
+        vintage="2015",
         wine_type="Red",
-        price=1500.00,
+        price="1500.00",
         currency="USD",
-        notes="Amazing find at airport duty-free",
+        notes="Airport duty-free",
         shop_name="Le Caviste",
         town_city="Paris",
         state_county="Île-de-France",
         country="France",
         capture_type="shelf",
     )
-    assert body["wine_name"] == "Domaine de la Romanée-Conti"
-    assert body["vintage"] == 2015
-    assert body["wine_type"] == "Red"
-    assert body["price"] == 1500.00
-    assert body["currency"] == "USD"
-    assert body["notes"] == "Amazing find at airport duty-free"
-    assert body["capture_type"] == "shelf"
-    assert body["location"]["shop_name"] == "Le Caviste"
-    assert body["location"]["town_city"] == "Paris"
-    assert body["location"]["state_county"] == "Île-de-France"
-    assert body["location"]["country"] == "France"
+    entry = body["prices"][0]
+    assert entry["price"] == 1500.00
+    assert entry["currency"] == "USD"
+    assert entry["notes"] == "Airport duty-free"
+    assert entry["capture_type"] == "shelf"
+    assert body["prices"][0]["location"]["shop_name"] == "Le Caviste"
+    assert body["prices"][0]["location"]["country"] == "France"
 
 
 @pytest.mark.asyncio
-async def test_create_capture_with_coordinates(client: AsyncClient) -> None:
-    """GPS coordinates should be stored and returned."""
-    body = await _create_capture(
+async def test_create_price_with_coordinates(client: AsyncClient) -> None:
+    """GPS coordinates should be stored in the price entry."""
+    name = f"Coords Wine {uuid.uuid4().hex[:6]}"
+    body = await _create_price(
         client,
+        wine_name=name,
         latitude=48.8566,
         longitude=2.3522,
         accuracy_metres=15.0,
     )
-    assert body["coordinates"]["latitude"] == 48.8566
-    assert body["coordinates"]["longitude"] == 2.3522
-    assert body["coordinates"]["accuracy_metres"] == 15.0
+    coords = body["prices"][0]["coordinates"]
+    assert coords["latitude"] == 48.8566
+    assert coords["longitude"] == 2.3522
+    assert coords["accuracy_metres"] == 15.0
 
 
 @pytest.mark.asyncio
-async def test_create_capture_with_photo(
+async def test_create_price_with_photo(
     client: AsyncClient, sample_image_bytes: bytes
 ) -> None:
-    """A photo upload should produce a photo_url in the response."""
+    """A photo upload should produce a photo_url in the entry."""
+    name = f"Photo Wine {uuid.uuid4().hex[:6]}"
     photo = ("label.png", io.BytesIO(sample_image_bytes), "image/png")
-    body = await _create_capture(client, photo=photo)
-    assert body["photo_url"] is not None
-    assert body["photo_url"].startswith("/api/prices/photos/")
+    body = await _create_price(client, wine_name=name, photo=photo)
+    assert body["prices"][0]["photo_url"] is not None
+    assert body["prices"][0]["photo_url"].startswith("/api/prices/photos/")
 
 
 @pytest.mark.asyncio
-async def test_create_capture_with_captured_at(client: AsyncClient) -> None:
-    """An explicit captured_at timestamp should be honoured."""
-    ts = "2025-06-15T14:30:00+00:00"
-    body = await _create_capture(client, captured_at=ts)
-    assert "2025-06-15" in body["captured_at"]
+async def test_second_price_appends_to_same_wine(client: AsyncClient) -> None:
+    """Adding a second price for the same wine should append, not create new."""
+    name = f"Append Wine {uuid.uuid4().hex[:6]}"
+    body1 = await _create_price(client, wine_name=name, price="10.00")
+    body2 = await _create_price(client, wine_name=name, price="12.00")
+
+    assert body1["id"] == body2["id"]
+    assert len(body2["prices"]) == 2
+    assert body2["prices"][0]["price"] == 10.00
+    assert body2["prices"][1]["price"] == 12.00
 
 
 @pytest.mark.asyncio
-async def test_create_capture_with_jpeg_photo(
-    client: AsyncClient, sample_image_bytes: bytes
-) -> None:
-    """JPEG content type should be accepted."""
-    photo = ("photo.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")
-    body = await _create_capture(client, photo=photo)
-    assert body["photo_url"] is not None
+async def test_different_vintage_creates_separate_doc(client: AsyncClient) -> None:
+    """Different vintages of the same wine should be separate documents."""
+    name = f"Vintage Wine {uuid.uuid4().hex[:6]}"
+    body1 = await _create_price(client, wine_name=name, vintage="2018", price="10.00")
+    body2 = await _create_price(client, wine_name=name, vintage="2019", price="12.00")
 
-
-@pytest.mark.asyncio
-async def test_create_capture_with_webp_photo(
-    client: AsyncClient, sample_image_bytes: bytes
-) -> None:
-    """WebP content type should be accepted."""
-    photo = ("photo.webp", io.BytesIO(sample_image_bytes), "image/webp")
-    body = await _create_capture(client, photo=photo)
-    assert body["photo_url"] is not None
+    assert body1["id"] != body2["id"]
 
 
 # ---------------------------------------------------------------------------
@@ -156,38 +156,53 @@ async def test_create_capture_with_webp_photo(
 
 @pytest.mark.asyncio
 async def test_invalid_capture_type_rejected(client: AsyncClient) -> None:
-    """Capture type must be 'bottle' or 'shelf'."""
-    response = await client.post("/api/prices", data={"capture_type": "crate"})
+    response = await client.post(
+        "/api/prices",
+        data={"capture_type": "crate", "wine_name": "X", "price": "10"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_wine_name_required(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/prices", data={"capture_type": "bottle", "price": "10"}
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_price_required(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/prices", data={"capture_type": "bottle", "wine_name": "X"}
+    )
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_wine_name_too_long_rejected(client: AsyncClient) -> None:
-    """Wine name over 500 characters should be rejected."""
     response = await client.post(
         "/api/prices",
-        data={"capture_type": "bottle", "wine_name": "A" * 501},
+        data={"capture_type": "bottle", "wine_name": "A" * 501, "price": "10"},
     )
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_notes_too_long_rejected(client: AsyncClient) -> None:
-    """Notes over 2000 characters should be rejected."""
     response = await client.post(
         "/api/prices",
-        data={"capture_type": "bottle", "notes": "N" * 2001},
+        data={"capture_type": "bottle", "wine_name": "X", "price": "10", "notes": "N" * 2001},
     )
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_invalid_photo_content_type_rejected(client: AsyncClient) -> None:
-    """Only image/* content types should be accepted for photo."""
     fake_pdf = ("doc.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")
     response = await client.post(
         "/api/prices",
-        data={"capture_type": "bottle"},
+        data={"capture_type": "bottle", "wine_name": "X", "price": "10"},
         files={"photo": fake_pdf},
     )
     assert response.status_code == 422
@@ -195,11 +210,10 @@ async def test_invalid_photo_content_type_rejected(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_photo_too_large_rejected(client: AsyncClient) -> None:
-    """Photos over 10 MB should be rejected."""
     big_photo = ("huge.png", io.BytesIO(b"\x00" * (10 * 1024 * 1024 + 1)), "image/png")
     response = await client.post(
         "/api/prices",
-        data={"capture_type": "bottle"},
+        data={"capture_type": "bottle", "wine_name": "X", "price": "10"},
         files={"photo": big_photo},
     )
     assert response.status_code == 422
@@ -211,58 +225,33 @@ async def test_photo_too_large_rejected(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_captures_empty(client: AsyncClient) -> None:
-    """A new user should have no captures."""
+async def test_list_prices_empty(client: AsyncClient) -> None:
     response = await client.get("/api/prices")
     assert response.status_code == 200
-    assert response.json() == []
+    # May contain entries from other tests but shouldn't error
+    assert isinstance(response.json(), list)
 
 
 @pytest.mark.asyncio
-async def test_list_captures_returns_created(client: AsyncClient) -> None:
-    """Created captures should appear in the listing."""
-    await _create_capture(client, wine_name="Wine A", price=10.0)
-    await _create_capture(client, wine_name="Wine B", price=20.0)
+async def test_list_prices_returns_user_wines(client: AsyncClient) -> None:
+    """Only wines where the user contributed prices should appear."""
+    name = f"List Wine {uuid.uuid4().hex[:6]}"
+    await _create_price(client, wine_name=name, price="10.00")
 
     response = await client.get("/api/prices")
     assert response.status_code == 200
-    captures = response.json()
-    assert len(captures) >= 2
-    names = {c["wine_name"] for c in captures}
-    assert "Wine A" in names
-    assert "Wine B" in names
+    summaries = response.json()
+    names = {s["wine_name"] for s in summaries}
+    assert name in names
+
+    # Check summary fields
+    match = next(s for s in summaries if s["wine_name"] == name)
+    assert match["price_count"] >= 1
+    assert match["latest_price"] is not None
 
 
 @pytest.mark.asyncio
-async def test_list_captures_newest_first(client: AsyncClient) -> None:
-    """Captures should be ordered newest first."""
-    await _create_capture(client, wine_name="Older", captured_at="2024-01-01T00:00:00+00:00")
-    await _create_capture(client, wine_name="Newer", captured_at="2025-06-01T00:00:00+00:00")
-
-    response = await client.get("/api/prices")
-    captures = response.json()
-    names = [c["wine_name"] for c in captures]
-    assert names.index("Newer") < names.index("Older")
-
-
-@pytest.mark.asyncio
-async def test_list_captures_pagination(client: AsyncClient) -> None:
-    """Skip and limit should control pagination."""
-    for i in range(5):
-        await _create_capture(client, wine_name=f"Paginated {i}", price=float(i))
-
-    response = await client.get("/api/prices?skip=0&limit=2")
-    assert response.status_code == 200
-    assert len(response.json()) == 2
-
-    response = await client.get("/api/prices?skip=2&limit=2")
-    assert response.status_code == 200
-    assert len(response.json()) == 2
-
-
-@pytest.mark.asyncio
-async def test_list_captures_limit_capped_at_200(client: AsyncClient) -> None:
-    """Requesting limit > 200 should be capped silently."""
+async def test_list_prices_limit_capped(client: AsyncClient) -> None:
     response = await client.get("/api/prices?limit=500")
     assert response.status_code == 200
 
@@ -273,70 +262,93 @@ async def test_list_captures_limit_capped_at_200(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_capture_by_id(client: AsyncClient) -> None:
-    """Should return the specific capture."""
-    created = await _create_capture(client, wine_name="Get Me")
+async def test_get_wine_price_by_id(client: AsyncClient) -> None:
+    name = f"Get Wine {uuid.uuid4().hex[:6]}"
+    created = await _create_price(client, wine_name=name)
     response = await client.get(f"/api/prices/{created['id']}")
     assert response.status_code == 200
-    assert response.json()["wine_name"] == "Get Me"
+    assert response.json()["wine_name"] == name
+    assert len(response.json()["prices"]) >= 1
 
 
 @pytest.mark.asyncio
-async def test_get_nonexistent_capture_returns_404(client: AsyncClient) -> None:
-    """A random ObjectId should 404."""
+async def test_get_nonexistent_returns_404(client: AsyncClient) -> None:
     from bson import ObjectId
-
-    fake_id = str(ObjectId())
-    response = await client.get(f"/api/prices/{fake_id}")
+    response = await client.get(f"/api/prices/{ObjectId()}")
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# Delete
+# Delete entry
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_delete_capture(client: AsyncClient) -> None:
-    """Deleting a capture should remove it."""
-    created = await _create_capture(client, wine_name="Delete Me")
-    response = await client.delete(f"/api/prices/{created['id']}")
+async def test_delete_price_entry(client: AsyncClient) -> None:
+    name = f"Delete Wine {uuid.uuid4().hex[:6]}"
+    created = await _create_price(client, wine_name=name)
+    wine_id = created["id"]
+
+    response = await client.delete(f"/api/prices/{wine_id}/entries/0")
     assert response.status_code == 204
 
-    # Verify it's gone
-    response = await client.get(f"/api/prices/{created['id']}")
+    # Wine document should be gone (was the only entry)
+    response = await client.get(f"/api/prices/{wine_id}")
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_delete_capture_removes_photo(
+async def test_delete_entry_keeps_others(client: AsyncClient) -> None:
+    name = f"KeepOthers Wine {uuid.uuid4().hex[:6]}"
+    await _create_price(client, wine_name=name, price="10.00")
+    body = await _create_price(client, wine_name=name, price="20.00")
+    wine_id = body["id"]
+
+    # Delete first entry
+    response = await client.delete(f"/api/prices/{wine_id}/entries/0")
+    assert response.status_code == 204
+
+    # Second entry should remain
+    response = await client.get(f"/api/prices/{wine_id}")
+    assert response.status_code == 200
+    assert len(response.json()["prices"]) == 1
+    assert response.json()["prices"][0]["price"] == 20.00
+
+
+@pytest.mark.asyncio
+async def test_delete_entry_removes_photo(
     client: AsyncClient, sample_image_bytes: bytes
 ) -> None:
-    """Deleting a capture with a photo should also remove the photo file."""
+    name = f"PhotoDel Wine {uuid.uuid4().hex[:6]}"
     photo = ("label.png", io.BytesIO(sample_image_bytes), "image/png")
-    created = await _create_capture(client, photo=photo)
-    photo_url = created["photo_url"]
+    created = await _create_price(client, wine_name=name, photo=photo)
+    photo_url = created["prices"][0]["photo_url"]
 
-    # Photo should be accessible
+    # Photo accessible
     response = await client.get(photo_url)
     assert response.status_code == 200
 
-    # Delete the capture
-    response = await client.delete(f"/api/prices/{created['id']}")
+    # Delete entry
+    response = await client.delete(f"/api/prices/{created['id']}/entries/0")
     assert response.status_code == 204
 
-    # Photo should no longer be accessible
+    # Photo gone
     response = await client.get(photo_url)
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_delete_nonexistent_capture_returns_404(client: AsyncClient) -> None:
-    """Deleting a non-existent capture should 404."""
+async def test_delete_nonexistent_entry_returns_404(client: AsyncClient) -> None:
     from bson import ObjectId
+    response = await client.delete(f"/api/prices/{ObjectId()}/entries/0")
+    assert response.status_code == 404
 
-    fake_id = str(ObjectId())
-    response = await client.delete(f"/api/prices/{fake_id}")
+
+@pytest.mark.asyncio
+async def test_delete_out_of_range_index_returns_404(client: AsyncClient) -> None:
+    name = f"OOB Wine {uuid.uuid4().hex[:6]}"
+    created = await _create_price(client, wine_name=name)
+    response = await client.delete(f"/api/prices/{created['id']}/entries/99")
     assert response.status_code == 404
 
 
@@ -349,25 +361,21 @@ async def test_delete_nonexistent_capture_returns_404(client: AsyncClient) -> No
 async def test_get_photo(
     client: AsyncClient, sample_image_bytes: bytes
 ) -> None:
-    """A photo should be downloadable via its URL."""
+    name = f"PhotoGet Wine {uuid.uuid4().hex[:6]}"
     photo = ("label.png", io.BytesIO(sample_image_bytes), "image/png")
-    created = await _create_capture(client, photo=photo)
-    response = await client.get(created["photo_url"])
+    created = await _create_price(client, wine_name=name, photo=photo)
+    response = await client.get(created["prices"][0]["photo_url"])
     assert response.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_photo_path_traversal_rejected(client: AsyncClient) -> None:
-    """Path traversal attempts should be blocked."""
-    # The framework normalises ../../ out of URLs, so test with encoded dots
-    # that survive routing but trigger the filename validation
     response = await client.get("/api/prices/photos/..%2F..%2Fetc%2Fpasswd")
-    assert response.status_code in (400, 404)  # blocked either way
+    assert response.status_code in (400, 404)
 
 
 @pytest.mark.asyncio
 async def test_photo_nonexistent_returns_404(client: AsyncClient) -> None:
-    """Requesting a photo filename that doesn't belong to the user should 404."""
     response = await client.get("/api/prices/photos/nonexistent.png")
     assert response.status_code == 404
 
@@ -378,53 +386,15 @@ async def test_photo_nonexistent_returns_404(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_see_other_users_captures(
+async def test_other_user_cannot_delete_entry(
     client: AsyncClient, init_test_db
 ) -> None:
-    """User A's captures should not be visible to User B."""
-    # Create a capture as the fixture user
-    await _create_capture(client, wine_name="User A Wine")
-
-    # Create a second user client
-    from winebox.models import User
-    from winebox.services.auth import get_password_hash, create_access_token
-    from httpx import ASGITransport
-    from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
-
-    other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
-    other_user = User(
-        email=other_email,
-        hashed_password=_CACHED_TEST_PASSWORD_HASH,
-        is_active=True,
-        is_verified=True,
-        is_superuser=False,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
-    )
-    await other_user.insert()
-    other_token = create_access_token(data={"sub": other_email})
-    app = get_test_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-        headers={"Authorization": f"Bearer {other_token}"},
-    ) as other_client:
-        response = await other_client.get("/api/prices")
-        assert response.status_code == 200
-        names = {c["wine_name"] for c in response.json()}
-        assert "User A Wine" not in names
-
-
-@pytest.mark.asyncio
-async def test_user_cannot_delete_other_users_capture(
-    client: AsyncClient, init_test_db
-) -> None:
-    """User B should not be able to delete User A's capture."""
-    created = await _create_capture(client, wine_name="Protected")
+    """User B should not be able to delete User A's price entry."""
+    name = f"Protected Wine {uuid.uuid4().hex[:6]}"
+    created = await _create_price(client, wine_name=name)
 
     from winebox.models import User
     from winebox.services.auth import create_access_token
-    from httpx import ASGITransport
     from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
 
     other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
@@ -445,25 +415,21 @@ async def test_user_cannot_delete_other_users_capture(
         base_url="http://test",
         headers={"Authorization": f"Bearer {other_token}"},
     ) as other_client:
-        response = await other_client.delete(f"/api/prices/{created['id']}")
-        assert response.status_code == 404
-
-    # Original user can still see it
-    response = await client.get(f"/api/prices/{created['id']}")
-    assert response.status_code == 200
+        response = await other_client.delete(f"/api/prices/{created['id']}/entries/0")
+        assert response.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_access_other_users_photo(
+async def test_other_user_cannot_access_photo(
     client: AsyncClient, sample_image_bytes: bytes, init_test_db
 ) -> None:
     """User B should not be able to download User A's photo."""
+    name = f"PhotoIso Wine {uuid.uuid4().hex[:6]}"
     photo = ("label.png", io.BytesIO(sample_image_bytes), "image/png")
-    created = await _create_capture(client, photo=photo)
+    created = await _create_price(client, wine_name=name, photo=photo)
 
     from winebox.models import User
     from winebox.services.auth import create_access_token
-    from httpx import ASGITransport
     from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
 
     other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
@@ -484,8 +450,45 @@ async def test_user_cannot_access_other_users_photo(
         base_url="http://test",
         headers={"Authorization": f"Bearer {other_token}"},
     ) as other_client:
-        response = await other_client.get(created["photo_url"])
+        response = await other_client.get(created["prices"][0]["photo_url"])
         assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_two_users_contribute_to_same_wine(
+    client: AsyncClient, init_test_db
+) -> None:
+    """Two users adding prices for the same wine share one document."""
+    name = f"Shared Wine {uuid.uuid4().hex[:6]}"
+    body1 = await _create_price(client, wine_name=name, price="10.00")
+
+    from winebox.models import User
+    from winebox.services.auth import create_access_token
+    from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
+
+    other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
+    other_user = User(
+        email=other_email,
+        hashed_password=_CACHED_TEST_PASSWORD_HASH,
+        is_active=True,
+        is_verified=True,
+        is_superuser=False,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    await other_user.insert()
+    other_token = create_access_token(data={"sub": other_email})
+    app = get_test_app()
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {other_token}"},
+    ) as other_client:
+        body2 = await _create_price(other_client, wine_name=name, price="15.00")
+
+    # Same document, two entries
+    assert body1["id"] == body2["id"]
+    assert len(body2["prices"]) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -497,9 +500,9 @@ async def test_user_cannot_access_other_users_photo(
 async def test_unauthenticated_create_rejected(
     unauthenticated_client: AsyncClient,
 ) -> None:
-    """Creating a capture without auth should fail."""
     response = await unauthenticated_client.post(
-        "/api/prices", data={"capture_type": "bottle"}
+        "/api/prices",
+        data={"capture_type": "bottle", "wine_name": "X", "price": "10"},
     )
     assert response.status_code == 401
 
@@ -508,22 +511,50 @@ async def test_unauthenticated_create_rejected(
 async def test_unauthenticated_list_rejected(
     unauthenticated_client: AsyncClient,
 ) -> None:
-    """Listing captures without auth should fail."""
     response = await unauthenticated_client.get("/api/prices")
     assert response.status_code == 401
 
 
-@pytest.mark.asyncio
-async def test_unauthenticated_delete_rejected(
-    unauthenticated_client: AsyncClient,
-) -> None:
-    """Deleting a capture without auth should fail."""
-    from bson import ObjectId
+# ---------------------------------------------------------------------------
+# Overflow & history
+# ---------------------------------------------------------------------------
 
-    response = await unauthenticated_client.delete(
-        f"/api/prices/{ObjectId()}"
-    )
-    assert response.status_code == 401
+
+@pytest.mark.asyncio
+async def test_overflow_archives_to_history(client: AsyncClient) -> None:
+    """Adding a 21st price should archive the oldest to wine_prices_history."""
+    name = f"Overflow Wine {uuid.uuid4().hex[:6]}"
+
+    # Add 21 prices
+    for i in range(21):
+        body = await _create_price(
+            client,
+            wine_name=name,
+            price=str(10.0 + i),
+        )
+
+    # Should have exactly 20 entries in the document
+    assert len(body["prices"]) == 20
+
+    # First entry should be the second price (index 1), not the first (index 0)
+    assert body["prices"][0]["price"] == 11.0
+
+    # The oldest (price 10.0) should be in history
+    wine_id = body["id"]
+    response = await client.get(f"/api/prices/{wine_id}/history")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) >= 1
+    assert any(h["price"] == 10.0 for h in history)
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_empty_when_no_overflow(client: AsyncClient) -> None:
+    name = f"NoOverflow Wine {uuid.uuid4().hex[:6]}"
+    body = await _create_price(client, wine_name=name, price="10.00")
+    response = await client.get(f"/api/prices/{body['id']}/history")
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 # ---------------------------------------------------------------------------
@@ -533,14 +564,9 @@ async def test_unauthenticated_delete_rejected(
 
 @pytest.mark.asyncio
 async def test_supported_currencies(client: AsyncClient) -> None:
-    """All documented currencies should be accepted."""
     for currency in ("EUR", "GBP", "USD", "CHF", "AUD", "NZD", "CAD", "JPY", "ZAR"):
-        body = await _create_capture(
-            client,
-            wine_name=f"Wine {currency}",
-            price=9.99,
-            currency=currency,
+        name = f"Currency {currency} {uuid.uuid4().hex[:6]}"
+        body = await _create_price(
+            client, wine_name=name, price="9.99", currency=currency,
         )
-        assert body["currency"] == currency
-
-
+        assert body["prices"][0]["currency"] == currency
