@@ -69,7 +69,6 @@ AUTO_MAPPED = {
     "Country": "country",
     "Region": "region",
     "Vintage": "vintage",
-    "Description": "notes",
     "Colour": "wine_type_id",
 }
 
@@ -399,8 +398,9 @@ class TestXWinesImport:
         modal = page.locator(".modal.active")
         modal_text = modal.text_content() or ""
 
-        # Get the first wine card's name for matching
-        first_wine_name = (wine_cards[0].text_content() or "").strip()
+        # Get the first wine card's title for matching
+        first_wine_title = page.locator(".wine-card .wine-card-title").first
+        first_wine_name = (first_wine_title.text_content() or "").strip()
         assert first_wine_name in modal_text, (
             f"Modal should contain wine name '{first_wine_name}'"
         )

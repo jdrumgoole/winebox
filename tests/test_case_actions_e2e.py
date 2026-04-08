@@ -1,7 +1,7 @@
 """End-to-end tests for case-level actions (sell, gift, breakage).
 
 These tests verify that users can perform actions on entire cases
-by finding wines via the Search tab.
+via the wine detail modal accessed from search results.
 
 Run with: uv run python -m pytest -m e2e tests/test_case_actions_e2e.py -v
 """
@@ -66,8 +66,8 @@ def _add_case_via_api(page: Page, name: str = "Case Action Wine") -> dict:
     return result
 
 
-def _search_for_wine(page: Page, name: str) -> None:
-    """Navigate to Search tab and find a wine by name."""
+def _open_wine_detail_via_search(page: Page, name: str) -> None:
+    """Navigate to Search tab, find a wine, and open its detail modal."""
     page.click("a[data-page='cellar']")
     page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
     page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
@@ -76,36 +76,40 @@ def _search_for_wine(page: Page, name: str) -> None:
     page.fill("#search-q", name)
     page.press("#search-q", "Enter")
     page.wait_for_selector(".wine-card", state="visible", timeout=10000)
+    card = page.locator(".wine-card", has_text=name).first
+    card.click()
+    page.wait_for_selector("#wine-modal.active", state="visible", timeout=10000)
 
 
 @pytest.mark.e2e
 class TestCaseActionModal:
-    """Test the case action modal opens and shows correct options."""
+    """Test the case action modal opens from wine detail and shows correct options."""
 
     def test_case_action_button_visible(self, authenticated_page: Page) -> None:
-        """Case Action button appears on wine cards found via search."""
+        """Case Action button appears in the wine detail modal for wines with cases."""
         page = authenticated_page
         _add_case_via_api(page, "Visible Case Wine")
-        _search_for_wine(page, "Visible Case Wine")
+        _open_wine_detail_via_search(page, "Visible Case Wine")
 
-        expect(page.locator(".case-action-btn").first).to_be_visible(timeout=5000)
+        # Case action button should be in the modal's case breakdown
+        expect(page.locator("#wine-detail .case-action-btn").first).to_be_visible(timeout=5000)
 
     def test_case_action_modal_opens(self, authenticated_page: Page) -> None:
-        """Clicking Case Actions opens the case action modal."""
+        """Clicking Case Actions in the detail modal opens the case action modal."""
         page = authenticated_page
         _add_case_via_api(page, "Modal Open Wine")
-        _search_for_wine(page, "Modal Open Wine")
+        _open_wine_detail_via_search(page, "Modal Open Wine")
 
-        page.locator(".case-action-btn").first.click()
+        page.locator("#wine-detail .case-action-btn").first.click()
         expect(page.locator("#case-action-modal.active")).to_be_visible(timeout=5000)
 
     def test_case_action_modal_shows_reasons(self, authenticated_page: Page) -> None:
         """Case action modal shows Sell, Gift, and Breakage options."""
         page = authenticated_page
         _add_case_via_api(page, "Reasons Wine")
-        _search_for_wine(page, "Reasons Wine")
+        _open_wine_detail_via_search(page, "Reasons Wine")
 
-        page.locator(".case-action-btn").first.click()
+        page.locator("#wine-detail .case-action-btn").first.click()
         page.wait_for_selector("#case-action-modal.active", state="visible", timeout=5000)
 
         expect(page.locator(".case-reason-card[data-reason='sold']")).to_be_visible()
@@ -118,13 +122,12 @@ class TestCaseActionExecution:
     """Test that case actions work end-to-end."""
 
     def test_sell_case(self, authenticated_page: Page) -> None:
-        """Selling a case shows success toast and updates cellar."""
+        """Selling a case shows success toast."""
         page = authenticated_page
         _add_case_via_api(page, "Sell Case Wine")
-        _search_for_wine(page, "Sell Case Wine")
+        _open_wine_detail_via_search(page, "Sell Case Wine")
 
-        card = page.locator(".wine-card", has_text="Sell Case Wine").first
-        card.locator(".case-action-btn").click()
+        page.locator("#wine-detail .case-action-btn").first.click()
         page.wait_for_selector("#case-action-modal.active", state="visible", timeout=5000)
 
         page.locator(".case-reason-card[data-reason='sold']").click()
@@ -140,10 +143,9 @@ class TestCaseActionExecution:
         """Gifting a case shows success toast."""
         page = authenticated_page
         _add_case_via_api(page, "Gift Case Wine")
-        _search_for_wine(page, "Gift Case Wine")
+        _open_wine_detail_via_search(page, "Gift Case Wine")
 
-        card = page.locator(".wine-card", has_text="Gift Case Wine").first
-        card.locator(".case-action-btn").click()
+        page.locator("#wine-detail .case-action-btn").first.click()
         page.wait_for_selector("#case-action-modal.active", state="visible", timeout=5000)
 
         page.locator(".case-reason-card[data-reason='gifted']").click()

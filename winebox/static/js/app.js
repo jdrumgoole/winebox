@@ -1991,7 +1991,7 @@ async function loadImportTab() {
 
     // Find the most recent completed import batch
     try {
-        const resp = await fetchWithAuth(`${API_BASE}/import/batches?limit=1`);
+        const resp = await fetchWithAuth(`${API_BASE}/import/batches?limit=5`);
         if (!resp.ok) return;
         const batches = await resp.json();
 
@@ -2644,6 +2644,7 @@ async function showWineDetail(wineId) {
                         <span class="case-count">${caseData.bottles.length}/${caseSize} remaining</span>
                         ${provenance ? `<span class="case-provenance">from ${escapeHtml(provenance)}</span>` : ''}
                         ${purchasePrice ? `<span class="case-price">${purchasePrice}</span>` : ''}
+                        ${caseData.bottles.length > 0 ? `<button class="btn btn-small btn-outline case-action-btn" data-case-id="${caseId}" data-remaining="${caseData.bottles.length}">Sell / Gift</button>` : ''}
                     </div>
                 `);
             }
@@ -2823,6 +2824,14 @@ async function showWineDetail(wineId) {
                 content.style.display = 'none';
                 icon.textContent = '+';
             }
+        });
+
+        // Wire up case action buttons in the detail modal
+        detailEl.querySelectorAll('.case-action-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openCaseActionModal(btn.dataset.caseId, btn.dataset.remaining);
+            });
         });
     } catch (error) {
         showToast('Failed to load wine details', 'error');

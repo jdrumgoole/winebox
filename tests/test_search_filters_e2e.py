@@ -107,8 +107,7 @@ class TestCaseAwareSearchFilters:
         page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
 
         page.select_option("#search-storage", "case")
-        page.locator("#search-form button[type='submit']").scroll_into_view_if_needed()
-        page.click("#search-form button[type='submit']")
+        page.evaluate("document.querySelector('#search-form').requestSubmit()")
         page.wait_for_timeout(2000)
 
         # Should show results (at least our cased wine)
