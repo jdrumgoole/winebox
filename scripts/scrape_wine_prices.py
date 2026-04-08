@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Scrape wine prices from retail websites using Playwright.
+"""Discover wine prices from retail websites using Playwright.
 
-Searches target retailers for wines in the database and stores
-prices in the wine_prices collection with source="web_scraper".
+Browses retailer sites to discover wines and their prices, storing
+them in the wine_prices collection with source="web_scraper".
 
 Usage:
     uv run python scripts/scrape_wine_prices.py [OPTIONS]
 
 Examples:
-    uv run python scripts/scrape_wine_prices.py --dry-run --max-wines 3 --verbose
-    uv run python scripts/scrape_wine_prices.py --retailer vivino --max-wines 10
-    uv run python scripts/scrape_wine_prices.py --retailer all --database winebox-oat
+    uv run python scripts/scrape_wine_prices.py --dry-run --collect 5 --verbose
+    uv run python scripts/scrape_wine_prices.py --retailer majestic --collect 20
+    uv run python scripts/scrape_wine_prices.py --retailer vivino --collect 50
 """
 
 import argparse
@@ -22,7 +22,7 @@ import sys
 import time
 import urllib.parse
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -31,12 +31,74 @@ from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
 
-# How recently a web_scraper price must exist to skip re-scraping
-SKIP_IF_SCRAPED_WITHIN_DAYS = 7
+
+class RateLimiter:
+    """Adaptive rate limiter with exponential backoff on errors."""
+
+    def __init__(self, base_delay: float) -> None:
+        self.base_delay = base_delay
+        self.current_delay = base_delay
+        self.consecutive_errors = 0
+        self.total_requests = 0
+
+    def wait(self) -> None:
+        """Wait before the next request."""
+        time.sleep(self.current_delay)
+        self.total_requests += 1
+
+    def record_success(self) -> None:
+        """Reset backoff on a successful request."""
+        self.consecutive_errors = 0
+        self.current_delay = self.base_delay
+
+    def record_error(self) -> None:
+        """Increase delay on consecutive errors."""
+        self.consecutive_errors += 1
+        if self.consecutive_errors >= MAX_ERRORS_BEFORE_BACKOFF:
+            self.current_delay = min(
+                self.current_delay * BACKOFF_MULTIPLIER,
+                MAX_DELAY,
+            )
+            logger.warning(
+                "  %d consecutive errors — backing off to %.1fs delay",
+                self.consecutive_errors, self.current_delay,
+            )
+
+
+def check_robots_txt(page: Page, base_url: str) -> bool:
+    """Check if robots.txt allows scraping. Returns True if allowed or unclear."""
+    robots_url = f"{base_url}/robots.txt"
+    try:
+        page.goto(robots_url, wait_until="domcontentloaded", timeout=10000)
+        text = page.inner_text("body").lower()
+        # Check for blanket disallow for all user agents
+        if "user-agent: *" in text and "disallow: /" in text:
+            # Check if it's a blanket block (Disallow: /) vs specific paths
+            lines = text.split("\n")
+            in_star_block = False
+            for line in lines:
+                line = line.strip()
+                if line == "user-agent: *":
+                    in_star_block = True
+                elif line.startswith("user-agent:"):
+                    in_star_block = False
+                elif in_star_block and line == "disallow: /":
+                    return False
+        return True
+    except Exception:
+        # If we can't read robots.txt, proceed cautiously
+        return True
 
 # Price sanity bounds
 MIN_PRICE = 2.0
 MAX_PRICE = 50_000.0
+
+# Responsible scraping settings
+DEFAULT_DELAY = 3.0          # seconds between page loads
+MAX_PAGES_PER_CATEGORY = 20  # don't crawl deeper than this per category
+MAX_ERRORS_BEFORE_BACKOFF = 3  # consecutive errors before increasing delay
+BACKOFF_MULTIPLIER = 2.0     # multiply delay on consecutive errors
+MAX_DELAY = 30.0             # cap on backoff delay
 
 
 # ---------------------------------------------------------------------------
@@ -44,24 +106,17 @@ MAX_PRICE = 50_000.0
 # ---------------------------------------------------------------------------
 
 @dataclass
-class ScrapedPrice:
-    """A price extracted from a retailer website."""
-
-    price: float
-    currency: str
-    retailer_name: str
-    retailer_country: str
-    product_name: str
-    product_url: str
-
-
-@dataclass
-class WineQuery:
-    """A wine to search for."""
+class DiscoveredWine:
+    """A wine discovered on a retailer website."""
 
     name: str
     vintage: Optional[int]
     wine_type: Optional[str]
+    price: float
+    currency: str
+    retailer_name: str
+    retailer_country: str
+    product_url: str
 
 
 # ---------------------------------------------------------------------------
@@ -93,55 +148,8 @@ def get_mongodb_url() -> str:
     return "mongodb://localhost:27017"
 
 
-def get_wines_to_scrape(
-    db,
-    max_wines: int | None = None,
-) -> list[WineQuery]:
-    """Fetch unique wines from the wines collection."""
-    pipeline = [
-        {"$match": {"name": {"$ne": None}}},
-        {"$group": {
-            "_id": {"name": "$name", "vintage": "$vintage", "wine_type_id": "$wine_type_id"},
-        }},
-    ]
-    if max_wines:
-        pipeline.append({"$limit": max_wines})
-
-    results = list(db["wines"].aggregate(pipeline))
-    wines = []
-    for r in results:
-        key = r["_id"]
-        wines.append(WineQuery(
-            name=key["name"],
-            vintage=key.get("vintage"),
-            wine_type=key.get("wine_type_id"),
-        ))
-    return wines
-
-
-def was_recently_scraped(db, wine: WineQuery) -> bool:
-    """Check if this wine has a web_scraper price within the last N days."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=SKIP_IF_SCRAPED_WITHIN_DAYS)
-    doc = db["wine_prices"].find_one({
-        "wine_name": wine.name,
-        "vintage": wine.vintage,
-        "wine_type": wine.wine_type,
-        "prices": {
-            "$elemMatch": {
-                "source": "web_scraper",
-                "timestamp": {"$gte": cutoff},
-            }
-        }
-    })
-    return doc is not None
-
-
-def store_price(db, wine: WineQuery, scraped: ScrapedPrice) -> None:
-    """Store a scraped price directly via pymongo (sync).
-
-    Uses the same logic as add_price_entry but with sync pymongo
-    to avoid asyncio.run() issues in the script context.
-    """
+def store_wine_price(db, wine: DiscoveredWine) -> bool:
+    """Store a discovered wine price. Returns True if new wine, False if appended."""
     now = datetime.now(timezone.utc)
     col = db["wine_prices"]
     history_col = db["wine_prices_history"]
@@ -149,17 +157,17 @@ def store_price(db, wine: WineQuery, scraped: ScrapedPrice) -> None:
     entry_doc = {
         "timestamp": now,
         "source": "web_scraper",
-        "price": scraped.price,
-        "currency": scraped.currency,
+        "price": wine.price,
+        "currency": wine.currency,
         "owner_id": None,
         "location": {
-            "shop_name": scraped.retailer_name,
+            "shop_name": wine.retailer_name,
             "town_city": None,
             "state_county": None,
-            "country": scraped.retailer_country,
+            "country": wine.retailer_country,
         },
         "coordinates": None,
-        "notes": f"Scraped from {scraped.product_url}",
+        "notes": f"Discovered on {wine.retailer_name}",
         "photo_path": None,
         "capture_type": None,
     }
@@ -179,313 +187,399 @@ def store_price(db, wine: WineQuery, scraped: ScrapedPrice) -> None:
             "created_at": now,
             "updated_at": now,
         })
-        return
+        return True
 
+    # Append to existing
     prices = doc.get("prices", [])
     prices.append(entry_doc)
 
-    # Overflow: archive oldest beyond 20
     if len(prices) > 20:
         overflow_count = len(prices) - 20
         overflow = prices[:overflow_count]
         prices = prices[overflow_count:]
-
-        history_docs = [
-            {
-                **wine_filter,
-                **entry,
-                "archived_at": now,
-            }
-            for entry in overflow
-        ]
+        history_docs = [{**wine_filter, **entry, "archived_at": now} for entry in overflow]
         history_col.insert_many(history_docs)
 
     col.update_one(
         {"_id": doc["_id"]},
         {"$set": {"prices": prices, "updated_at": now}},
     )
+    return False
 
 
 # ---------------------------------------------------------------------------
-# Price parsing
+# Price / vintage parsing
 # ---------------------------------------------------------------------------
 
-# Regex patterns for price extraction
-PRICE_PATTERNS = [
-    # $29.99 or $ 29.99
-    re.compile(r"\$\s?(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)"),
-    # €29,99 or €29.99 or € 29,99
-    re.compile(r"€\s?(\d{1,5}(?:[.,]\d{2,3})*)"),
-    # £29.99 or £ 29.99
-    re.compile(r"£\s?(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)"),
-]
-
-CURRENCY_BY_SYMBOL = {"$": "USD", "€": "EUR", "£": "GBP"}
-
-
-def extract_price_from_text(text: str) -> Optional[tuple[float, str]]:
-    """Extract the first valid price and currency from text.
-
-    Returns:
-        Tuple of (price, currency) or None if no valid price found.
-    """
-    for symbol, currency in CURRENCY_BY_SYMBOL.items():
-        for pattern in PRICE_PATTERNS:
-            if symbol not in str(pattern.pattern):
-                continue
-            match = pattern.search(text)
-            if match:
-                raw = match.group(1)
-                # Normalise: remove thousands separators, fix decimal
-                if currency == "EUR" and "," in raw and "." not in raw:
-                    # €29,99 → 29.99
-                    raw = raw.replace(",", ".")
-                else:
-                    raw = raw.replace(",", "")
-                try:
-                    price = float(raw)
-                    if MIN_PRICE <= price <= MAX_PRICE:
-                        return (price, currency)
-                except ValueError:
-                    continue
+def extract_gbp_price(text: str) -> Optional[float]:
+    """Extract a GBP price from text, preferring 'per bottle' over 'Mix Six'."""
+    per_bottle = re.search(r"£(\d{1,5}(?:\.\d{2})?)\s*per bottle", text)
+    if per_bottle:
+        return float(per_bottle.group(1))
+    mix_six = re.search(r"£(\d{1,5}(?:\.\d{2})?)\s*Mix Six", text)
+    if mix_six:
+        return float(mix_six.group(1))
+    any_price = re.search(r"£(\d{1,5}(?:\.\d{2})?)", text)
+    if any_price:
+        return float(any_price.group(1))
     return None
 
 
-def build_search_query(wine: WineQuery) -> str:
-    """Build a search query string from wine details."""
-    parts = [wine.name]
-    if wine.vintage:
-        parts.append(str(wine.vintage))
-    return " ".join(parts)
+def extract_eur_price(text: str) -> Optional[float]:
+    """Extract a EUR price from text."""
+    match = re.search(r"€\s?(\d{1,5}(?:[.,]\d{2})?)", text)
+    if not match:
+        return None
+    raw = match.group(1).replace(",", ".")
+    return float(raw)
 
 
-# ---------------------------------------------------------------------------
-# Retailer scrapers
-# ---------------------------------------------------------------------------
+def extract_usd_price(text: str) -> Optional[float]:
+    """Extract a USD price from text."""
+    match = re.search(r"\$\s?(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)", text)
+    if not match:
+        return None
+    return float(match.group(1).replace(",", ""))
 
-def scrape_vivino(page: Page, wine: WineQuery, delay: float) -> Optional[ScrapedPrice]:
-    """Scrape a price from vivino.com.
 
-    Vivino doesn't show prices on the search results page. We search,
-    click through to the first matching wine's detail page, then extract
-    the price from there.
+def parse_vintage_from_name(name: str) -> tuple[str, Optional[int]]:
+    """Extract vintage year from a wine name if present.
+
+    Returns (clean_name, vintage) tuple.
     """
-    query = build_search_query(wine)
-    url = f"https://www.vivino.com/search/wines?q={urllib.parse.quote(query)}"
-
-    try:
-        page.goto(url, wait_until="domcontentloaded", timeout=15000)
-        time.sleep(delay)
-
-        # Find the first wine link in search results
-        link = page.query_selector('a[href*="/w/"]')
-        if not link:
-            return None
-
-        href = link.get_attribute("href") or ""
-        product_url = f"https://www.vivino.com{href}" if not href.startswith("http") else href
-
-        # Get wine name from the link text for match validation
-        product_name = link.inner_text().strip()[:200]
-
-        # Navigate to the product page
-        page.goto(product_url, wait_until="domcontentloaded", timeout=15000)
-        time.sleep(delay)
-
-        # Extract price from the product page body text
-        body_text = page.inner_text("body")
-
-        # Vivino shows prices like "Available prices ... starting at around €225"
-        # or direct prices like "€29.99" / "$45.00"
-        result = extract_price_from_text(body_text)
-        if not result:
-            return None
-
-        price, currency = result
-
-        return ScrapedPrice(
-            price=price,
-            currency=currency,
-            retailer_name="Vivino",
-            retailer_country="Global",
-            product_name=product_name,
-            product_url=product_url,
-        )
-    except Exception as e:
-        logger.debug("Vivino scrape failed for %s: %s", query, e)
-        return None
+    # Match 4-digit year (1900-2099) at end or in the middle
+    match = re.search(r"\b((?:19|20)\d{2})(?:/\d{2,4})?\b", name)
+    if match:
+        vintage = int(match.group(1))
+        clean = name[:match.start()].strip().rstrip(",").strip()
+        if not clean:
+            clean = name
+        return clean, vintage
+    return name, None
 
 
-def scrape_wine_com(page: Page, wine: WineQuery, delay: float) -> Optional[ScrapedPrice]:
-    """Scrape a price from wine.com."""
-    query = build_search_query(wine)
-    url = f"https://www.wine.com/search?searchText={urllib.parse.quote(query)}"
+def classify_wine_type(text: str) -> Optional[str]:
+    """Guess the wine type from surrounding text."""
+    lower = text.lower()
+    if "red wine" in lower or "red" in lower:
+        return "Red"
+    if "white wine" in lower or "white" in lower:
+        return "White"
+    if "rosé" in lower or "rose wine" in lower:
+        return "Rosé"
+    if "sparkling" in lower or "champagne" in lower or "prosecco" in lower or "cava" in lower:
+        return "Sparkling"
+    return None
 
-    try:
-        page.goto(url, wait_until="domcontentloaded", timeout=15000)
-        time.sleep(delay)
 
-        # Wait for product listings
-        page.wait_for_selector('[class*="prodItem"], [class*="product-card"], .searchResults', timeout=8000)
+# ---------------------------------------------------------------------------
+# Majestic scraper (browse via search)
+# ---------------------------------------------------------------------------
 
-        # Get page text and look for prices
-        cards = page.query_selector_all('[class*="prodItem"], [class*="product-card"]')
-        if not cards:
-            # Fallback: get all text from results area
-            results_area = page.query_selector('.searchResults, [class*="search-results"], main')
-            if not results_area:
-                return None
-            text = results_area.inner_text()
-            result = extract_price_from_text(text)
-            if not result:
-                return None
-            price, currency = result
-            return ScrapedPrice(
-                price=price, currency=currency,
-                retailer_name="Wine.com", retailer_country="US",
-                product_name=query, product_url=url,
+MAJESTIC_CATEGORIES = [
+    ("red wine", "Red"),
+    ("bordeaux", "Red"),
+    ("rioja", "Red"),
+    ("pinot noir", "Red"),
+    ("malbec", "Red"),
+    ("white wine", "White"),
+    ("chablis", "White"),
+    ("sauvignon blanc", "White"),
+    ("chardonnay", "White"),
+    ("rosé wine", "Rosé"),
+    ("champagne", "Sparkling"),
+    ("prosecco", "Sparkling"),
+    ("sparkling wine", "Sparkling"),
+]
+
+MAJESTIC_PAGE_SIZE = 18  # Majestic's default; larger values break pagination
+
+
+def browse_majestic(
+    page: Page,
+    delay: float,
+    collect_target: Optional[int],
+    dry_run: bool,
+    verbose: bool,
+    db,
+    stats: dict,
+    shutdown_flag: list,
+) -> None:
+    """Browse majestic.co.uk categories and extract wine prices."""
+    limiter = RateLimiter(delay)
+
+    for search_term, wine_type in MAJESTIC_CATEGORIES:
+        if shutdown_flag[0]:
+            break
+        if collect_target and stats["wines_collected"] >= collect_target:
+            break
+
+        # Load first page of this category
+        url = f"https://www.majestic.co.uk/search?q={urllib.parse.quote(search_term)}"
+        print(f"\n  [{wine_type}] {url}")
+
+        limiter.wait()
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            limiter.record_success()
+            # Dismiss cookie consent overlay if present (blocks all clicks)
+            accept_btn = page.query_selector("#onetrust-accept-btn-handler, button:has-text('Accept')")
+            if accept_btn:
+                try:
+                    accept_btn.click(timeout=3000)
+                    page.wait_for_timeout(500)
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.error("  Failed to load: %s", e)
+            limiter.record_error()
+            stats["errors"] += 1
+            continue
+
+        for page_num in range(1, MAX_PAGES_PER_CATEGORY + 1):
+            if shutdown_flag[0]:
+                break
+            if collect_target and stats["wines_collected"] >= collect_target:
+                break
+
+            if page_num > 1:
+                print(f"  [{wine_type}] Page {page_num}")
+
+            text = page.inner_text("body")
+
+            total_match = re.search(r"(\d+)\s*Products? found", text)
+            if not total_match:
+                break
+
+            # Parse product blocks
+            blocks = re.split(r"\nAdd\s*\n", text)
+            wines_on_page = 0
+
+            for block in blocks[1:]:
+                if shutdown_flag[0]:
+                    break
+                if collect_target and stats["wines_collected"] >= collect_target:
+                    break
+
+                lines = [l.strip() for l in block.split("\n") if l.strip()]
+                if not lines:
+                    continue
+
+                raw_name = lines[0]
+                price = extract_gbp_price(block)
+                if price is None or price < MIN_PRICE or price > MAX_PRICE:
+                    continue
+
+                clean_name, vintage = parse_vintage_from_name(raw_name)
+                wines_on_page += 1
+                stats["wines_processed"] += 1
+
+                wine = DiscoveredWine(
+                    name=clean_name,
+                    vintage=vintage,
+                    wine_type=wine_type,
+                    price=price,
+                    currency="GBP",
+                    retailer_name="Majestic",
+                    retailer_country="UK",
+                    product_url=page.url,
+                )
+
+                if verbose:
+                    v = f" {vintage}" if vintage else ""
+                    print(f"    {clean_name}{v}: £{price:.2f}")
+
+                if not dry_run:
+                    try:
+                        is_new = store_wine_price(db, wine)
+                        stats["prices_stored"] += 1
+                        if is_new:
+                            stats["wines_collected"] += 1
+                            if not verbose:
+                                v = f" {vintage}" if vintage else ""
+                                print(f"    NEW: {clean_name}{v}: £{price:.2f}")
+                    except Exception as e:
+                        logger.error("    Failed to store: %s", e)
+                        stats["errors"] += 1
+                else:
+                    stats["wines_collected"] += 1
+
+            if wines_on_page == 0:
+                break
+
+            # Click the next page button in Majestic's JS pagination
+            next_btn = page.query_selector("li.next-page:not(.disabled)")
+            if not next_btn:
+                break
+
+            limiter.wait()
+            try:
+                next_btn.click()
+                page.wait_for_timeout(2000)
+                limiter.record_success()
+            except Exception:
+                break
+
+
+# ---------------------------------------------------------------------------
+# Vivino scraper (browse via search)
+# ---------------------------------------------------------------------------
+
+VIVINO_CATEGORIES = [
+    ("red wine", "Red"),
+    ("white wine", "White"),
+    ("rosé wine", "Rosé"),
+    ("sparkling wine", "Sparkling"),
+    ("champagne", "Sparkling"),
+]
+
+
+def browse_vivino(
+    page: Page,
+    delay: float,
+    collect_target: Optional[int],
+    dry_run: bool,
+    verbose: bool,
+    db,
+    stats: dict,
+    shutdown_flag: list,
+) -> None:
+    """Browse vivino.com by following wine links from search results."""
+    limiter = RateLimiter(delay)
+
+    for search_term, wine_type in VIVINO_CATEGORIES:
+        if shutdown_flag[0]:
+            break
+        if collect_target and stats["wines_collected"] >= collect_target:
+            break
+
+        page_num = 1
+        while True:
+            if shutdown_flag[0]:
+                break
+            if collect_target and stats["wines_collected"] >= collect_target:
+                break
+
+            if page_num > MAX_PAGES_PER_CATEGORY:
+                if verbose:
+                    print(f"    Reached page limit ({MAX_PAGES_PER_CATEGORY}) — next category")
+                break
+
+            url = (
+                f"https://www.vivino.com/search/wines?q={urllib.parse.quote(search_term)}"
+                f"&start={((page_num - 1) * 25) + 1}"
             )
+            print(f"\n  [{wine_type}] Page {page_num}: {url}")
 
-        card = cards[0]
-        card_text = card.inner_text()
-        result = extract_price_from_text(card_text)
-        if not result:
-            return None
+            limiter.wait()
 
-        price, currency = result
-        name_el = card.query_selector('[class*="prodName"], [class*="product-name"], a')
-        product_name = name_el.inner_text() if name_el else card_text[:100]
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                limiter.record_success()
+            except Exception as e:
+                logger.error("  Failed to load page: %s", e)
+                limiter.record_error()
+                stats["errors"] += 1
+                break
 
-        link_el = card.query_selector("a[href]")
-        product_url = link_el.get_attribute("href") if link_el else url
-        if product_url and not product_url.startswith("http"):
-            product_url = f"https://www.wine.com{product_url}"
+            # Find all wine links
+            links = page.query_selector_all('a[href*="/w/"]')
+            if not links:
+                break
 
-        return ScrapedPrice(
-            price=price, currency=currency,
-            retailer_name="Wine.com", retailer_country="US",
-            product_name=product_name.strip(), product_url=product_url or url,
-        )
-    except Exception as e:
-        logger.debug("Wine.com scrape failed for %s: %s", query, e)
-        return None
+            # Collect hrefs first to avoid stale element issues
+            hrefs = []
+            for link in links:
+                try:
+                    href = link.get_attribute("href")
+                    name_text = link.inner_text().strip()
+                    if href and name_text:
+                        full_url = f"https://www.vivino.com{href}" if not href.startswith("http") else href
+                        hrefs.append((full_url, name_text))
+                except Exception:
+                    continue
 
+            if not hrefs:
+                break
 
-def scrape_totalwine(page: Page, wine: WineQuery, delay: float) -> Optional[ScrapedPrice]:
-    """Scrape a price from totalwine.com."""
-    query = build_search_query(wine)
-    url = f"https://www.totalwine.com/search/all?text={urllib.parse.quote(query)}"
+            wines_on_page = 0
+            for wine_url, raw_name in hrefs:
+                if shutdown_flag[0]:
+                    break
+                if collect_target and stats["wines_collected"] >= collect_target:
+                    break
 
-    try:
-        page.goto(url, wait_until="domcontentloaded", timeout=15000)
-        time.sleep(delay)
+                # Visit wine detail page to get price
+                limiter.wait()
+                try:
+                    page.goto(wine_url, wait_until="domcontentloaded", timeout=15000)
+                    limiter.record_success()
+                except Exception:
+                    limiter.record_error()
+                    continue
 
-        page.wait_for_selector('[class*="product"], [data-testid*="product"]', timeout=8000)
+                body_text = page.inner_text("body")
+                price = extract_eur_price(body_text)
+                if price is None:
+                    price = extract_usd_price(body_text)
+                    currency = "USD" if price else "EUR"
+                else:
+                    currency = "EUR"
 
-        cards = page.query_selector_all('[class*="productCard"], [class*="product-card"], [data-testid*="product"]')
-        if not cards:
-            body_text = page.inner_text("body")
-            result = extract_price_from_text(body_text[:2000])
-            if not result:
-                return None
-            price, currency = result
-            return ScrapedPrice(
-                price=price, currency=currency,
-                retailer_name="Total Wine", retailer_country="US",
-                product_name=query, product_url=url,
-            )
+                if price is None or price < MIN_PRICE or price > MAX_PRICE:
+                    if verbose:
+                        print(f"    {raw_name[:60]}: no price")
+                    continue
 
-        card = cards[0]
-        card_text = card.inner_text()
-        result = extract_price_from_text(card_text)
-        if not result:
-            return None
+                clean_name, vintage = parse_vintage_from_name(raw_name)
+                wines_on_page += 1
+                stats["wines_processed"] += 1
 
-        price, currency = result
-        name_el = card.query_selector('[class*="title"], [class*="name"], a')
-        product_name = name_el.inner_text() if name_el else card_text[:100]
+                wine = DiscoveredWine(
+                    name=clean_name,
+                    vintage=vintage,
+                    wine_type=wine_type,
+                    price=price,
+                    currency=currency,
+                    retailer_name="Vivino",
+                    retailer_country="Global",
+                    product_url=wine_url,
+                )
 
-        link_el = card.query_selector("a[href]")
-        product_url = link_el.get_attribute("href") if link_el else url
-        if product_url and not product_url.startswith("http"):
-            product_url = f"https://www.totalwine.com{product_url}"
+                if verbose:
+                    v = f" {vintage}" if vintage else ""
+                    print(f"    {clean_name}{v}: {currency} {price:.2f}")
 
-        return ScrapedPrice(
-            price=price, currency=currency,
-            retailer_name="Total Wine", retailer_country="US",
-            product_name=product_name.strip(), product_url=product_url or url,
-        )
-    except Exception as e:
-        logger.debug("Total Wine scrape failed for %s: %s", query, e)
-        return None
+                if not dry_run:
+                    try:
+                        is_new = store_wine_price(db, wine)
+                        stats["prices_stored"] += 1
+                        if is_new:
+                            stats["wines_collected"] += 1
+                            if not verbose:
+                                v = f" {vintage}" if vintage else ""
+                                print(f"    NEW: {clean_name}{v}: {currency} {price:.2f}")
+                    except Exception as e:
+                        logger.error("    Failed to store: %s", e)
+                        stats["errors"] += 1
+                else:
+                    stats["wines_collected"] += 1
 
+            if wines_on_page == 0:
+                break
 
-def scrape_majestic(page: Page, wine: WineQuery, delay: float) -> Optional[ScrapedPrice]:
-    """Scrape a price from majestic.co.uk."""
-    query = build_search_query(wine)
-    url = f"https://www.majestic.co.uk/search?q={urllib.parse.quote(query)}"
-
-    try:
-        page.goto(url, wait_until="domcontentloaded", timeout=15000)
-        time.sleep(delay)
-
-        page.wait_for_selector('[class*="product"], [class*="search-result"]', timeout=8000)
-
-        cards = page.query_selector_all('[class*="product-card"], [class*="product-item"], [class*="search-result"]')
-        if not cards:
-            body_text = page.inner_text("body")
-            result = extract_price_from_text(body_text[:2000])
-            if not result:
-                return None
-            price, currency = result
-            return ScrapedPrice(
-                price=price, currency=currency,
-                retailer_name="Majestic", retailer_country="UK",
-                product_name=query, product_url=url,
-            )
-
-        card = cards[0]
-        card_text = card.inner_text()
-        result = extract_price_from_text(card_text)
-        if not result:
-            return None
-
-        price, currency = result
-        name_el = card.query_selector('[class*="title"], [class*="name"], a')
-        product_name = name_el.inner_text() if name_el else card_text[:100]
-
-        link_el = card.query_selector("a[href]")
-        product_url = link_el.get_attribute("href") if link_el else url
-        if product_url and not product_url.startswith("http"):
-            product_url = f"https://www.majestic.co.uk{product_url}"
-
-        return ScrapedPrice(
-            price=price, currency=currency,
-            retailer_name="Majestic", retailer_country="UK",
-            product_name=product_name.strip(), product_url=product_url or url,
-        )
-    except Exception as e:
-        logger.debug("Majestic scrape failed for %s: %s", query, e)
-        return None
+            page_num += 1
 
 
 # Registry of available scrapers
 SCRAPERS: dict[str, dict] = {
-    "vivino": {
-        "fn": scrape_vivino,
-        "name": "Vivino",
-    },
-    "wine.com": {
-        "fn": scrape_wine_com,
-        "name": "Wine.com",
-    },
-    "totalwine": {
-        "fn": scrape_totalwine,
-        "name": "Total Wine",
-    },
     "majestic": {
-        "fn": scrape_majestic,
-        "name": "Majestic",
+        "fn": browse_majestic,
+        "name": "Majestic (majestic.co.uk)",
+    },
+    "vivino": {
+        "fn": browse_vivino,
+        "name": "Vivino (vivino.com)",
     },
 }
 
@@ -496,7 +590,7 @@ SCRAPERS: dict[str, dict] = {
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Scrape wine prices from retail websites.",
+        description="Discover wine prices from retail websites.",
     )
     parser.add_argument(
         "--database",
@@ -504,10 +598,10 @@ def main() -> int:
         help="MongoDB database name (default: winebox-oat)",
     )
     parser.add_argument(
-        "--max-wines",
+        "--collect",
         type=int,
         default=None,
-        help="Maximum number of wines to process",
+        help="Stop after discovering N unique wines (default: unlimited)",
     )
     parser.add_argument(
         "--retailer",
@@ -518,15 +612,10 @@ def main() -> int:
     parser.add_argument(
         "--delay",
         type=float,
-        default=2.0,
-        help="Seconds to wait between page loads (default: 2.0)",
+        default=DEFAULT_DELAY,
+        help=f"Seconds to wait between page loads (default: {DEFAULT_DELAY})",
     )
-    parser.add_argument(
-        "--collect",
-        type=int,
-        default=None,
-        help="Stop after collecting prices for N unique wines",
-    )
+    parser.add_argument("--honor-robots", action="store_true", help="Check and respect robots.txt")
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing to DB")
     parser.add_argument("--verbose", action="store_true", help="Show detailed output")
 
@@ -534,7 +623,6 @@ def main() -> int:
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format="%(levelname)s: %(message)s")
-    # Suppress noisy pymongo debug logs
     logging.getLogger("pymongo").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -554,11 +642,6 @@ def main() -> int:
     client = MongoClient(mongodb_url)
     db = client[args.database]
 
-
-    # Fetch wines
-    wines = get_wines_to_scrape(db, max_wines=args.max_wines)
-    print(f"Found {len(wines)} wines to look up")
-
     # Select scrapers
     if args.retailer == "all":
         active_scrapers = list(SCRAPERS.values())
@@ -568,21 +651,17 @@ def main() -> int:
     scraper_names = ", ".join(s["name"] for s in active_scrapers)
     print(f"Retailers: {scraper_names}")
     print(f"Delay: {args.delay}s between requests")
+    if args.collect:
+        print(f"Collect target: {args.collect} unique wines")
     if args.dry_run:
         print("DRY RUN — no prices will be stored")
     print("=" * 60)
 
-    if args.collect:
-        print(f"Will stop after collecting prices for {args.collect} unique wines")
-
-    # Stats
     stats = {
         "wines_processed": 0,
-        "wines_skipped": 0,
-        "prices_found": 0,
+        "wines_collected": 0,
         "prices_stored": 0,
         "errors": 0,
-        "wines_collected": 0,
     }
 
     start_time = time.time()
@@ -598,79 +677,53 @@ def main() -> int:
         )
         page = context.new_page()
 
-        for i, wine in enumerate(wines):
+        # Map retailer keys to base URLs for robots.txt check
+        robots_urls = {
+            "majestic": "https://www.majestic.co.uk",
+            "vivino": "https://www.vivino.com",
+        }
+
+        for scraper_info in active_scrapers:
             if shutdown_flag[0]:
-                print("\nInterrupted — stopping.")
                 break
-
-            # Check if we've collected enough unique wines
             if args.collect and stats["wines_collected"] >= args.collect:
-                print(f"\nReached collection target of {args.collect} wines — stopping.")
                 break
 
-            label = f"{wine.name}"
-            if wine.vintage:
-                label += f" {wine.vintage}"
-            print(f"\n[{i + 1}/{len(wines)}] {label}")
-
-            # Skip if recently scraped
-            if not args.dry_run and was_recently_scraped(db, wine):
-                print(f"  Skipped — scraped within last {SKIP_IF_SCRAPED_WITHIN_DAYS} days")
-                stats["wines_skipped"] += 1
-                continue
-
-            stats["wines_processed"] += 1
-            found_price_for_this_wine = False
-
-            for scraper_info in active_scrapers:
-                if shutdown_flag[0]:
-                    break
-
-                scraper_fn = scraper_info["fn"]
-                retailer_name = scraper_info["name"]
-
-                try:
-                    result = scraper_fn(page, wine, args.delay)
-                except Exception as e:
-                    logger.error("  %s: error — %s", retailer_name, e)
-                    stats["errors"] += 1
-                    continue
-
-                if result is None:
-                    if args.verbose:
-                        print(f"  {retailer_name}: no price found")
-                    continue
-
-                stats["prices_found"] += 1
-                found_price_for_this_wine = True
-                print(
-                    f"  {retailer_name}: {result.currency} {result.price:.2f}"
-                    f" — {result.product_name[:60]}"
+            # Check robots.txt if --honor-robots is set
+            if args.honor_robots:
+                retailer_key = next(
+                    (k for k, v in SCRAPERS.items() if v is scraper_info), None
                 )
+                base_url = robots_urls.get(retailer_key, "")
+                if base_url and not check_robots_txt(page, base_url):
+                    print(f"\n  {scraper_info['name']}: robots.txt disallows scraping — skipping.")
+                    continue
 
-                if not args.dry_run:
-                    try:
-                        store_price(db, wine, result)
-                        stats["prices_stored"] += 1
-                    except Exception as e:
-                        logger.error("  Failed to store: %s", e)
-                        stats["errors"] += 1
-
-            if found_price_for_this_wine:
-                stats["wines_collected"] += 1
+            print(f"\nBrowsing {scraper_info['name']}...")
+            scraper_fn = scraper_info["fn"]
+            scraper_fn(
+                page=page,
+                delay=args.delay,
+                collect_target=args.collect,
+                dry_run=args.dry_run,
+                verbose=args.verbose,
+                db=db,
+                stats=stats,
+                shutdown_flag=shutdown_flag,
+            )
 
         browser.close()
 
-    # Report
     elapsed = time.time() - start_time
     print("\n" + "=" * 60)
     print(f"Scraping complete in {elapsed:.1f}s")
-    print(f"  Wines processed: {stats['wines_processed']}")
-    print(f"  Wines collected: {stats['wines_collected']}")
-    print(f"  Wines skipped:   {stats['wines_skipped']}")
-    print(f"  Prices found:    {stats['prices_found']}")
-    print(f"  Prices stored:   {stats['prices_stored']}")
-    print(f"  Errors:          {stats['errors']}")
+    print(f"  Wines discovered:  {stats['wines_processed']}")
+    print(f"  New wines:         {stats['wines_collected']}")
+    print(f"  Prices stored:     {stats['prices_stored']}")
+    print(f"  Errors:            {stats['errors']}")
+    if elapsed > 0 and stats['wines_processed'] > 0:
+        rate = elapsed / stats['wines_processed']
+        print(f"  Avg time per wine: {rate:.1f}s")
 
     client.close()
     return 0 if not stats["errors"] else 1
