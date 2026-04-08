@@ -1478,12 +1478,11 @@ def test_e2e_oat(
         test_files = f"tests/{pattern}"
     else:
         test_files = (
-            "-m e2e "
             # Fast (UI-only)
-            "tests/test_admin_e2e.py "
             "tests/test_app_navigation_e2e.py "
             "tests/test_cellar_e2e.py "
             "tests/test_cellar_tabs_e2e.py "
+            "tests/test_case_actions_e2e.py "
             "tests/test_checkout_e2e.py "
             "tests/test_export_e2e.py "
             "tests/test_history_e2e.py "
@@ -1492,6 +1491,7 @@ def test_e2e_oat(
             "tests/test_settings_e2e.py "
             "tests/test_registration_e2e.py "
             "tests/test_undo_import_e2e.py "
+            "tests/test_wine_detail_e2e.py "
             # Medium
             "tests/test_checkin_e2e.py "
             "tests/test_demo_e2e.py "
@@ -1507,16 +1507,20 @@ def test_e2e_oat(
     mongodb_url = env_values.get("WINEBOX_MONGODB_URL", "")
     secret_key = env_values.get("WINEBOX_SECRET_KEY", "oat-e2e-test-secret-key-1234567890")
 
+    # Set environment via os.environ to avoid shell quoting issues with pty
+    import os
+    os.environ["WINEBOX_TEST_URL"] = oat_url
+    os.environ["WINEBOX_MONGODB_URL"] = mongodb_url
+    os.environ["WINEBOX_DATABASE"] = OAT_DATABASE
+    os.environ["WINEBOX_SECRET_KEY"] = secret_key
+    os.environ["WINEBOX_USE_CLAUDE_VISION"] = "false"
+    os.environ["WINEBOX_TEST_USER"] = ""
+    os.environ["WINEBOX_TEST_PASSWORD"] = ""
+
+    # Use separate pytest-e2e.ini to avoid pyproject.toml's addopts which has
+    # `-m 'not e2e'` — xdist workers re-read the config and would exclude all E2E tests.
     test_cmd = (
-        f"WINEBOX_TEST_URL={oat_url} "
-        f"WINEBOX_MONGODB_URL='{mongodb_url}' "
-        f"WINEBOX_DATABASE={OAT_DATABASE} "
-        f"WINEBOX_SECRET_KEY={secret_key} "
-        f"WINEBOX_USE_CLAUDE_VISION=false "
-        # Unset shared test user so each worker creates its own user via
-        # winebox-admin against the OAT database (needed for parallel workers)
-        f"WINEBOX_TEST_USER= WINEBOX_TEST_PASSWORD= "
-        f"uv run python -m pytest {test_files} -n {workers} --dist loadfile --override-ini='addopts='"
+        f"uv run python -m pytest -c pytest-e2e.ini {test_files} -n {workers}"
     )
     if verbose:
         test_cmd += " -v"
