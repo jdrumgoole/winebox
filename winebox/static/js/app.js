@@ -53,6 +53,7 @@ let lastScanResult = null;  // Store last scan result to avoid rescanning on che
 let cellarViewMode = 'cards';
 let cellarLastWines = [];
 let cellarGroupedData = null;
+let currentCellarTab = 'dashboard';
 let metViewMode = 'cards';
 let metLastWines = [];
 let selectedMetWineId = null;
@@ -563,8 +564,31 @@ function handleHashParams() {
 
 // Handle hash navigation on page load and hash changes
 function handleHashNavigation() {
-    const hashPage = window.location.hash.slice(1).split('?')[0];
+    const rawHash = window.location.hash.slice(1).split('?')[0];
 
+    // Support cellar sub-tab hashes: #cellar/search, #cellar/import, #cellar/history
+    const cellarSubTabs = ['dashboard', 'search', 'import', 'history'];
+    if (rawHash.startsWith('cellar/') && authToken && currentUser) {
+        const subTab = rawHash.split('/')[1];
+        if (cellarSubTabs.includes(subTab)) {
+            isHandlingPopState = true;
+            currentCellarTab = subTab;
+            navigateTo('cellar');
+            isHandlingPopState = false;
+            return;
+        }
+    }
+
+    // Backward compat: #search and #history redirect to cellar sub-tabs
+    if ((rawHash === 'search' || rawHash === 'history') && authToken && currentUser) {
+        isHandlingPopState = true;
+        currentCellarTab = rawHash;
+        navigateTo('cellar');
+        isHandlingPopState = false;
+        return;
+    }
+
+    const hashPage = rawHash;
     // If it's a valid app page and user is logged in, navigate to it
     if (hashPage && APP_PAGES.includes(hashPage) && authToken && currentUser) {
         isHandlingPopState = true;
@@ -859,6 +883,15 @@ function navigateTo(page) {
     // Redirect old dashboard bookmarks to cellar
     if (page === 'dashboard') page = 'cellar';
 
+    // Redirect search/history to cellar sub-tabs
+    if (page === 'search') {
+        currentCellarTab = 'search';
+        page = 'cellar';
+    } else if (page === 'history') {
+        currentCellarTab = 'history';
+        page = 'cellar';
+    }
+
     // Update nav links — highlight "My Cellar" when on add-to-cellar page
     document.querySelectorAll('.nav-link').forEach(link => {
         const isActive = link.dataset.page === page ||
@@ -879,8 +912,13 @@ function navigateTo(page) {
     currentPage = page;
 
     // Update URL hash to reflect current page
-    if (!isHandlingPopState && window.location.hash !== `#${page}`) {
-        history.pushState(null, '', `#${page}`);
+    if (!isHandlingPopState) {
+        const hash = page === 'cellar' && currentCellarTab !== 'dashboard'
+            ? `#cellar/${currentCellarTab}`
+            : `#${page}`;
+        if (window.location.hash !== hash) {
+            history.pushState(null, '', hash);
+        }
     }
 
     // Track page view
@@ -902,12 +940,6 @@ function navigateTo(page) {
             navigateTo('add-to-cellar');
             setTimeout(() => selectEntryPath('import'), 50);
             return;
-        case 'history':
-            loadHistory();
-            break;
-        case 'search':
-            // Search results loaded on form submit
-            break;
         case 'xwines':
             loadXWinesFilters();
             break;
@@ -970,6 +1002,11 @@ function initForms() {
             }
         });
     }
+
+    // Cellar sub-tab switching
+    document.querySelectorAll('.cellar-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchCellarTab(btn.dataset.cellarTab));
+    });
 
     // Search form
     document.getElementById('search-form').addEventListener('submit', handleSearch);
@@ -1902,13 +1939,140 @@ function renderActivityList(transactions) {
 // Cellar
 async function loadCellar() {
     try {
-        // Update welcome panel — always show but swap button based on demo status
-        updateWelcomePanel();
-
-        // Load analytics (stats, charts, activity, value panel)
-        loadCellarAnalytics();
+        switchCellarTab(currentCellarTab);
     } catch (error) {
         console.error('Failed to load cellar:', error);
+    }
+}
+
+function switchCellarTab(tab) {
+    currentCellarTab = tab;
+
+    // Toggle tab buttons
+    document.querySelectorAll('.cellar-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.cellarTab === tab);
+    });
+
+    // Toggle panels
+    document.querySelectorAll('.cellar-panel').forEach(panel => {
+        const isActive = panel.id === `cellar-panel-${tab}`;
+        panel.classList.toggle('active', isActive);
+        panel.style.display = isActive ? 'block' : 'none';
+    });
+
+    // Update URL hash
+    if (!isHandlingPopState) {
+        const hash = tab !== 'dashboard' ? `#cellar/${tab}` : '#cellar';
+        if (window.location.hash !== hash) {
+            history.replaceState(null, '', hash);
+        }
+    }
+
+    // Load data for the active tab
+    switch (tab) {
+        case 'dashboard':
+            loadCellarAnalytics();
+            break;
+        case 'search':
+            // Search results loaded on form submit
+            break;
+        case 'import':
+            loadImportTab();
+            break;
+        case 'history':
+            loadHistory();
+            break;
+    }
+}
+
+async function loadImportTab() {
+    // Update welcome panel (demo data button state)
+    updateWelcomePanel();
+
+    // Find the most recent completed import batch
+    try {
+        const resp = await fetchWithAuth(`${API_BASE}/import/batches?limit=1`);
+        if (!resp.ok) return;
+        const batches = await resp.json();
+
+        const actionsDiv = document.getElementById('import-tab-actions');
+        const analyticsDiv = document.getElementById('import-batch-analytics');
+
+        // Find the most recent completed (not rolled back) batch
+        const lastBatch = batches.find(b => b.status === 'completed');
+
+        if (lastBatch && lastBatch.wines_created > 0) {
+            // Show undo button with batch info
+            const lastImportInfo = document.getElementById('import-tab-last-import');
+            const importDate = new Date(lastBatch.imported_at).toLocaleDateString();
+            lastImportInfo.textContent = `Last import: ${lastBatch.filename} (${lastBatch.wines_created} wines, ${importDate})`;
+            actionsDiv.style.display = '';
+
+            // Wire up undo button
+            const undoBtn = document.getElementById('import-tab-undo-btn');
+            undoBtn.onclick = () => handleUndoLastImport(lastBatch);
+
+            // Load batch-specific analytics
+            const winesResp = await fetchWithAuth(`${API_BASE}/import/${lastBatch.id}/wines`);
+            if (winesResp.ok) {
+                const batchData = await winesResp.json();
+                renderImportBatchAnalytics(batchData);
+                analyticsDiv.style.display = '';
+            }
+        } else {
+            actionsDiv.style.display = 'none';
+            analyticsDiv.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Failed to load import tab:', error);
+    }
+}
+
+function renderImportBatchAnalytics(batchData) {
+    const summary = batchData.summary;
+
+    // Update import stats
+    document.getElementById('import-stat-wines').textContent = summary.wines_created || 0;
+    document.getElementById('import-stat-bottles').textContent = summary.total_bottles || 0;
+    document.getElementById('import-stat-cases').textContent = summary.total_cases || 0;
+
+    // Update heading
+    const heading = document.getElementById('import-batch-heading');
+    heading.textContent = `Last Import: ${batchData.filename}`;
+
+    // Render charts using existing helpers with import-prefixed canvas IDs
+    _renderDoughnutChart('chart-import-wine-type', summary.by_wine_type, WINE_TYPE_LABELS, WINE_TYPE_COLORS);
+    _renderHorizontalBarChart('chart-import-country', summary.by_country, 10);
+    _renderHorizontalBarChart('chart-import-grape', summary.by_grape_variety, 10);
+    _renderVintageChart('chart-import-vintage', summary.by_vintage);
+}
+
+async function handleUndoLastImport(batch) {
+    const confirmed = confirm(
+        `Remove all ${batch.wines_created} wines from "${batch.filename}"?\n\nThis will permanently delete the wines added by this import.`
+    );
+    if (!confirmed) return;
+
+    try {
+        const resp = await fetchWithAuth(`${API_BASE}/import/batches/${batch.id}/wines`, {
+            method: 'DELETE',
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            showToast(err.detail || 'Failed to undo import', 'error');
+            return;
+        }
+        const result = await resp.json();
+        showToast(`Removed ${result.wines_deleted} wines from import`, 'success');
+
+        // Refresh Import tab
+        loadImportTab();
+
+        // Refresh Dashboard analytics
+        loadCellarAnalytics();
+    } catch (error) {
+        console.error('Failed to undo import:', error);
+        showToast('Failed to undo import', 'error');
     }
 }
 
@@ -3998,9 +4162,14 @@ function initImportPage() {
     document.getElementById('import-use-different-file-btn').addEventListener('click', resetImportPage);
     document.getElementById('import-new-btn').addEventListener('click', resetImportPage);
 
-    // Go to Cellar buttons (CSP-compliant)
+    // Go to Cellar buttons (CSP-compliant) — navigate to Import sub-tab
     document.querySelectorAll('.import-go-to-cellar-btn').forEach(btn => {
-        btn.addEventListener('click', () => navigateTo('cellar'));
+        btn.addEventListener('click', () => {
+            currentCellarTab = 'import';
+            navigateTo('cellar');
+            // Also refresh dashboard analytics in background
+            loadCellarAnalytics();
+        });
     });
 
     // Case size prompt buttons

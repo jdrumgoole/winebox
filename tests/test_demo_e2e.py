@@ -48,6 +48,12 @@ def _navigate_to_cellar(page: Page) -> None:
     page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
 
 
+def _navigate_to_import_tab(page: Page) -> None:
+    _navigate_to_cellar(page)
+    page.click("[data-cellar-tab='import']")
+    page.wait_for_selector("#cellar-panel-import", state="visible", timeout=5000)
+
+
 def _cleanup_demo_data(page: Page) -> None:
     """Remove all wines and demo data via API so tests start with a truly empty cellar."""
     page.evaluate("""
@@ -79,7 +85,7 @@ class TestDemoDataE2E:
         """New user with empty cellar sees the demo welcome prompt."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_cellar(page)
+        _navigate_to_import_tab(page)
 
         try:
             # Wait for the demo welcome to appear
@@ -95,7 +101,7 @@ class TestDemoDataE2E:
         """Welcome screen shows entry-path cards for Scan, Enter Details, Import."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_cellar(page)
+        _navigate_to_import_tab(page)
 
         try:
             page.wait_for_selector("#cellar-welcome-panel", state="visible", timeout=10000)
@@ -113,7 +119,7 @@ class TestDemoDataE2E:
         """Clicking 'Load sample wines' populates the cellar."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_cellar(page)
+        _navigate_to_import_tab(page)
 
         try:
             # Wait for welcome and click install
@@ -131,7 +137,7 @@ class TestDemoDataE2E:
         """After loading demo data, welcome panel shows 'Remove sample wines'."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_cellar(page)
+        _navigate_to_import_tab(page)
         page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
         page.click("#cellar-demo-install-btn")
         page.wait_for_selector("#cellar-demo-remove-btn", state="visible", timeout=60000)
@@ -146,7 +152,7 @@ class TestDemoDataE2E:
         """Clicking 'Remove sample wines' clears demo data and shows install button again."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_cellar(page)
+        _navigate_to_import_tab(page)
         page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
         page.click("#cellar-demo-install-btn")
         page.wait_for_selector("#cellar-demo-remove-btn", state="visible", timeout=60000)
@@ -161,21 +167,26 @@ class TestDemoDataE2E:
             raise
 
     def test_cellar_has_demo_wines_after_install(self, authenticated_page: Page) -> None:
-        """After loading demo data, the cellar page shows wines."""
+        """After loading demo data, the dashboard shows non-zero stats."""
         page = authenticated_page
         _cleanup_demo_data(page)
-        _navigate_to_cellar(page)
+        _navigate_to_import_tab(page)
 
         try:
             page.wait_for_selector("#cellar-demo-install-btn", state="visible", timeout=10000)
             page.click("#cellar-demo-install-btn")
             page.wait_for_selector("#cellar-demo-remove-btn", state="visible", timeout=60000)
 
-            # Should have wine cards or rows
-            page.wait_for_selector(".wine-card, .wine-row, tr[data-wine-id]", timeout=10000)
-            wine_elements = page.locator(".wine-card, .wine-row, tr[data-wine-id]")
-            count = wine_elements.count()
-            assert count > 0, f"Expected wines in cellar, got {count}"
+            # Switch to dashboard tab and check stats updated
+            page.click("[data-cellar-tab='dashboard']")
+            page.wait_for_selector("#cellar-panel-dashboard", state="visible", timeout=5000)
+            # Wait for stats to load (non-dash value)
+            page.wait_for_function(
+                "document.getElementById('stat-total-bottles').textContent !== '-'",
+                timeout=10000,
+            )
+            bottles = page.text_content("#stat-total-bottles")
+            assert bottles and int(bottles) > 0, f"Expected bottles > 0, got {bottles}"
         except Exception:
             capture_artifacts(page, "demo_cellar_wines")
             raise

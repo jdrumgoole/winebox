@@ -1,4 +1,4 @@
-"""E2E tests for the Cellar page (wine list, detail modal, views).
+"""E2E tests for the Cellar page (tabbed layout, dashboard, modals).
 
 Requirements:
     uv run python -m invoke start-background
@@ -7,6 +7,7 @@ Run with:
     uv run python -m pytest -m e2e tests/test_cellar_e2e.py -v --override-ini="addopts="
 """
 
+import re
 from typing import Generator
 
 import pytest
@@ -45,39 +46,33 @@ def _navigate_to_cellar(page: Page) -> None:
 
 @pytest.mark.e2e
 class TestCellarPage:
-    """E2E tests for the cellar page."""
+    """E2E tests for the cellar page tab structure."""
 
-    def test_cellar_shows_welcome_or_list(self, authenticated_page: Page) -> None:
-        """Welcome panel or wine list is present."""
+    def test_cellar_has_tab_bar(self, authenticated_page: Page) -> None:
+        """Tab bar with Dashboard/Search/Import/History is present."""
         _navigate_to_cellar(authenticated_page)
-        # Either the welcome panel (empty cellar) or wine list (populated) should exist
+        expect(authenticated_page.locator("#cellar-tabs")).to_be_visible()
+        tabs = authenticated_page.locator(".cellar-tab")
+        assert tabs.count() == 4
+
+    def test_cellar_dashboard_tab_active_by_default(self, authenticated_page: Page) -> None:
+        """Dashboard tab is active by default."""
+        _navigate_to_cellar(authenticated_page)
+        dashboard_tab = authenticated_page.locator("[data-cellar-tab='dashboard']")
+        expect(dashboard_tab).to_have_class(re.compile("active"))
+        expect(authenticated_page.locator("#cellar-panel-dashboard")).to_be_visible()
+
+    def test_cellar_stats_grid_visible(self, authenticated_page: Page) -> None:
+        """Stats grid is visible on Dashboard tab."""
+        _navigate_to_cellar(authenticated_page)
+        expect(authenticated_page.locator("#cellar-stats-grid")).to_be_visible()
+
+    def test_cellar_welcome_panel_on_import_tab(self, authenticated_page: Page) -> None:
+        """Welcome panel with entry-path cards is on the Import tab."""
+        _navigate_to_cellar(authenticated_page)
+        authenticated_page.click("[data-cellar-tab='import']")
+        authenticated_page.wait_for_selector("#cellar-panel-import", state="visible", timeout=5000)
         expect(authenticated_page.locator("#cellar-welcome-panel")).to_be_visible()
-
-    def test_cellar_has_filter(self, authenticated_page: Page) -> None:
-        """Filter dropdown is present."""
-        _navigate_to_cellar(authenticated_page)
-        expect(authenticated_page.locator("#cellar-filter")).to_be_visible()
-
-    def test_cellar_card_view_toggle(self, authenticated_page: Page) -> None:
-        """Card view toggle button is present."""
-        _navigate_to_cellar(authenticated_page)
-        expect(authenticated_page.locator("#cellar-view-cards")).to_be_visible()
-
-    def test_cellar_table_view_toggle(self, authenticated_page: Page) -> None:
-        """Table view toggle button is present and switchable."""
-        _navigate_to_cellar(authenticated_page)
-        table_btn = authenticated_page.locator("#cellar-view-table")
-        expect(table_btn).to_be_visible()
-        table_btn.click()
-        authenticated_page.wait_for_timeout(500)
-        # Should switch to table view
-        cards_btn = authenticated_page.locator("#cellar-view-cards")
-        expect(cards_btn).to_be_visible()
-
-    def test_cellar_export_available(self, authenticated_page: Page) -> None:
-        """Export button is present on cellar page."""
-        _navigate_to_cellar(authenticated_page)
-        expect(authenticated_page.locator("#cellar-export-btn")).to_be_visible()
 
 
 @pytest.mark.e2e

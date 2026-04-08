@@ -39,8 +39,10 @@ def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
 
 
 def _navigate_to_search(page: Page) -> None:
-    page.click("a[data-page='search']")
-    page.wait_for_selector("#page-search", state="visible", timeout=5000)
+    page.click("a[data-page='cellar']")
+    page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+    page.click("[data-cellar-tab='search']")
+    page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
 
 
 def _expand_advanced_filters(page: Page) -> None:

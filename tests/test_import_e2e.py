@@ -98,9 +98,11 @@ def csv_with_spirits(tmp_path: Path) -> Path:
 
 
 def _navigate_to_import(page: Page) -> None:
-    """Navigate to the import wizard via My Cellar → Import from File card."""
+    """Navigate to the import wizard via My Cellar → Import tab → Import from File card."""
     page.click("a[data-page='cellar']")
     page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+    page.click("[data-cellar-tab='import']")
+    page.wait_for_selector("#cellar-panel-import", state="visible", timeout=10000)
     page.click("#cellar-welcome-panel .entry-path-card[data-tab='import']")
     page.wait_for_selector("#import-step-upload", state="visible", timeout=10000)
 

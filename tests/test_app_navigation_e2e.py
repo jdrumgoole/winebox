@@ -1,4 +1,4 @@
-"""E2E smoke tests for core app navigation (cellar, history, settings, danger zone).
+"""E2E smoke tests for core app navigation (cellar tabs, settings, met).
 
 These tests focus on verifying that primary navigation targets are reachable
 and that key UI elements render, rather than deep business logic. They reuse
@@ -69,12 +69,16 @@ class TestCoreNavigation:
         page = authenticated_page
         page.click("a[data-page='cellar']")
         expect(page.locator("#page-cellar")).to_be_visible()
-        expect(page.locator("#cellar-welcome-panel")).to_be_visible()
+        expect(page.locator("#cellar-tabs")).to_be_visible()
+        # Dashboard tab active by default
+        expect(page.locator("#cellar-panel-dashboard")).to_be_visible()
 
-    def test_navigate_to_history(self, authenticated_page: Page) -> None:
+    def test_navigate_to_history_via_tab(self, authenticated_page: Page) -> None:
         page = authenticated_page
-        page.click("a[data-page='history']")
-        expect(page.locator("#page-history")).to_be_visible()
+        page.click("a[data-page='cellar']")
+        expect(page.locator("#page-cellar")).to_be_visible()
+        page.click("[data-cellar-tab='history']")
+        expect(page.locator("#cellar-panel-history")).to_be_visible()
         expect(page.locator("#history-list")).to_be_visible()
 
     def test_navigate_to_settings(self, authenticated_page: Page) -> None:
@@ -103,11 +107,19 @@ class TestCoreNavigation:
         expect(page.locator("nav a[data-page='add-to-cellar']")).to_have_count(0)
         expect(page.locator("nav a[data-page='checkin']")).to_have_count(0)
 
+    def test_no_search_or_history_nav_links(self, authenticated_page: Page) -> None:
+        """Search and History are now sub-tabs under My Cellar, not top-level nav."""
+        page = authenticated_page
+        expect(page.locator("nav a[data-page='search']")).to_have_count(0)
+        expect(page.locator("nav a[data-page='history']")).to_have_count(0)
+
     def test_cellar_entry_cards_navigate(self, authenticated_page: Page) -> None:
-        """Test that cellar entry-path cards navigate to add-to-cellar wizard."""
+        """Test that import tab entry-path cards navigate to add-to-cellar wizard."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
         expect(page.locator("#page-cellar")).to_be_visible()
+        page.click("[data-cellar-tab='import']")
+        page.wait_for_selector("#cellar-panel-import", state="visible", timeout=5000)
         page.click("#cellar-welcome-panel .entry-path-card[data-tab='scan']")
         expect(page.locator("#page-add-to-cellar")).to_be_visible()
 
@@ -119,4 +131,3 @@ class TestCoreNavigation:
         page.click("#met-record-wine-btn")
         expect(page.locator("#page-checkin")).to_be_visible()
         expect(page.locator("#front-label")).to_be_visible()
-

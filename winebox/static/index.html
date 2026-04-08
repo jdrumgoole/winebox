@@ -47,9 +47,7 @@
             </button>
             <nav id="main-nav">
                 <a href="#" data-page="cellar" class="nav-link active" aria-current="page">My Cellar</a>
-                <a href="#" data-page="search" class="nav-link">Cellar Search</a>
                 <a href="#" data-page="met" class="nav-link">Wines I've Met</a>
-                <a href="#" data-page="history" class="nav-link">History</a>
                 <a href="#" data-page="xwines" class="nav-link">Wine Reference</a>
             </nav>
             <div id="user-info" class="user-info" style="display: none;">
@@ -398,105 +396,301 @@
         <!-- Cellar Page -->
         <section id="page-cellar" class="page" aria-labelledby="page-cellar-title">
             <h2 id="page-cellar-title">My Cellar</h2>
-            <div class="demo-welcome" id="cellar-welcome-panel">
-                <div class="demo-welcome-content">
-                    <h3>Welcome to WineBox</h3>
-                    <p>How would you like to add wines to your cellar?</p>
-                    <div class="entry-path-cards">
-                        <a href="#" data-page="add-to-cellar" data-tab="scan" class="entry-path-card">
-                            <div class="entry-path-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                                    <circle cx="12" cy="13" r="4"></circle>
-                                </svg>
+            <div class="cellar-tabs" id="cellar-tabs">
+                <button class="cellar-tab active" data-cellar-tab="dashboard">Dashboard</button>
+                <button class="cellar-tab" data-cellar-tab="search">Search</button>
+                <button class="cellar-tab" data-cellar-tab="import">Import</button>
+                <button class="cellar-tab" data-cellar-tab="history">History</button>
+            </div>
+
+            <!-- Dashboard Panel -->
+            <div id="cellar-panel-dashboard" class="cellar-panel active">
+                <div class="stats-grid" id="cellar-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total-bottles">-</div>
+                        <div class="stat-label">Bottles</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-unique-wines">-</div>
+                        <div class="stat-label">Wines</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total-cases">-</div>
+                        <div class="stat-label">Cases</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-wines-met">-</div>
+                        <div class="stat-label">Met</div>
+                    </div>
+                </div>
+                <div class="chart-grid" id="cellar-chart-grid">
+                    <div class="chart-card">
+                        <h3>Wine Types</h3>
+                        <div class="chart-wrapper chart-wrapper-sm">
+                            <canvas id="chart-wine-type"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Price Range</h3>
+                        <div class="chart-wrapper chart-wrapper-sm">
+                            <canvas id="chart-price-tier"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card chart-card-wide">
+                        <h3>Top Countries</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-country"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card chart-card-wide">
+                        <h3>Top Grape Varieties</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-grape"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card chart-card-full">
+                        <h3>Vintages</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-vintage"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="cellar-value-panel" id="cellar-value-panel">
+                    <h3>Cellar Value by Wine Type</h3>
+                    <div class="value-grid" id="cellar-value-grid"></div>
+                </div>
+                <h3 id="cellar-activity-heading">Recent Activity</h3>
+                <div id="recent-activity" class="activity-list"></div>
+            </div>
+
+            <!-- Search Panel -->
+            <div id="cellar-panel-search" class="cellar-panel" style="display:none;">
+                <form id="search-form">
+                    <div class="form-group full-width">
+                        <label for="search-q">Search</label>
+                        <input type="text" id="search-q" name="q" placeholder="Search by name, winery, region, grape...">
+                    </div>
+                    <div class="form-grid">
+                            <div class="form-group">
+                                <label for="search-vintage">Vintage</label>
+                                <input type="number" id="search-vintage" name="vintage" min="1900" max="2100">
                             </div>
-                            <h3>Scan a Label</h3>
-                            <p>Take a photo to auto-detect wine details</p>
-                        </a>
-                        <a href="#" data-page="add-to-cellar" data-tab="manual" class="entry-path-card">
-                            <div class="entry-path-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                </svg>
+                            <div class="form-group">
+                                <label for="search-grape">Grape Variety</label>
+                                <input type="text" id="search-grape" name="grape">
                             </div>
-                            <h3>Enter Details</h3>
-                            <p>Type in the wine details manually</p>
-                        </a>
-                        <a href="#" data-page="add-to-cellar" data-tab="import" class="entry-path-card">
-                            <div class="entry-path-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="17 8 12 3 7 8"></polyline>
-                                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                                </svg>
+                            <div class="form-group">
+                                <label for="search-winery">Winery</label>
+                                <input type="text" id="search-winery" name="winery">
                             </div>
-                            <h3>Import from File</h3>
-                            <p>Upload a CSV or Excel spreadsheet</p>
-                        </a>
+                            <div class="form-group">
+                                <label for="search-region">Region</label>
+                                <input type="text" id="search-region" name="region">
+                            </div>
+                            <div class="form-group">
+                                <label for="search-country">Country</label>
+                                <input type="text" id="search-country" name="country">
+                            </div>
+                            <div class="form-group">
+                                <label for="search-wine-type">Wine Type</label>
+                                <select id="search-wine-type" name="wine_type">
+                                    <option value="">All Types</option>
+                                    <option value="red">Red</option>
+                                    <option value="white">White</option>
+                                    <option value="rosé">Rosé</option>
+                                    <option value="sparkling">Sparkling</option>
+                                    <option value="fortified">Fortified</option>
+                                    <option value="dessert">Dessert</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="search-price-tier">Price Tier</label>
+                                <select id="search-price-tier" name="price_tier">
+                                    <option value="">All Tiers</option>
+                                    <option value="budget">Budget</option>
+                                    <option value="value">Value</option>
+                                    <option value="mid_range">Mid-Range</option>
+                                    <option value="premium">Premium</option>
+                                    <option value="luxury">Luxury</option>
+                                    <option value="ultra_premium">Ultra Premium</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="search-in-stock">
+                                    <input type="checkbox" id="search-in-stock" name="in_stock">
+                                    In Stock Only
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="search-storage">Storage</label>
+                                <select id="search-storage" name="storage">
+                                    <option value="">All</option>
+                                    <option value="case">In Case</option>
+                                    <option value="loose">Loose Bottles</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="search-provenance">Provenance</label>
+                                <input type="text" id="search-provenance" name="provenance" placeholder="Where purchased">
+                            </div>
+                            <div class="form-group">
+                                <label for="search-enriched">Augmented Data</label>
+                                <select id="search-enriched" name="enriched">
+                                    <option value="">All Wines</option>
+                                    <option value="yes">Augmented</option>
+                                    <option value="no">Not Augmented</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div style="margin-top:0.5rem;">
-                        <button class="btn btn-outline btn-small" id="cellar-demo-install-btn">Load sample wines</button>
-                        <p class="demo-hint">Sample wines can be removed at any time</p>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Search</button>
+                        <button type="reset" class="btn btn-secondary">Clear</button>
+                    </div>
+                </form>
+                <div id="search-results" class="wine-grid"></div>
+            </div>
+
+            <!-- Import Panel -->
+            <div id="cellar-panel-import" class="cellar-panel" style="display:none;">
+                <div class="demo-welcome" id="cellar-welcome-panel">
+                    <div class="demo-welcome-content">
+                        <h3>Add Wines to Your Cellar</h3>
+                        <p>How would you like to add wines?</p>
+                        <div class="entry-path-cards">
+                            <a href="#" data-page="add-to-cellar" data-tab="scan" class="entry-path-card">
+                                <div class="entry-path-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                        <circle cx="12" cy="13" r="4"></circle>
+                                    </svg>
+                                </div>
+                                <h3>Scan a Label</h3>
+                                <p>Take a photo to auto-detect wine details</p>
+                            </a>
+                            <a href="#" data-page="add-to-cellar" data-tab="manual" class="entry-path-card">
+                                <div class="entry-path-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                </div>
+                                <h3>Enter Details</h3>
+                                <p>Type in the wine details manually</p>
+                            </a>
+                            <a href="#" data-page="add-to-cellar" data-tab="import" class="entry-path-card">
+                                <div class="entry-path-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                </div>
+                                <h3>Import from File</h3>
+                                <p>Upload a CSV or Excel spreadsheet</p>
+                            </a>
+                        </div>
+                        <div style="margin-top:0.5rem;">
+                            <button class="btn btn-outline btn-small" id="cellar-demo-install-btn">Load sample wines</button>
+                            <p class="demo-hint">Sample wines can be removed at any time</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="import-tab-actions" id="import-tab-actions" style="display:none;">
+                    <div class="import-tab-last-import" id="import-tab-last-import"></div>
+                    <button class="btn btn-outline btn-small btn-danger" id="import-tab-undo-btn">Undo Last Import</button>
+                </div>
+                <div id="import-batch-analytics" style="display:none;">
+                    <h3 class="import-batch-heading" id="import-batch-heading">Last Import</h3>
+                    <div class="stats-grid" id="import-stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="import-stat-wines">-</div>
+                            <div class="stat-label">Wines</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="import-stat-bottles">-</div>
+                            <div class="stat-label">Bottles</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="import-stat-cases">-</div>
+                            <div class="stat-label">Cases</div>
+                        </div>
+                    </div>
+                    <div class="chart-grid" id="import-chart-grid">
+                        <div class="chart-card">
+                            <h3>Wine Types</h3>
+                            <div class="chart-wrapper chart-wrapper-sm">
+                                <canvas id="chart-import-wine-type"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card chart-card-wide">
+                            <h3>Countries</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="chart-import-country"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card chart-card-wide">
+                            <h3>Grape Varieties</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="chart-import-grape"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card chart-card-full">
+                            <h3>Vintages</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="chart-import-vintage"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="stats-grid" id="cellar-stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-total-bottles">-</div>
-                    <div class="stat-label">Bottles</div>
+
+            <!-- History Panel -->
+            <div id="cellar-panel-history" class="cellar-panel" style="display:none;">
+                <div class="filter-bar">
+                    <select id="history-filter">
+                        <option value="all">All Transactions</option>
+                        <option value="CHECK_IN">Added</option>
+                        <option value="CHECK_OUT">All Removals</option>
+                        <option value="DRINK">Drank</option>
+                        <option value="SELL">Sold</option>
+                        <option value="GIFT">Gifted</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                    <div class="export-dropdown" id="history-export-dropdown">
+                        <button class="btn btn-secondary export-dropdown-btn" id="history-export-btn">
+                            Export
+                            <span class="dropdown-arrow">&#9662;</span>
+                        </button>
+                        <div class="export-dropdown-menu">
+                            <a href="#" data-format="csv" data-type="transactions">CSV</a>
+                            <a href="#" data-format="xlsx" data-type="transactions">Excel</a>
+                            <a href="#" data-format="yaml" data-type="transactions">YAML</a>
+                            <a href="#" data-format="json" data-type="transactions">JSON</a>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-unique-wines">-</div>
-                    <div class="stat-label">Wines</div>
+                <div id="history-charts" class="chart-grid" style="display: none;">
+                    <div class="chart-card chart-card-full">
+                        <h3>Activity Timeline</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-history-timeline"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Removal Reasons</h3>
+                        <div class="chart-wrapper chart-wrapper-sm">
+                            <canvas id="chart-history-reasons"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Activity Summary</h3>
+                        <div class="history-stats" id="history-stats">
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-total-cases">-</div>
-                    <div class="stat-label">Cases</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-wines-met">-</div>
-                    <div class="stat-label">Met</div>
-                </div>
+                <div id="history-list" class="transaction-list"></div>
             </div>
-            <div class="chart-grid" id="cellar-chart-grid">
-                <div class="chart-card">
-                    <h3>Wine Types</h3>
-                    <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-wine-type"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Price Range</h3>
-                    <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-price-tier"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card chart-card-wide">
-                    <h3>Top Countries</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="chart-country"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card chart-card-wide">
-                    <h3>Top Grape Varieties</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="chart-grape"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card chart-card-full">
-                    <h3>Vintages</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="chart-vintage"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="cellar-value-panel" id="cellar-value-panel">
-                <h3>Cellar Value by Wine Type</h3>
-                <div class="value-grid" id="cellar-value-grid"></div>
-            </div>
-            <h3 id="cellar-activity-heading">Recent Activity</h3>
-            <div id="recent-activity" class="activity-list"></div>
         </section>
 
         <!-- Wines I've Met Page -->
@@ -910,142 +1104,7 @@
             </div>
         </div>
 
-        <!-- History Page -->
-        <section id="page-history" class="page" aria-labelledby="page-history-title">
-            <h2 id="page-history-title">Transaction History</h2>
-            <div class="filter-bar">
-                <select id="history-filter">
-                    <option value="all">All Transactions</option>
-                    <option value="CHECK_IN">Added</option>
-                    <option value="CHECK_OUT">All Removals</option>
-                    <option value="DRINK">Drank</option>
-                    <option value="SELL">Sold</option>
-                    <option value="GIFT">Gifted</option>
-                    <option value="OTHER">Other</option>
-                </select>
-                <div class="export-dropdown" id="history-export-dropdown">
-                    <button class="btn btn-secondary export-dropdown-btn" id="history-export-btn">
-                        Export
-                        <span class="dropdown-arrow">&#9662;</span>
-                    </button>
-                    <div class="export-dropdown-menu">
-                        <a href="#" data-format="csv" data-type="transactions">CSV</a>
-                        <a href="#" data-format="xlsx" data-type="transactions">Excel</a>
-                        <a href="#" data-format="yaml" data-type="transactions">YAML</a>
-                        <a href="#" data-format="json" data-type="transactions">JSON</a>
-                    </div>
-                </div>
-            </div>
-            <div id="history-charts" class="chart-grid" style="display: none;">
-                <div class="chart-card chart-card-full">
-                    <h3>Activity Timeline</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="chart-history-timeline"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Removal Reasons</h3>
-                    <div class="chart-wrapper chart-wrapper-sm">
-                        <canvas id="chart-history-reasons"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Activity Summary</h3>
-                    <div class="history-stats" id="history-stats">
-                    </div>
-                </div>
-            </div>
-            <div id="history-list" class="transaction-list"></div>
-        </section>
-
-        <!-- Search Page -->
-        <section id="page-search" class="page" aria-labelledby="page-search-title">
-            <h2 id="page-search-title">Cellar Search</h2>
-            <form id="search-form">
-                <div class="form-group full-width">
-                    <label for="search-q">Search</label>
-                    <input type="text" id="search-q" name="q" placeholder="Search by name, winery, region, grape...">
-                </div>
-                <div class="form-grid">
-                        <div class="form-group">
-                            <label for="search-vintage">Vintage</label>
-                            <input type="number" id="search-vintage" name="vintage" min="1900" max="2100">
-                        </div>
-                        <div class="form-group">
-                            <label for="search-grape">Grape Variety</label>
-                            <input type="text" id="search-grape" name="grape">
-                        </div>
-                        <div class="form-group">
-                            <label for="search-winery">Winery</label>
-                            <input type="text" id="search-winery" name="winery">
-                        </div>
-                        <div class="form-group">
-                            <label for="search-region">Region</label>
-                            <input type="text" id="search-region" name="region">
-                        </div>
-                        <div class="form-group">
-                            <label for="search-country">Country</label>
-                            <input type="text" id="search-country" name="country">
-                        </div>
-                        <div class="form-group">
-                            <label for="search-wine-type">Wine Type</label>
-                            <select id="search-wine-type" name="wine_type">
-                                <option value="">All Types</option>
-                                <option value="red">Red</option>
-                                <option value="white">White</option>
-                                <option value="rosé">Rosé</option>
-                                <option value="sparkling">Sparkling</option>
-                                <option value="fortified">Fortified</option>
-                                <option value="dessert">Dessert</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="search-price-tier">Price Tier</label>
-                            <select id="search-price-tier" name="price_tier">
-                                <option value="">All Tiers</option>
-                                <option value="budget">Budget</option>
-                                <option value="value">Value</option>
-                                <option value="mid_range">Mid-Range</option>
-                                <option value="premium">Premium</option>
-                                <option value="luxury">Luxury</option>
-                                <option value="ultra_premium">Ultra Premium</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="search-in-stock">
-                                <input type="checkbox" id="search-in-stock" name="in_stock">
-                                In Stock Only
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label for="search-storage">Storage</label>
-                            <select id="search-storage" name="storage">
-                                <option value="">All</option>
-                                <option value="case">In Case</option>
-                                <option value="loose">Loose Bottles</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="search-provenance">Provenance</label>
-                            <input type="text" id="search-provenance" name="provenance" placeholder="Where purchased">
-                        </div>
-                        <div class="form-group">
-                            <label for="search-enriched">Augmented Data</label>
-                            <select id="search-enriched" name="enriched">
-                                <option value="">All Wines</option>
-                                <option value="yes">Augmented</option>
-                                <option value="no">Not Augmented</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Search</button>
-                    <button type="reset" class="btn btn-secondary">Clear</button>
-                </div>
-            </form>
-            <div id="search-results" class="wine-grid"></div>
-        </section>
+        <!-- History and Search pages moved into My Cellar sub-tabs -->
 
         <!-- Import Page -->
         <!-- Import page removed — import UI is now in the Add to Cellar wizard -->

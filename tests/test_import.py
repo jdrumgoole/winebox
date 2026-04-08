@@ -265,6 +265,32 @@ async def test_list_batches(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_batches_with_limit(client: AsyncClient) -> None:
+    """Test listing import batches with limit parameter."""
+    # Create two batches
+    csv_data1 = _make_csv(["Name"], [["Wine First"]])
+    csv_data2 = _make_csv(["Name"], [["Wine Second"]])
+    files1 = {"file": ("first.csv", io.BytesIO(csv_data1), "text/csv")}
+    files2 = {"file": ("second.csv", io.BytesIO(csv_data2), "text/csv")}
+    await client.post("/api/import/upload", files=files1)
+    await client.post("/api/import/upload", files=files2)
+
+    # Without limit — returns all
+    resp_all = await client.get("/api/import/batches")
+    assert resp_all.status_code == 200
+    all_batches = resp_all.json()
+    assert len(all_batches) >= 2
+
+    # With limit=1 — returns only the most recent
+    resp_limited = await client.get("/api/import/batches?limit=1")
+    assert resp_limited.status_code == 200
+    limited = resp_limited.json()
+    assert len(limited) == 1
+    # Most recent batch should be second.csv
+    assert limited[0]["filename"] == "second.csv"
+
+
+@pytest.mark.asyncio
 async def test_delete_batch(client: AsyncClient) -> None:
     """Test deleting an import batch."""
     csv_data = _make_csv(["Name"], [["Wine A"]])
