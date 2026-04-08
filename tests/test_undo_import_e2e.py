@@ -138,8 +138,13 @@ class TestUndoImport:
             }
         }""")
 
-        _navigate_to_import_tab(page)
-        page.wait_for_selector("#import-tab-actions", state="visible", timeout=20000)
+        # Reload the import tab to pick up the new batch
+        page.click("a[data-page='cellar']")
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='import']", state="visible", timeout=10000)
+        page.click("[data-cellar-tab='import']")
+        page.wait_for_selector("#cellar-panel-import", state="visible", timeout=10000)
+        page.wait_for_selector("#import-tab-actions", state="visible", timeout=30000)
 
         expect(page.locator("#import-tab-undo-btn")).to_be_visible()
         expect(page.locator("#import-tab-last-import")).to_contain_text("undo_test.csv")

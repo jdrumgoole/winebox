@@ -83,7 +83,7 @@ class TestCaseAwareSearchFilters:
 
         # Add a case via API first
         page.evaluate("""async () => {
-            const token = localStorage.getItem('access_token');
+            const token = localStorage.getItem('winebox_token');
             await fetch('/api/cases', {
                 method: 'POST',
                 headers: {
