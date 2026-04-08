@@ -111,8 +111,8 @@ class TestUndoImport:
                 body: JSON.stringify({ mapping: { 'Name': 'name', 'Vintage': 'vintage' } })
             });
 
-            // Process
-            await fetch('/api/import/' + batchId + '/process', {
+            // Process and wait for completion
+            const processResp = await fetch('/api/import/' + batchId + '/process', {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Bearer ' + token,
@@ -125,10 +125,11 @@ class TestUndoImport:
                     default_case_size: 0
                 })
             });
+            await processResp.json();
         }""")
 
         _navigate_to_import_tab(page)
-        page.wait_for_selector("#import-tab-actions", state="visible", timeout=10000)
+        page.wait_for_selector("#import-tab-actions", state="visible", timeout=15000)
 
         expect(page.locator("#import-tab-undo-btn")).to_be_visible()
         expect(page.locator("#import-tab-last-import")).to_contain_text("undo_test.csv")

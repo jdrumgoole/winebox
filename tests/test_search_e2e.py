@@ -60,7 +60,7 @@ class TestSearchPage:
     def test_search_page_renders(self, authenticated_page: Page) -> None:
         """#search page and form visible."""
         _navigate_to_search(authenticated_page)
-        expect(authenticated_page.locator("#page-search")).to_be_visible()
+        expect(authenticated_page.locator("#cellar-panel-search")).to_be_visible()
         expect(authenticated_page.locator("#search-form")).to_be_visible()
 
     def test_search_form_has_inputs(self, authenticated_page: Page) -> None:

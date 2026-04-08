@@ -69,7 +69,7 @@ class TestHistoryPage:
     def test_history_page_renders(self, authenticated_page: Page) -> None:
         """History list visible."""
         _navigate_to_history(authenticated_page)
-        expect(authenticated_page.locator("#page-history")).to_be_visible()
+        expect(authenticated_page.locator("#cellar-panel-history")).to_be_visible()
         expect(authenticated_page.locator("#history-list")).to_be_visible()
 
     def test_history_has_filter(self, authenticated_page: Page) -> None:

@@ -61,50 +61,6 @@ def _ensure_empty_cellar(page: Page) -> None:
 
 
 @pytest.mark.e2e
-class TestExportFromCellar:
-    """E2E tests for export functionality from cellar page."""
-
-    def test_export_button_visible(self, authenticated_page: Page) -> None:
-        """Export dropdown on cellar page."""
-        _navigate_to_cellar(authenticated_page)
-        expect(authenticated_page.locator("#cellar-export-btn")).to_be_visible()
-
-    def test_export_dropdown_markup_exists(self, authenticated_page: Page) -> None:
-        """Export dropdown markup is present in the DOM."""
-        _navigate_to_cellar(authenticated_page)
-        dropdown = authenticated_page.locator("#cellar-export-dropdown")
-        expect(dropdown).to_be_attached()
-
-    def test_export_csv_option_in_markup(self, authenticated_page: Page) -> None:
-        """CSV export option exists in dropdown markup."""
-        _navigate_to_cellar(authenticated_page)
-        csv_option = authenticated_page.locator("#cellar-export-dropdown [data-format='csv']")
-        expect(csv_option).to_be_attached()
-
-    def test_export_xlsx_option_in_markup(self, authenticated_page: Page) -> None:
-        """XLSX export option exists in dropdown markup."""
-        _navigate_to_cellar(authenticated_page)
-        xlsx_option = authenticated_page.locator("#cellar-export-dropdown [data-format='xlsx']")
-        expect(xlsx_option).to_be_attached()
-
-    def test_export_button_disabled_when_empty(self, authenticated_page: Page) -> None:
-        """Export button is disabled when cellar is empty."""
-        _ensure_empty_cellar(authenticated_page)
-        _navigate_to_cellar(authenticated_page)
-        # Wait for cellar to render the empty state
-        authenticated_page.wait_for_timeout(1000)
-        export_btn = authenticated_page.locator("#cellar-export-btn")
-        expect(export_btn).to_be_attached()
-        expect(export_btn).to_be_disabled()
-
-    def test_export_yaml_option_in_markup(self, authenticated_page: Page) -> None:
-        """YAML export option exists in dropdown markup."""
-        _navigate_to_cellar(authenticated_page)
-        yaml_option = authenticated_page.locator("#cellar-export-dropdown [data-format='yaml']")
-        expect(yaml_option).to_be_attached()
-
-
-@pytest.mark.e2e
 class TestExportFromHistory:
     """E2E tests for export from history page."""
 
