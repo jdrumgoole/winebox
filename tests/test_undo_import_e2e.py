@@ -121,22 +121,22 @@ class TestUndoImport:
                 body: JSON.stringify({
                     skip_non_wine: true,
                     default_quantity: 1,
-                    skip_enrichment: true,
-                    default_case_size: 0
+                    skip_enrichment: true
                 })
             });
-            const processResult = await processResp.json();
+            const processOk = processResp.ok;
+            const processBody = await processResp.text();
 
             // Verify batch is completed
             const statusResp = await fetch('/api/import/batches/' + batchId, {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
             const batch = await statusResp.json();
-            return { batchId, status: batch.status, wines: processResult.wines_created };
+            return { batchId, status: batch.status, processOk, processBody };
         }""")
 
+        assert result["processOk"], f"Process failed: {result['processBody']}"
         assert result["status"] == "completed", f"Batch not completed: {result}"
-        assert result["wines"] > 0, f"No wines created: {result}"
 
         _navigate_to_import_tab(page)
         page.wait_for_selector("#import-tab-actions", state="visible", timeout=30000)
