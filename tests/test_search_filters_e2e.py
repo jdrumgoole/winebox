@@ -46,27 +46,30 @@ class TestCaseAwareSearchFilters:
         """Storage filter dropdown is visible on search page."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='search']")
-        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
         expect(page.locator("#search-storage")).to_be_visible()
 
     def test_provenance_filter_visible(self, authenticated_page: Page) -> None:
         """Provenance input is visible on search page."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='search']")
-        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
         expect(page.locator("#search-provenance")).to_be_visible()
 
     def test_storage_filter_has_options(self, authenticated_page: Page) -> None:
         """Storage filter has All, In Case, and Loose Bottles options."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='search']")
-        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
 
         options = page.locator("#search-storage option")
         assert options.count() == 3
@@ -98,9 +101,10 @@ class TestCaseAwareSearchFilters:
         }""")
 
         page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='search']")
-        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
 
         page.select_option("#search-storage", "case")
         page.click("#search-form button[type='submit']")
@@ -115,9 +119,10 @@ class TestCaseAwareSearchFilters:
         page = authenticated_page
 
         page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='search']")
-        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
 
         page.fill("#search-provenance", "Wine Merchant")
         page.click("#search-form button[type='submit']")

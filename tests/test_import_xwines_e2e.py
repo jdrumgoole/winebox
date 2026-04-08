@@ -385,7 +385,7 @@ class TestXWinesImport:
         page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
 
         # Search for a known imported wine
-        page.fill("#search-q", csv_descriptions[0][:30])
+        page.fill("#search-q", next(iter(csv_descriptions))[:30])
         page.click("#search-form button[type='submit']")
         page.wait_for_selector(".wine-card", state="visible", timeout=15000)
 

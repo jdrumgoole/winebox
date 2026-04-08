@@ -289,9 +289,11 @@ class TestImportProcess:
 
         # Verify the wines appear via Search
         page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible")
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='search']")
-        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
+        page.wait_for_selector("#search-form button[type='submit']", state="visible", timeout=5000)
         page.fill("#search-q", "Petrus")
         page.click("#search-form button[type='submit']")
         page.wait_for_selector(".wine-card", state="visible", timeout=10000)
@@ -366,9 +368,11 @@ class TestImportCustomFields:
 
         # Navigate to Search tab and find the imported wine
         page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='search']")
-        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
+        page.wait_for_selector("#search-form button[type='submit']", state="visible", timeout=5000)
         page.fill("#search-q", "Petrus")
         page.click("#search-form button[type='submit']")
         page.wait_for_selector(".wine-card", state="visible", timeout=10000)

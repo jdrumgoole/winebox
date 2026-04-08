@@ -44,7 +44,7 @@ def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
 def _add_case_via_api(page: Page, name: str = "Case Action Wine") -> dict:
     """Add a case of wine via API."""
     result = page.evaluate(f"""async () => {{
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem('winebox_token');
         const resp = await fetch('/api/cases', {{
             method: 'POST',
             headers: {{
@@ -70,8 +70,10 @@ def _search_for_wine(page: Page, name: str) -> None:
     """Navigate to Search tab and find a wine by name."""
     page.click("a[data-page='cellar']")
     page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+    page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
     page.click("[data-cellar-tab='search']")
-    page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+    page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
+    page.wait_for_selector("#search-form button[type='submit']", state="visible", timeout=5000)
     page.fill("#search-q", name)
     page.click("#search-form button[type='submit']")
     page.wait_for_selector(".wine-card", state="visible", timeout=10000)

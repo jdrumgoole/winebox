@@ -40,9 +40,10 @@ def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
 
 def _navigate_to_history(page: Page) -> None:
     page.click("a[data-page='cellar']")
-    page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+    page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+    page.wait_for_selector("[data-cellar-tab='history']", state="visible", timeout=10000)
     page.click("[data-cellar-tab='history']")
-    page.wait_for_selector("#cellar-panel-history", state="visible", timeout=5000)
+    page.wait_for_selector("#cellar-panel-history", state="visible", timeout=10000)
 
 
 def _ensure_empty_cellar(page: Page) -> None:

@@ -68,9 +68,10 @@ class TestExportFromHistory:
         """Export button present on history page (disabled when empty)."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='history']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='history']")
-        page.wait_for_selector("#cellar-panel-history", state="visible", timeout=5000)
+        page.wait_for_selector("#cellar-panel-history", state="visible", timeout=10000)
         export_btn = page.locator("#history-export-btn")
         expect(export_btn).to_be_attached()
 
@@ -78,8 +79,9 @@ class TestExportFromHistory:
         """History export dropdown markup exists in the DOM."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+        page.wait_for_selector("[data-cellar-tab='history']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='history']")
-        page.wait_for_selector("#cellar-panel-history", state="visible", timeout=5000)
+        page.wait_for_selector("#cellar-panel-history", state="visible", timeout=10000)
         dropdown = page.locator("#history-export-dropdown")
         expect(dropdown).to_be_attached()

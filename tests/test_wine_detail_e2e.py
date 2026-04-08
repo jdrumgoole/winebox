@@ -49,7 +49,7 @@ def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
 def _add_case_via_api(page: Page) -> str:
     """Add a case of wine via the API and return the wine_id."""
     result = page.evaluate("""async () => {
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem('winebox_token');
         const resp = await fetch('/api/cases', {
             method: 'POST',
             headers: {
@@ -78,7 +78,7 @@ def _add_case_via_api(page: Page) -> str:
 def _add_loose_bottles_via_api(page: Page) -> str:
     """Add loose bottles via the API and return the wine_id."""
     result = page.evaluate("""async () => {
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem('winebox_token');
         const resp = await fetch('/api/bottles', {
             method: 'POST',
             headers: {
@@ -103,8 +103,10 @@ def _open_wine_detail_via_search(page: Page, wine_name: str) -> None:
     """Navigate to Search tab, find a wine by name, and open its detail modal."""
     page.click("a[data-page='cellar']")
     page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+    page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
     page.click("[data-cellar-tab='search']")
-    page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+    page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
+    page.wait_for_selector("#search-form button[type='submit']", state="visible", timeout=5000)
     page.fill("#search-q", wine_name)
     page.click("#search-form button[type='submit']")
     page.wait_for_selector(".wine-card", state="visible", timeout=10000)
