@@ -277,18 +277,52 @@ def classify_wine_type(text: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 MAJESTIC_CATEGORIES = [
+    # Red
     ("red wine", "Red"),
     ("bordeaux", "Red"),
     ("rioja", "Red"),
     ("pinot noir", "Red"),
     ("malbec", "Red"),
+    ("cabernet sauvignon", "Red"),
+    ("merlot", "Red"),
+    ("shiraz", "Red"),
+    ("tempranillo", "Red"),
+    ("sangiovese", "Red"),
+    ("nebbiolo", "Red"),
+    ("grenache", "Red"),
+    ("zinfandel", "Red"),
+    ("chianti", "Red"),
+    ("barolo", "Red"),
+    ("côtes du rhône", "Red"),
+    ("burgundy red", "Red"),
+    ("argentina red", "Red"),
+    ("australia red", "Red"),
+    ("chile red", "Red"),
+    ("south africa red", "Red"),
+    ("italy red", "Red"),
+    ("spain red", "Red"),
+    ("portugal red", "Red"),
+    # White
     ("white wine", "White"),
     ("chablis", "White"),
     ("sauvignon blanc", "White"),
     ("chardonnay", "White"),
+    ("riesling", "White"),
+    ("pinot grigio", "White"),
+    ("viognier", "White"),
+    ("gewurztraminer", "White"),
+    ("albariño", "White"),
+    ("sancerre", "White"),
+    ("pouilly fumé", "White"),
+    ("new zealand white", "White"),
+    # Rosé
     ("rosé wine", "Rosé"),
+    ("provence rosé", "Rosé"),
+    # Sparkling
     ("champagne", "Sparkling"),
     ("prosecco", "Sparkling"),
+    ("cava", "Sparkling"),
+    ("crémant", "Sparkling"),
     ("sparkling wine", "Sparkling"),
 ]
 
@@ -322,14 +356,12 @@ def browse_majestic(
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=15000)
             limiter.record_success()
-            # Dismiss cookie consent overlay if present (blocks all clicks)
-            accept_btn = page.query_selector("#onetrust-accept-btn-handler, button:has-text('Accept')")
-            if accept_btn:
-                try:
-                    accept_btn.click(timeout=3000)
-                    page.wait_for_timeout(500)
-                except Exception:
-                    pass
+            # Dismiss cookie consent overlay via JS click (bypasses overlay interception)
+            page.evaluate("""
+                const btn = document.getElementById('onetrust-accept-btn-handler');
+                if (btn) btn.click();
+            """)
+            page.wait_for_timeout(500)
         except Exception as e:
             logger.error("  Failed to load: %s", e)
             limiter.record_error()
