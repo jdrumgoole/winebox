@@ -22,6 +22,7 @@ class PriceSource(str, enum.Enum):
     KAGGLE_IMPORT = "kaggle_import"
     XWINES_IMPORT = "xwines_import"
     CSV_IMPORT = "csv_import"
+    WEB_SCRAPER = "web_scraper"
 
 
 class PriceEntry(BaseModel):
