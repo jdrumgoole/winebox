@@ -481,11 +481,15 @@ async def process_batch_stream(
 @router.get("/batches", response_model=list[ImportBatchSummary])
 async def list_batches(
     current_user: RequireAuth,
+    limit: int | None = None,
 ) -> list[ImportBatchSummary]:
     """List the current user's import batches."""
-    batches = await ImportBatch.find(
+    query = ImportBatch.find(
         {"owner_id": current_user.id}
-    ).sort([("imported_at", -1)]).to_list()
+    ).sort([("imported_at", -1)])
+    if limit is not None:
+        query = query.limit(limit)
+    batches = await query.to_list()
 
     return [
         ImportBatchSummary(
