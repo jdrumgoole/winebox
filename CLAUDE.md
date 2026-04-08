@@ -42,15 +42,6 @@
 - Run tests frequently during development to catch regressions early
 - **Prefer calling real functions over mocking them.** Only mock when truly necessary (e.g. no API key available, destructive side effects, or isolating a specific failure mode). Skip tests with `pytest.mark.skipif` when a required resource (API key, database, etc.) is unavailable rather than building elaborate mock scaffolding.
 
-## Git Worktree Workflow
-- **All planned work MUST be done in a git worktree on a feature branch**, not directly on `main`
-- Create a worktree: `git worktree add ../winebox-<branch-name> -b <branch-name>`
-- Do all development and testing in the worktree
-- Once the branch passes all tests, merge it into `main` and clean up:
-  - `git checkout main && git merge <branch-name>`
-  - `git worktree remove ../winebox-<branch-name>`
-  - `git branch -d <branch-name>`
-- Never commit feature work directly to `main` — always use a branch in a worktree
 
 ## Security Guidelines
 
