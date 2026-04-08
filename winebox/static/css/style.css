@@ -1222,6 +1222,23 @@ details.advanced-fields .form-grid {
     font-weight: 500;
 }
 
+.wine-detail-field .value.enriched {
+    color: #2e7d32;
+}
+
+.wine-detail-field:has(.value.enriched) {
+    background: #e8f5e9;
+    border-left: 3px solid #4caf50;
+}
+
+.wine-detail-field:has(.value.enriched) .label::after {
+    content: ' (augmented)';
+    text-transform: none;
+    font-style: italic;
+    letter-spacing: normal;
+    color: #4caf50;
+}
+
 /* Custom fields grid in detail modal */
 .wine-detail-custom-fields {
     display: grid;
