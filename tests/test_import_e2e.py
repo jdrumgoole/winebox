@@ -293,9 +293,8 @@ class TestImportProcess:
         page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='search']")
         page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
-        page.wait_for_selector("#search-form button[type='submit']", state="visible", timeout=5000)
         page.fill("#search-q", "Petrus")
-        page.click("#search-form button[type='submit']")
+        page.press("#search-q", "Enter")
         page.wait_for_selector(".wine-card", state="visible", timeout=10000)
 
         results_text = page.locator("#search-results").text_content()
@@ -372,9 +371,8 @@ class TestImportCustomFields:
         page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
         page.click("[data-cellar-tab='search']")
         page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
-        page.wait_for_selector("#search-form button[type='submit']", state="visible", timeout=5000)
         page.fill("#search-q", "Petrus")
-        page.click("#search-form button[type='submit']")
+        page.press("#search-q", "Enter")
         page.wait_for_selector(".wine-card", state="visible", timeout=10000)
 
         wine_card = page.locator(".wine-card", has_text="Petrus").first

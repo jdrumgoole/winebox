@@ -44,7 +44,7 @@ def _navigate_to_search(page: Page) -> None:
     page.wait_for_selector("[data-cellar-tab='search']", state="visible", timeout=10000)
     page.click("[data-cellar-tab='search']")
     page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
-    page.wait_for_selector("#search-form button[type='submit']", state="visible", timeout=5000)
+    page.wait_for_selector("#search-form", state="visible", timeout=5000)
 
 
 def _expand_advanced_filters(page: Page) -> None:
@@ -74,7 +74,7 @@ class TestSearchPage:
         """Enter a name, submit form - results area should exist."""
         _navigate_to_search(authenticated_page)
         authenticated_page.fill("#search-q", "wine")
-        authenticated_page.click("#search-form button[type='submit']")
+        authenticated_page.press("#search-q", "Enter")
         authenticated_page.wait_for_timeout(1000)
         expect(authenticated_page.locator("#search-results")).to_be_attached()
 
@@ -82,7 +82,7 @@ class TestSearchPage:
         """Gibberish query returns no results."""
         _navigate_to_search(authenticated_page)
         authenticated_page.fill("#search-q", "zzzznonexistentwine99999")
-        authenticated_page.click("#search-form button[type='submit']")
+        authenticated_page.press("#search-q", "Enter")
         authenticated_page.wait_for_timeout(1000)
         expect(authenticated_page.locator("#search-results")).to_be_attached()
 
