@@ -85,8 +85,8 @@ class TestUndoImport:
         """After importing wines via API, the undo button appears on Import tab."""
         page = authenticated_page
 
-        # Create a completed import via API (increase timeout for slow servers)
-        page.evaluate("""async () => {
+        # Create a completed import via API
+        result = page.evaluate("""async () => {
             const token = localStorage.getItem('winebox_token');
             const csv = 'Name,Vintage\\nTest Undo Wine,2020\\n';
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -111,7 +111,7 @@ class TestUndoImport:
                 body: JSON.stringify({ mapping: { 'Name': 'name', 'Vintage': 'vintage' } })
             });
 
-            // Process and wait for completion
+            // Process
             const processResp = await fetch('/api/import/' + batchId + '/process', {
                 method: 'POST',
                 headers: {
@@ -125,25 +125,20 @@ class TestUndoImport:
                     default_case_size: 0
                 })
             });
-            await processResp.json();
+            const processResult = await processResp.json();
 
-            // Poll until batch status is 'completed'
-            for (let i = 0; i < 20; i++) {
-                const statusResp = await fetch('/api/import/batches/' + batchId, {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                const batch = await statusResp.json();
-                if (batch.status === 'completed') break;
-                await new Promise(r => setTimeout(r, 500));
-            }
+            // Verify batch is completed
+            const statusResp = await fetch('/api/import/batches/' + batchId, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const batch = await statusResp.json();
+            return { batchId, status: batch.status, wines: processResult.wines_created };
         }""")
 
-        # Reload the import tab to pick up the new batch
-        page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
-        page.wait_for_selector("[data-cellar-tab='import']", state="visible", timeout=10000)
-        page.click("[data-cellar-tab='import']")
-        page.wait_for_selector("#cellar-panel-import", state="visible", timeout=10000)
+        assert result["status"] == "completed", f"Batch not completed: {result}"
+        assert result["wines"] > 0, f"No wines created: {result}"
+
+        _navigate_to_import_tab(page)
         page.wait_for_selector("#import-tab-actions", state="visible", timeout=30000)
 
         expect(page.locator("#import-tab-undo-btn")).to_be_visible()
