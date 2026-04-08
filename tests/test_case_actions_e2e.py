@@ -1,7 +1,7 @@
 """End-to-end tests for case-level actions (sell, gift, breakage).
 
 These tests verify that users can perform actions on entire cases
-from the grouped cellar view.
+by finding wines via the Search tab.
 
 Run with: uv run python -m pytest -m e2e tests/test_case_actions_e2e.py -v
 """
@@ -66,29 +66,34 @@ def _add_case_via_api(page: Page, name: str = "Case Action Wine") -> dict:
     return result
 
 
+def _search_for_wine(page: Page, name: str) -> None:
+    """Navigate to Search tab and find a wine by name."""
+    page.click("a[data-page='cellar']")
+    page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+    page.click("[data-cellar-tab='search']")
+    page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+    page.fill("#search-q", name)
+    page.click("#search-form button[type='submit']")
+    page.wait_for_selector(".wine-card", state="visible", timeout=10000)
+
+
 @pytest.mark.e2e
 class TestCaseActionModal:
     """Test the case action modal opens and shows correct options."""
 
     def test_case_action_button_visible(self, authenticated_page: Page) -> None:
-        """Case Action button appears on case rows in grouped cellar."""
+        """Case Action button appears on wine cards found via search."""
         page = authenticated_page
         _add_case_via_api(page, "Visible Case Wine")
+        _search_for_wine(page, "Visible Case Wine")
 
-        page.click("a[data-page='cellar']")
-        page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
-        page.wait_for_selector(".wine-card", state="visible", timeout=10000)
-
-        # Should have a Case Actions button
         expect(page.locator(".case-action-btn").first).to_be_visible(timeout=5000)
 
     def test_case_action_modal_opens(self, authenticated_page: Page) -> None:
         """Clicking Case Actions opens the case action modal."""
         page = authenticated_page
         _add_case_via_api(page, "Modal Open Wine")
-
-        page.click("a[data-page='cellar']")
-        page.wait_for_selector(".wine-card", state="visible", timeout=10000)
+        _search_for_wine(page, "Modal Open Wine")
 
         page.locator(".case-action-btn").first.click()
         expect(page.locator("#case-action-modal.active")).to_be_visible(timeout=5000)
@@ -97,9 +102,8 @@ class TestCaseActionModal:
         """Case action modal shows Sell, Gift, and Breakage options."""
         page = authenticated_page
         _add_case_via_api(page, "Reasons Wine")
+        _search_for_wine(page, "Reasons Wine")
 
-        page.click("a[data-page='cellar']")
-        page.wait_for_selector(".wine-card", state="visible", timeout=10000)
         page.locator(".case-action-btn").first.click()
         page.wait_for_selector("#case-action-modal.active", state="visible", timeout=5000)
 
@@ -116,26 +120,17 @@ class TestCaseActionExecution:
         """Selling a case shows success toast and updates cellar."""
         page = authenticated_page
         _add_case_via_api(page, "Sell Case Wine")
+        _search_for_wine(page, "Sell Case Wine")
 
-        page.click("a[data-page='cellar']")
-        page.wait_for_selector(".wine-card", state="visible", timeout=10000)
-
-        # Find the case action button for our wine
         card = page.locator(".wine-card", has_text="Sell Case Wine").first
         card.locator(".case-action-btn").click()
         page.wait_for_selector("#case-action-modal.active", state="visible", timeout=5000)
 
-        # Select Sell
         page.locator(".case-reason-card[data-reason='sold']").click()
-
-        # Fill sale price
         page.fill("#case-action-sale-price", "150")
         page.fill("#case-action-buyer", "Wine Shop")
-
-        # Confirm
         page.click("#case-action-confirm-btn")
 
-        # Should show success toast
         expect(page.locator(".toast")).to_be_visible(timeout=5000)
         toast_text = page.locator(".toast").text_content() or ""
         assert "sold" in toast_text.lower() or "bottle" in toast_text.lower()
@@ -144,9 +139,7 @@ class TestCaseActionExecution:
         """Gifting a case shows success toast."""
         page = authenticated_page
         _add_case_via_api(page, "Gift Case Wine")
-
-        page.click("a[data-page='cellar']")
-        page.wait_for_selector(".wine-card", state="visible", timeout=10000)
+        _search_for_wine(page, "Gift Case Wine")
 
         card = page.locator(".wine-card", has_text="Gift Case Wine").first
         card.locator(".case-action-btn").click()

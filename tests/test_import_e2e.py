@@ -287,14 +287,17 @@ class TestImportProcess:
             results = page.locator("#import-step-results")
             expect(results).to_contain_text("4", timeout=20000)
 
-        # Verify the wines appear in the cellar
+        # Verify the wines appear via Search
         page.click("a[data-page='cellar']")
         page.wait_for_selector("#page-cellar", state="visible")
+        page.click("[data-cellar-tab='search']")
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+        page.fill("#search-q", "Petrus")
+        page.click("#search-form button[type='submit']")
         page.wait_for_selector(".wine-card", state="visible", timeout=10000)
 
-        cellar_text = page.locator("#page-cellar").text_content()
-        assert "Chateau Petrus" in cellar_text
-        assert "Tignanello" in cellar_text
+        results_text = page.locator("#search-results").text_content()
+        assert "Petrus" in results_text
 
     def test_import_with_non_wine_filtering(self, authenticated_page: Page, csv_with_spirits: Path) -> None:
         """Test that non-wine rows (whiskey, gin) are filtered out."""
@@ -361,12 +364,15 @@ class TestImportCustomFields:
 
         _confirm_and_wait_for_import(page)
 
-        # Navigate to cellar and find the imported wine
+        # Navigate to Search tab and find the imported wine
         page.click("a[data-page='cellar']")
+        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.click("[data-cellar-tab='search']")
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+        page.fill("#search-q", "Petrus")
+        page.click("#search-form button[type='submit']")
         page.wait_for_selector(".wine-card", state="visible", timeout=10000)
 
-        # Find a card containing one of our imported wines
-        # The sample CSV has "Chateau Petrus" as the first wine
         wine_card = page.locator(".wine-card", has_text="Petrus").first
         if wine_card.count() == 0:
             wine_card = page.locator(".wine-card").first

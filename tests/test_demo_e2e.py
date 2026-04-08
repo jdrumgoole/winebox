@@ -177,13 +177,17 @@ class TestDemoDataE2E:
             page.click("#cellar-demo-install-btn")
             page.wait_for_selector("#cellar-demo-remove-btn", state="visible", timeout=60000)
 
-            # Switch to dashboard tab and check stats updated
+            # Switch to dashboard tab — this triggers loadCellarAnalytics
             page.click("[data-cellar-tab='dashboard']")
             page.wait_for_selector("#cellar-panel-dashboard", state="visible", timeout=5000)
-            # Wait for stats to load (non-dash value)
+            # Wait for stats to show a positive bottle count
             page.wait_for_function(
-                "document.getElementById('stat-total-bottles').textContent !== '-'",
-                timeout=10000,
+                """() => {
+                    const el = document.getElementById('stat-total-bottles');
+                    const val = el ? el.textContent.trim() : '-';
+                    return val !== '-' && val !== '0' && parseInt(val) > 0;
+                }""",
+                timeout=15000,
             )
             bottles = page.text_content("#stat-total-bottles")
             assert bottles and int(bottles) > 0, f"Expected bottles > 0, got {bottles}"

@@ -32,7 +32,7 @@
 - When running tests, use `WINEBOX_USE_CLAUDE_VISION=false` to use Tesseract only and keep costs down
 - Example: `WINEBOX_USE_CLAUDE_VISION=false uv run python -m pytest tests/`
 - Production test credentials are available via `WINEBOX_TEST_USER` and `WINEBOX_TEST_PASSWORD` environment variables in `.env`. This user has been validated and can be used to log in to production for testing.
-- **Treat skipped tests as failures.** Do not use `pytest.skip()` or `pytest.mark.skipif` to hide broken tests. Tests must either pass or fail — skipping masks regressions. If a test cannot run because a resource is unavailable, fix the test infrastructure so the resource is available, or remove the test entirely if the feature is no longer supported.
+- **Never skip failing tests.** Do not use `pytest.skip()`, `pytest.mark.skipif`, or `xfail` to hide broken tests. Every test must pass — no exceptions. If a feature is removed, update or remove the corresponding tests immediately. If a test cannot run because a resource is unavailable, fix the test infrastructure. Skipping masks regressions and is never acceptable.
 - **All tests must be designed from the start to run in parallel.** Use per-worker users, isolated data, and fresh browser contexts. Avoid shared mutable state, fixed ports, shared databases, or any resources that cause conflicts when tests run concurrently via pytest-xdist. E2E tests use `--dist loadfile` so same-file tests share a worker, but different files run in parallel.
 
 ## Development Approach

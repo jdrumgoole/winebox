@@ -435,20 +435,24 @@ class TestXWinesDoesNotBreakExisting:
     """Verify the X-Wines tab doesn't break existing functionality."""
 
     def test_search_tab_still_works(self, authenticated_page: Page) -> None:
-        """Test that the existing Search tab still works after adding X-Wines."""
+        """Test that the Search sub-tab still works after adding X-Wines."""
         page = authenticated_page
 
-        # Navigate to Search tab
-        page.click("a[data-page='search']")
-        expect(page.locator("#page-search")).to_be_visible()
+        # Navigate to Search sub-tab under My Cellar
+        page.click("a[data-page='cellar']")
+        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.click("[data-cellar-tab='search']")
+        expect(page.locator("#cellar-panel-search")).to_be_visible()
 
         # Then navigate to X-Wines
         page.click("a[data-page='xwines']")
         expect(page.locator("#page-xwines")).to_be_visible()
 
-        # And back to Search
-        page.click("a[data-page='search']")
-        expect(page.locator("#page-search")).to_be_visible()
+        # And back to Search sub-tab
+        page.click("a[data-page='cellar']")
+        page.wait_for_selector("#page-cellar", state="visible", timeout=5000)
+        page.click("[data-cellar-tab='search']")
+        expect(page.locator("#cellar-panel-search")).to_be_visible()
 
     def test_cellar_tab_still_works(self, authenticated_page: Page) -> None:
         """Test that the Cellar tab still works."""

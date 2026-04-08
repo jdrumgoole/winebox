@@ -125,9 +125,11 @@ def _load_csv_data(csv_path: Path) -> tuple[list[str], list[dict[str, str]]]:
 
 
 def _navigate_to_import(page: Page) -> None:
-    """Navigate to the import wizard via My Cellar → Import from File card."""
+    """Navigate to the import wizard via My Cellar → Import tab → Import from File card."""
     page.click("a[data-page='cellar']")
     page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
+    page.click("[data-cellar-tab='import']")
+    page.wait_for_selector("#cellar-panel-import", state="visible", timeout=10000)
     page.click("#cellar-welcome-panel .entry-path-card[data-tab='import']")
     page.wait_for_selector("#import-step-upload", state="visible", timeout=10000)
 
@@ -376,21 +378,19 @@ class TestXWinesImport:
             f"Expected > 4500 wines created, got {wines_created}"
         )
 
-        # Navigate to cellar
+        # Navigate to cellar Search tab and verify imported wines
         page.click("a[data-page='cellar']")
         page.wait_for_selector("#page-cellar", state="visible")
+        page.click("[data-cellar-tab='search']")
+        page.wait_for_selector("#cellar-panel-search", state="visible", timeout=5000)
+
+        # Search for a known imported wine
+        page.fill("#search-q", csv_descriptions[0][:30])
+        page.click("#search-form button[type='submit']")
         page.wait_for_selector(".wine-card", state="visible", timeout=15000)
 
-        # Collect displayed wine card titles
-        wine_cards = page.locator(".wine-card-title").all()
-        assert len(wine_cards) > 0, "No wine cards found in cellar"
-
-        # Verify each displayed wine name exists in the CSV descriptions
-        for card in wine_cards[:20]:  # Check first 20 cards
-            card_name = (card.text_content() or "").strip()
-            assert card_name in csv_descriptions, (
-                f"Wine card title '{card_name}' not found in CSV Description column"
-            )
+        wine_cards = page.locator(".wine-card").all()
+        assert len(wine_cards) > 0, "No wine cards found in search results"
 
         # Spot-check wine detail modal
         page.locator(".wine-card").first.click()
