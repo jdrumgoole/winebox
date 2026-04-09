@@ -12,9 +12,6 @@ from winebox.models.token_blacklist import RevokedToken
 from winebox.models.login_attempt import LoginAttempt
 from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.import_batch_row import RawUploadRow
-from winebox.models.case import Case
-from winebox.models.bottle import Bottle
-from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
 from winebox.models.cellar import CellarItem, EmbeddedWine
 from winebox.models.cellar_event import CellarEvent, CellarEventType
 from winebox.models.price_capture import CaptureType, ShopLocation, GeoCoordinates
@@ -46,12 +43,6 @@ __all__ = [
     "ImportBatch",
     "ImportStatus",
     "RawUploadRow",
-    # Case & Bottle tracking (legacy — being replaced by Cellar)
-    "Case",
-    "Bottle",
-    "WineEvent",
-    "WineEventType",
-    "WineEventScope",
     # Cellar (document-oriented replacement)
     "CellarItem",
     "EmbeddedWine",

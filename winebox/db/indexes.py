@@ -137,20 +137,6 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("cellar_id", ASCENDING), ("event_type", ASCENDING)]),
         IndexModel([("import_batch_id", ASCENDING)]),
     ],
-    # Legacy — kept for backward compatibility during transition
-    "cases": [
-        IndexModel([("owner_id", ASCENDING)]),
-        IndexModel([("owner_id", ASCENDING), ("wine_id", ASCENDING)]),
-    ],
-    "bottles": [
-        IndexModel([("owner_id", ASCENDING)]),
-        IndexModel([("case_id", ASCENDING)]),
-        IndexModel([("owner_id", ASCENDING), ("wine_id", ASCENDING)]),
-    ],
-    "wine_events": [
-        IndexModel([("bottle_id", ASCENDING)]),
-        IndexModel([("case_id", ASCENDING)]),
-    ],
     "wine_prices": [
         IndexModel(
             [("wine_name", ASCENDING), ("vintage", ASCENDING), ("wine_type", ASCENDING)],

@@ -56,9 +56,6 @@ def test_expected_collections_present() -> None:
         "raw_uploads",
         "cellars",
         "cellar_events",
-        "cases",
-        "bottles",
-        "wine_events",
         "wine_prices",
         "wine_prices_history",
     }

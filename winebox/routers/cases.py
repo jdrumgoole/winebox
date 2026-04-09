@@ -9,7 +9,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from winebox.models.wine_event import WineEventType  # Used in AddCaseEventRequest schema
+from winebox.models.cellar_event import CellarEventType
 
 from winebox.models.wine import Wine
 from winebox.services.auth import RequireAuth
@@ -58,7 +58,7 @@ class AddBottlesRequest(BaseModel):
 class AddEventRequest(BaseModel):
     """Request to record a bottle (wine) event."""
 
-    event_type: WineEventType
+    event_type: CellarEventType
     event_date: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=2000)
     tasting_notes: Optional[str] = Field(None, max_length=2000)
@@ -70,7 +70,7 @@ class AddEventRequest(BaseModel):
 class AddCaseEventRequest(BaseModel):
     """Request to record a case-level event (sold, gifted, etc.)."""
 
-    event_type: WineEventType
+    event_type: CellarEventType
     event_date: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=2000)
     sale_price: Optional[float] = Field(None, ge=0)
@@ -269,21 +269,12 @@ async def add_case_event(
             "bottles_affected": 0,
         }
 
-    # Map old event types to new
-    event_type_map = {
-        WineEventType.SOLD: CellarEventType.SOLD,
-        WineEventType.GIFTED: CellarEventType.GIFTED,
-        WineEventType.BREAKAGE: CellarEventType.BREAKAGE,
-        WineEventType.OTHER: CellarEventType.OTHER,
-    }
-    cellar_event_type = event_type_map.get(request.event_type, CellarEventType.OTHER)
-
     # Create cellar event
     event = CellarEvent(
         cellar_id=current_user.id,
         cellar_item_id=oid,
         item_type="case",
-        event_type=cellar_event_type,
+        event_type=request.event_type,
         quantity=bottles_remaining,
         event_date=now,
         notes=request.notes,
@@ -301,7 +292,7 @@ async def add_case_event(
 
     logger.info(
         "Case %s event: %s (%d bottles affected, user %s)",
-        case_id, cellar_event_type.value, bottles_remaining, current_user.id,
+        case_id, request.event_type.value, bottles_remaining, current_user.id,
     )
 
     return {

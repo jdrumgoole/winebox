@@ -1,4 +1,7 @@
-"""Bottle management endpoints — loose bottles and event recording."""
+"""Bottle management endpoints — loose bottles and removal events.
+
+All data lives in the cellars and cellar_events collections.
+"""
 
 import logging
 from datetime import datetime, timezone
@@ -8,8 +11,8 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException
 
-from winebox.models.bottle import Bottle
-from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
+from winebox.models.cellar import CellarItem
+from winebox.models.cellar_event import CellarEvent, CellarEventType
 from winebox.models.wine import Wine
 from winebox.routers.cases import AddBottlesRequest, AddEventRequest, _find_or_create_wine
 from winebox.services.auth import RequireAuth
@@ -21,11 +24,7 @@ router = APIRouter()
 
 @router.post("")
 async def add_loose_bottles(request: AddBottlesRequest, current_user: RequireAuth) -> dict:
-    """Add loose bottles (no case) to the cellar.
-
-    Creates a Wine record (or reuses existing), N Bottle records,
-    and N 'added' events.
-    """
+    """Add loose bottles (no case) to the cellar."""
     wine = await _find_or_create_wine(
         current_user.id,
         request.name, request.winery, request.vintage,
@@ -40,11 +39,6 @@ async def add_loose_bottles(request: AddBottlesRequest, current_user: RequireAut
         quantity=request.quantity,
     )
 
-    logger.info(
-        "Created %d loose bottles of %s for user %s",
-        request.quantity, wine.name, current_user.id,
-    )
-
     return {
         "wine_id": str(wine.id),
         "bottles_created": result["bottles_created"],
@@ -56,130 +50,145 @@ async def list_bottles(
     current_user: RequireAuth,
     wine_id: str | None = None,
 ) -> dict:
-    """List bottles, optionally filtered by wine_id, with current status."""
-    query: dict[str, Any] = {"owner_id": current_user.id}
+    """List cellar items, optionally filtered by wine_id.
+
+    Returns items in a format compatible with the frontend removal flow.
+    Each item has an id, quantity, and in_cellar status.
+    """
+    cellar_col = CellarItem.get_pymongo_collection()
+    query: dict[str, Any] = {"cellar_id": current_user.id}
     if wine_id:
         try:
-            query["wine_id"] = ObjectId(wine_id)
+            query["wine.wine_id"] = ObjectId(wine_id)
         except InvalidId:
             raise HTTPException(status_code=400, detail="Invalid wine_id")
 
-    bottles = await Bottle.find(query).sort([("created_at", -1)]).to_list()
-    if not bottles:
-        return {"bottles": [], "total": 0}
-
-    # Batch-fetch latest event for all bottles in one aggregation
-    bottle_ids = [b.id for b in bottles]
-    event_col = WineEvent.get_pymongo_collection()
-    pipeline = [
-        {"$match": {"bottle_id": {"$in": bottle_ids}}},
-        {"$sort": {"created_at": -1}},
-        {"$group": {"_id": "$bottle_id", "event_type": {"$first": "$event_type"}}},
-    ]
-    cursor = await event_col.aggregate(pipeline)
-    latest_events = {doc["_id"]: doc["event_type"] for doc in await cursor.to_list(length=None)}
+    items = await cellar_col.find(query).sort("created_at", -1).to_list(length=None)
 
     result = []
-    for bottle in bottles:
-        latest_type = latest_events.get(bottle.id, "unknown")
+    for item in items:
+        wine = item.get("wine", {})
+        qty = item.get("quantity", 0)
         result.append({
-            "id": str(bottle.id),
-            "wine_id": str(bottle.wine_id),
-            "case_id": str(bottle.case_id) if bottle.case_id else None,
-            "name": bottle.name,
-            "winery": bottle.winery,
-            "vintage": bottle.vintage,
-            "grape_variety": bottle.grape_variety,
-            "country": bottle.country,
-            "region": bottle.region,
-            "wine_type": bottle.wine_type,
-            "status": latest_type,
-            "in_cellar": latest_type == WineEventType.ADDED.value,
-            "created_at": bottle.created_at.isoformat(),
+            "id": str(item["_id"]),
+            "wine_id": str(wine.get("wine_id", "")),
+            "case_id": str(item["_id"]) if item.get("item_type") == "case" else None,
+            "name": wine.get("name", ""),
+            "winery": wine.get("winery"),
+            "vintage": wine.get("vintage"),
+            "grape_variety": wine.get("grape_variety"),
+            "country": wine.get("country"),
+            "region": wine.get("region"),
+            "wine_type": wine.get("wine_type"),
+            "status": "added" if qty > 0 else "removed",
+            "in_cellar": qty > 0,
+            "quantity": qty,
+            "item_type": item.get("item_type", "bottle"),
+            "created_at": item["created_at"].isoformat() if item.get("created_at") else None,
         })
 
     return {"bottles": result, "total": len(result)}
 
 
-@router.post("/{bottle_id}/events")
-async def add_bottle_event(
-    bottle_id: str,
+@router.post("/{item_id}/events")
+async def add_item_event(
+    item_id: str,
     request: AddEventRequest,
     current_user: RequireAuth,
 ) -> dict:
-    """Record an event for a bottle (drunk, sold, gifted, breakage, other).
+    """Record a removal event for a cellar item (drunk, sold, gifted, etc.).
 
-    This changes the bottle's state. The bottle record itself is never
-    modified — only events are appended.
+    Decrements the item's quantity and creates a CellarEvent.
     """
     try:
-        oid = ObjectId(bottle_id)
+        oid = ObjectId(item_id)
     except InvalidId:
-        raise HTTPException(status_code=404, detail="Bottle not found")
+        raise HTTPException(status_code=404, detail="Item not found")
 
-    bottle = await Bottle.find_one({"_id": oid, "owner_id": current_user.id})
-    if not bottle:
-        raise HTTPException(status_code=404, detail="Bottle not found")
+    cellar_col = CellarItem.get_pymongo_collection()
+    item = await cellar_col.find_one({"_id": oid, "cellar_id": current_user.id})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
 
-    # Don't allow 'added' events via this endpoint (use add_cases/add_loose_bottles)
-    if request.event_type == WineEventType.ADDED:
+    if request.event_type == CellarEventType.ADDED:
         raise HTTPException(
             status_code=400,
             detail="Cannot manually add 'added' events. Use the add cases/bottles endpoints.",
         )
 
-    event = WineEvent(scope=WineEventScope.BOTTLE, 
-        bottle_id=bottle.id,
-        owner_id=current_user.id,
+    current_qty = item.get("quantity", 0)
+    if current_qty <= 0:
+        return {
+            "event_id": None,
+            "bottle_id": item_id,
+            "event_type": request.event_type.value,
+        }
+
+    now = request.event_date or datetime.now(timezone.utc)
+
+    # Decrement by 1 (the frontend removes one bottle at a time)
+    new_qty = max(0, current_qty - 1)
+    await cellar_col.update_one(
+        {"_id": oid},
+        {"$set": {"quantity": new_qty, "updated_at": now}},
+    )
+
+    event = CellarEvent(
+        cellar_id=current_user.id,
+        cellar_item_id=oid,
+        item_type=item.get("item_type", "bottle"),
         event_type=request.event_type,
-        event_date=request.event_date or datetime.now(timezone.utc),
+        quantity=1,
+        event_date=now,
         notes=request.notes,
         tasting_notes=request.tasting_notes,
         sale_price=request.sale_price,
         buyer=request.buyer,
         gift_recipient=request.gift_recipient,
-        created_at=datetime.now(timezone.utc),
     )
     await event.insert()
 
+    wine = item.get("wine", {})
     logger.info(
-        "Bottle %s event: %s (wine=%s, user=%s)",
-        bottle_id, request.event_type.value, bottle.name, current_user.id,
+        "Cellar item %s event: %s (wine=%s, user=%s)",
+        item_id, request.event_type.value, wine.get("name"), current_user.id,
     )
 
     return {
         "event_id": str(event.id),
-        "bottle_id": bottle_id,
+        "bottle_id": item_id,
         "event_type": request.event_type.value,
     }
 
 
-@router.get("/{bottle_id}/events")
-async def get_wine_events(
-    bottle_id: str,
+@router.get("/{item_id}/events")
+async def get_item_events(
+    item_id: str,
     current_user: RequireAuth,
 ) -> dict:
-    """Get the event history for a bottle (most recent first)."""
+    """Get the event history for a cellar item (most recent first)."""
     try:
-        oid = ObjectId(bottle_id)
+        oid = ObjectId(item_id)
     except InvalidId:
-        raise HTTPException(status_code=404, detail="Bottle not found")
+        raise HTTPException(status_code=404, detail="Item not found")
 
-    bottle = await Bottle.find_one({"_id": oid, "owner_id": current_user.id})
-    if not bottle:
-        raise HTTPException(status_code=404, detail="Bottle not found")
+    cellar_col = CellarItem.get_pymongo_collection()
+    item = await cellar_col.find_one({"_id": oid, "cellar_id": current_user.id})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
 
-    events = await WineEvent.find(
-        {"bottle_id": bottle.id}
+    events = await CellarEvent.find(
+        {"cellar_item_id": oid}
     ).sort([("created_at", -1)]).to_list()
 
     return {
-        "bottle_id": bottle_id,
+        "bottle_id": item_id,
         "events": [
             {
                 "id": str(e.id),
                 "event_type": e.event_type.value,
                 "event_date": e.event_date.isoformat(),
+                "quantity": e.quantity,
                 "notes": e.notes,
                 "tasting_notes": e.tasting_notes,
                 "sale_price": e.sale_price,
