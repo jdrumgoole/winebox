@@ -1012,8 +1012,12 @@ function initForms() {
         }
     });
 
-    // Dashboard demo install button
+    // Dashboard demo buttons
     document.getElementById('dashboard-demo-install-btn')?.addEventListener('click', installDemoData);
+    document.getElementById('dashboard-demo-remove-btn')?.addEventListener('click', async () => {
+        await removeDemoData();
+        loadCellarAnalytics();
+    });
 
     // Search form
     document.getElementById('search-form').addEventListener('submit', handleSearch);
@@ -2138,6 +2142,9 @@ async function loadCellarAnalytics() {
             emptyState.style.display = summary.total_bottles === 0 ? '' : 'none';
         }
 
+        // Show/hide demo data banner
+        updateDashboardDemoBanner();
+
         // Render charts
         renderDashboardCharts(summary);
 
@@ -2159,6 +2166,19 @@ async function loadCellarAnalytics() {
         renderActivityList(transactions);
     } catch (error) {
         console.error('Failed to load cellar analytics:', error);
+    }
+}
+
+async function updateDashboardDemoBanner() {
+    const banner = document.getElementById('dashboard-demo-banner');
+    if (!banner) return;
+    try {
+        const resp = await fetchWithAuth(`${API_BASE}/demo/status`);
+        if (!resp.ok) { banner.style.display = 'none'; return; }
+        const status = await resp.json();
+        banner.style.display = (status.installed && status.wine_count > 0) ? '' : 'none';
+    } catch {
+        banner.style.display = 'none';
     }
 }
 
