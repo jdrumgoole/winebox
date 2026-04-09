@@ -106,11 +106,11 @@ class TestDemoDataE2E:
         try:
             page.wait_for_selector("#cellar-welcome-panel", state="visible", timeout=10000)
             cards = page.locator('#cellar-welcome-panel .entry-path-card')
-            expect(cards).to_have_count(3)
-            # First card navigates to add-to-cellar wizard
+            expect(cards).to_have_count(4)
+            # First card (Scan) shows sub-wizard inline
             cards.first.click()
-            page.wait_for_selector("#page-add-to-cellar", state="visible", timeout=5000)
-            expect(page.locator("#page-add-to-cellar")).to_be_visible()
+            page.wait_for_selector("#add-cellar-scan", state="visible", timeout=5000)
+            expect(page.locator("#add-cellar-scan")).to_be_visible()
         except Exception:
             capture_artifacts(page, "demo_entry_path_cards")
             raise

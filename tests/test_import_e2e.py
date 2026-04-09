@@ -103,7 +103,7 @@ def _navigate_to_import(page: Page) -> None:
     page.wait_for_selector("#page-cellar", state="visible", timeout=10000)
     page.click("[data-cellar-tab='import']")
     page.wait_for_selector("#cellar-panel-import", state="visible", timeout=10000)
-    page.click("#cellar-welcome-panel .entry-path-card[data-tab='import']")
+    page.click("[data-import-path='import']")
     page.wait_for_selector("#import-step-upload", state="visible", timeout=10000)
 
 

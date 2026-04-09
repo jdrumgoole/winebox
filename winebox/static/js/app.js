@@ -858,13 +858,6 @@ function initNavigation() {
             return;
         }
 
-        // Handle import tab shortcut on add-to-cellar page
-        if (link.dataset.tab && page === 'add-to-cellar') {
-            navigateTo('add-to-cellar');
-            setTimeout(() => selectEntryPath(link.dataset.tab), 50);
-            return;
-        }
-
         navigateTo(page);
     });
 
@@ -933,12 +926,13 @@ function navigateTo(page) {
             loadMet();
             break;
         case 'add-to-cellar':
-            resetAddToCellarWizard();
-            break;
+            // Orphan page removed — redirect to Import tab
+            currentCellarTab = 'import';
+            navigateTo('cellar');
+            return;
         case 'import':
-            // Import has been merged into Add to Cellar wizard — redirect
-            navigateTo('add-to-cellar');
-            setTimeout(() => selectEntryPath('import'), 50);
+            currentCellarTab = 'import';
+            navigateTo('cellar');
             return;
         case 'xwines':
             loadXWinesFilters();
@@ -1990,6 +1984,7 @@ function switchCellarTab(tab) {
             // Search results loaded on form submit
             break;
         case 'import':
+            resetImportWizard();
             loadImportTab();
             break;
         case 'history':
@@ -4199,8 +4194,8 @@ function initImportPage() {
     // Go to Cellar buttons (CSP-compliant) — navigate to Import sub-tab
     document.querySelectorAll('.import-go-to-cellar-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            currentCellarTab = 'import';
-            navigateTo('cellar');
+            resetImportWizard();
+            loadImportTab();
             // Also refresh dashboard analytics in background
             loadCellarAnalytics();
         });
@@ -5854,17 +5849,11 @@ const ENTRY_PATH_LABELS = {
 };
 
 function initAddToCellarPage() {
-    // Entry path card clicks
-    document.querySelectorAll('.entry-path-card').forEach(card => {
+    // Import tab entry-path card clicks
+    document.querySelectorAll('[data-import-path]').forEach(card => {
         card.addEventListener('click', () => {
-            selectEntryPath(card.dataset.path);
+            selectImportPath(card.dataset.importPath);
         });
-    });
-
-    // Breadcrumb root link
-    document.getElementById('breadcrumb-root')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        resetAddToCellarWizard();
     });
 
     // Manual entry form
@@ -5874,9 +5863,9 @@ function initAddToCellarPage() {
     }
 
     // Back buttons
-    document.getElementById('manual-back-btn')?.addEventListener('click', () => resetAddToCellarWizard());
-    document.getElementById('scan-back-btn')?.addEventListener('click', () => resetAddToCellarWizard());
-    document.getElementById('from-met-back-btn')?.addEventListener('click', () => resetAddToCellarWizard());
+    document.getElementById('manual-back-btn')?.addEventListener('click', () => { resetImportWizard(); loadImportTab(); });
+    document.getElementById('scan-back-btn')?.addEventListener('click', () => { resetImportWizard(); loadImportTab(); });
+    document.getElementById('from-met-back-btn')?.addEventListener('click', () => { resetImportWizard(); loadImportTab(); });
     document.getElementById('met-picker-back-btn')?.addEventListener('click', () => {
         document.getElementById('met-picker-selected').style.display = 'none';
         document.getElementById('met-picker-list').style.display = '';
@@ -5922,32 +5911,32 @@ function initAddToCellarPage() {
     setupCaseToggle('manual-quantity-unit', 'manual-case-size', '.manual-case-fields');
 }
 
-function resetAddToCellarWizard() {
-    // Show cards, hide all sub-wizards
-    document.getElementById('entry-path-cards').style.display = '';
+function resetImportWizard() {
+    // Show welcome panel and cards, hide all sub-wizards
+    const welcomePanel = document.getElementById('cellar-welcome-panel');
+    if (welcomePanel) welcomePanel.style.display = '';
     document.querySelectorAll('.add-cellar-subwizard').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('.entry-path-card').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('[data-import-path]').forEach(c => c.classList.remove('active'));
     selectedMetWineId = null;
-
-    // Hide step breadcrumb, show subtitle
-    document.querySelectorAll('.breadcrumb-step-sep').forEach(el => el.style.display = 'none');
-    document.getElementById('breadcrumb-current').textContent = '';
-    document.getElementById('add-cellar-subtitle').style.display = '';
 }
 
-function selectEntryPath(path) {
-    // Hide cards, show selected sub-wizard
-    document.getElementById('entry-path-cards').style.display = 'none';
+// Legacy alias
+function resetAddToCellarWizard() { resetImportWizard(); }
+
+function selectImportPath(path) {
+    // Hide welcome panel, show selected sub-wizard
+    const welcomePanel = document.getElementById('cellar-welcome-panel');
+    if (welcomePanel) welcomePanel.style.display = 'none';
+    // Also hide import analytics while in a sub-wizard
+    const actionsDiv = document.getElementById('import-tab-actions');
+    if (actionsDiv) actionsDiv.style.display = 'none';
+    const analyticsDiv = document.getElementById('import-batch-analytics');
+    if (analyticsDiv) analyticsDiv.style.display = 'none';
+
     document.querySelectorAll('.add-cellar-subwizard').forEach(el => el.style.display = 'none');
-
-    document.querySelectorAll('.entry-path-card').forEach(c => {
-        c.classList.toggle('active', c.dataset.path === path);
+    document.querySelectorAll('[data-import-path]').forEach(c => {
+        c.classList.toggle('active', c.dataset.importPath === path);
     });
-
-    // Show step in breadcrumb, hide subtitle
-    document.querySelectorAll('.breadcrumb-step-sep').forEach(el => el.style.display = '');
-    document.getElementById('breadcrumb-current').textContent = ENTRY_PATH_LABELS[path] || path;
-    document.getElementById('add-cellar-subtitle').style.display = 'none';
 
     if (path === 'scan') {
         document.getElementById('add-cellar-scan').style.display = 'block';
@@ -5960,6 +5949,9 @@ function selectEntryPath(path) {
         document.getElementById('add-cellar-import').style.display = 'block';
     }
 }
+
+// Legacy alias
+function selectEntryPath(path) { selectImportPath(path); }
 
 // Scan-to-cellar sub-wizard
 let scanCellarResult = null;
@@ -6104,7 +6096,9 @@ async function handleScanCellarSubmit() {
         document.getElementById('scan-front-preview').innerHTML = 'Tap to take photo or select image';
         document.getElementById('scan-back-preview').innerHTML = 'Tap to take photo or select image';
         document.getElementById('scan-cellar-fields').style.display = 'none';
-        navigateTo('cellar');
+        resetImportWizard();
+        loadImportTab();
+        loadCellarAnalytics();
     } catch (error) {
         showToast(error.message, 'error');
     }
@@ -6168,7 +6162,9 @@ async function handleManualCellarSubmit(e) {
         const wine = await response.json();
         showToast(`Added to cellar: ${wine.name}`, 'success');
         form.reset();
-        navigateTo('cellar');
+        resetImportWizard();
+        loadImportTab();
+        loadCellarAnalytics();
     } catch (error) {
         showToast(error.message, 'error');
     }

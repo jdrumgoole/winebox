@@ -407,10 +407,9 @@
             <div id="cellar-panel-dashboard" class="cellar-panel active">
                 <div id="dashboard-empty-state" class="dashboard-empty-state" style="display:none;">
                     <h3>Your cellar is empty</h3>
-                    <p>Get started by importing wines or loading sample data to explore the app.</p>
-                    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.75rem;">
-                        <a href="#" data-cellar-tab-link="import" class="btn btn-primary">Import Wines</a>
-                        <button class="btn btn-outline btn-small" id="dashboard-demo-install-btn">Load sample wines</button>
+                    <p>Load sample data to explore the app, or switch to the Import tab to add your own wines.</p>
+                    <div style="margin-top:0.75rem;">
+                        <button class="btn btn-primary" id="dashboard-demo-install-btn">Load sample wines</button>
                     </div>
                 </div>
                 <div class="stats-grid" id="cellar-stats-grid">
@@ -565,8 +564,8 @@
                     <div class="demo-welcome-content">
                         <h3>Add Wines to Your Cellar</h3>
                         <p>How would you like to add wines?</p>
-                        <div class="entry-path-cards">
-                            <a href="#" data-page="add-to-cellar" data-tab="scan" class="entry-path-card">
+                        <div class="entry-path-cards" id="import-entry-path-cards">
+                            <div class="entry-path-card" data-import-path="scan">
                                 <div class="entry-path-icon">
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
@@ -575,8 +574,8 @@
                                 </div>
                                 <h3>Scan a Label</h3>
                                 <p>Take a photo to auto-detect wine details</p>
-                            </a>
-                            <a href="#" data-page="add-to-cellar" data-tab="manual" class="entry-path-card">
+                            </div>
+                            <div class="entry-path-card" data-import-path="manual">
                                 <div class="entry-path-icon">
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -585,8 +584,8 @@
                                 </div>
                                 <h3>Enter Details</h3>
                                 <p>Type in the wine details manually</p>
-                            </a>
-                            <a href="#" data-page="add-to-cellar" data-tab="from-met" class="entry-path-card">
+                            </div>
+                            <div class="entry-path-card" data-import-path="from-met">
                                 <div class="entry-path-icon">
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
@@ -594,8 +593,8 @@
                                 </div>
                                 <h3>From a Wine I've Met</h3>
                                 <p>Add a wine you previously recorded</p>
-                            </a>
-                            <a href="#" data-page="add-to-cellar" data-tab="import" class="entry-path-card">
+                            </div>
+                            <div class="entry-path-card" data-import-path="import">
                                 <div class="entry-path-icon">
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -605,7 +604,7 @@
                                 </div>
                                 <h3>Import from File</h3>
                                 <p>Upload a CSV or Excel spreadsheet</p>
-                            </a>
+                            </div>
                         </div>
                         <div style="margin-top:0.5rem;">
                             <button class="btn btn-outline btn-small" id="cellar-demo-install-btn">Load sample wines</button>
@@ -660,128 +659,9 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- History Panel -->
-            <div id="cellar-panel-history" class="cellar-panel" style="display:none;">
-                <div class="filter-bar">
-                    <select id="history-filter">
-                        <option value="all">All Transactions</option>
-                        <option value="CHECK_IN">Added</option>
-                        <option value="CHECK_OUT">All Removals</option>
-                        <option value="DRINK">Drank</option>
-                        <option value="SELL">Sold</option>
-                        <option value="GIFT">Gifted</option>
-                        <option value="OTHER">Other</option>
-                    </select>
-                    <div class="export-dropdown" id="history-export-dropdown">
-                        <button class="btn btn-secondary export-dropdown-btn" id="history-export-btn">
-                            Export
-                            <span class="dropdown-arrow">&#9662;</span>
-                        </button>
-                        <div class="export-dropdown-menu">
-                            <a href="#" data-format="csv" data-type="transactions">CSV</a>
-                            <a href="#" data-format="xlsx" data-type="transactions">Excel</a>
-                            <a href="#" data-format="yaml" data-type="transactions">YAML</a>
-                            <a href="#" data-format="json" data-type="transactions">JSON</a>
-                        </div>
-                    </div>
-                </div>
-                <div id="history-charts" class="chart-grid" style="display: none;">
-                    <div class="chart-card chart-card-full">
-                        <h3>Activity Timeline</h3>
-                        <div class="chart-wrapper">
-                            <canvas id="chart-history-timeline"></canvas>
-                        </div>
-                    </div>
-                    <div class="chart-card">
-                        <h3>Removal Reasons</h3>
-                        <div class="chart-wrapper chart-wrapper-sm">
-                            <canvas id="chart-history-reasons"></canvas>
-                        </div>
-                    </div>
-                    <div class="chart-card">
-                        <h3>Activity Summary</h3>
-                        <div class="history-stats" id="history-stats">
-                        </div>
-                    </div>
-                </div>
-                <div id="history-list" class="transaction-list"></div>
-            </div>
-        </section>
-
-        <!-- Wines I've Met Page -->
-        <section id="page-met" class="page" aria-labelledby="page-met-title">
-            <div class="page-header">
-                <div>
-                    <h2 id="page-met-title">Wines I've Met</h2>
-                    <p class="page-subtitle">Wines you've encountered in shops, restaurants, and tastings</p>
-                </div>
-                <button class="btn btn-primary" id="met-record-wine-btn">+ Record a Wine</button>
-            </div>
-            <div class="filter-bar">
-                <input type="text" id="met-search" placeholder="Search wines I've met...">
-                <div class="view-toggle">
-                    <button id="met-view-cards" class="active" title="Card view">Cards</button>
-                    <button id="met-view-table" title="Table view">Table</button>
-                </div>
-            </div>
-            <div id="met-list" class="wine-grid"></div>
-        </section>
-
-        <!-- Add to Cellar Wizard Page -->
-        <section id="page-add-to-cellar" class="page" aria-labelledby="page-add-to-cellar-title">
-            <div class="wizard-breadcrumb" id="add-cellar-breadcrumb-top">
-                <a href="#" data-cellar-tab-link="import" id="breadcrumb-cellar-link">My Cellar &rsaquo; Import</a>
-                <span class="breadcrumb-sep breadcrumb-step-sep" style="display:none;">&rsaquo;</span>
-                <span id="breadcrumb-current"></span>
-            </div>
-            <h2 id="page-add-to-cellar-title">Add Wine to Your Cellar</h2>
-            <p class="page-subtitle" id="add-cellar-subtitle">Choose how you'd like to add a wine</p>
-
-            <div class="entry-path-cards" id="entry-path-cards">
-                <div class="entry-path-card" data-path="scan">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                            <circle cx="12" cy="13" r="4"></circle>
-                        </svg>
-                    </div>
-                    <h3>Scan a Label</h3>
-                    <p>Take a photo to auto-detect wine details</p>
-                </div>
-                <div class="entry-path-card" data-path="manual">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </div>
-                    <h3>Enter Details Manually</h3>
-                    <p>Type in the wine details and quantity</p>
-                </div>
-                <div class="entry-path-card" data-path="from-met">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                        </svg>
-                    </div>
-                    <h3>From a Wine I've Met</h3>
-                    <p>Add a wine you previously recorded</p>
-                </div>
-                <div class="entry-path-card" data-path="import">
-                    <div class="entry-path-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                    </div>
-                    <h3>Import from File</h3>
-                    <p>Upload a CSV or Excel spreadsheet</p>
-                </div>
-            </div>
-
+                <!-- Sub-wizards (shown when user picks an entry path) -->
+                <div id="import-subwizard-container">
             <!-- Scan a Label Sub-wizard -->
             <div id="add-cellar-scan" class="add-cellar-subwizard" style="display:none;">
                 <div class="form-section">
@@ -1117,9 +997,77 @@
                     </div>
                 </div>
             </div>
+                </div>
+            </div>
+
+            <!-- History Panel -->
+            <div id="cellar-panel-history" class="cellar-panel" style="display:none;">
+                <div class="filter-bar">
+                    <select id="history-filter">
+                        <option value="all">All Transactions</option>
+                        <option value="CHECK_IN">Added</option>
+                        <option value="CHECK_OUT">All Removals</option>
+                        <option value="DRINK">Drank</option>
+                        <option value="SELL">Sold</option>
+                        <option value="GIFT">Gifted</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                    <div class="export-dropdown" id="history-export-dropdown">
+                        <button class="btn btn-secondary export-dropdown-btn" id="history-export-btn">
+                            Export
+                            <span class="dropdown-arrow">&#9662;</span>
+                        </button>
+                        <div class="export-dropdown-menu">
+                            <a href="#" data-format="csv" data-type="transactions">CSV</a>
+                            <a href="#" data-format="xlsx" data-type="transactions">Excel</a>
+                            <a href="#" data-format="yaml" data-type="transactions">YAML</a>
+                            <a href="#" data-format="json" data-type="transactions">JSON</a>
+                        </div>
+                    </div>
+                </div>
+                <div id="history-charts" class="chart-grid" style="display: none;">
+                    <div class="chart-card chart-card-full">
+                        <h3>Activity Timeline</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-history-timeline"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Removal Reasons</h3>
+                        <div class="chart-wrapper chart-wrapper-sm">
+                            <canvas id="chart-history-reasons"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Activity Summary</h3>
+                        <div class="history-stats" id="history-stats">
+                        </div>
+                    </div>
+                </div>
+                <div id="history-list" class="transaction-list"></div>
+            </div>
         </section>
 
-        <!-- Wine Detail Modal -->
+        <!-- Wines I've Met Page -->
+        <section id="page-met" class="page" aria-labelledby="page-met-title">
+            <div class="page-header">
+                <div>
+                    <h2 id="page-met-title">Wines I've Met</h2>
+                    <p class="page-subtitle">Wines you've encountered in shops, restaurants, and tastings</p>
+                </div>
+                <button class="btn btn-primary" id="met-record-wine-btn">+ Record a Wine</button>
+            </div>
+            <div class="filter-bar">
+                <input type="text" id="met-search" placeholder="Search wines I've met...">
+                <div class="view-toggle">
+                    <button id="met-view-cards" class="active" title="Card view">Cards</button>
+                    <button id="met-view-table" title="Table view">Table</button>
+                </div>
+            </div>
+            <div id="met-list" class="wine-grid"></div>
+        </section>
+
+<!-- Wine Detail Modal -->
         <div id="wine-modal" class="modal">
             <div class="modal-content">
                 <span class="modal-close">&times;</span>

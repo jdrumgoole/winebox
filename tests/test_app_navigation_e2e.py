@@ -114,14 +114,14 @@ class TestCoreNavigation:
         expect(page.locator("nav a[data-page='history']")).to_have_count(0)
 
     def test_cellar_entry_cards_navigate(self, authenticated_page: Page) -> None:
-        """Test that import tab entry-path cards navigate to add-to-cellar wizard."""
+        """Test that import tab entry-path cards show sub-wizards inline."""
         page = authenticated_page
         page.click("a[data-page='cellar']")
         expect(page.locator("#page-cellar")).to_be_visible()
         page.click("[data-cellar-tab='import']")
         page.wait_for_selector("#cellar-panel-import", state="visible", timeout=5000)
-        page.click("#cellar-welcome-panel .entry-path-card[data-tab='scan']")
-        expect(page.locator("#page-add-to-cellar")).to_be_visible()
+        page.click("[data-import-path='scan']")
+        expect(page.locator("#add-cellar-scan")).to_be_visible()
 
     def test_record_wine_on_met_page(self, authenticated_page: Page) -> None:
         """Test that 'Record a Wine' button on Wines I've Met navigates to checkin form."""
