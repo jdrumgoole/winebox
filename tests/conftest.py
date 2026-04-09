@@ -99,7 +99,7 @@ def pytest_unconfigure(config: pytest.Config) -> None:
         emails = [u["email"] for u in test_users]
 
         # Delete all data owned by test users
-        for collection in ["wines", "transactions", "import_batches", "raw_uploads"]:
+        for collection in ["wines", "transactions", "import_batches", "raw_uploads", "cellars", "cellar_events"]:
             db[collection].delete_many({"owner_id": {"$in": user_ids}})
 
         # Delete the test users themselves

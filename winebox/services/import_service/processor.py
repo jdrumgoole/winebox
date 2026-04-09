@@ -225,13 +225,11 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
         await Wine.insert_many(wine_docs)
         wines_created = len(wine_docs)
 
-        # Create bottles, cases, and events
-        from winebox.models.bottle import Bottle
-        from winebox.models.case import Case
-        from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
-        bottle_batch: list[Bottle] = []
-        event_batch: list[WineEvent] = []
-        case_batch: list[Case] = []
+        # Create cellar items (cases + loose bottles) and events
+        from winebox.models.cellar import CellarItem, EmbeddedWine
+        from winebox.models.cellar_event import CellarEvent, CellarEventType
+        cellar_items: list[CellarItem] = []
+        cellar_events: list[CellarEvent] = []
         now = datetime.now(timezone.utc)
 
         for wine_doc in wine_docs:
@@ -239,74 +237,73 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
             if qty <= 0:
                 continue
 
+            embedded_wine = EmbeddedWine(
+                wine_id=wine_doc.id, name=wine_doc.name, winery=wine_doc.winery,
+                vintage=wine_doc.vintage, grape_variety=wine_doc.grape_variety,
+                country=wine_doc.country, region=wine_doc.region,
+                wine_type=wine_doc.wine_type_id,
+                estimated_price_low=wine_doc.estimated_price_low,
+                estimated_price_high=wine_doc.estimated_price_high,
+                price_tier=wine_doc.price_tier,
+            )
+
             meta = case_meta.get(wine_doc.id)
             if meta:
-                # Wine has case structure — create Case records with linked bottles
                 num_cases, case_size = meta
                 loose_remainder = qty - (num_cases * case_size)
 
                 for _ in range(num_cases):
-                    case_id = _OID()
-                    case_batch.append(Case(
-                        id=case_id,
-                        owner_id=wine_doc.owner_id,
-                        wine_id=wine_doc.id,
-                        case_size=case_size,
+                    item_id = _OID()
+                    cellar_items.append(CellarItem(
+                        id=item_id, cellar_id=wine_doc.owner_id,
+                        item_type="case", wine=embedded_wine,
+                        quantity=case_size, case_size=case_size,
                         purchase_date=getattr(wine_doc, 'purchase_date', None),
-                        created_at=now,
+                        import_batch_id=chunk.batch_id,
+                        created_at=now, updated_at=now,
                     ))
-                    for _ in range(case_size):
-                        bid = _OID()
-                        bottle_batch.append(Bottle(
-                            id=bid, owner_id=wine_doc.owner_id, wine_id=wine_doc.id,
-                            case_id=case_id, name=wine_doc.name, winery=wine_doc.winery,
-                            vintage=wine_doc.vintage, grape_variety=wine_doc.grape_variety,
-                            country=wine_doc.country, region=wine_doc.region,
-                            wine_type=wine_doc.wine_type_id, created_at=now,
-                        ))
-                        event_batch.append(WineEvent(
-                            scope=WineEventScope.BOTTLE,
-                            bottle_id=bid, owner_id=wine_doc.owner_id,
-                            event_type=WineEventType.ADDED, event_date=now, created_at=now,
-                        ))
+                    cellar_events.append(CellarEvent(
+                        cellar_id=wine_doc.owner_id, cellar_item_id=item_id,
+                        item_type="case", event_type=CellarEventType.ADDED,
+                        quantity=case_size, import_batch_id=chunk.batch_id,
+                        event_date=now, created_at=now,
+                    ))
 
-                # Create loose bottles for any remainder
-                for _ in range(max(0, loose_remainder)):
-                    bid = _OID()
-                    bottle_batch.append(Bottle(
-                        id=bid, owner_id=wine_doc.owner_id, wine_id=wine_doc.id,
-                        case_id=None, name=wine_doc.name, winery=wine_doc.winery,
-                        vintage=wine_doc.vintage, grape_variety=wine_doc.grape_variety,
-                        country=wine_doc.country, region=wine_doc.region,
-                        wine_type=wine_doc.wine_type_id, created_at=now,
+                if loose_remainder > 0:
+                    item_id = _OID()
+                    cellar_items.append(CellarItem(
+                        id=item_id, cellar_id=wine_doc.owner_id,
+                        item_type="bottle", wine=embedded_wine,
+                        quantity=loose_remainder,
+                        import_batch_id=chunk.batch_id,
+                        created_at=now, updated_at=now,
                     ))
-                    event_batch.append(WineEvent(
-                        scope=WineEventScope.BOTTLE,
-                        bottle_id=bid, owner_id=wine_doc.owner_id,
-                        event_type=WineEventType.ADDED, event_date=now, created_at=now,
+                    cellar_events.append(CellarEvent(
+                        cellar_id=wine_doc.owner_id, cellar_item_id=item_id,
+                        item_type="bottle", event_type=CellarEventType.ADDED,
+                        quantity=loose_remainder, import_batch_id=chunk.batch_id,
+                        event_date=now, created_at=now,
                     ))
             else:
-                # Loose bottles — no case
-                for _ in range(qty):
-                    bid = _OID()
-                    bottle_batch.append(Bottle(
-                        id=bid, owner_id=wine_doc.owner_id, wine_id=wine_doc.id,
-                        case_id=None, name=wine_doc.name, winery=wine_doc.winery,
-                        vintage=wine_doc.vintage, grape_variety=wine_doc.grape_variety,
-                        country=wine_doc.country, region=wine_doc.region,
-                        wine_type=wine_doc.wine_type_id, created_at=now,
-                    ))
-                    event_batch.append(WineEvent(
-                        scope=WineEventScope.BOTTLE,
-                        bottle_id=bid, owner_id=wine_doc.owner_id,
-                        event_type=WineEventType.ADDED, event_date=now, created_at=now,
-                    ))
+                # Loose bottles — one cellar item per wine
+                item_id = _OID()
+                cellar_items.append(CellarItem(
+                    id=item_id, cellar_id=wine_doc.owner_id,
+                    item_type="bottle", wine=embedded_wine,
+                    quantity=qty,
+                    import_batch_id=chunk.batch_id,
+                    created_at=now, updated_at=now,
+                ))
+                cellar_events.append(CellarEvent(
+                    cellar_id=wine_doc.owner_id, cellar_item_id=item_id,
+                    item_type="bottle", event_type=CellarEventType.ADDED,
+                    quantity=qty, import_batch_id=chunk.batch_id,
+                    event_date=now, created_at=now,
+                ))
 
-        if case_batch:
-            await Case.insert_many(case_batch)
-        if bottle_batch:
-            await Bottle.insert_many(bottle_batch)
-            await WineEvent.insert_many(event_batch)
+        if cellar_items:
+            await CellarItem.insert_many(cellar_items)
+            await CellarEvent.insert_many(cellar_events)
     except BulkWriteError as e:
         n_inserted = e.details.get("nInserted", 0)
         wines_created = n_inserted

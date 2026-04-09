@@ -561,6 +561,18 @@ async def undo_import(
         "import_batch_id": batch.id,
     })
 
+    # Delete corresponding cellar items and events
+    from winebox.models.cellar import CellarItem
+    from winebox.models.cellar_event import CellarEvent
+    await CellarItem.get_pymongo_collection().delete_many({
+        "cellar_id": batch.owner_id,
+        "import_batch_id": batch.id,
+    })
+    await CellarEvent.get_pymongo_collection().delete_many({
+        "cellar_id": batch.owner_id,
+        "import_batch_id": batch.id,
+    })
+
     # Mark batch as rolled back
     batch.status = ImportStatus.ROLLED_BACK
     await batch.save()

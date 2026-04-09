@@ -190,82 +190,67 @@ async def add_cases(request: AddCaseRequest, current_user: RequireAuth) -> dict:
         request.wine_type,
     )
 
-    now = datetime.now(timezone.utc)
-    cases_created = []
-    total_bottles = 0
+    from winebox.services.bottle_service import create_cellar_items_for_wine
+    result = await create_cellar_items_for_wine(
+        owner_id=current_user.id,
+        wine=wine,
+        quantity=request.num_cases * request.case_size,
+        case_size=request.case_size,
+        num_cases=request.num_cases,
+        purchase_date=request.purchase_date,
+        purchase_price=request.purchase_price,
+        provenance=request.provenance,
+    )
 
-    for _ in range(request.num_cases):
-        # Create case
-        case = Case(
-            owner_id=current_user.id,
-            wine_id=wine.id,
-            case_size=request.case_size,
-            purchase_date=request.purchase_date,
-            purchase_price=request.purchase_price,
-            provenance=request.provenance,
-            created_at=now,
-        )
-        await case.insert()
+    # Build response matching old format
+    from winebox.models.cellar import CellarItem
+    cellar_col = CellarItem.get_pymongo_collection()
+    case_items = await cellar_col.find({
+        "cellar_id": current_user.id,
+        "item_type": "case",
+        "wine.wine_id": wine.id,
+    }).sort("created_at", -1).limit(request.num_cases).to_list(length=None)
 
-        # Create bottles with pre-generated IDs
-        bottle_ids = [ObjectId() for _ in range(request.case_size)]
-        bottles = [
-            Bottle(id=bid, **_bottle_dict(current_user.id, wine, case_id=case.id), created_at=now)
-            for bid in bottle_ids
-        ]
-        await Bottle.insert_many(bottles)
-
-        # Create 'added' events
-        events = [
-            WineEvent(scope=WineEventScope.BOTTLE, 
-                bottle_id=bid,
-                owner_id=current_user.id,
-                event_type=WineEventType.ADDED,
-                event_date=now,
-                created_at=now,
-            )
-            for bid in bottle_ids
-        ]
-        await WineEvent.insert_many(events)
-
-        total_bottles += request.case_size
-        cases_created.append({
-            "id": str(case.id),
-            "case_size": request.case_size,
-        })
+    cases_created_list = [
+        {"id": str(item["_id"]), "case_size": item.get("case_size", 0)}
+        for item in case_items
+    ]
 
     logger.info(
         "Created %d cases (%d bottles) of %s for user %s",
-        request.num_cases, total_bottles, wine.name, current_user.id,
+        result["cases_created"], result["bottles_created"], wine.name, current_user.id,
     )
 
     return {
         "wine_id": str(wine.id),
-        "cases_created": len(cases_created),
-        "bottles_created": total_bottles,
-        "cases": cases_created,
+        "cases_created": result["cases_created"],
+        "bottles_created": result["bottles_created"],
+        "cases": cases_created_list,
     }
 
 
 @router.get("")
 async def list_cases(current_user: RequireAuth) -> dict:
-    """List all cases for the current user."""
-    cases = await Case.find({"owner_id": current_user.id}).sort(
-        [("created_at", -1)]
-    ).to_list()
+    """List all cases for the current user from the cellars collection."""
+    from winebox.models.cellar import CellarItem
+    cellar_col = CellarItem.get_pymongo_collection()
+
+    items = await cellar_col.find(
+        {"cellar_id": current_user.id, "item_type": "case"}
+    ).sort("created_at", -1).to_list(length=None)
 
     result = []
-    for case in cases:
-        remaining = await _count_bottles_in_cellar({"case_id": case.id})
+    for item in items:
+        wine = item.get("wine", {})
         result.append({
-            "id": str(case.id),
-            "wine_id": str(case.wine_id),
-            "case_size": case.case_size,
-            "bottles_remaining": remaining,
-            "purchase_date": case.purchase_date.isoformat() if case.purchase_date else None,
-            "purchase_price": case.purchase_price,
-            "provenance": case.provenance,
-            "created_at": case.created_at.isoformat(),
+            "id": str(item["_id"]),
+            "wine_id": str(wine.get("wine_id", "")),
+            "case_size": item.get("case_size", 0),
+            "bottles_remaining": item.get("quantity", 0),
+            "purchase_date": item["purchase_date"].isoformat() if item.get("purchase_date") else None,
+            "purchase_price": item.get("purchase_price"),
+            "provenance": item.get("provenance"),
+            "created_at": item["created_at"].isoformat(),
         })
 
     return {"cases": result, "total": len(result)}
@@ -273,52 +258,31 @@ async def list_cases(current_user: RequireAuth) -> dict:
 
 @router.get("/{case_id}")
 async def get_case(case_id: str, current_user: RequireAuth) -> dict:
-    """Get case details with bottle list."""
+    """Get case details from the cellars collection."""
+    from winebox.models.cellar import CellarItem
     try:
         oid = ObjectId(case_id)
     except InvalidId:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    case = await Case.find_one({"_id": oid, "owner_id": current_user.id})
-    if not case:
+    cellar_col = CellarItem.get_pymongo_collection()
+    item = await cellar_col.find_one({
+        "_id": oid, "cellar_id": current_user.id, "item_type": "case"
+    })
+    if not item:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    # Get all bottles in this case
-    bottles = await Bottle.find({"case_id": case.id}).to_list()
-    event_col = WineEvent.get_pymongo_collection()
-
-    bottle_list = []
-    bottles_remaining = 0
-    for bottle in bottles:
-        # Get latest event
-        latest = await event_col.find_one(
-            {"bottle_id": bottle.id},
-            sort=[("created_at", -1)],
-        )
-        status = latest["event_type"] if latest else "unknown"
-        in_cellar = status == WineEventType.ADDED.value
-
-        if in_cellar:
-            bottles_remaining += 1
-
-        bottle_list.append({
-            "id": str(bottle.id),
-            "status": status,
-            "in_cellar": in_cellar,
-            "name": bottle.name,
-            "created_at": bottle.created_at.isoformat(),
-        })
+    wine = item.get("wine", {})
 
     return {
-        "id": str(case.id),
-        "wine_id": str(case.wine_id),
-        "case_size": case.case_size,
-        "bottles_remaining": bottles_remaining,
-        "bottles": bottle_list,
-        "purchase_date": case.purchase_date.isoformat() if case.purchase_date else None,
-        "purchase_price": case.purchase_price,
-        "provenance": case.provenance,
-        "created_at": case.created_at.isoformat(),
+        "id": str(item["_id"]),
+        "wine_id": str(wine.get("wine_id", "")),
+        "case_size": item.get("case_size", 0),
+        "bottles_remaining": item.get("quantity", 0),
+        "purchase_date": item["purchase_date"].isoformat() if item.get("purchase_date") else None,
+        "purchase_price": item.get("purchase_price"),
+        "provenance": item.get("provenance"),
+        "created_at": item["created_at"].isoformat() if item.get("created_at") else None,
     }
 
 

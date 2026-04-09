@@ -570,22 +570,15 @@ async def test_case_import_creates_cases(client: AsyncClient) -> None:
     case_sizes = sorted([c["case_size"] for c in cases])
     assert case_sizes == [6, 6, 6, 12]  # 2×6 (Margaux) + 1×12 (Opus) + 1×6 (Dom)
 
-    # Verify total bottles
-    bottles_resp = await client.get("/api/bottles")
-    assert bottles_resp.status_code == 200
-    all_bottles = bottles_resp.json()["bottles"]
+    # Verify total bottles via cellar grouped endpoint
+    grouped_resp = await client.get("/api/cellar/grouped")
+    assert grouped_resp.status_code == 200
+    grouped = grouped_resp.json()
 
     # Margaux: 2×6=12, Opus: 1×12=12, Cloudy Bay: 3 loose, Dom: 1×6=6, Barolo: 4 loose
     # Total: 12 + 12 + 3 + 6 + 4 = 37
-    assert len(all_bottles) == 37
-
-    # Verify loose bottles have no case_id
-    loose_bottles = [b for b in all_bottles if b["case_id"] is None]
-    assert len(loose_bottles) == 7  # 3 Cloudy Bay + 4 Barolo
-
-    # Verify cased bottles have case_ids
-    cased_bottles = [b for b in all_bottles if b["case_id"] is not None]
-    assert len(cased_bottles) == 30  # 12 + 12 + 6
+    assert grouped["total_bottles"] == 37
+    assert grouped["total_cases"] == 4
 
 
 @pytest.mark.asyncio
