@@ -51,7 +51,11 @@ async def create_bottles_for_wine(
     case_ids: list[ObjectId] = []
 
     if case_size and case_size > 0:
-        # Create cases with bottles
+        # Create all cases, then batch-insert bottles and events
+        all_cases = []
+        all_bottles = []
+        all_events = []
+
         for _ in range(num_cases):
             case = Case(
                 owner_id=owner_id,
@@ -62,12 +66,12 @@ async def create_bottles_for_wine(
                 provenance=provenance,
                 created_at=now,
             )
-            await case.insert()
+            all_cases.append(case)
             case_ids.append(case.id)
 
             bottle_ids = [ObjectId() for _ in range(case_size)]
-            bottles = [
-                Bottle(
+            for bid in bottle_ids:
+                all_bottles.append(Bottle(
                     id=bid,
                     owner_id=owner_id,
                     wine_id=wine.id,
@@ -80,23 +84,21 @@ async def create_bottles_for_wine(
                     region=wine.region,
                     wine_type=wine.wine_type_id,
                     created_at=now,
-                )
-                for bid in bottle_ids
-            ]
-            await Bottle.insert_many(bottles)
-
-            events = [
-                WineEvent(scope=WineEventScope.BOTTLE, 
+                ))
+                all_events.append(WineEvent(
+                    scope=WineEventScope.BOTTLE,
                     bottle_id=bid,
                     owner_id=owner_id,
                     event_type=WineEventType.ADDED,
                     event_date=now,
                     created_at=now,
-                )
-                for bid in bottle_ids
-            ]
-            await WineEvent.insert_many(events)
+                ))
             all_bottle_ids.extend(bottle_ids)
+
+        # 3 round-trips total regardless of num_cases
+        await Case.insert_many(all_cases)
+        await Bottle.insert_many(all_bottles)
+        await WineEvent.insert_many(all_events)
     else:
         # Create loose bottles
         bottle_ids = [ObjectId() for _ in range(quantity)]

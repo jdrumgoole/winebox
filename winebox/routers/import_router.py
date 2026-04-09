@@ -683,6 +683,9 @@ async def remap_unmapped_columns(
                 name_header = h
                 break
 
+    from pymongo import UpdateOne
+    bulk_ops = []
+
     for idx in sorted(raw_rows_by_index.keys()):
         raw_row = raw_rows_by_index[idx]
         if not name_header:
@@ -704,22 +707,22 @@ async def remap_unmapped_columns(
 
             if field.startswith("custom:"):
                 custom_name = field[7:]
-                if wine.custom_fields is None:
-                    wine.custom_fields = {}
-                wine.custom_fields[custom_name] = value
                 updates[f"custom_fields.{custom_name}"] = value
                 fields_added.add(custom_name)
             elif field in VALID_WINE_FIELDS:
-                # Only set if the wine doesn't already have this field populated
                 current_val = getattr(wine, field, None)
                 if current_val is None or current_val == "" or current_val == 0:
-                    setattr(wine, field, value)
                     updates[field] = value
                     fields_added.add(field)
 
         if updates:
-            await wine.save()
+            bulk_ops.append(UpdateOne({"_id": wine.id}, {"$set": updates}))
             wines_updated += 1
+
+    # Execute all updates in one round-trip
+    if bulk_ops:
+        wines_col = Wine.get_pymongo_collection()
+        await wines_col.bulk_write(bulk_ops, ordered=False)
 
     # Update batch to remove remapped headers from unmapped_headers
     remapped_headers = [h for h, f in request.mapping.items() if f != "skip"]

@@ -11,6 +11,8 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
+from pymongo import UpdateOne
+
 from winebox.db import PyObjectId
 from winebox.models.wine import Wine
 from winebox.services.xwines_enrichment import (
@@ -30,23 +32,12 @@ _enrichment_progress: dict[str, dict[str, Any]] = {}
 
 
 def get_enrichment_progress(owner_id: str) -> dict[str, Any] | None:
-    """Get the current enrichment progress for an owner.
-
-    Args:
-        owner_id: Owner ID string.
-
-    Returns:
-        Progress dict or None if no enrichment is running.
-    """
+    """Get the current enrichment progress for an owner."""
     return _enrichment_progress.get(owner_id)
 
 
 def clear_enrichment_progress(owner_id: str) -> None:
-    """Clear enrichment progress for an owner.
-
-    Args:
-        owner_id: Owner ID string.
-    """
+    """Clear enrichment progress for an owner."""
     _enrichment_progress.pop(owner_id, None)
 
 
@@ -56,36 +47,24 @@ async def enrich_unenriched_wines(
 ) -> dict[str, int]:
     """Enrich wines that have no xwines_id set.
 
-    Queries for unenriched wines belonging to the owner, batches them,
-    runs Atlas Search + Claude re-ranking, and updates matched documents.
-
-    Enrichment operates on Wine records, not Bottles. A wine with a case
-    (multiple bottles) has a single Wine document — enriching it once
-    automatically applies to all bottles referencing that wine.
-
-    Args:
-        owner_id: The owner whose wines to enrich.
-        progress_callback: Optional callback(enriched_so_far, total) called
-            after each batch completes.
-
-    Returns:
-        Dict with keys: total, enriched, failed.
+    Uses bulk_write to batch database updates instead of per-wine writes.
+    Streams wines from the cursor in batches to avoid loading all into memory.
     """
     owner_str = str(owner_id)
+    wines_col = Wine.get_pymongo_collection()
 
     # Set progress immediately so the SSE endpoint knows enrichment is starting
     _enrichment_progress[owner_str] = {
         "phase": "enriching",
         "enriched": 0,
-        "total": 0,  # Will be updated after query
+        "total": 0,
     }
 
-    # Find all unenriched wines for this owner
-    unenriched = await Wine.find(
+    # Count unenriched wines (lightweight query, no data transfer)
+    total = await wines_col.count_documents(
         {"owner_id": owner_id, "xwines_id": None},
-    ).to_list()
+    )
 
-    total = len(unenriched)
     if total == 0:
         _enrichment_progress[owner_str] = {
             "phase": "done",
@@ -94,7 +73,6 @@ async def enrich_unenriched_wines(
         }
         return {"total": 0, "enriched": 0, "failed": 0}
 
-    # Update progress with actual total
     _enrichment_progress[owner_str] = {
         "phase": "enriching",
         "enriched": 0,
@@ -104,31 +82,40 @@ async def enrich_unenriched_wines(
     enriched_count = 0
     failed_count = 0
 
-    # Process in batches
-    for batch_start in range(0, total, ENRICHMENT_BATCH_SIZE):
-        batch_end = min(batch_start + ENRICHMENT_BATCH_SIZE, total)
-        batch = unenriched[batch_start:batch_end]
+    # Stream wines in batches using skip/limit to avoid loading all into memory
+    processed = 0
+    while processed < total:
+        batch_docs = await wines_col.find(
+            {"owner_id": owner_id, "xwines_id": None},
+        ).sort("_id", 1).limit(ENRICHMENT_BATCH_SIZE).to_list(length=ENRICHMENT_BATCH_SIZE)
 
-        names = [wine.name for wine in batch]
+        if not batch_docs:
+            break
+
+        names = [doc["name"] for doc in batch_docs]
 
         try:
             matches = await _find_best_xwines_matches_batch(names)
         except Exception as e:
             logger.warning("Batch enrichment lookup failed: %s", e)
-            failed_count += len(batch)
+            failed_count += len(batch_docs)
+            processed += len(batch_docs)
             continue
 
-        for wine in batch:
-            match = matches.get(wine.name)
+        # Build bulk update operations for this batch
+        bulk_ops = []
+        now = datetime.now(timezone.utc)
+
+        for doc in batch_docs:
+            match = matches.get(doc["name"])
             if not match:
                 continue
 
-            # Apply enrichment fields
             enriched_fields: list[str] = []
             update_dict: dict[str, Any] = {}
 
             for parsed_key, xwines_attr, transform in _FIELD_MAP:
-                existing_value = getattr(wine, parsed_key, None)
+                existing_value = doc.get(parsed_key)
                 if existing_value:
                     continue
 
@@ -145,24 +132,30 @@ async def enrich_unenriched_wines(
                     update_dict[parsed_key] = xwines_value
                     enriched_fields.append(parsed_key)
 
-            # Also fill wine_type_id from wine_type if empty
-            if not wine.wine_type_id and match.wine_type:
+            if not doc.get("wine_type_id") and match.wine_type:
                 wt = str(match.wine_type).lower()
                 update_dict["wine_type_id"] = wt
                 enriched_fields.append("wine_type_id")
 
             update_dict["xwines_id"] = match.xwines_id
             update_dict["enriched_fields"] = enriched_fields
-            update_dict["updated_at"] = datetime.now(timezone.utc)
+            update_dict["updated_at"] = now
 
+            bulk_ops.append(
+                UpdateOne({"_id": doc["_id"]}, {"$set": update_dict})
+            )
+
+        # Execute all updates for this batch in one round-trip
+        if bulk_ops:
             try:
-                await wine.set(update_dict)
-                enriched_count += 1
+                result = await wines_col.bulk_write(bulk_ops, ordered=False)
+                enriched_count += result.modified_count
             except Exception as e:
-                logger.warning("Failed to update wine %s: %s", wine.id, e)
-                failed_count += 1
+                logger.warning("Bulk enrichment write failed: %s", e)
+                failed_count += len(bulk_ops)
 
-        # Update progress
+        processed += len(batch_docs)
+
         _enrichment_progress[owner_str] = {
             "phase": "enriching",
             "enriched": enriched_count,
@@ -172,10 +165,8 @@ async def enrich_unenriched_wines(
         if progress_callback:
             progress_callback(enriched_count, total)
 
-        # Yield control to event loop between batches
         await asyncio.sleep(0)
 
-    # Mark as done
     _enrichment_progress[owner_str] = {
         "phase": "done",
         "enriched": enriched_count,
