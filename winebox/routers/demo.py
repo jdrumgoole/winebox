@@ -245,45 +245,51 @@ async def _flush_wine_batch(
     ]
     await Transaction.insert_many(txn_batch)
 
-    bottle_docs: list[Bottle] = []
-    event_docs: list[WineEvent] = []
-    case_docs: list[Case] = []
+    from winebox.models.cellar import CellarItem, EmbeddedWine
+    from winebox.models.cellar_event import CellarEvent, CellarEventType
+
+    cellar_items: list[CellarItem] = []
+    cellar_events: list[CellarEvent] = []
 
     for w, (q, ca, case_size, provenance, purchase_price) in zip(wine_batch, batch_meta):
-        case_id = None
+        embedded = EmbeddedWine(
+            wine_id=w.id, name=w.name, winery=w.winery,
+            vintage=w.vintage, grape_variety=w.grape_variety,
+            country=w.country, region=w.region, wine_type=w.wine_type_id,
+            estimated_price_low=w.estimated_price_low,
+            estimated_price_high=w.estimated_price_high,
+            price_tier=w.price_tier,
+        )
 
         if case_size and case_size > 0:
-            case_id = ObjectId()
-            case_docs.append(Case(
-                id=case_id,
-                owner_id=owner_id,
-                wine_id=w.id,
-                case_size=case_size,
-                purchase_date=ca,
-                purchase_price=purchase_price,
-                provenance=provenance,
-                created_at=ca,
+            item_id = ObjectId()
+            cellar_items.append(CellarItem(
+                id=item_id, cellar_id=owner_id, item_type="case",
+                wine=embedded, quantity=q, case_size=case_size,
+                purchase_price=purchase_price, purchase_date=ca,
+                provenance=provenance, created_at=ca, updated_at=ca,
+            ))
+            cellar_events.append(CellarEvent(
+                cellar_id=owner_id, cellar_item_id=item_id,
+                item_type="case", event_type=CellarEventType.ADDED,
+                quantity=q, event_date=ca, created_at=ca,
+            ))
+        else:
+            item_id = ObjectId()
+            cellar_items.append(CellarItem(
+                id=item_id, cellar_id=owner_id, item_type="bottle",
+                wine=embedded, quantity=q,
+                created_at=ca, updated_at=ca,
+            ))
+            cellar_events.append(CellarEvent(
+                cellar_id=owner_id, cellar_item_id=item_id,
+                item_type="bottle", event_type=CellarEventType.ADDED,
+                quantity=q, event_date=ca, created_at=ca,
             ))
 
-        for _ in range(q):
-            bid = ObjectId()
-            bottle_docs.append(Bottle(
-                id=bid, owner_id=owner_id, wine_id=w.id, case_id=case_id,
-                name=w.name, winery=w.winery, vintage=w.vintage,
-                grape_variety=w.grape_variety, country=w.country,
-                region=w.region, wine_type=w.wine_type_id, created_at=ca,
-            ))
-            event_docs.append(WineEvent(
-                scope=WineEventScope.BOTTLE,
-                bottle_id=bid, owner_id=owner_id,
-                event_type=WineEventType.ADDED, event_date=ca, created_at=ca,
-            ))
-
-    if case_docs:
-        await Case.insert_many(case_docs)
-    if bottle_docs:
-        await Bottle.insert_many(bottle_docs)
-        await WineEvent.insert_many(event_docs)
+    if cellar_items:
+        await CellarItem.insert_many(cellar_items)
+        await CellarEvent.insert_many(cellar_events)
 
 
 async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) -> None:
@@ -513,28 +519,24 @@ async def remove_demo(current_user: RequireAuth) -> DemoRemoveResponse:
 
     demo_wine_ids = [w.id for w in demo_wines]
 
-    # Delete bottles and their events for demo wines
-    demo_bottles = await Bottle.find(
-        {"owner_id": current_user.id, "wine_id": {"$in": demo_wine_ids}}
-    ).to_list()
-    demo_bottle_ids = [b.id for b in demo_bottles]
+    # Delete cellar items and events for demo wines
+    from winebox.models.cellar import CellarItem
+    from winebox.models.cellar_event import CellarEvent
+    cellar_col = CellarItem.get_pymongo_collection()
+    event_col = CellarEvent.get_pymongo_collection()
 
-    if demo_bottle_ids:
-        await WineEvent.get_pymongo_collection().delete_many(
-            {"owner_id": current_user.id, "bottle_id": {"$in": demo_bottle_ids}}
-        )
-        await Bottle.get_pymongo_collection().delete_many(
-            {"owner_id": current_user.id, "wine_id": {"$in": demo_wine_ids}}
-        )
+    demo_items = await cellar_col.find(
+        {"cellar_id": current_user.id, "wine.wine_id": {"$in": demo_wine_ids}},
+        {"_id": 1},
+    ).to_list(length=None)
+    demo_item_ids = [item["_id"] for item in demo_items]
 
-    # Delete cases and case-level events for demo wines
-    demo_case_ids = list({b.case_id for b in demo_bottles if b.case_id})
-    if demo_case_ids:
-        await WineEvent.get_pymongo_collection().delete_many(
-            {"owner_id": current_user.id, "case_id": {"$in": demo_case_ids}}
+    if demo_item_ids:
+        await event_col.delete_many(
+            {"cellar_id": current_user.id, "cellar_item_id": {"$in": demo_item_ids}}
         )
-    await Case.get_pymongo_collection().delete_many(
-        {"owner_id": current_user.id, "wine_id": {"$in": demo_wine_ids}}
+    await cellar_col.delete_many(
+        {"cellar_id": current_user.id, "wine.wine_id": {"$in": demo_wine_ids}}
     )
 
     txn_result = await Transaction.get_pymongo_collection().delete_many(
@@ -546,9 +548,9 @@ async def remove_demo(current_user: RequireAuth) -> DemoRemoveResponse:
     )
 
     logger.info(
-        "Demo data removed for user %s: %d wines, %d transactions, %d bottles, %d cases",
+        "Demo data removed for user %s: %d wines, %d transactions, %d cellar items",
         current_user.id, wine_result.deleted_count, txn_result.deleted_count,
-        len(demo_bottle_ids), len(demo_case_ids),
+        len(demo_item_ids),
     )
 
     return DemoRemoveResponse(

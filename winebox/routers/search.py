@@ -8,8 +8,6 @@ from bson import ObjectId
 from fastapi import APIRouter, Query
 
 from winebox.models import Transaction, TransactionType, Wine
-from winebox.models.bottle import Bottle
-from winebox.models.case import Case
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
 
@@ -114,33 +112,25 @@ async def search_wines(
     elif in_stock is False:
         conditions["inventory.quantity"] = {"$lte": 0}
 
-    # Filter by storage type (case/loose) via bottles collection
+    # Filter by storage type (case/loose) via cellars collection
     if storage or provenance:
-        bottle_col = Bottle.get_pymongo_collection()
-        bottle_query: dict = {"owner_id": current_user.id}
+        from winebox.models.cellar import CellarItem
+        cellar_col = CellarItem.get_pymongo_collection()
+        cellar_query: dict = {"cellar_id": current_user.id}
 
         if storage == "case":
-            bottle_query["case_id"] = {"$ne": None}
+            cellar_query["item_type"] = "case"
         elif storage == "loose":
-            bottle_query["case_id"] = None
+            cellar_query["item_type"] = "bottle"
 
         if provenance:
-            # Find case IDs matching provenance, then filter bottles by those cases
-            case_col = Case.get_pymongo_collection()
             prov_pattern = re.compile(re.escape(provenance), re.IGNORECASE)
-            matching_cases = await case_col.find(
-                {"owner_id": current_user.id, "provenance": {"$regex": prov_pattern}},
-                {"_id": 1},
-            ).to_list(length=None)
-            matching_case_ids = [c["_id"] for c in matching_cases]
-            if not matching_case_ids:
-                return []
-            bottle_query["case_id"] = {"$in": matching_case_ids}
+            cellar_query["provenance"] = {"$regex": prov_pattern}
 
-        matching_bottles = await bottle_col.find(
-            bottle_query, {"wine_id": 1}
+        matching_items = await cellar_col.find(
+            cellar_query, {"wine.wine_id": 1}
         ).to_list(length=None)
-        matching_wine_ids = {b["wine_id"] for b in matching_bottles}
+        matching_wine_ids = {item["wine"]["wine_id"] for item in matching_items if item.get("wine")}
         if not matching_wine_ids:
             return []
         if "_id" in conditions and "$in" in conditions["_id"]:
