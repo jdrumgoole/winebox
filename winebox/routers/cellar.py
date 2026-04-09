@@ -1,14 +1,15 @@
-"""Cellar inventory endpoints."""
+"""Cellar inventory endpoints.
+
+Reads from the `cellars` collection — one document per physical item
+(case or loose bottle) in the user's cellar.
+"""
 
 from typing import Any
 
 from fastapi import APIRouter
 
+from winebox.models.cellar import CellarItem
 from winebox.models import Wine
-from winebox.models.bottle import Bottle
-from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
-from winebox.models.case import Case
-# Bottle/WineEvent used by /grouped endpoint; Case used by /summary
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
@@ -36,47 +37,53 @@ async def get_cellar_summary(
 ) -> dict:
     """Get cellar summary statistics.
 
-    Uses a single $facet aggregation to compute all breakdowns in one
-    round-trip instead of 8 separate queries.
+    Uses $facet aggregation on the cellars collection for all breakdowns
+    in one round-trip.
     """
+    cellar_col = CellarItem.get_pymongo_collection()
+
     base_match = {
-        "owner_id": current_user.id,
-        "collection": "cellar",
-        "inventory.quantity": {"$gt": 0},
+        "cellar_id": current_user.id,
+        "quantity": {"$gt": 0},
     }
 
     pipeline = [
         {"$match": base_match},
         {"$facet": {
             "total_bottles": [
-                {"$group": {"_id": None, "total": {"$sum": "$inventory.quantity"}}},
+                {"$group": {"_id": None, "total": {"$sum": "$quantity"}}},
             ],
             "unique_wines": [
+                {"$group": {"_id": "$wine.wine_id"}},
+                {"$count": "count"},
+            ],
+            "total_cases": [
+                {"$match": {"item_type": "case"}},
                 {"$count": "count"},
             ],
             "by_vintage": [
-                {"$match": {"vintage": {"$ne": None}}},
-                {"$group": {"_id": "$vintage", "count": {"$sum": "$inventory.quantity"}}},
+                {"$match": {"wine.vintage": {"$ne": None}}},
+                {"$group": {"_id": "$wine.vintage", "count": {"$sum": "$quantity"}}},
                 {"$sort": {"_id": -1}},
             ],
             "by_country": [
-                {"$match": {"country": {"$ne": None}}},
-                {"$group": {"_id": "$country", "count": {"$sum": "$inventory.quantity"}}},
+                {"$match": {"wine.country": {"$ne": None}}},
+                {"$group": {"_id": "$wine.country", "count": {"$sum": "$quantity"}}},
                 {"$sort": {"count": -1}},
             ],
             "by_grape": [
-                {"$match": {"grape_variety": {"$ne": None}}},
-                {"$group": {"_id": "$grape_variety", "count": {"$sum": "$inventory.quantity"}}},
+                {"$match": {"wine.grape_variety": {"$ne": None}}},
+                {"$group": {"_id": "$wine.grape_variety", "count": {"$sum": "$quantity"}}},
                 {"$sort": {"count": -1}},
             ],
             "by_wine_type": [
-                {"$match": {"wine_type_id": {"$ne": None}}},
-                {"$group": {"_id": "$wine_type_id", "count": {"$sum": "$inventory.quantity"}}},
+                {"$match": {"wine.wine_type": {"$ne": None}}},
+                {"$group": {"_id": "$wine.wine_type", "count": {"$sum": "$quantity"}}},
                 {"$sort": {"count": -1}},
             ],
             "by_price_tier": [
-                {"$match": {"price_tier": {"$ne": None}}},
-                {"$group": {"_id": "$price_tier", "count": {"$sum": "$inventory.quantity"}}},
+                {"$match": {"wine.price_tier": {"$ne": None}}},
+                {"$group": {"_id": "$wine.price_tier", "count": {"$sum": "$quantity"}}},
                 {"$sort": {"count": -1}},
             ],
             "value_by_wine_type": [
@@ -84,28 +91,28 @@ async def get_cellar_summary(
                     "estimated_price_mid": {
                         "$cond": {
                             "if": {"$and": [
-                                {"$ne": ["$estimated_price_low", None]},
-                                {"$ne": ["$estimated_price_high", None]},
+                                {"$ne": ["$wine.estimated_price_low", None]},
+                                {"$ne": ["$wine.estimated_price_high", None]},
                             ]},
                             "then": {"$divide": [
-                                {"$add": ["$estimated_price_low", "$estimated_price_high"]},
+                                {"$add": ["$wine.estimated_price_low", "$wine.estimated_price_high"]},
                                 2,
                             ]},
                             "else": {"$cond": {
-                                "if": {"$ne": ["$estimated_price_low", None]},
-                                "then": "$estimated_price_low",
-                                "else": "$estimated_price_high",
+                                "if": {"$ne": ["$wine.estimated_price_low", None]},
+                                "then": "$wine.estimated_price_low",
+                                "else": "$wine.estimated_price_high",
                             }},
                         }
                     },
                 }},
                 {"$group": {
-                    "_id": {"$ifNull": ["$wine_type_id", "other"]},
-                    "bottles": {"$sum": "$inventory.quantity"},
+                    "_id": {"$ifNull": ["$wine.wine_type", "other"]},
+                    "bottles": {"$sum": "$quantity"},
                     "total_value": {"$sum": {
                         "$multiply": [
                             {"$ifNull": ["$estimated_price_mid", 0]},
-                            "$inventory.quantity",
+                            "$quantity",
                         ]
                     }},
                 }},
@@ -114,17 +121,13 @@ async def get_cellar_summary(
         }},
     ]
 
-    cursor = await Wine.get_pymongo_collection().aggregate(pipeline)
+    cursor = await cellar_col.aggregate(pipeline)
     result = await cursor.to_list(length=None)
     facets = result[0] if result else {}
 
     total_bottles = facets.get("total_bottles", [{}])[0].get("total", 0) if facets.get("total_bottles") else 0
     unique_wines = facets.get("unique_wines", [{}])[0].get("count", 0) if facets.get("unique_wines") else 0
-
-    # Total wines tracked uses a different filter (includes out-of-stock)
-    total_wines_tracked = await Wine.find(
-        {"owner_id": current_user.id, "collection": WineCollection.CELLAR}
-    ).count()
+    total_cases = facets.get("total_cases", [{}])[0].get("count", 0) if facets.get("total_cases") else 0
 
     by_vintage = {str(row["_id"]): row["count"] for row in facets.get("by_vintage", [])}
     by_country = {row["_id"]: row["count"] for row in facets.get("by_country", [])}
@@ -140,14 +143,10 @@ async def get_cellar_summary(
         for row in facets.get("value_by_wine_type", [])
     ]
 
-    # Case count from cases collection
-    case_col = Case.get_pymongo_collection()
-    total_cases = await case_col.count_documents({"owner_id": current_user.id})
-
     return {
         "total_bottles": total_bottles,
         "unique_wines": unique_wines,
-        "total_wines_tracked": total_wines_tracked,
+        "total_wines_tracked": unique_wines,
         "total_cases": total_cases,
         "by_vintage": by_vintage,
         "by_country": by_country,
@@ -164,90 +163,49 @@ async def get_cellar_grouped(
 ) -> dict:
     """Get cellar contents grouped by wine identity with case/bottle breakdown.
 
-    Returns wines with their cases and loose bottles, all derived from
-    the bottles collection (event-sourced state).
+    Single query on the cellars collection — no cross-collection joins.
     """
-    bottle_col = Bottle.get_pymongo_collection()
-    event_col = WineEvent.get_pymongo_collection()
-    case_col = Case.get_pymongo_collection()
+    cellar_col = CellarItem.get_pymongo_collection()
 
-    # Find bottles that have been removed (have a non-"added" event)
-    # This is much faster than $lookup per bottle — one query to get removed IDs,
-    # then exclude them from the bottle query.
-    removal_types = [t.value for t in WineEventType if t != WineEventType.ADDED]
-    removed_docs = await event_col.find(
-        {"owner_id": current_user.id, "event_type": {"$in": removal_types}, "bottle_id": {"$ne": None}},
-        {"bottle_id": 1},
-    ).to_list(length=None)
-    removed_bottle_ids = {doc["bottle_id"] for doc in removed_docs}
-
-    # Get all bottles NOT removed
-    bottle_query: dict[str, Any] = {"owner_id": current_user.id}
-    if removed_bottle_ids:
-        bottle_query["_id"] = {"$nin": list(removed_bottle_ids)}
-
-    bottles_cursor = bottle_col.find(bottle_query)
-    bottles_in_cellar = await bottles_cursor.to_list(length=None)
+    items = await cellar_col.find(
+        {"cellar_id": current_user.id, "quantity": {"$gt": 0}}
+    ).sort("wine.name", 1).to_list(length=None)
 
     # Group by wine_id
     wine_groups: dict[str, dict[str, Any]] = {}
-    for b in bottles_in_cellar:
-        wine_id = str(b["wine_id"])
+    for item in items:
+        wine = item.get("wine", {})
+        wine_id = str(wine.get("wine_id", ""))
         if wine_id not in wine_groups:
             wine_groups[wine_id] = {
                 "wine_id": wine_id,
-                "name": b.get("name", "Unknown"),
-                "winery": b.get("winery"),
-                "vintage": b.get("vintage"),
-                "grape_variety": b.get("grape_variety"),
-                "country": b.get("country"),
-                "region": b.get("region"),
-                "wine_type": b.get("wine_type"),
+                "name": wine.get("name", "Unknown"),
+                "winery": wine.get("winery"),
+                "vintage": wine.get("vintage"),
+                "grape_variety": wine.get("grape_variety"),
+                "country": wine.get("country"),
+                "region": wine.get("region"),
+                "wine_type": wine.get("wine_type"),
                 "total_bottles": 0,
-                "cases": {},
+                "cases": [],
                 "loose_bottles": 0,
             }
 
         group = wine_groups[wine_id]
-        group["total_bottles"] += 1
+        qty = item.get("quantity", 0)
+        group["total_bottles"] += qty
 
-        case_id = b.get("case_id")
-        if case_id:
-            case_key = str(case_id)
-            if case_key not in group["cases"]:
-                group["cases"][case_key] = {"id": case_key, "bottles_remaining": 0}
-            group["cases"][case_key]["bottles_remaining"] += 1
+        if item.get("item_type") == "case":
+            group["cases"].append({
+                "id": str(item["_id"]),
+                "case_size": item.get("case_size", 0),
+                "bottles_remaining": qty,
+                "purchase_date": item.get("purchase_date"),
+                "purchase_price": item.get("purchase_price"),
+                "provenance": item.get("provenance"),
+            })
         else:
-            group["loose_bottles"] += 1
-
-    # Enrich cases with metadata
-    all_case_ids = set()
-    for g in wine_groups.values():
-        all_case_ids.update(g["cases"].keys())
-
-    if all_case_ids:
-        from bson import ObjectId
-        case_docs = await case_col.find(
-            {"_id": {"$in": [ObjectId(cid) for cid in all_case_ids]}}
-        ).to_list(length=None)
-        case_lookup = {str(c["_id"]): c for c in case_docs}
-
-        for g in wine_groups.values():
-            enriched_cases = []
-            for case_key, case_info in g["cases"].items():
-                doc = case_lookup.get(case_key, {})
-                enriched_cases.append({
-                    "id": case_key,
-                    "case_size": doc.get("case_size", 0),
-                    "bottles_remaining": case_info["bottles_remaining"],
-                    "purchase_date": doc.get("purchase_date", None),
-                    "purchase_price": doc.get("purchase_price"),
-                    "provenance": doc.get("provenance"),
-                })
-            g["cases"] = enriched_cases
-    else:
-        for g in wine_groups.values():
-            g["cases"] = []
+            group["loose_bottles"] += qty
 
     wines = sorted(wine_groups.values(), key=lambda w: w["name"].lower())
 
