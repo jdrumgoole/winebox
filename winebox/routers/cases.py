@@ -9,9 +9,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from winebox.models.bottle import Bottle
-from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
-from winebox.models.case import Case
+from winebox.models.wine_event import WineEventType  # Used in AddCaseEventRequest schema
 
 from winebox.models.wine import Wine
 from winebox.services.auth import RequireAuth
@@ -119,57 +117,6 @@ async def _find_or_create_wine(
     await wine.insert()
     return wine
 
-
-def _bottle_dict(
-    owner_id: Any, wine: Wine, case_id: Any | None = None,
-) -> dict[str, Any]:
-    """Build a Bottle document dict with denormalised wine identity."""
-    return {
-        "owner_id": owner_id,
-        "wine_id": wine.id,
-        "case_id": case_id,
-        "name": wine.name,
-        "winery": wine.winery,
-        "vintage": wine.vintage,
-        "grape_variety": wine.grape_variety,
-        "country": wine.country,
-        "region": wine.region,
-        "wine_type": wine.wine_type_id,
-    }
-
-
-async def _get_latest_event(bottle_id: Any) -> WineEvent | None:
-    """Get the most recent event for a bottle."""
-    events = await WineEvent.find(
-        {"bottle_id": bottle_id}
-    ).sort([("created_at", -1)]).limit(1).to_list()
-    return events[0] if events else None
-
-
-async def _count_bottles_in_cellar(query: dict[str, Any]) -> int:
-    """Count bottles whose latest event is 'added' (still in cellar)."""
-    # Get all bottle IDs matching the query
-    bottle_col = Bottle.get_pymongo_collection()
-    event_col = WineEvent.get_pymongo_collection()
-
-    bottle_ids = [
-        doc["_id"]
-        async for doc in bottle_col.find(query, {"_id": 1})
-    ]
-    if not bottle_ids:
-        return 0
-
-    # Aggregate: for each bottle, get latest event, keep only 'added'
-    pipeline = [
-        {"$match": {"bottle_id": {"$in": bottle_ids}}},
-        {"$sort": {"created_at": -1}},
-        {"$group": {"_id": "$bottle_id", "latest_type": {"$first": "$event_type"}}},
-        {"$match": {"latest_type": WineEventType.ADDED.value}},
-        {"$count": "count"},
-    ]
-    cursor = await event_col.aggregate(pipeline)
-    result = await cursor.to_list(length=1)
-    return result[0]["count"] if result else 0
 
 
 # ---------------------------------------------------------------------------

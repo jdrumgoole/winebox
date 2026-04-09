@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from winebox.models.bottle import Bottle
 from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
 from winebox.models.wine import Wine
-from winebox.routers.cases import AddBottlesRequest, AddEventRequest, _find_or_create_wine, _bottle_dict
+from winebox.routers.cases import AddBottlesRequest, AddEventRequest, _find_or_create_wine
 from winebox.services.auth import RequireAuth
 
 logger = logging.getLogger(__name__)

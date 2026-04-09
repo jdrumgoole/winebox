@@ -23,11 +23,8 @@ from starlette.responses import StreamingResponse
 
 from winebox.database import get_database
 from winebox.db import PyObjectId
-from winebox.models.bottle import Bottle
-from winebox.models.case import Case
 from winebox.models.transaction import Transaction, TransactionType
 from winebox.models.wine import InventoryInfo, Wine
-from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
 from winebox.services.auth import RequireAuth
 
 logger = logging.getLogger(__name__)

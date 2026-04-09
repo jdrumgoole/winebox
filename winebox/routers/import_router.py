@@ -788,13 +788,12 @@ async def get_batch_wines(
         (w.inventory.quantity if w.inventory else 0) for w in wines
     )
 
-    # Count cases created for this batch's wines
-    from winebox.models.case import Case
-    wine_ids = [w.id for w in wines]
+    # Count cases created for this batch from cellars collection
+    from winebox.models.cellar import CellarItem
     total_cases = 0
-    if wine_ids:
-        total_cases = await Case.get_pymongo_collection().count_documents(
-            {"owner_id": current_user.id, "wine_id": {"$in": wine_ids}}
+    if batch.id:
+        total_cases = await CellarItem.get_pymongo_collection().count_documents(
+            {"cellar_id": current_user.id, "item_type": "case", "import_batch_id": batch.id}
         )
 
     return {
