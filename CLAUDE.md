@@ -10,6 +10,12 @@
 - **Never display naked numbers in the UI.** Every number must have a label or unit that explains what it represents. For example, show "3.8 (245 ratings)" not "3.8 (245)"; show "14.5% ABV" not "14.5%". A non-technical user should never have to guess what a number means.
 - **When renaming UI elements, update the code to match.** If a button label changes from "Check In" to "Record Wine", rename the corresponding HTML IDs, CSS classes, JS functions, API endpoints, and test references too. The codebase must reflect what the user sees on screen — stale names like `checkin-form` for a "Record Wine" feature create confusion and maintenance burden.
 
+## MongoDB Schema Design
+- **Prefer one document per item over embedded arrays.** Grow data by adding documents, not by appending to arrays. Embedded arrays create 16MB limits, rewrite-on-update costs, and concurrency issues.
+- **Embed immutable descriptors, not mutable state.** A wine descriptor can be embedded in a bottle because it will never change for that physical item. Mutable data (quantities, events) should not be embedded in growing arrays.
+- **Physical items are documents, abstract entities are embedded.** A bottle and a case are physical things — they get their own documents. A wine is an abstract descriptor — it gets embedded in the physical item it describes.
+- **Minimize cross-collection lookups.** Each document should be self-contained for its primary use case. Denormalize data needed for display rather than doing joins at query time.
+
 ## Backups
 - **All database backups must go to S3**, never just `/tmp/` on a droplet. Use `scripts/mongodb_backup.py` with the `--profile winebox_backup` flag.
 - Example: `uv run python scripts/mongodb_backup.py --profile winebox_backup backup "mongodb+srv://...@shared.2t22cum.mongodb.net/winebox"`

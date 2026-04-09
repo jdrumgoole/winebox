@@ -15,6 +15,8 @@ from winebox.models.import_batch_row import RawUploadRow
 from winebox.models.case import Case
 from winebox.models.bottle import Bottle
 from winebox.models.wine_event import WineEvent, WineEventType, WineEventScope
+from winebox.models.cellar import CellarItem, EmbeddedWine
+from winebox.models.cellar_event import CellarEvent, CellarEventType
 from winebox.models.price_capture import CaptureType, ShopLocation, GeoCoordinates
 from winebox.models.wine_price import WinePrice, WinePriceHistory, PriceEntry, PriceSource
 
@@ -44,12 +46,17 @@ __all__ = [
     "ImportBatch",
     "ImportStatus",
     "RawUploadRow",
-    # Case & Bottle tracking
+    # Case & Bottle tracking (legacy — being replaced by Cellar)
     "Case",
     "Bottle",
     "WineEvent",
     "WineEventType",
     "WineEventScope",
+    # Cellar (document-oriented replacement)
+    "CellarItem",
+    "EmbeddedWine",
+    "CellarEvent",
+    "CellarEventType",
     # Price tracker
     "WinePrice",
     "WinePriceHistory",

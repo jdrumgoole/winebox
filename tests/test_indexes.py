@@ -54,6 +54,8 @@ def test_expected_collections_present() -> None:
         "login_attempts",
         "import_batches",
         "raw_uploads",
+        "cellars",
+        "cellar_events",
         "cases",
         "bottles",
         "wine_events",

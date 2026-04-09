@@ -124,7 +124,20 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("xwines_id", ASCENDING), ("vintage", ASCENDING)], unique=True),
         IndexModel([("xwines_id", ASCENDING)]),  # For lookups without vintage
     ],
-    # Case & Bottle tracking — minimal indexes, add more when query patterns emerge
+    # Cellar — one document per physical item (case or bottle)
+    "cellars": [
+        IndexModel([("cellar_id", ASCENDING)]),
+        IndexModel([("cellar_id", ASCENDING), ("item_type", ASCENDING)]),
+        IndexModel([("cellar_id", ASCENDING), ("wine.wine_id", ASCENDING)]),
+        IndexModel([("import_batch_id", ASCENDING)]),
+    ],
+    "cellar_events": [
+        IndexModel([("cellar_id", ASCENDING), ("cellar_item_id", ASCENDING)]),
+        IndexModel([("cellar_id", ASCENDING), ("event_date", DESCENDING)]),
+        IndexModel([("cellar_id", ASCENDING), ("event_type", ASCENDING)]),
+        IndexModel([("import_batch_id", ASCENDING)]),
+    ],
+    # Legacy — kept for backward compatibility during transition
     "cases": [
         IndexModel([("owner_id", ASCENDING)]),
         IndexModel([("owner_id", ASCENDING), ("wine_id", ASCENDING)]),
