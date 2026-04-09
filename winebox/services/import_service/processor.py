@@ -164,32 +164,6 @@ def _convert_chunk_from_rows(
     return _Chunk(wine_datas, chunk_start, chunk_end, rows_skipped, skipped_rows, errors, batch_id)
 
 
-def _convert_chunk(
-    batch: ImportBatch,
-    owner_id: PyObjectId,
-    chunk_start: int,
-    chunk_end: int,
-    skip_non_wine: bool,
-    default_quantity: int,
-    existing_wines: set[tuple[str, ...]] | None = None,
-    skip_duplicates: bool = False,
-    default_case_size: int | None = None,
-) -> _Chunk:
-    """Phase 1: Convert raw rows from ImportBatch.rows (backwards compatible path)."""
-    chunk_rows = batch.rows[chunk_start:chunk_end]
-    return _convert_chunk_from_rows(
-        chunk_rows,
-        batch.column_mapping,
-        owner_id,
-        chunk_start,
-        chunk_end,
-        skip_non_wine,
-        default_quantity,
-        batch_id=batch.id,
-        existing_wines=existing_wines,
-        skip_duplicates=skip_duplicates,
-        default_case_size=default_case_size,
-    )
 
 
 async def _enrich_chunk(chunk: _Chunk) -> _Chunk:
@@ -467,54 +441,35 @@ async def _feeder(
     default_case_size: int | None = None,
 ) -> None:
     """Feed chunks into the pipeline and manage orderly shutdown."""
-    # Convert and enqueue all chunks
-    if batch.rows:
-        # Backwards compatible path: use rows embedded on ImportBatch
-        for chunk_start in range(0, total, chunk_size):
-            chunk_end = min(chunk_start + chunk_size, total)
-            chunk = await asyncio.to_thread(
-                _convert_chunk,
-                batch,
-                owner_id,
-                chunk_start,
-                chunk_end,
-                skip_non_wine,
-                default_quantity,
-                existing_wines,
-                skip_duplicates,
-                default_case_size,
-            )
-            await enrichment_queue.put(chunk)
-    else:
-        # New path: stream rows from RawUploadRow collection by index
-        collection = RawUploadRow.get_pymongo_collection()
-        for chunk_start in range(0, total, chunk_size):
-            chunk_end = min(chunk_start + chunk_size, total)
-            cursor = collection.find(
-                {
-                    "batch_id": batch.id,
-                    "index": {"$gte": chunk_start, "$lt": chunk_end},
-                }
-            ).sort("index", 1)
-            docs = await cursor.to_list(length=chunk_end - chunk_start)
-            rows = [doc.get("row", {}) for doc in docs]
-            if not rows:
-                continue
-            chunk = await asyncio.to_thread(
-                _convert_chunk_from_rows,
-                rows,
-                batch.column_mapping,
-                owner_id,
-                chunk_start,
-                chunk_end,
-                skip_non_wine,
-                default_quantity,
-                batch_id=batch.id,
-                existing_wines=existing_wines,
-                skip_duplicates=skip_duplicates,
-                default_case_size=default_case_size,
-            )
-            await enrichment_queue.put(chunk)
+    # Stream rows from raw_uploads collection by index
+    collection = RawUploadRow.get_pymongo_collection()
+    for chunk_start in range(0, total, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, total)
+        cursor = collection.find(
+            {
+                "batch_id": batch.id,
+                "index": {"$gte": chunk_start, "$lt": chunk_end},
+            }
+        ).sort("index", 1)
+        docs = await cursor.to_list(length=chunk_end - chunk_start)
+        rows = [doc.get("row", {}) for doc in docs]
+        if not rows:
+            continue
+        chunk = await asyncio.to_thread(
+            _convert_chunk_from_rows,
+            rows,
+            batch.column_mapping,
+            owner_id,
+            chunk_start,
+            chunk_end,
+            skip_non_wine,
+            default_quantity,
+            batch_id=batch.id,
+            existing_wines=existing_wines,
+            skip_duplicates=skip_duplicates,
+            default_case_size=default_case_size,
+        )
+        await enrichment_queue.put(chunk)
 
     # Poison pills for enrichment workers
     for _ in range(num_workers):
@@ -584,9 +539,7 @@ async def _process_chunks(
         chunk_size: Number of rows per chunk.
         skip_duplicates: Whether to skip wines that already exist in cellar.
     """
-    # Determine total rows: prefer ImportBatch.rows for backwards compatibility,
-    # otherwise fall back to row_count (populated when using RawUploadRow).
-    total = len(batch.rows) if batch.rows else batch.row_count
+    total = batch.row_count
     num_workers = ENRICHMENT_WORKERS
 
     # Pre-fetch existing wines for duplicate detection
@@ -682,10 +635,6 @@ async def _process_chunks(
     # Collect final results from writer
     wines_created, rows_skipped, skipped_rows, errors = await writer_future
     await feeder_task
-
-    # Clear embedded rows — feeder has consumed them and audit data lives in
-    # raw_uploads. This avoids writing the full rows list in the final save.
-    batch.rows = []
 
     # Compute unmapped headers from the column mapping
     if batch.column_mapping:

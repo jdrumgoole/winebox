@@ -168,14 +168,12 @@ async def upload_spreadsheet(
     remaining_rows: list[dict] = await asyncio.to_thread(list, row_gen)
     all_rows = preview_rows + remaining_rows
 
-    # Create batch with rows embedded (single document write, no chunked inserts).
-    # The processor reads directly from batch.rows — no wait for raw_uploads.
+    # Create batch (rows stored separately in raw_uploads, not embedded)
     batch = ImportBatch(
         owner_id=current_user.id,
         filename=file.filename or "unknown",
         file_type=ext,
         headers=headers,
-        rows=all_rows,
         row_count=len(all_rows),
         preview_rows=preview_rows,
         file_checksum=file_checksum,
@@ -183,8 +181,8 @@ async def upload_spreadsheet(
     )
     await batch.insert()
 
-    # Copy rows to raw_uploads for permanent audit trail (background, non-blocking)
-    asyncio.create_task(_insert_raw_upload_rows(batch.id, all_rows))
+    # Store rows in raw_uploads collection
+    await _insert_raw_upload_rows(batch.id, all_rows)
 
     # Collect AI result (likely already finished during row consumption + batch insert)
     ai_mapping = None

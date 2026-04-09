@@ -45,18 +45,24 @@ async def _insert_xwines_wine(**kwargs) -> XWinesWine:
     return xwine
 
 
-def _make_batch(owner_id: ObjectId, rows: list[dict], mapping: dict) -> ImportBatch:
-    """Create an ImportBatch document (unsaved) with the given rows and mapping."""
-    return ImportBatch(
+async def _make_batch(owner_id: ObjectId, rows: list[dict], mapping: dict) -> ImportBatch:
+    """Create an ImportBatch with rows stored in raw_uploads."""
+    from winebox.models.import_batch_row import RawUploadRow
+
+    batch = ImportBatch(
         owner_id=owner_id,
         filename="test.csv",
         file_type="csv",
         status=ImportStatus.MAPPED,
         column_mapping=mapping,
         headers=list(mapping.keys()),
-        rows=rows,
         row_count=len(rows),
     )
+    await batch.insert()
+    if rows:
+        docs = [RawUploadRow(batch_id=batch.id, index=i, row=row) for i, row in enumerate(rows)]
+        await RawUploadRow.insert_many(docs)
+    return batch
 
 
 # ---------------------------------------------------------------------------
@@ -71,12 +77,11 @@ async def test_import_enriches_empty_fields(init_test_db) -> None:
     wine_name = xwine.name
 
     owner_id = ObjectId()
-    batch = _make_batch(
+    batch = await _make_batch(
         owner_id=owner_id,
         rows=[{"Wine Name": wine_name}],
         mapping={"Wine Name": "name"},
     )
-    await batch.insert()
 
     result = await process_import_batch(batch, owner_id, skip_enrichment=False)
 
@@ -111,7 +116,7 @@ async def test_import_preserves_csv_values(init_test_db) -> None:
     wine_name = xwine.name
 
     owner_id = ObjectId()
-    batch = _make_batch(
+    batch = await _make_batch(
         owner_id=owner_id,
         rows=[{
             "Wine Name": wine_name,
@@ -124,7 +129,6 @@ async def test_import_preserves_csv_values(init_test_db) -> None:
             "Region": "region",
         },
     )
-    await batch.insert()
 
     result = await process_import_batch(batch, owner_id, skip_enrichment=False)
 
@@ -160,12 +164,11 @@ async def test_import_no_match_no_enrichment(init_test_db) -> None:
     # No X-Wines data inserted
 
     owner_id = ObjectId()
-    batch = _make_batch(
+    batch = await _make_batch(
         owner_id=owner_id,
         rows=[{"Wine Name": "Totally Unknown Wine ABCXYZ"}],
         mapping={"Wine Name": "name"},
     )
-    await batch.insert()
 
     result = await process_import_batch(batch, owner_id)
 
@@ -186,12 +189,11 @@ async def test_import_no_match_no_enrichment(init_test_db) -> None:
 async def test_import_enrichment_failure_nonfatal(init_test_db) -> None:
     """If X-Wines lookup raises an exception, the wine is still imported."""
     owner_id = ObjectId()
-    batch = _make_batch(
+    batch = await _make_batch(
         owner_id=owner_id,
         rows=[{"Wine Name": "Some Wine"}],
         mapping={"Wine Name": "name"},
     )
-    await batch.insert()
 
     with patch(
         "winebox.services.import_service.processor.enrich_batch_with_xwines",
@@ -220,12 +222,11 @@ async def test_import_multi_chunk_pipeline(init_test_db) -> None:
     """Import 120 rows (3 chunks of 50+50+20) — all should be created."""
     owner_id = ObjectId()
     rows = [{"Wine Name": f"Pipeline Wine {i}"} for i in range(120)]
-    batch = _make_batch(
+    batch = await _make_batch(
         owner_id=owner_id,
         rows=rows,
         mapping={"Wine Name": "name"},
     )
-    await batch.insert()
 
     with patch(
         "winebox.services.import_service.processor.enrich_batch_with_xwines",
@@ -252,12 +253,11 @@ async def test_import_streaming_progress_monotonic(init_test_db) -> None:
     """Streaming progress should be monotonically increasing even with pipeline."""
     owner_id = ObjectId()
     rows = [{"Wine Name": f"Progress Wine {i}"} for i in range(75)]
-    batch = _make_batch(
+    batch = await _make_batch(
         owner_id=owner_id,
         rows=rows,
         mapping={"Wine Name": "name"},
     )
-    await batch.insert()
 
     batch.status = ImportStatus.MAPPED
     await batch.save()
