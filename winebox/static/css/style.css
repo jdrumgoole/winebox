@@ -413,6 +413,30 @@ h3 {
     font-size: 0.9rem;
 }
 
+/* Empty cellar states */
+.dashboard-empty-state,
+.empty-search-state {
+    text-align: center;
+    padding: 2rem 1rem;
+    background: var(--card-background);
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--border-color);
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-empty-state h3,
+.empty-search-state h3 {
+    font-family: 'Playfair Display', serif;
+    margin: 0 0 0.5rem;
+    color: var(--text-color);
+}
+
+.dashboard-empty-state p,
+.empty-search-state p {
+    color: var(--text-muted);
+    margin: 0 0 0.75rem;
+}
+
 @media (max-width: 768px) {
     .value-grid {
         grid-template-columns: repeat(2, 1fr);

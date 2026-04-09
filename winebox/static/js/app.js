@@ -1008,6 +1008,19 @@ function initForms() {
         btn.addEventListener('click', () => switchCellarTab(btn.dataset.cellarTab));
     });
 
+    // Cellar tab links (from empty states, breadcrumbs, and other UI elements)
+    document.addEventListener('click', (e) => {
+        const tabLink = e.target.closest('[data-cellar-tab-link]');
+        if (tabLink) {
+            e.preventDefault();
+            currentCellarTab = tabLink.dataset.cellarTabLink;
+            navigateTo('cellar');
+        }
+    });
+
+    // Dashboard demo install button
+    document.getElementById('dashboard-demo-install-btn')?.addEventListener('click', installDemoData);
+
     // Search form
     document.getElementById('search-form').addEventListener('submit', handleSearch);
 
@@ -2124,6 +2137,12 @@ async function loadCellarAnalytics() {
         document.getElementById('stat-unique-wines').textContent = summary.unique_wines;
         document.getElementById('stat-total-cases').textContent = summary.total_cases || 0;
 
+        // Show/hide empty state based on whether cellar has wines
+        const emptyState = document.getElementById('dashboard-empty-state');
+        if (emptyState) {
+            emptyState.style.display = summary.total_bottles === 0 ? '' : 'none';
+        }
+
         // Render charts
         renderDashboardCharts(summary);
 
@@ -2373,7 +2392,13 @@ function setCellarViewMode(mode) {
 }
 
 function emptyCellarHtml() {
-    return '';
+    return `
+        <div class="empty-search-state">
+            <h3>Your cellar is empty</h3>
+            <p>Add wines to your cellar first, then search to find them here.</p>
+            <a href="#" data-cellar-tab-link="import" class="btn btn-primary">Import Wines</a>
+        </div>
+    `;
 }
 
 function renderCellarTable(containerId, wines) {
@@ -5879,16 +5904,22 @@ function initAddToCellarPage() {
     initScanCellarSubwizard();
 
     // Cases toggle for scan and manual quantity fields
-    function setupCaseToggle(unitSelectId, caseSizeId) {
+    function setupCaseToggle(unitSelectId, caseSizeId, extraFieldsSelector) {
         const unitSelect = document.getElementById(unitSelectId);
         const caseSizeInput = document.getElementById(caseSizeId);
         if (!unitSelect || !caseSizeInput) return;
         unitSelect.addEventListener('change', () => {
-            caseSizeInput.style.display = unitSelect.value === 'cases' ? '' : 'none';
+            const isCases = unitSelect.value === 'cases';
+            caseSizeInput.style.display = isCases ? '' : 'none';
+            if (extraFieldsSelector) {
+                document.querySelectorAll(extraFieldsSelector).forEach(el => {
+                    el.style.display = isCases ? '' : 'none';
+                });
+            }
         });
     }
     setupCaseToggle('scan-quantity-unit', 'scan-case-size');
-    setupCaseToggle('manual-quantity-unit', 'manual-case-size');
+    setupCaseToggle('manual-quantity-unit', 'manual-case-size', '.manual-case-fields');
 }
 
 function resetAddToCellarWizard() {
@@ -6117,6 +6148,10 @@ async function handleManualCellarSubmit(e) {
         const caseSize = parseInt(document.getElementById('manual-case-size').value) || 12;
         formData.append('quantity', String(manualQty * caseSize));
         formData.append('case_size', String(caseSize));
+        const provenance = document.getElementById('manual-provenance')?.value;
+        if (provenance) formData.append('provenance', provenance);
+        const purchasePrice = document.getElementById('manual-purchase-price')?.value;
+        if (purchasePrice) formData.append('purchase_price', purchasePrice);
     } else {
         formData.append('quantity', String(manualQty));
     }

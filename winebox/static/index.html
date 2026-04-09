@@ -405,6 +405,14 @@
 
             <!-- Dashboard Panel -->
             <div id="cellar-panel-dashboard" class="cellar-panel active">
+                <div id="dashboard-empty-state" class="dashboard-empty-state" style="display:none;">
+                    <h3>Your cellar is empty</h3>
+                    <p>Get started by importing wines or loading sample data to explore the app.</p>
+                    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.75rem;">
+                        <a href="#" data-cellar-tab-link="import" class="btn btn-primary">Import Wines</a>
+                        <button class="btn btn-outline btn-small" id="dashboard-demo-install-btn">Load sample wines</button>
+                    </div>
+                </div>
                 <div class="stats-grid" id="cellar-stats-grid">
                     <div class="stat-card">
                         <div class="stat-value" id="stat-total-bottles">-</div>
@@ -715,9 +723,7 @@
         <!-- Add to Cellar Wizard Page -->
         <section id="page-add-to-cellar" class="page" aria-labelledby="page-add-to-cellar-title">
             <div class="wizard-breadcrumb" id="add-cellar-breadcrumb-top">
-                <a href="#" data-page="cellar">My Cellar</a>
-                <span class="breadcrumb-sep">&rsaquo;</span>
-                <a href="#" id="breadcrumb-root">Add Wine</a>
+                <a href="#" data-cellar-tab-link="import" id="breadcrumb-cellar-link">My Cellar &rsaquo; Import</a>
                 <span class="breadcrumb-sep breadcrumb-step-sep" style="display:none;">&rsaquo;</span>
                 <span id="breadcrumb-current"></span>
             </div>
@@ -900,6 +906,14 @@
                                 </select>
                                 <input type="number" id="manual-case-size" min="1" value="12" style="width:4rem;display:none;" placeholder="per case">
                             </div>
+                        </div>
+                        <div class="form-group manual-case-fields" style="display:none;">
+                            <label for="manual-provenance">Purchased from</label>
+                            <input type="text" id="manual-provenance" placeholder="e.g. Berry Bros, Majestic">
+                        </div>
+                        <div class="form-group manual-case-fields" style="display:none;">
+                            <label for="manual-purchase-price">Price per case</label>
+                            <input type="number" id="manual-purchase-price" min="0" step="0.01" placeholder="0.00">
                         </div>
                     </div>
                     <div class="form-actions">

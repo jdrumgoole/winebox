@@ -49,6 +49,8 @@ async def checkin_wine(
     classification: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
     alcohol_percentage: Annotated[float | None, Form(ge=0, le=100)] = None,
     wine_type_id: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH)] = None,
+    provenance: Annotated[str | None, Form(max_length=MAX_FIELD_LENGTH, description="Where the wine was purchased")] = None,
+    purchase_price: Annotated[float | None, Form(ge=0, description="Price paid per case")] = None,
     notes: Annotated[str | None, Form(max_length=MAX_NOTES_LENGTH, description="Check-in notes")] = None,
     front_label_text: Annotated[str | None, Form(max_length=MAX_OCR_TEXT_LENGTH, description="Pre-scanned front label text")] = None,
     back_label_text: Annotated[str | None, Form(max_length=MAX_OCR_TEXT_LENGTH, description="Pre-scanned back label text")] = None,
@@ -207,6 +209,8 @@ async def checkin_wine(
         wine=wine,
         quantity=quantity,
         case_size=case_size,
+        provenance=provenance,
+        purchase_price=purchase_price,
     )
 
     # Create transaction (legacy — kept for backward compatibility)
