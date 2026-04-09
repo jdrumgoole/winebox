@@ -294,77 +294,72 @@ async def add_case_event(
 ) -> dict:
     """Record a case-level event (sold, gifted, etc.).
 
-    This creates a CaseEvent AND creates corresponding WineEvents for
-    all bottles still in the case, so their individual state is updated.
+    Creates a CellarEvent and decrements the case's quantity.
     """
+    from winebox.models.cellar import CellarItem
+    from winebox.models.cellar_event import CellarEvent, CellarEventType
+
     try:
         oid = ObjectId(case_id)
     except InvalidId:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    case = await Case.find_one({"_id": oid, "owner_id": current_user.id})
-    if not case:
+    cellar_col = CellarItem.get_pymongo_collection()
+    item = await cellar_col.find_one({
+        "_id": oid, "cellar_id": current_user.id, "item_type": "case"
+    })
+    if not item:
         raise HTTPException(status_code=404, detail="Case not found")
 
     now = request.event_date or datetime.now(timezone.utc)
+    bottles_remaining = item.get("quantity", 0)
 
-    # Create case event
-    case_event = WineEvent(scope=WineEventScope.CASE, 
-        case_id=case.id,
-        owner_id=current_user.id,
-        event_type=request.event_type,
+    if bottles_remaining <= 0:
+        return {
+            "event_id": None,
+            "case_id": case_id,
+            "event_type": request.event_type.value,
+            "bottles_affected": 0,
+        }
+
+    # Map old event types to new
+    event_type_map = {
+        WineEventType.SOLD: CellarEventType.SOLD,
+        WineEventType.GIFTED: CellarEventType.GIFTED,
+        WineEventType.BREAKAGE: CellarEventType.BREAKAGE,
+        WineEventType.OTHER: CellarEventType.OTHER,
+    }
+    cellar_event_type = event_type_map.get(request.event_type, CellarEventType.OTHER)
+
+    # Create cellar event
+    event = CellarEvent(
+        cellar_id=current_user.id,
+        cellar_item_id=oid,
+        item_type="case",
+        event_type=cellar_event_type,
+        quantity=bottles_remaining,
         event_date=now,
         notes=request.notes,
         sale_price=request.sale_price,
         buyer=request.buyer,
         gift_recipient=request.gift_recipient,
     )
-    await case_event.insert()
+    await event.insert()
 
-    # Map case event type to wine event type
-    wine_event_map = {
-        WineEventType.SOLD: WineEventType.SOLD,
-        WineEventType.GIFTED: WineEventType.GIFTED,
-        WineEventType.BREAKAGE: WineEventType.BREAKAGE,
-        WineEventType.OTHER: WineEventType.OTHER,
-    }
-    wine_event_type = wine_event_map.get(request.event_type)
-
-    bottles_affected = 0
-    if wine_event_type:
-        # Create wine events for all bottles still in cellar
-        bottles = await Bottle.find({"case_id": case.id}).to_list()
-        event_col = WineEvent.get_pymongo_collection()
-
-        wine_events = []
-        for bottle in bottles:
-            latest = await event_col.find_one(
-                {"bottle_id": bottle.id}, sort=[("created_at", -1)]
-            )
-            if latest and latest["event_type"] == WineEventType.ADDED.value:
-                wine_events.append(WineEvent(
-                    bottle_id=bottle.id,
-                    owner_id=current_user.id,
-                    event_type=wine_event_type,
-                    event_date=now,
-                    notes=request.notes,
-                    sale_price=request.sale_price,
-                    buyer=request.buyer,
-                    gift_recipient=request.gift_recipient,
-                ))
-                bottles_affected += 1
-
-        if wine_events:
-            await WineEvent.insert_many(wine_events)
+    # Decrement case quantity to 0 (entire case affected)
+    await cellar_col.update_one(
+        {"_id": oid},
+        {"$set": {"quantity": 0, "updated_at": now}},
+    )
 
     logger.info(
         "Case %s event: %s (%d bottles affected, user %s)",
-        case_id, request.event_type.value, bottles_affected, current_user.id,
+        case_id, cellar_event_type.value, bottles_remaining, current_user.id,
     )
 
     return {
-        "event_id": str(case_event.id),
+        "event_id": str(event.id),
         "case_id": case_id,
         "event_type": request.event_type.value,
-        "bottles_affected": bottles_affected,
+        "bottles_affected": bottles_remaining,
     }

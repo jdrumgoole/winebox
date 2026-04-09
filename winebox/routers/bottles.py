@@ -33,25 +33,12 @@ async def add_loose_bottles(request: AddBottlesRequest, current_user: RequireAut
         request.wine_type,
     )
 
-    now = datetime.now(timezone.utc)
-    bottle_ids = [ObjectId() for _ in range(request.quantity)]
-    bottles = [
-        Bottle(id=bid, **_bottle_dict(current_user.id, wine, case_id=None), created_at=now)
-        for bid in bottle_ids
-    ]
-    await Bottle.insert_many(bottles)
-
-    events = [
-        WineEvent(scope=WineEventScope.BOTTLE, 
-            bottle_id=bid,
-            owner_id=current_user.id,
-            event_type=WineEventType.ADDED,
-            event_date=now,
-            created_at=now,
-        )
-        for bid in bottle_ids
-    ]
-    await WineEvent.insert_many(events)
+    from winebox.services.bottle_service import create_cellar_items_for_wine
+    result = await create_cellar_items_for_wine(
+        owner_id=current_user.id,
+        wine=wine,
+        quantity=request.quantity,
+    )
 
     logger.info(
         "Created %d loose bottles of %s for user %s",
@@ -60,7 +47,7 @@ async def add_loose_bottles(request: AddBottlesRequest, current_user: RequireAut
 
     return {
         "wine_id": str(wine.id),
-        "bottles_created": request.quantity,
+        "bottles_created": result["bottles_created"],
     }
 
 
