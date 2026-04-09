@@ -356,12 +356,7 @@ def browse_majestic(
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=15000)
             limiter.record_success()
-            # Dismiss cookie consent overlay via JS click (bypasses overlay interception)
-            page.evaluate("""
-                const btn = document.getElementById('onetrust-accept-btn-handler');
-                if (btn) btn.click();
-            """)
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(1000)
         except Exception as e:
             logger.error("  Failed to load: %s", e)
             limiter.record_error()
@@ -439,18 +434,21 @@ def browse_majestic(
             if wines_on_page == 0:
                 break
 
-            # Click the next page button in Majestic's JS pagination
-            next_btn = page.query_selector("li.next-page:not(.disabled)")
-            if not next_btn:
+            # Click next page via JS (bypasses cookie overlay that blocks pointer events)
+            has_next = page.evaluate("""
+                () => {
+                    // Remove cookie overlay if present
+                    document.querySelectorAll('#onetrust-consent-sdk, .onetrust-pc-dark-filter').forEach(el => el.remove());
+                    const next = document.querySelector('li.next-page:not(.disabled) a, li.next-page:not(.disabled)');
+                    if (next) { next.click(); return true; }
+                    return false;
+                }
+            """)
+            if not has_next:
                 break
 
             limiter.wait()
-            try:
-                next_btn.click()
-                page.wait_for_timeout(2000)
-                limiter.record_success()
-            except Exception:
-                break
+            page.wait_for_timeout(2000)
 
 
 # ---------------------------------------------------------------------------
