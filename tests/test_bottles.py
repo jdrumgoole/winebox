@@ -205,3 +205,85 @@ async def test_cellar_event_history(client: AsyncClient) -> None:
     # Verify case is now empty
     case_resp = await client.get(f"/api/cases/{case_id}")
     assert case_resp.json()["bottles_remaining"] == 0
+
+
+@pytest.mark.asyncio
+async def test_loose_bottle_remainder(client: AsyncClient) -> None:
+    """Adding a case where quantity doesn't evenly divide creates loose bottles."""
+    # 14 bottles with case_size=6 → 2 cases (12 bottles) + 2 loose
+    resp = await client.post("/api/cases", json={
+        "name": "Remainder Wine",
+        "case_size": 6,
+        "num_cases": 2,
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["cases_created"] == 2
+    assert data["bottles_created"] == 12
+
+    # Verify via grouped view
+    grouped = (await client.get("/api/cellar/grouped")).json()
+    wine = next((w for w in grouped["wines"] if w["name"] == "Remainder Wine"), None)
+    assert wine is not None
+    assert len(wine["cases"]) == 2
+    assert wine["total_bottles"] == 12
+
+
+@pytest.mark.asyncio
+async def test_add_bottles_updates_wine_inventory(client: AsyncClient) -> None:
+    """Adding loose bottles via POST /api/bottles updates wine inventory.quantity."""
+    resp = await client.post("/api/bottles", json={
+        "name": "Inventory Sync Wine",
+        "quantity": 5,
+    })
+    assert resp.status_code == 200
+    wine_id = resp.json()["wine_id"]
+
+    # Wine should have inventory.quantity = 5
+    wine_resp = await client.get(f"/api/wines/{wine_id}")
+    assert wine_resp.status_code == 200
+    assert wine_resp.json()["inventory"]["quantity"] == 5
+
+
+@pytest.mark.asyncio
+async def test_list_bottles_returns_cellar_items(client: AsyncClient) -> None:
+    """GET /api/bottles returns cellar items with quantity and status."""
+    resp = await client.post("/api/bottles", json={
+        "name": "List Test Wine",
+        "quantity": 2,
+    })
+    wine_id = resp.json()["wine_id"]
+
+    bottles_resp = await client.get(f"/api/bottles?wine_id={wine_id}")
+    assert bottles_resp.status_code == 200
+    data = bottles_resp.json()
+    assert data["total"] >= 1
+    item = data["bottles"][0]
+    assert item["in_cellar"] is True
+    assert item["quantity"] == 2
+    assert item["item_type"] == "bottle"
+
+
+@pytest.mark.asyncio
+async def test_remove_bottle_decrements_quantity(client: AsyncClient) -> None:
+    """POST /api/bottles/{id}/events decrements cellar item quantity by 1."""
+    resp = await client.post("/api/bottles", json={
+        "name": "Decrement Wine",
+        "quantity": 3,
+    })
+    wine_id = resp.json()["wine_id"]
+
+    # Get the cellar item ID
+    bottles_resp = await client.get(f"/api/bottles?wine_id={wine_id}")
+    item_id = bottles_resp.json()["bottles"][0]["id"]
+
+    # Remove one bottle
+    event_resp = await client.post(f"/api/bottles/{item_id}/events", json={
+        "event_type": "drunk",
+        "tasting_notes": "Lovely with pasta",
+    })
+    assert event_resp.status_code == 200
+
+    # Should now have 2 remaining
+    bottles_resp2 = await client.get(f"/api/bottles?wine_id={wine_id}")
+    assert bottles_resp2.json()["bottles"][0]["quantity"] == 2
