@@ -48,6 +48,7 @@ jobs:
           WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
           WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
           WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
+          WINEBOX_USE_CLAUDE_VISION: "true"
           WINEBOX_POSTHOG_API_KEY: ${{ secrets.WINEBOX_POSTHOG_API_KEY }}
           WINEBOX_POSTHOG_ENABLED: ${{ secrets.WINEBOX_POSTHOG_ENABLED }}
           WINEBOX_DO_TOKEN: ${{ secrets.WINEBOX_DO_TOKEN }}
@@ -70,7 +71,8 @@ jobs:
           WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
           WINEBOX_DATABASE: "winebox-oat"
           WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
-          WINEBOX_USE_CLAUDE_VISION: "false"
+          WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
+          WINEBOX_USE_CLAUDE_VISION: "true"
           WINEBOX_TEST_USER: ""
           WINEBOX_TEST_PASSWORD: ""
         run: |
