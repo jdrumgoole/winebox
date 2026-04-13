@@ -5,12 +5,6 @@ on:
     # Run at 2:17 AM UTC every night (avoid :00/:30 stampede)
     - cron: "17 2 * * *"
   workflow_dispatch:
-    inputs:
-      skip_deploy:
-        description: "Skip deploy, only run tests"
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   deploy-and-test:
@@ -54,32 +48,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Install SSH key
-        if: ${{ !inputs.skip_deploy }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.OAT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo -e "Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null" > ~/.ssh/config
-          chmod 600 ~/.ssh/config
-
-      - name: Deploy to OAT
-        if: ${{ !inputs.skip_deploy }}
+      - name: Run unit tests
         env:
-          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
-          WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
-          WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
           WINEBOX_USE_CLAUDE_VISION: "true"
-          WINEBOX_POSTHOG_API_KEY: ${{ secrets.WINEBOX_POSTHOG_API_KEY }}
-          WINEBOX_POSTHOG_ENABLED: ${{ secrets.WINEBOX_POSTHOG_ENABLED }}
-          WINEBOX_DO_TOKEN: ${{ secrets.WINEBOX_DO_TOKEN }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          WINEBOX_TEST_USER: ${{ secrets.WINEBOX_TEST_USER }}
-          WINEBOX_TEST_PASSWORD: ${{ secrets.WINEBOX_TEST_PASSWORD }}
+          WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
         run: |
-          uv run python -m invoke deploy-oat --host ${{ secrets.OAT_DROPLET_IP }}
+          uv run python -m pytest -m "not e2e" -v
 
       - name: Install Playwright browsers
         run: uv run playwright install --with-deps
