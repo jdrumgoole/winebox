@@ -40,7 +40,8 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.OAT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.OAT_DROPLET_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+          echo -e "Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
       - name: Deploy to OAT
         if: ${{ !inputs.skip_deploy }}
