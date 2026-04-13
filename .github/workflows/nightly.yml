@@ -79,7 +79,7 @@ jobs:
           WINEBOX_TEST_USER: ${{ secrets.WINEBOX_TEST_USER }}
           WINEBOX_TEST_PASSWORD: ${{ secrets.WINEBOX_TEST_PASSWORD }}
         run: |
-          uv run python -m invoke deploy-oat --release --host ${{ secrets.OAT_DROPLET_IP }}
+          uv run python -m invoke deploy-oat --host ${{ secrets.OAT_DROPLET_IP }}
 
       - name: Install Playwright browsers
         run: uv run playwright install --with-deps
