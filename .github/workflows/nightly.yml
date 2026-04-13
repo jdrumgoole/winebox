@@ -20,7 +20,16 @@ jobs:
       tests_passed: ${{ steps.e2e.outcome == 'success' }}
       test_output: ${{ steps.e2e.outputs.test_output }}
 
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
     steps:
+      - name: Install Tesseract OCR
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+
       - uses: actions/checkout@v4
 
       - name: Set up Python
