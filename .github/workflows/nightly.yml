@@ -16,6 +16,10 @@ jobs:
   deploy-and-test:
     name: Deploy to OAT and run full test suite
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     outputs:
       tests_passed: ${{ steps.e2e.outcome == 'success' }}
       test_output: ${{ steps.e2e.outputs.test_output }}
@@ -131,6 +135,9 @@ jobs:
     needs: deploy-and-test
     if: needs.deploy-and-test.outputs.tests_passed == 'false'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -208,6 +215,8 @@ jobs:
       needs.deploy-and-test.outputs.tests_passed == 'false' &&
       (needs.auto-fix.result == 'failure' || needs.auto-fix.result == 'skipped')
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
 
     steps:
       - uses: actions/checkout@v4
