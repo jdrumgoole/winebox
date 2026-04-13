@@ -31,6 +31,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
 
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "WineBox Nightly Bot"
+          git config user.email "nightly-bot@winebox.app"
 
       - name: Set up Python
         uses: actions/setup-python@v5
