@@ -288,8 +288,8 @@ winebox/
 │   │   ├── schema.py     # Pydantic config models
 │   │   ├── loader.py     # TOML loading logic
 │   │   └── settings.py   # Global settings instance
-│   ├── database.py       # MongoDB/Beanie setup
-│   ├── models/           # Beanie document models
+│   ├── database.py       # MongoDB/PyMongo setup
+│   ├── models/           # MongoDB document models
 │   ├── schemas/          # Pydantic API schemas
 │   ├── routers/          # API endpoints
 │   ├── services/         # Business logic (OCR, etc.)

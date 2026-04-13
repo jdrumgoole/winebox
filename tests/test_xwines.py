@@ -30,7 +30,7 @@ async def test_xwines_search_query_too_short(client: AsyncClient) -> None:
 async def test_xwines_search_with_data(client: AsyncClient, init_test_db) -> None:
     """Test search with X-Wines data in database."""
     uid = random.randint(100000, 999999)
-    # Add test wines to database using Beanie
+    # Add test wines to database using PyMongo
     test_wines = [
         XWinesWine(
             xwines_id=uid,

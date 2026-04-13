@@ -123,7 +123,15 @@ def store_wine_price(db, wine: DiscoveredWine) -> bool:
         })
         return True
 
+    # Skip if the most recent price from the same retailer has the same price
     prices = doc.get("prices", [])
+    for existing in reversed(prices):
+        if (existing.get("location", {}).get("shop_name") == wine.retailer_name
+                and existing.get("source") == "web_scraper"):
+            if existing.get("price") == wine.price and existing.get("currency") == wine.currency:
+                return False  # Duplicate — same retailer, same price
+            break  # Different price from same retailer — record the change
+
     prices.append(entry_doc)
     if len(prices) > 20:
         overflow = prices[: len(prices) - 20]
@@ -149,6 +157,16 @@ def extract_gbp_price(text: str) -> Optional[float]:
     if any_price:
         return float(any_price.group(1))
     return None
+
+
+def extract_eur_price(text: str) -> Optional[float]:
+    """Extract a EUR price (€X.XX or €X,XX) from text."""
+    match = re.search(r"€\s?(\d{1,5}(?:[.,]\d{2})?)", text)
+    if not match:
+        return None
+    raw = match.group(1).replace(",", ".")
+    price = float(raw)
+    return price if MIN_PRICE <= price <= MAX_PRICE else None
 
 
 def parse_vintage_from_name(name: str) -> tuple[str, Optional[int]]:
@@ -353,11 +371,139 @@ def browse_majestic(
         time.sleep(delay)
 
 
+# ---------------------------------------------------------------------------
+# O'Briens catalog walker
+# ---------------------------------------------------------------------------
+
+def _parse_obriens_products(page: Page) -> list[tuple[str, float, str]]:
+    """Parse product cards from an O'Briens collection page.
+
+    Returns list of (wine_name, price_eur, product_url) tuples.
+    """
+    cards = page.query_selector_all(".card-wrapper")
+    results = []
+    for card in cards:
+        try:
+            title_el = card.query_selector(".card__heading a, .products-productTitle")
+            if not title_el:
+                continue
+            title = title_el.inner_text().strip()
+            if not title:
+                continue
+
+            # Skip non-wine products (cases, gift cards, accessories)
+            lower = title.lower()
+            if any(skip in lower for skip in ["case", "gift card", "voucher", "glass", "opener"]):
+                continue
+
+            card_text = card.inner_text()
+            price = extract_eur_price(card_text)
+            if price is None:
+                continue
+
+            link_el = card.query_selector('a[href*="/products/"]')
+            href = link_el.get_attribute("href") if link_el else ""
+            if href and not href.startswith("http"):
+                href = f"https://www.obrienswine.ie{href}"
+
+            results.append((title, price, href))
+        except Exception:
+            continue
+    return results
+
+
+def browse_obriens(
+    page: Page,
+    delay: float,
+    collect_target: Optional[int],
+    dry_run: bool,
+    verbose: bool,
+    db,
+    stats: dict,
+    shutdown_flag: list,
+) -> None:
+    """Walk the O'Briens wine catalog by paginating through /collections/wine.
+
+    O'Briens is a Shopify site with simple ?page=N pagination
+    and server-rendered product cards.
+    """
+    page_num = 1
+
+    while True:
+        if shutdown_flag[0]:
+            break
+        if collect_target and stats["wines_collected"] >= collect_target:
+            break
+
+        url = f"https://www.obrienswine.ie/collections/wine?page={page_num}"
+        if page_num == 1 or verbose:
+            print(f"\n  Page {page_num}: {url}")
+
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=20000)
+            time.sleep(delay)
+        except Exception as e:
+            logger.error("  Failed to load page %d: %s", page_num, e)
+            stats["errors"] += 1
+            break
+
+        products = _parse_obriens_products(page)
+        if not products:
+            break
+
+        if not verbose:
+            print(f"\n  Page {page_num}: {len(products)} wines")
+
+        for title, price, product_url in products:
+            if shutdown_flag[0]:
+                break
+            if collect_target and stats["wines_collected"] >= collect_target:
+                break
+
+            clean_name, vintage = parse_vintage_from_name(title)
+            wine_type = classify_wine_type_from_text(page.inner_text("body"))
+            stats["wines_processed"] += 1
+
+            wine = DiscoveredWine(
+                name=clean_name,
+                vintage=vintage,
+                wine_type=wine_type,
+                price=price,
+                currency="EUR",
+                retailer_name="O'Briens",
+                retailer_country="Ireland",
+                product_url=product_url,
+            )
+
+            if dry_run:
+                stats["wines_collected"] += 1
+                if verbose:
+                    v = f" {vintage}" if vintage else ""
+                    print(f"    {clean_name}{v}: €{price:.2f}")
+            else:
+                try:
+                    is_new = store_wine_price(db, wine)
+                    stats["prices_stored"] += 1
+                    if is_new:
+                        stats["wines_collected"] += 1
+                        v = f" {vintage}" if vintage else ""
+                        print(f"    NEW: {clean_name}{v}: €{price:.2f}")
+                except Exception as e:
+                    logger.error("    Store failed: %s", e)
+                    stats["errors"] += 1
+
+        page_num += 1
+
+
 # Scraper registry
 SCRAPERS = {
     "majestic": {
         "fn": browse_majestic,
         "name": "Majestic (majestic.co.uk)",
+    },
+    "obriens": {
+        "fn": browse_obriens,
+        "name": "O'Briens (obrienswine.ie)",
     },
 }
 

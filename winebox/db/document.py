@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class QuerySet:
     """Async query builder for MongoDB find operations.
 
-    Provides a chainable API similar to Beanie's FindMany:
+    Provides a chainable API similar to an ODM query builder:
         Model.find({"field": "value"}).sort([("f", -1)]).skip(10).limit(5).to_list()
     """
 
@@ -97,7 +97,7 @@ class QuerySet:
 class MongoDocument(BaseModel):
     """Base class for MongoDB documents using motor directly.
 
-    Provides a Beanie-like API without automatic index management.
+    Provides an ODM-like API without automatic index management.
     Subclasses must define a Settings inner class with a `name` attribute
     specifying the MongoDB collection name.
 

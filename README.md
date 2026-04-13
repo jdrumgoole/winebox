@@ -354,7 +354,7 @@ winebox/
 ├── winebox/          # Application package
 │   ├── main.py       # FastAPI app
 │   ├── config/       # Configuration module
-│   ├── models/       # MongoDB/Beanie models
+│   ├── models/       # MongoDB document models
 │   ├── schemas/      # API schemas
 │   ├── routers/      # API endpoints
 │   ├── services/     # Business logic
@@ -377,7 +377,7 @@ invoke docs-serve
 
 - **FastAPI**: Web framework
 - **MongoDB**: Document database
-- **Beanie**: MongoDB ODM
+- **PyMongo (async)**: MongoDB driver
 - **fastapi-users**: Authentication
 - **Tesseract/Claude Vision**: OCR engines
 - **Vanilla JS**: Frontend (no frameworks)

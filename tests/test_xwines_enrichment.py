@@ -106,7 +106,7 @@ def test_tokenize_empty() -> None:
 
 
 def _make_xwines_wine(**kwargs: object) -> XWinesWine:
-    """Create an XWinesWine without requiring Beanie DB initialization."""
+    """Create an XWinesWine without requiring DB initialization."""
     defaults = {
         "xwines_id": 0,
         "name": "",

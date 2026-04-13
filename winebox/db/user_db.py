@@ -1,7 +1,6 @@
 """Motor-based user database adapter for fastapi-users.
 
-Replaces fastapi_users_db_beanie.BeanieUserDatabase with a direct
-motor implementation.
+Direct motor implementation of the fastapi-users database adapter.
 """
 
 from typing import Any, Optional

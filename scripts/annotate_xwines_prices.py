@@ -5,7 +5,7 @@ Standalone script that uses the Anthropic API (Claude Haiku) to estimate
 retail prices for wines in the xwines_wines collection. Results are stored
 in a separate xwines_prices collection to keep reference data clean.
 
-Uses pymongo directly (not Beanie) following the pattern of
+Uses pymongo directly (not the ODM) following the pattern of
 deploy/import_xwines_mongo.py.
 
 Usage:
