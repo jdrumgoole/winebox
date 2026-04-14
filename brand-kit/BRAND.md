@@ -28,9 +28,11 @@ The wordmark uses a **two-tone treatment**: "Wine" is bold, "Box" is regular wei
 | Case Wood Dark | `#A08060` | 160, 128, 96 | Case fill (dark theme) |
 | Case Stroke | `#8A6C4E` | 138, 108, 78 | Case stroke & vertical dividers |
 | Case Grain | `#907050` | 144, 112, 80 | Case grain lines |
+| Text Heading | `#2C2C2C` | 44, 44, 44 | Heading text |
 | Cream | `#FAF7F2` | 250, 247, 242 | Page background |
 | Cream Dark | `#F0EBE3` | 240, 235, 227 | Hero gradient end |
 | Dark BG | `#1A0A10` | 26, 10, 16 | Dark mode background |
+| Dark Wine | `#E0C0CC` | 224, 192, 204 | "Wine" text (dark theme) |
 | Body Text | `#666666` | 102, 102, 102 | Paragraph text |
 
 ### Key Gradients
@@ -83,11 +85,12 @@ The kit ships as SVGs only. To generate PNGs and favicon PNGs, run:
 
 ```bash
 cd brand-kit
-pip install cairosvg
+pip install playwright pillow
+playwright install chromium
 python generate_pngs.py
 ```
 
-This requires **Playfair Display** and **Cormorant Garamond** fonts installed on the system (available from Google Fonts). The script generates PNGs in `png/` and favicons in `favicon/` at standard sizes with 192 DPI for retina-quality output.
+The script uses headless Chromium (via Playwright) with Google Fonts loaded at runtime, so no local font installation is needed. It renders at 2x device scale and downscales with LANCZOS for crisp, retina-quality output. PNGs are written to `png/` and favicons to `favicon/`.
 
 ## Favicon Files
 

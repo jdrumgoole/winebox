@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WineBox Brand Kit</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --burgundy: #5C0A2D;
@@ -292,7 +292,7 @@ const themes = [
 const configs = [
   { style:'logo-full', label:'Full Logo', container:'full-logos', pngSizes:[400,800,1600] },
   { style:'logo-compact', label:'Compact', container:'compact-logos', pngSizes:[200,400,800,1600] },
-  { style:'icon', label:'Icon', container:'icon-logos', pngSizes:[64,128,256,512,1024] },
+  { style:'icon', label:'Icon', container:'icon-logos', pngSizes:[16,32,48,64,128,256,512,1024] },
 ];
 
 configs.forEach(cfg => {
@@ -325,9 +325,12 @@ const colours = [
   { name:'Case Wood', hex:'#B8956A' },
   { name:'Case Wood Dark', hex:'#A08060' },
   { name:'Case Stroke', hex:'#8A6C4E' },
+  { name:'Case Grain', hex:'#907050' },
+  { name:'Text Heading', hex:'#2C2C2C' },
   { name:'Cream', hex:'#FAF7F2' },
   { name:'Cream Dark', hex:'#F0EBE3' },
   { name:'Dark BG', hex:'#1A0A10' },
+  { name:'Dark Wine', hex:'#E0C0CC' },
   { name:'Body Text', hex:'#666666' },
 ];
 const cg = document.getElementById('colour-grid');
