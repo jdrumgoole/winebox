@@ -149,6 +149,14 @@ async def add_cases(request: AddCaseRequest, current_user: RequireAuth) -> dict:
         provenance=request.provenance,
     )
 
+    # Sync Wine.inventory.quantity
+    total_bottles = request.num_cases * request.case_size
+    wines_col = Wine.get_pymongo_collection()
+    await wines_col.update_one(
+        {"_id": wine.id},
+        {"$inc": {"inventory.quantity": total_bottles}},
+    )
+
     # Build response matching old format
     from winebox.models.cellar import CellarItem
     cellar_col = CellarItem.get_pymongo_collection()

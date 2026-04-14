@@ -128,3 +128,55 @@ async def test_list_wines_collection_filter(client: AsyncClient, sample_image_by
     wines = response.json()
     assert all(w["collection"] == "met" for w in wines)
     assert len(wines) == 1
+
+
+@pytest.mark.asyncio
+async def test_record_met_wine_with_custom_fields(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Custom fields JSON is parsed and stored on the wine."""
+    import json
+    files = {
+        "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+    }
+    custom = json.dumps({"Tasting Room": "Excellent", "Rating": "5 stars"})
+    data = {
+        "name": "Custom Fields Met Wine",
+        "mode": "met",
+        "custom_fields": custom,
+    }
+    response = await client.post("/api/wines/checkin", data=data, files=files)
+    assert response.status_code == 201
+    wine = response.json()
+    assert wine["custom_fields"]["Tasting Room"] == "Excellent"
+    assert wine["custom_fields"]["Rating"] == "5 stars"
+
+
+@pytest.mark.asyncio
+async def test_record_met_wine_invalid_custom_fields(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Invalid custom fields JSON returns 400."""
+    files = {
+        "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
+    }
+    data = {
+        "name": "Bad Custom Wine",
+        "mode": "met",
+        "custom_fields": "not valid json{{{",
+    }
+    response = await client.post("/api/wines/checkin", data=data, files=files)
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_record_met_wine_with_back_label(client: AsyncClient, sample_image_bytes: bytes) -> None:
+    """Recording with a back label image saves both labels."""
+    files = {
+        "front_label": ("front.png", io.BytesIO(sample_image_bytes), "image/png"),
+        "back_label": ("back.png", io.BytesIO(sample_image_bytes), "image/png"),
+    }
+    data = {
+        "name": "Two Label Wine",
+        "mode": "met",
+    }
+    response = await client.post("/api/wines/checkin", data=data, files=files)
+    assert response.status_code == 201
+    wine = response.json()
+    assert wine.get("back_label_image_path") is not None

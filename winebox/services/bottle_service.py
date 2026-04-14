@@ -153,6 +153,7 @@ async def create_cellar_items_for_wine(
     cases_created = sum(1 for i in cellar_items if i.item_type == "case")
     total_bottles = sum(i.quantity for i in cellar_items)
 
+
     logger.info(
         "Created %d cellar items (%d cases, %d bottles) for wine %s (owner %s)",
         len(cellar_items), cases_created, total_bottles, wine.name, owner_id,

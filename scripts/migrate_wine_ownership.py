@@ -48,7 +48,7 @@ async def migrate_wines(admin_id: PyObjectId, dry_run: bool = False) -> int:
     Returns:
         Number of documents updated.
     """
-    # Use PyMongo directly to avoid Beanie model validation
+    # Use PyMongo directly to avoid model validation
     collection = Wine.get_pymongo_collection()
 
     # Count wines without owner_id
@@ -84,7 +84,7 @@ async def migrate_transactions(admin_id: PyObjectId, dry_run: bool = False) -> i
     Returns:
         Number of documents updated.
     """
-    # Use PyMongo directly to avoid Beanie model validation
+    # Use PyMongo directly to avoid model validation
     collection = Transaction.get_pymongo_collection()
 
     # Count transactions without owner_id
@@ -113,14 +113,14 @@ async def migrate_transactions(admin_id: PyObjectId, dry_run: bool = False) -> i
 async def create_indexes(dry_run: bool = False) -> None:
     """Create indexes on owner_id fields.
 
-    Note: Beanie should handle this automatically on init, but this ensures
+    Note: The app should handle this automatically on init, but this ensures
     the indexes exist after migration.
     """
     if dry_run:
         logger.info("[DRY RUN] Would create indexes on owner_id fields")
         return
 
-    # The indexes are defined in the model Settings, so Beanie should create them
+    # The indexes are defined in the model Settings, so the app should create them
     # However, we can explicitly ensure they exist
     wine_collection = Wine.get_pymongo_collection()
     transaction_collection = Transaction.get_pymongo_collection()
@@ -140,7 +140,7 @@ async def verify_migration() -> dict[str, Any]:
     """
     results = {}
 
-    # Use PyMongo directly to avoid Beanie model validation issues
+    # Use PyMongo directly to avoid model validation issues
     wine_collection = Wine.get_pymongo_collection()
     transaction_collection = Transaction.get_pymongo_collection()
 

@@ -268,7 +268,7 @@ def test_e2e_db(
     Path("data").mkdir(parents=True, exist_ok=True)
 
     # Load X-Wines test data before starting server (to avoid index conflicts
-    # between the import's text index and Beanie's model indexes)
+    # between the import's text index and model indexes)
     _ensure_xwines_data(ctx, e2e_db)
 
     print(f"Starting e2e test server on port {e2e_port} with database '{e2e_db}'...")
@@ -382,7 +382,7 @@ def _ensure_xwines_data(ctx: Context, db_name: str) -> None:
         f"db_name = '{db_name}'\n"
         "client = MongoClient(settings.mongodb_url)\n"
         "db = client[db_name]\n"
-        "# Drop any conflicting text indexes that would clash with Beanie\n"
+        "# Drop any conflicting text indexes that would clash with startup indexes\n"
         "try:\n"
         "    for idx in db.xwines_wines.list_indexes():\n"
         "        if idx.get('textIndexVersion'):\n"
@@ -429,7 +429,7 @@ def _ensure_xwines_data(ctx: Context, db_name: str) -> None:
         "    metadata_col.insert_one({'key': 'version', 'value': version})\n"
         "    metadata_col.insert_one({'key': 'wine_count', 'value': len(wines)})\n"
         "    metadata_col.insert_one({'key': 'imported_at', 'value': datetime.now(timezone.utc).isoformat()})\n"
-        "    # Do NOT create a text index — Beanie will create its own on startup\n"
+        "    # Do NOT create a text index — the app will create its own on startup\n"
         "    client.close()\n"
         "    print(f'  Loaded {len(wines)} wines into {db.name}')\n"
         "    return 0\n"

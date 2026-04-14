@@ -108,7 +108,7 @@ def _open_wine_detail_via_search(page: Page, wine_name: str) -> None:
     page.wait_for_selector("#cellar-panel-search", state="visible", timeout=10000)
     page.fill("#search-q", wine_name)
     page.press("#search-q", "Enter")
-    page.wait_for_selector(".wine-card", state="visible", timeout=10000)
+    page.wait_for_selector(".wine-card", state="visible", timeout=15000)
     card = page.locator(".wine-card", has_text=wine_name).first
     card.click()
     page.wait_for_selector("#wine-modal.active", state="visible", timeout=10000)
@@ -135,6 +135,8 @@ class TestWineDetailBottleInfo:
         """Wine detail modal shows loose bottle count."""
         page = authenticated_page
         _add_loose_bottles_via_api(page)
+        # Wait for text index to catch up on Atlas before searching
+        page.wait_for_timeout(1000)
         _open_wine_detail_via_search(page, "Detail Test Cloudy Bay")
 
         detail = page.locator("#wine-detail")

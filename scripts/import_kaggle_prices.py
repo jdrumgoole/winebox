@@ -4,7 +4,7 @@
 Reads Red.csv, White.csv, Rose.csv, and Sparkling.csv from a configurable
 directory and imports them into the `kaggle_wine_prices` collection.
 
-Uses pymongo directly (not Beanie) following the pattern of
+Uses pymongo directly (not the ODM) following the pattern of
 scripts/annotate_xwines_prices.py.
 
 Usage:

@@ -1,6 +1,6 @@
 """Pydantic-compatible ObjectId type for MongoDB documents.
 
-Drop-in replacement for beanie.PydanticObjectId.
+Drop-in replacement for a custom PyObjectId type.
 """
 
 from typing import Annotated, Any

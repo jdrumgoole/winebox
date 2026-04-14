@@ -1,0 +1,235 @@
+name: Nightly OAT Deploy & Test
+
+on:
+  schedule:
+    # Run at 2:17 AM UTC every night (avoid :00/:30 stampede)
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  deploy-and-test:
+    name: Deploy to OAT and run full test suite
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      tests_passed: ${{ steps.e2e.outcome == 'success' }}
+      test_output: ${{ steps.e2e.outputs.test_output }}
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: Install Tesseract OCR
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "WineBox Nightly Bot"
+          git config user.email "nightly-bot@winebox.app"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run unit tests
+        env:
+          WINEBOX_USE_CLAUDE_VISION: "true"
+          WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
+        run: |
+          uv run python -m pytest -m "not e2e" -v
+
+      - name: Install Playwright browsers
+        run: uv run playwright install --with-deps
+
+      - name: Run full E2E tests against OAT
+        id: e2e
+        continue-on-error: true
+        env:
+          WINEBOX_TEST_URL: "https://oat.winebox.app"
+          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
+          WINEBOX_DATABASE: "winebox-oat"
+          WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
+          WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
+          WINEBOX_USE_CLAUDE_VISION: "true"
+          WINEBOX_TEST_USER: ""
+          WINEBOX_TEST_PASSWORD: ""
+        run: |
+          set -o pipefail
+          uv run python -m pytest -c pytest-e2e.ini \
+            tests/test_app_navigation_e2e.py \
+            tests/test_cellar_e2e.py \
+            tests/test_cellar_tabs_e2e.py \
+            tests/test_case_actions_e2e.py \
+            tests/test_checkout_e2e.py \
+            tests/test_export_e2e.py \
+            tests/test_history_e2e.py \
+            tests/test_search_e2e.py \
+            tests/test_search_filters_e2e.py \
+            tests/test_settings_e2e.py \
+            tests/test_registration_e2e.py \
+            tests/test_undo_import_e2e.py \
+            tests/test_wine_detail_e2e.py \
+            tests/test_checkin_e2e.py \
+            tests/test_demo_e2e.py \
+            tests/test_xwines_e2e.py \
+            tests/test_import_e2e.py \
+            tests/test_import_xwines_e2e.py \
+            -n 2 -v 2>&1 | tee /tmp/e2e-results.txt
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: /tmp/e2e-results.txt
+
+      - name: Check test results
+        if: steps.e2e.outcome == 'success'
+        run: echo "All E2E tests passed"
+
+  auto-fix:
+    name: Auto-fix failing tests with Claude Code
+    needs: deploy-and-test
+    if: needs.deploy-and-test.outputs.tests_passed == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-test-results
+          path: /tmp
+
+      - name: Extract failure summary
+        id: failures
+        run: |
+          FAILURES=$(grep "FAILED" /tmp/e2e-results.txt | head -20 || echo "No specific failures found")
+          echo "failures<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$FAILURES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude Code to fix failures
+        id: claude_fix
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
+          prompt: |
+            The nightly E2E tests against OAT failed. Here are the failures:
+
+            ${{ steps.failures.outputs.failures }}
+
+            Full test output is in /tmp/e2e-results.txt.
+
+            Diagnose the failures, fix the code, and commit the fix to a new branch.
+            Create the branch as `fix/nightly-$(date +%Y%m%d)`.
+            Only fix test failures — do not refactor or add features.
+            Run the unit tests to verify the fix doesn't break anything.
+          allowed_tools: "Bash,Read,Write,Edit,Grep,Glob"
+
+      - name: Create PR if fix was committed
+        if: steps.claude_fix.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="fix/nightly-$(date +%Y%m%d)"
+          if git diff --quiet HEAD origin/main 2>/dev/null; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git push origin HEAD:$BRANCH
+          gh pr create \
+            --base main \
+            --head $BRANCH \
+            --title "fix: Nightly auto-fix for E2E test failures ($(date +%Y-%m-%d))" \
+            --body "$(cat <<'BODY'
+          ## Nightly Auto-Fix
+
+          The nightly E2E tests failed and Claude Code attempted an automatic fix.
+
+          ### Failures detected:
+          ${{ steps.failures.outputs.failures }}
+
+          ### Review checklist:
+          - [ ] Changes look correct
+          - [ ] CI passes on this PR
+          - [ ] No unintended side effects
+
+          🤖 Generated by the nightly CI pipeline
+          BODY
+          )"
+
+  create-issue:
+    name: Create issue for unresolved failures
+    needs: [deploy-and-test, auto-fix]
+    if: |
+      always() &&
+      needs.deploy-and-test.outputs.tests_passed == 'false' &&
+      (needs.auto-fix.result == 'failure' || needs.auto-fix.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-test-results
+          path: /tmp
+
+      - name: Create GitHub issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FAILURES=$(grep "FAILED" /tmp/e2e-results.txt | head -20 || echo "See attached test output")
+          SUMMARY=$(tail -5 /tmp/e2e-results.txt)
+
+          gh issue create \
+            --title "Nightly E2E failures ($(date +%Y-%m-%d)) — auto-fix failed" \
+            --label "bug,nightly" \
+            --body "$(cat <<BODY
+          ## Nightly E2E Test Failures
+
+          The nightly deploy and test run found failures that could not be automatically fixed.
+
+          ### Test Summary
+          \`\`\`
+          $SUMMARY
+          \`\`\`
+
+          ### Failed Tests
+          \`\`\`
+          $FAILURES
+          \`\`\`
+
+          ### Actions
+          - Check the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for full details
+          - Download the test results artifact for complete output
+
+          🤖 Created automatically by the nightly CI pipeline
+          BODY
+          )"

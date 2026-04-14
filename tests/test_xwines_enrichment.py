@@ -106,7 +106,7 @@ def test_tokenize_empty() -> None:
 
 
 def _make_xwines_wine(**kwargs: object) -> XWinesWine:
-    """Create an XWinesWine without requiring Beanie DB initialization."""
+    """Create an XWinesWine without requiring DB initialization."""
     defaults = {
         "xwines_id": 0,
         "name": "",
@@ -354,8 +354,10 @@ async def test_enrich_no_name_skipped(init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_scan_returns_xwines_fields(client: AsyncClient, init_test_db, sample_image_bytes: bytes) -> None:
     """Scan endpoint includes wine_type and xwines_id from enrichment."""
-    uid = uuid.uuid4().hex[:8]
-    wine_name = f"Test Scan Wine {uid}"
+    uid = uuid.uuid4().hex[:12]
+    # Use a highly unique name with no common words that could collide
+    # with other tests inserting XWinesWine docs in parallel
+    wine_name = f"Zinfandel Reserva Exclusiva {uid}"
     xwines_id = hash(uid) % 1_000_000 + 3_000_000
 
     # Insert an X-Wines wine that will match the OCR result
@@ -363,14 +365,14 @@ async def test_scan_returns_xwines_fields(client: AsyncClient, init_test_db, sam
         xwines_id=xwines_id,
         name=wine_name,
         wine_type="White",
-        winery_name=f"Scan Winery {uid}",
+        winery_name=f"Bodega Unica {uid}",
         country="Italy",
         country_code="IT",
         region_name="Tuscany",
         grapes="['Trebbiano']",
         abv=12.0,
         avg_rating=4.0,
-        rating_count=50,
+        rating_count=200,  # High rating_count to win scoring tiebreaks
     )
     await xwine.insert()
 

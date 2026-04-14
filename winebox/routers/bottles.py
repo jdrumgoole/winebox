@@ -39,6 +39,13 @@ async def add_loose_bottles(request: AddBottlesRequest, current_user: RequireAut
         quantity=request.quantity,
     )
 
+    # Sync Wine.inventory.quantity so search finds this wine
+    wines_col = Wine.get_pymongo_collection()
+    await wines_col.update_one(
+        {"_id": wine.id},
+        {"$inc": {"inventory.quantity": request.quantity}},
+    )
+
     return {
         "wine_id": str(wine.id),
         "bottles_created": result["bottles_created"],

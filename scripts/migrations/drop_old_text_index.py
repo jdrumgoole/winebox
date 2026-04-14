@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drop the old wines text index so Beanie can create the updated one.
+"""Drop the old wines text index so the app can create the updated one.
 
 The text index was expanded in v0.5.12 to include sub_region and appellation.
 MongoDB does not allow creating a new text index when one already exists with
