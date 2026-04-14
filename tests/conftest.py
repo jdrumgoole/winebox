@@ -56,10 +56,14 @@ def pytest_configure(config: pytest.Config) -> None:
     Uses sync MongoClient since pytest_configure is synchronous.
     """
     if not hasattr(config, "workerinput"):
+        # Skip local-DB drop when running E2E against a remote target (OAT).
+        # Remote E2E jobs don't need a local mongo at all.
+        if os.environ.get("WINEBOX_TEST_URL"):
+            return
         from pymongo import MongoClient
 
         url = os.environ.get("TEST_MONGODB_URL", "mongodb://localhost:27017")
-        sync_client = MongoClient(url)
+        sync_client = MongoClient(url, serverSelectionTimeoutMS=2000)
         sync_client.drop_database(SHARED_TEST_DB)
         sync_client.close()
 
