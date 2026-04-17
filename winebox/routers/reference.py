@@ -59,9 +59,9 @@ async def get_wine_type(type_id: str) -> WineTypeResponse:
 
 @router.get("/grape-varieties", response_model=list[GrapeVarietyResponse])
 async def list_grape_varieties(
-    color: str | None = Query(None, description="Filter by color: 'red' or 'white'"),
-    category: str | None = Query(None, description="Filter by category: 'international' or 'regional'"),
-    search: str | None = Query(None, description="Search by name (partial match)"),
+    color: str | None = Query(None, max_length=50, description="Filter by color: 'red' or 'white'"),
+    category: str | None = Query(None, max_length=50, description="Filter by category: 'international' or 'regional'"),
+    search: str | None = Query(None, max_length=200, description="Search by name (partial match)"),
 ) -> list[GrapeVarietyResponse]:
     """List grape varieties with optional filters."""
     conditions = {}
@@ -113,10 +113,10 @@ async def get_grape_variety(variety_id: str) -> GrapeVarietyResponse:
 
 @router.get("/regions", response_model=list[RegionResponse])
 async def list_regions(
-    country: str | None = Query(None, description="Filter by country"),
+    country: str | None = Query(None, max_length=100, description="Filter by country"),
     level: int | None = Query(None, ge=0, le=4, description="Filter by hierarchy level"),
-    parent_id: str | None = Query(None, description="Filter by parent region ID"),
-    search: str | None = Query(None, description="Search by name (partial match)"),
+    parent_id: str | None = Query(None, max_length=64, description="Filter by parent region ID"),
+    search: str | None = Query(None, max_length=200, description="Search by name (partial match)"),
 ) -> list[RegionResponse]:
     """List regions with optional filters."""
     conditions = {}
@@ -152,7 +152,7 @@ async def list_regions(
 
 @router.get("/regions/tree", response_model=RegionTree)
 async def get_region_tree(
-    country: str | None = Query(None, description="Filter tree by country"),
+    country: str | None = Query(None, max_length=100, description="Filter tree by country"),
 ) -> RegionTree:
     """Get hierarchical region tree starting from countries."""
     conditions = {}
@@ -292,8 +292,8 @@ async def get_region_path(region_id: str) -> list[RegionResponse]:
 
 @router.get("/classifications", response_model=list[ClassificationResponse])
 async def list_classifications(
-    country: str | None = Query(None, description="Filter by country"),
-    system: str | None = Query(None, description="Filter by classification system"),
+    country: str | None = Query(None, max_length=100, description="Filter by country"),
+    system: str | None = Query(None, max_length=100, description="Filter by classification system"),
 ) -> list[ClassificationResponse]:
     """List classifications with optional filters."""
     conditions = {}
@@ -322,7 +322,7 @@ async def list_classifications(
 
 @router.get("/classifications/by-system", response_model=list[ClassificationsBySystem])
 async def list_classifications_by_system(
-    country: str | None = Query(None, description="Filter by country"),
+    country: str | None = Query(None, max_length=100, description="Filter by country"),
 ) -> list[ClassificationsBySystem]:
     """List classifications grouped by system."""
     conditions = {}

@@ -9,6 +9,7 @@ from fastapi import HTTPException, Query, status
 from pydantic import ValidationError
 
 from winebox.models import ImportBatch, Transaction, Wine
+from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineResponse, WineUpdate, WineWithInventory
 from winebox.services.auth import RequireAuth
 from winebox.services.rate_limit import MAX_PAGE_SIZE, MAX_USER_RESULTSET
@@ -23,14 +24,14 @@ async def list_wines(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=MAX_PAGE_SIZE),
     in_stock: bool | None = None,
-    collection: str | None = None,
+    collection: WineCollection | None = None,
 ) -> list[WineWithInventory]:
     """List all wines with optional filtering."""
     # Build filter conditions
     conditions: dict = {"owner_id": current_user.id}
 
     if collection:
-        conditions["collection"] = collection
+        conditions["collection"] = collection.value
 
     if in_stock is True:
         conditions["inventory.quantity"] = {"$gt": 0}

@@ -2850,7 +2850,7 @@ requires-dist = [
     { name = "fastapi-users", specifier = ">=14.0.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.26.0" },
     { name = "invoke", marker = "extra == 'dev'", specifier = ">=2.2.0" },
-    { name = "jinja2", specifier = ">=3.1.0" },
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "myst-parser", marker = "extra == 'dev'", specifier = ">=2.0.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pillow", specifier = ">=12.2.0" },

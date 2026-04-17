@@ -573,6 +573,12 @@ def main() -> int:
             },
         )
         page = context.new_page()
+        # Bound every Playwright operation so an unresponsive retailer site
+        # cannot hang the scraper indefinitely. Per-call `goto(timeout=...)`
+        # already exists; this sets a global default for everything else
+        # (selectors, frames, expects, downloads).
+        page.set_default_navigation_timeout(20_000)
+        page.set_default_timeout(15_000)
 
         for scraper_info in active_scrapers:
             if shutdown_flag[0]:

@@ -136,12 +136,17 @@ class DigitalOceanAPI:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
+        # Default per-call timeout (seconds). DigitalOcean's API normally
+        # responds in well under a second, so a 30s ceiling means a partial
+        # outage / DNS hiccup does not hang the deploy script indefinitely.
+        self._timeout = 30
 
     def list_droplets(self) -> list[dict]:
         """List all droplets."""
         response = requests.get(
             f"{self.BASE_URL}/droplets",
             headers=self.headers,
+            timeout=self._timeout,
         )
         response.raise_for_status()
         return response.json()["droplets"]
@@ -161,6 +166,7 @@ class DigitalOceanAPI:
         response = requests.get(
             f"{self.BASE_URL}/droplets/{droplet_id}",
             headers=self.headers,
+            timeout=self._timeout,
         )
         if response.status_code == 404:
             return None
@@ -192,6 +198,7 @@ class DigitalOceanAPI:
             f"{self.BASE_URL}/droplets/{droplet_id}/actions",
             headers=self.headers,
             json={"type": "rebuild", "image": image},
+            timeout=self._timeout,
         )
         if response.status_code not in (200, 201):
             print(f"Error rebuilding droplet: {response.status_code} {response.text}")
@@ -211,6 +218,7 @@ class DigitalOceanAPI:
         response = requests.get(
             f"{self.BASE_URL}/droplets/{droplet_id}/actions/{action_id}",
             headers=self.headers,
+            timeout=self._timeout,
         )
         if response.status_code == 404:
             return None
@@ -223,6 +231,7 @@ class DigitalOceanAPI:
             f"{self.BASE_URL}/domains/{domain}/records",
             headers=self.headers,
             params={"per_page": 100},
+            timeout=self._timeout,
         )
         response.raise_for_status()
         return response.json()["domain_records"]
@@ -233,6 +242,7 @@ class DigitalOceanAPI:
             f"{self.BASE_URL}/domains/{domain}/records",
             headers=self.headers,
             json=record,
+            timeout=self._timeout,
         )
         response.raise_for_status()
         return response.json()["domain_record"]
@@ -243,6 +253,7 @@ class DigitalOceanAPI:
             f"{self.BASE_URL}/domains/{domain}/records/{record_id}",
             headers=self.headers,
             json=record,
+            timeout=self._timeout,
         )
         response.raise_for_status()
         return response.json()["domain_record"]
@@ -252,6 +263,7 @@ class DigitalOceanAPI:
         response = requests.get(
             f"{self.BASE_URL}/firewalls",
             headers=self.headers,
+            timeout=self._timeout,
         )
         response.raise_for_status()
         return response.json()["firewalls"]
@@ -269,6 +281,7 @@ class DigitalOceanAPI:
             f"{self.BASE_URL}/firewalls",
             headers=self.headers,
             json=data,
+            timeout=self._timeout,
         )
         response.raise_for_status()
         return response.json()["firewall"]
@@ -287,6 +300,7 @@ class DigitalOceanAPI:
             f"{self.BASE_URL}/firewalls/{firewall_id}",
             headers=self.headers,
             json=data,
+            timeout=self._timeout,
         )
         response.raise_for_status()
         return response.json()["firewall"]

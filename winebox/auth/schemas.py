@@ -7,7 +7,7 @@ from pydantic import ConfigDict, field_validator
 
 from winebox.db import PyObjectId
 
-MIN_PASSWORD_LENGTH = 6
+MIN_PASSWORD_LENGTH = 8
 
 
 class UserRead(schemas.BaseUser[PyObjectId]):

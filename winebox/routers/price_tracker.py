@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 
@@ -53,6 +54,14 @@ def _photo_storage_path() -> Path:
     path = settings.image_storage_path / PRICE_PHOTOS_DIR
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _parse_wine_price_id(wine_price_id: str) -> ObjectId:
+    """Parse a wine_price_id, returning 404 (not 500) on a malformed value."""
+    try:
+        return ObjectId(wine_price_id)
+    except (InvalidId, TypeError):
+        raise HTTPException(status_code=404, detail="Wine price not found.")
 
 
 def _entry_to_out(entry: PriceEntry, current_user_id: ObjectId | None = None) -> PriceEntryOut:
@@ -132,21 +141,21 @@ def _wine_price_to_summary(doc: WinePrice) -> WinePriceSummaryOut:
 async def create_price_capture(
     request: Request,
     current_user: RequireAuth,
-    capture_type: str = Form("bottle"),
-    wine_name: str | None = Form(None),
+    capture_type: str = Form("bottle", max_length=20),
+    wine_name: str | None = Form(None, max_length=500),
     vintage: int | None = Form(None),
-    wine_type: str | None = Form(None),
+    wine_type: str | None = Form(None, max_length=50),
     price: float | None = Form(None),
-    currency: str = Form("EUR"),
-    notes: str | None = Form(None),
-    shop_name: str | None = Form(None),
-    town_city: str | None = Form(None),
-    state_county: str | None = Form(None),
-    country: str | None = Form(None),
+    currency: str = Form("EUR", max_length=10),
+    notes: str | None = Form(None, max_length=2000),
+    shop_name: str | None = Form(None, max_length=200),
+    town_city: str | None = Form(None, max_length=200),
+    state_county: str | None = Form(None, max_length=200),
+    country: str | None = Form(None, max_length=100),
     latitude: float | None = Form(None),
     longitude: float | None = Form(None),
     accuracy_metres: float | None = Form(None),
-    captured_at: str | None = Form(None),
+    captured_at: str | None = Form(None, max_length=64),
     photo: UploadFile | None = File(None),
 ) -> WinePriceOut:
     """Create a new price observation for a wine.
@@ -178,12 +187,20 @@ async def create_price_capture(
 
     # Save photo if provided
     photo_path = None
+    MAX_PHOTO_BYTES = 10 * 1024 * 1024
     if photo and photo.filename:
         if photo.content_type not in ("image/jpeg", "image/png", "image/webp", "image/heic"):
             raise HTTPException(status_code=422, detail="Photo must be JPEG, PNG, WebP, or HEIC.")
 
+        # Pre-check the declared upload size from the request before reading
+        # so a 1 GB upload is rejected at headers, not after streaming.
+        # `photo.size` is set by Starlette from the multipart Content-Length.
+        declared_size = getattr(photo, "size", None)
+        if declared_size is not None and declared_size > MAX_PHOTO_BYTES:
+            raise HTTPException(status_code=422, detail="Photo too large (max 10 MB).")
+
         content = await photo.read()
-        if len(content) > 10 * 1024 * 1024:
+        if len(content) > MAX_PHOTO_BYTES:
             raise HTTPException(status_code=422, detail="Photo too large (max 10 MB).")
 
         ext = photo.filename.rsplit(".", 1)[-1].lower() if "." in photo.filename else "jpg"
@@ -261,7 +278,7 @@ async def get_wine_price(
     current_user: RequireAuth,
 ) -> WinePriceOut:
     """Get a wine's full price history."""
-    doc = await WinePrice.find_one({"_id": ObjectId(wine_price_id)})
+    doc = await WinePrice.find_one({"_id": _parse_wine_price_id(wine_price_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="Wine price not found.")
     return _wine_price_to_out(doc, current_user.id)
@@ -281,7 +298,7 @@ async def delete_price_entry(
     Only the user who created the entry can delete it. If the prices
     array becomes empty, the entire wine document is removed.
     """
-    doc = await WinePrice.find_one({"_id": ObjectId(wine_price_id)})
+    doc = await WinePrice.find_one({"_id": _parse_wine_price_id(wine_price_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="Wine price not found.")
 
@@ -318,7 +335,7 @@ async def get_wine_price_history(
     limit: int = 50,
 ) -> list[WinePriceHistoryEntryOut]:
     """Get archived price history for a wine."""
-    doc = await WinePrice.find_one({"_id": ObjectId(wine_price_id)})
+    doc = await WinePrice.find_one({"_id": _parse_wine_price_id(wine_price_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="Wine price not found.")
 

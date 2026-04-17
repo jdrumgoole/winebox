@@ -97,6 +97,11 @@ async def export_wines(
             wine_dict = wine.model_dump(mode="json")
             wine_dict["id"] = str(wine.id)
 
+            # Strip internal owner_id from export payloads — exports are for the
+            # user, not for inter-user data exchange. Leaking the ObjectId could
+            # help an attacker correlate or enumerate users elsewhere.
+            wine_dict.pop("owner_id", None)
+
             # Optionally exclude blends/scores
             if not include_blends:
                 wine_dict.pop("grape_blends", None)
@@ -214,6 +219,7 @@ async def export_transactions(
             txn_dict = txn.model_dump(mode="json")
             txn_dict["id"] = str(txn.id)
             txn_dict["wine_id"] = str(txn.wine_id)
+            txn_dict.pop("owner_id", None)
 
             # Add wine details if requested
             if include_wine_details:

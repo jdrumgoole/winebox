@@ -8,6 +8,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Query, Request
 
 from winebox.models import Transaction, TransactionType, Wine
+from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
 from winebox.services.rate_limit import MAX_PAGE_SIZE, MAX_USER_RESULTSET, make_limiter
@@ -37,7 +38,7 @@ async def search_wines(
     checked_out_after: Annotated[datetime | None, Query(description="Checked out after date")] = None,
     checked_out_before: Annotated[datetime | None, Query(description="Checked out before date")] = None,
     in_stock: Annotated[bool | None, Query(description="Only wines currently in stock")] = None,
-    collection: Annotated[str | None, Query(description="Filter by collection: cellar or met")] = None,
+    collection: Annotated[WineCollection | None, Query(description="Filter by collection: cellar or met")] = None,
     storage: Annotated[str | None, Query(description="Storage type: 'case' or 'loose'")] = None,
     provenance: Annotated[str | None, Query(description="Case provenance (where purchased)", max_length=MAX_QUERY_LENGTH)] = None,
     wine_type: Annotated[str | None, Query(description="Wine type: red, white, rosé, sparkling, etc.", max_length=MAX_QUERY_LENGTH)] = None,
@@ -55,7 +56,7 @@ async def search_wines(
     conditions = {"owner_id": current_user.id}
 
     if collection:
-        conditions["collection"] = collection
+        conditions["collection"] = collection.value
 
     # Use MongoDB text search for full-text queries when available
     # Falls back to regex for compatibility (e.g., mongomock in tests)

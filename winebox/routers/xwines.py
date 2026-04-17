@@ -477,11 +477,11 @@ def _wine_model_to_result(wine: XWinesWine, price_data: dict | None = None) -> X
 @limiter.limit("120/minute;2000/hour")
 async def search_wines(
     request: Request,
-    q: str | None = Query(None, min_length=2, description="Search query (min 2 characters)"),
+    q: str | None = Query(None, min_length=2, max_length=200, description="Search query (min 2 characters)"),
     limit: int = Query(10, ge=1, le=50, description="Maximum results to return"),
-    skip: int = Query(0, ge=0, description="Number of results to skip"),
-    wine_type: str | None = Query(None, description="Filter by wine type"),
-    country: str | None = Query(None, description="Filter by country code"),
+    skip: int = Query(0, ge=0, le=10000, description="Number of results to skip"),
+    wine_type: str | None = Query(None, max_length=50, description="Filter by wine type"),
+    country: str | None = Query(None, max_length=100, description="Filter by country code"),
     price_min: float | None = Query(None, ge=0, description="Minimum price (USD)"),
     price_max: float | None = Query(None, ge=0, description="Maximum price (USD)"),
 ) -> XWinesSearchResponse:
@@ -648,10 +648,10 @@ async def list_countries() -> list[dict]:
 @limiter.limit("10/minute;30/hour")
 async def export_xwines_search(
     request: Request,
-    q: str | None = Query(None, min_length=2, description="Search query (min 2 characters)"),
+    q: str | None = Query(None, min_length=2, max_length=200, description="Search query (min 2 characters)"),
     format: ExportFormat = Query(default=ExportFormat.JSON, description="Export format"),
-    wine_type: str | None = Query(None, description="Filter by wine type"),
-    country: str | None = Query(None, description="Filter by country code"),
+    wine_type: str | None = Query(None, max_length=50, description="Filter by wine type"),
+    country: str | None = Query(None, max_length=100, description="Filter by country code"),
     price_min: float | None = Query(None, ge=0, description="Minimum price (USD)"),
     price_max: float | None = Query(None, ge=0, description="Maximum price (USD)"),
     limit: int = Query(1000, ge=1, le=10000, description="Maximum results to export"),

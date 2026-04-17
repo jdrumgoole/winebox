@@ -131,8 +131,24 @@ async def upload_spreadsheet(
             detail=f"Unsupported file type '.{ext}'. Allowed: CSV, XLSX",
         )
 
+    # Reject oversized uploads at headers (declared Content-Length) before
+    # streaming. Any larger spreadsheet should be split client-side. 25 MB
+    # is well above any realistic personal-cellar export.
+    MAX_IMPORT_BYTES = 25 * 1024 * 1024
+    declared_size = getattr(file, "size", None)
+    if declared_size is not None and declared_size > MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Import file too large (max 25 MB).",
+        )
+
     # Read file into memory so the generator survives after the request body closes
     file_bytes = await file.read()
+    if len(file_bytes) > MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Import file too large (max 25 MB).",
+        )
 
     # Compute file checksum for duplicate detection
     file_checksum = hashlib.sha256(file_bytes).hexdigest()
@@ -782,11 +798,14 @@ async def get_batch_wines(
         if wine.vintage:
             vintages[str(wine.vintage)] = vintages.get(str(wine.vintage), 0) + 1
 
-    # Serialize wines (match cellar format)
+    # Serialize wines (match cellar format). Strip owner_id — the requester
+    # already owns these wines (we filter by current_user.id), so leaking the
+    # raw ObjectId in the response only adds enumeration surface.
     wine_list = []
     for wine in wines:
         wine_dict = wine.model_dump(mode="json")
         wine_dict["id"] = str(wine.id)
+        wine_dict.pop("owner_id", None)
         wine_list.append(wine_dict)
 
     total_bottles = sum(

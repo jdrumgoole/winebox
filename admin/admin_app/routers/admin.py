@@ -29,18 +29,17 @@ async def get_admin_info(
     request: Request,
     admin: RequireAdmin,
 ) -> dict[str, Any]:
-    """Return server info for the admin panel header."""
-    from urllib.parse import urlparse
+    """Return server info for the admin panel header.
 
-    mongodb_url = settings.mongodb_url
-    parsed = urlparse(mongodb_url)
-    db_server = parsed.hostname or "unknown"
-
+    The MongoDB hostname is intentionally NOT exposed: even with admin auth,
+    leaking the cluster name (e.g. `shared.2t22cum.mongodb.net`) gives
+    attackers a free starting point if admin credentials are ever stolen.
+    Admins can read the URL from the secret store if they need it.
+    """
     app_url = str(request.base_url).rstrip("/")
 
     return {
         "database": settings.mongodb_database,
-        "db_server": db_server,
         "app_url": app_url,
     }
 

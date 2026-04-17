@@ -230,11 +230,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await close_db()
 
 
+# Disable interactive API docs (/docs, /redoc, /openapi.json) outside of
+# debug mode. Production and OAT serve real users — exposing the full
+# OpenAPI schema lets attackers enumerate every endpoint without effort.
+_docs_enabled = settings.debug
 app = FastAPI(
     title=settings.app_name,
     description="Wine Cellar Management Application with OCR label scanning",
     version=__version__,
     lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 # Add rate limiter
