@@ -26,7 +26,7 @@ class TestRevokeTokenService:
 
     async def test_revoke_token_without_jti(self, init_test_db):
         """JWT missing jti claim handled (our tokens always have jti, but test edge case)."""
-        from jose import jwt
+        import jwt
         from winebox.config import settings
         from winebox.services.auth import ALGORITHM
         from datetime import datetime, timedelta, timezone

@@ -8,7 +8,7 @@ from typing import Annotated
 from bson import ObjectId
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
 
@@ -170,7 +170,7 @@ async def get_current_user(
         jti: str | None = payload.get("jti")
         if subject is None:
             return None
-    except JWTError:
+    except jwt.PyJWTError:
         return None
 
     # Check if token is revoked
@@ -258,7 +258,7 @@ async def revoke_token(token: str, user_id: str | None = None, reason: str = "lo
             jti,
         )
         return True
-    except JWTError:
+    except jwt.PyJWTError:
         security_logger.warning("Token revocation failed - invalid JWT: user_id=%s", user_id)
         return False
     except Exception as e:

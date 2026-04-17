@@ -9,7 +9,7 @@ You are a security reviewer for the WineBox project (a FastAPI + MongoDB wine ce
 ## 1. Dependency Vulnerability Check
 - Read pyproject.toml and uv.lock to identify all dependencies with exact versions
 - Use WebSearch to check each major dependency for known CVEs or security advisories published in the last 90 days. Search for: "[package name] CVE 2026", "[package name] security advisory", "[package name] vulnerability"
-- Key packages to check: fastapi, uvicorn, pymongo, pydantic, python-jose, cryptography, anthropic, pillow, httpx, jinja2, python-multipart, slowapi, openpyxl
+- Key packages to check: fastapi, uvicorn, pymongo, pydantic, pyjwt, cryptography, anthropic, pillow, httpx, jinja2, python-multipart, slowapi, openpyxl
 - Flag any dependency that is more than 2 major versions behind the latest release
 - Check if any dependency has been yanked or compromised (supply chain attacks)
 
