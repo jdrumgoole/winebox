@@ -5,7 +5,7 @@ from typing import Any
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
@@ -17,8 +17,11 @@ from winebox.schemas.export import (
 )
 from winebox.services import export_service
 from winebox.services.auth import RequireAuth
+from winebox.services.rate_limit import MAX_USER_RESULTSET, make_limiter
 
 router = APIRouter()
+
+limiter = make_limiter()
 
 
 def _generate_filename(export_type: str, export_format: ExportFormat) -> str:
@@ -29,7 +32,9 @@ def _generate_filename(export_type: str, export_format: ExportFormat) -> str:
 
 
 @router.get("/wines")
+@limiter.limit("10/minute;30/hour")
 async def export_wines(
+    request: Request,
     current_user: RequireAuth,
     format: ExportFormat = Query(default=ExportFormat.JSON, description="Export format"),
     in_stock: bool | None = Query(default=None, description="Filter: only wines with quantity > 0"),
@@ -53,8 +58,9 @@ async def export_wines(
     if country:
         conditions["country"] = country
 
-    # Fetch wines (filtered by owner)
-    wines = await Wine.find(conditions).sort([("name", 1)]).to_list()
+    # Fetch wines (filtered by owner). Bounded — exports above MAX_USER_RESULTSET
+    # are well outside any realistic personal cellar size and would risk OOM.
+    wines = await Wine.find(conditions).sort([("name", 1)]).to_list(length=MAX_USER_RESULTSET)
 
     # Track applied filters
     filters_applied: dict[str, Any] = {}
@@ -120,7 +126,9 @@ async def export_wines(
 
 
 @router.get("/transactions")
+@limiter.limit("10/minute;30/hour")
 async def export_transactions(
+    request: Request,
     current_user: RequireAuth,
     format: ExportFormat = Query(default=ExportFormat.JSON, description="Export format"),
     transaction_type: TransactionType | None = Query(default=None, description="Filter by transaction type"),
@@ -153,8 +161,8 @@ async def export_transactions(
         conditions.setdefault("transaction_date", {})
         conditions["transaction_date"]["$lte"] = to_date
 
-    # Fetch transactions
-    transactions = await Transaction.find(conditions).sort([("transaction_date", -1)]).to_list()
+    # Fetch transactions (bounded — see MAX_USER_RESULTSET)
+    transactions = await Transaction.find(conditions).sort([("transaction_date", -1)]).to_list(length=MAX_USER_RESULTSET)
 
     # Track applied filters
     filters_applied: dict[str, Any] = {}
@@ -171,7 +179,7 @@ async def export_transactions(
     wines_by_id: dict[str, Any] = {}
     if include_wine_details and transactions:
         wine_ids = list({t.wine_id for t in transactions})
-        wines = await Wine.find({"_id": {"$in": wine_ids}}).to_list()
+        wines = await Wine.find({"_id": {"$in": wine_ids}}).to_list(length=MAX_USER_RESULTSET)
         wines_by_id = {wine.id: wine for wine in wines}
 
     # Generate response based on format

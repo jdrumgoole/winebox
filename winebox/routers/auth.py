@@ -6,8 +6,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, field_validator
-from slowapi import Limiter
 from slowapi.util import get_remote_address
+
+from winebox.services.rate_limit import make_limiter
 
 from winebox.auth import (
     UserCreate,
@@ -30,39 +31,65 @@ from winebox.services.auth import (
 
 router = APIRouter()
 
-# Rate limiter for auth endpoints (stricter than global limit)
-limiter = Limiter(key_func=get_remote_address)
+# Rate limiter for auth endpoints (stricter than the app-wide 60/min default
+# in winebox/main.py). The fastapi-users routers are mounted by include_router
+# below; without per-route limits they would inherit only the global default,
+# so brute-force / mass-registration / reset-spam attacks would be cheap.
+limiter = make_limiter()
+
+
+def _apply_rate_limits(fu_router, path_to_limit: dict[str, str]) -> None:
+    """Wrap fastapi-users routes with slowapi `@limiter.limit(...)` in place.
+
+    fastapi-users hands us a built APIRouter — we can't decorate its handlers
+    at definition time. Instead we walk the routes (every fastapi-users
+    handler accepts a `request: Request` parameter, which is what slowapi
+    needs) and rewrap their endpoints. Must be called before include_router
+    so the wrapped endpoint is what gets copied into the parent router.
+    """
+    for route in fu_router.routes:
+        rate = path_to_limit.get(route.path)
+        if not rate:
+            continue
+        route.endpoint = limiter.limit(rate)(route.endpoint)
 
 
 # ============================================================================
 # FastAPI-Users Router Integration
 # ============================================================================
 
-# Login endpoint (POST /api/auth/login)
-router.include_router(
-    fastapi_users.get_auth_router(auth_backend),
-    prefix="",
-)
+_auth_router = fastapi_users.get_auth_router(auth_backend)
+_apply_rate_limits(_auth_router, {"/login": "30/minute;200/hour"})
+router.include_router(_auth_router, prefix="")
 
 # Registration endpoint (POST /api/auth/register)
 if settings.registration_enabled:
-    router.include_router(
-        fastapi_users.get_register_router(UserRead, UserCreate),
-        prefix="",
-    )
+    _register_router = fastapi_users.get_register_router(UserRead, UserCreate)
+    _apply_rate_limits(_register_router, {"/register": "10/minute;50/hour"})
+    router.include_router(_register_router, prefix="")
 
 # Password reset endpoints (POST /api/auth/forgot-password, /api/auth/reset-password)
-router.include_router(
-    fastapi_users.get_reset_password_router(),
-    prefix="",
+_reset_router = fastapi_users.get_reset_password_router()
+_apply_rate_limits(
+    _reset_router,
+    {
+        "/forgot-password": "5/minute;20/hour",
+        "/reset-password": "5/minute;20/hour",
+    },
 )
+router.include_router(_reset_router, prefix="")
 
 # Email verification endpoints (POST /api/auth/request-verify-token, /api/auth/verify)
 if settings.email_verification_required:
-    router.include_router(
-        fastapi_users.get_verify_router(UserRead),
-        prefix="",
+    _verify_router = fastapi_users.get_verify_router(UserRead)
+    _apply_rate_limits(
+        _verify_router,
+        {
+            "/request-verify-token": "5/minute;30/hour",
+            "/verify": "10/minute;60/hour",
+        },
     )
+    router.include_router(_verify_router, prefix="")
 
 
 # ============================================================================

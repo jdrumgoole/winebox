@@ -19,6 +19,14 @@ load_dotenv()  # Load .env so API keys etc. are available to tests
 # but Settings() is loaded globally and must not trigger the safety guard.
 if "WINEBOX_DATABASE" not in os.environ:
     os.environ["WINEBOX_DATABASE"] = "winebox_test"
+
+# Disable slowapi rate limits for the test suite. The slowapi memory store
+# is per-process, so a single xdist worker's tests share one bucket per
+# endpoint. Otherwise tests like `test_supported_currencies` (which fires 9
+# POST /api/prices) only fail under parallel execution when an unrelated
+# test in the same worker has already consumed budget. Must be set BEFORE
+# any winebox.* import so make_limiter() picks it up.
+os.environ.setdefault("WINEBOX_RATE_LIMIT_DISABLED", "1")
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone

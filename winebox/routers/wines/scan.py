@@ -4,9 +4,10 @@ import asyncio
 import logging
 from typing import Annotated
 
-from fastapi import File, UploadFile
+from fastapi import File, Request, UploadFile
 
 from winebox.services.auth import RequireAuth
+from winebox.services.rate_limit import make_limiter
 from winebox.services.xwines_enrichment import enrich_parsed_with_xwines
 
 from ._common import (
@@ -19,8 +20,13 @@ from ._common import (
 
 logger = logging.getLogger(__name__)
 
+# Vision-bound and cost-bound — every scan can hit Claude.
+limiter = make_limiter()
 
+
+@limiter.limit("20/minute;200/hour")
 async def scan_label(
+    request: Request,
     current_user: RequireAuth,
     front_label: Annotated[UploadFile, File(description="Front label image")],
     back_label: Annotated[UploadFile | None, File(description="Back label image")] = None,

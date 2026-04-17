@@ -228,3 +228,14 @@ async def test_search_no_results(client: AsyncClient, sample_image_bytes: bytes)
     response = await client.get("/api/search?q=NonexistentWine")
     assert response.status_code == 200
     assert len(response.json()) == 0
+
+
+@pytest.mark.asyncio
+async def test_limit_above_cap_rejected(client: AsyncClient) -> None:
+    """`limit` above MAX_PAGE_SIZE must be rejected as 422 — defends against
+    a client requesting an unreasonably large page and forcing the server to
+    materialise an arbitrary number of documents."""
+    from winebox.services.rate_limit import MAX_PAGE_SIZE
+
+    response = await client.get(f"/api/search?limit={MAX_PAGE_SIZE + 1}")
+    assert response.status_code == 422

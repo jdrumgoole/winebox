@@ -8,7 +8,7 @@ from typing import Any
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
 from pydantic import ValidationError
 
 from winebox.db import PyObjectId
@@ -27,6 +27,7 @@ from winebox.schemas.import_schemas import (
     RowChunkRequest,
 )
 from winebox.services.auth import RequireAuth
+from winebox.services.rate_limit import make_limiter
 from winebox.services.import_service import (
     UPLOAD_CHUNK_SIZE,
     VALID_WINE_FIELDS,
@@ -42,6 +43,8 @@ from winebox.services.import_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+limiter = make_limiter()
 
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {"csv", "xlsx"}
@@ -103,7 +106,9 @@ async def _find_duplicate_batch(
 
 
 @router.post("/upload", response_model=ImportUploadResponse)
+@limiter.limit("10/minute;30/hour")
 async def upload_spreadsheet(
+    request: Request,
     current_user: RequireAuth,
     file: UploadFile = File(..., description="CSV or XLSX spreadsheet"),
     use_ai_mapping: bool = Query(

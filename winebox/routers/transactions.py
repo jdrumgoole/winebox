@@ -4,12 +4,13 @@ import logging
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
 
 from winebox.models import RemovalReason, Transaction, TransactionType, Wine
 from winebox.schemas.transaction import TransactionResponse
 from winebox.services.auth import RequireAuth
+from winebox.services.rate_limit import MAX_PAGE_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,8 @@ router = APIRouter()
 @router.get("", response_model=list[TransactionResponse])
 async def list_transactions(
     current_user: RequireAuth,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=MAX_PAGE_SIZE),
     transaction_type: TransactionType | None = None,
     wine_id: str | None = None,
     removal_reason: RemovalReason | None = None,

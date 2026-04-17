@@ -17,12 +17,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from bson import ObjectId
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
 from winebox.database import get_database
 from winebox.db import PyObjectId
+from winebox.services.rate_limit import make_limiter
 from winebox.models.transaction import Transaction, TransactionType
 from winebox.models.wine import InventoryInfo, Wine
 from winebox.services.auth import RequireAuth
@@ -30,6 +31,8 @@ from winebox.services.auth import RequireAuth
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+limiter = make_limiter()
 
 DEMO_TAG = {"_demo": "true"}
 
@@ -430,7 +433,8 @@ async def demo_status(current_user: RequireAuth) -> DemoStatusResponse:
 
 
 @router.post("/install", response_model=DemoInstallResponse)
-async def install_demo(current_user: RequireAuth) -> DemoInstallResponse:
+@limiter.limit("5/minute;10/hour")
+async def install_demo(request: Request, current_user: RequireAuth) -> DemoInstallResponse:
     """Start loading sample wines into the current user's cellar.
 
     Returns immediately. Use GET /api/demo/install/progress to monitor.

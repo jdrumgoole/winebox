@@ -6,13 +6,14 @@ Reads from the `cellars` collection — one document per physical item
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from winebox.models.cellar import CellarItem
 from winebox.models import Wine
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
+from winebox.services.rate_limit import MAX_PAGE_SIZE, MAX_USER_RESULTSET
 
 router = APIRouter()
 
@@ -20,8 +21,8 @@ router = APIRouter()
 @router.get("", response_model=list[WineWithInventory])
 async def get_cellar_inventory(
     current_user: RequireAuth,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=MAX_PAGE_SIZE),
 ) -> list[WineWithInventory]:
     """Get current cellar inventory (wines in stock)."""
     wines = await Wine.find(
@@ -169,7 +170,7 @@ async def get_cellar_grouped(
 
     items = await cellar_col.find(
         {"cellar_id": current_user.id, "quantity": {"$gt": 0}}
-    ).sort("wine.name", 1).to_list(length=None)
+    ).sort("wine.name", 1).to_list(length=MAX_USER_RESULTSET)
 
     # Group by wine_id
     wine_groups: dict[str, dict[str, Any]] = {}

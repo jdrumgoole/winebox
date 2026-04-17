@@ -5,11 +5,12 @@ from datetime import datetime
 from typing import Annotated
 
 from bson import ObjectId
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
 from winebox.models import Transaction, TransactionType, Wine
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
+from winebox.services.rate_limit import MAX_PAGE_SIZE, MAX_USER_RESULTSET, make_limiter
 
 router = APIRouter()
 
@@ -17,9 +18,13 @@ router = APIRouter()
 # Maximum length for search query parameters to prevent DoS
 MAX_QUERY_LENGTH = 200
 
+limiter = make_limiter()
+
 
 @router.get("", response_model=list[WineWithInventory])
+@limiter.limit("120/minute;2000/hour")
 async def search_wines(
+    request: Request,
     current_user: RequireAuth,
     q: Annotated[str | None, Query(description="Full-text search query", max_length=MAX_QUERY_LENGTH)] = None,
     vintage: Annotated[int | None, Query(description="Wine vintage year")] = None,
@@ -38,8 +43,8 @@ async def search_wines(
     wine_type: Annotated[str | None, Query(description="Wine type: red, white, rosé, sparkling, etc.", max_length=MAX_QUERY_LENGTH)] = None,
     price_tier: Annotated[str | None, Query(description="Price tier: budget, value, mid_range, premium, luxury, ultra_premium", max_length=MAX_QUERY_LENGTH)] = None,
     enriched: Annotated[str | None, Query(description="Enrichment filter: 'yes' for enriched, 'no' for unenriched")] = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=MAX_PAGE_SIZE),
 ) -> list[WineWithInventory]:
     """Search wines by various criteria.
 
@@ -129,7 +134,7 @@ async def search_wines(
 
         matching_items = await cellar_col.find(
             cellar_query, {"wine.wine_id": 1}
-        ).to_list(length=None)
+        ).to_list(length=MAX_USER_RESULTSET)
         matching_wine_ids = {item["wine"]["wine_id"] for item in matching_items if item.get("wine")}
         if not matching_wine_ids:
             return []
@@ -154,7 +159,7 @@ async def search_wines(
             else:
                 checkin_filter["transaction_date"] = {"$lte": checked_in_before}
 
-        checkin_transactions = await Transaction.find(checkin_filter).to_list()
+        checkin_transactions = await Transaction.find(checkin_filter).to_list(length=MAX_USER_RESULTSET)
         checkin_wine_ids = {t.wine_id for t in checkin_transactions}
 
         if wine_ids_from_transactions is None:
@@ -173,7 +178,7 @@ async def search_wines(
             else:
                 checkout_filter["transaction_date"] = {"$lte": checked_out_before}
 
-        checkout_transactions = await Transaction.find(checkout_filter).to_list()
+        checkout_transactions = await Transaction.find(checkout_filter).to_list(length=MAX_USER_RESULTSET)
         checkout_wine_ids = {t.wine_id for t in checkout_transactions}
 
         if wine_ids_from_transactions is None:

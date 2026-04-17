@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 
 from winebox.config import settings
@@ -35,10 +35,14 @@ from winebox.schemas.wine_price import (
 )
 from winebox.services.auth import RequireAuth
 from winebox.services.price_service import add_price_entry
+from winebox.services.rate_limit import make_limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Mobile capture pattern → modest per-min cap, generous hourly burst.
+limiter = make_limiter()
 
 # Sub-directory for price capture photos
 PRICE_PHOTOS_DIR = "price_captures"
@@ -124,7 +128,9 @@ def _wine_price_to_summary(doc: WinePrice) -> WinePriceSummaryOut:
 
 
 @router.post("", response_model=WinePriceOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute;200/hour")
 async def create_price_capture(
+    request: Request,
     current_user: RequireAuth,
     capture_type: str = Form("bottle"),
     wine_name: str | None = Form(None),

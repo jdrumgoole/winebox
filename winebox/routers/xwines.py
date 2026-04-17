@@ -12,7 +12,7 @@ import re
 import time
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 
 from winebox.database import get_database
@@ -28,8 +28,11 @@ from winebox.schemas.xwines import (
     XWinesWineSearchResult,
 )
 from winebox.services import export_service
+from winebox.services.rate_limit import MAX_REFERENCE_RESULTSET, make_limiter
 
 logger = logging.getLogger(__name__)
+
+limiter = make_limiter()
 
 
 # ---------------------------------------------------------------------------
@@ -388,9 +391,12 @@ async def _regex_search(
     # Fetch results from each tier, sorted by popularity
     sort_order = [("rating_count", -1), ("avg_rating", -1), ("name", 1)]
 
-    tier1_wines = await XWinesWine.find(tier1_conditions).sort(sort_order).to_list()
-    tier2_wines = await XWinesWine.find(tier2_conditions).sort(sort_order).to_list()
-    tier3_wines = await XWinesWine.find(tier3_conditions).sort(sort_order).to_list()
+    # Cap each tier load — without this a wildcard search could pull all
+    # ~150K X-Wines reference rows into memory before the dedupe + slice.
+    # MAX_REFERENCE_RESULTSET is well above any realistic skip+limit window.
+    tier1_wines = await XWinesWine.find(tier1_conditions).sort(sort_order).limit(MAX_REFERENCE_RESULTSET).to_list()
+    tier2_wines = await XWinesWine.find(tier2_conditions).sort(sort_order).limit(MAX_REFERENCE_RESULTSET).to_list()
+    tier3_wines = await XWinesWine.find(tier3_conditions).sort(sort_order).limit(MAX_REFERENCE_RESULTSET).to_list()
 
     # Combine and deduplicate results while preserving tier priority
     seen_ids: set[int] = set()
@@ -468,7 +474,9 @@ def _wine_model_to_result(wine: XWinesWine, price_data: dict | None = None) -> X
 
 
 @router.get("/search", response_model=XWinesSearchResponse)
+@limiter.limit("120/minute;2000/hour")
 async def search_wines(
+    request: Request,
     q: str | None = Query(None, min_length=2, description="Search query (min 2 characters)"),
     limit: int = Query(10, ge=1, le=50, description="Maximum results to return"),
     skip: int = Query(0, ge=0, description="Number of results to skip"),
@@ -637,7 +645,9 @@ async def list_countries() -> list[dict]:
 
 
 @router.get("/export")
+@limiter.limit("10/minute;30/hour")
 async def export_xwines_search(
+    request: Request,
     q: str | None = Query(None, min_length=2, description="Search query (min 2 characters)"),
     format: ExportFormat = Query(default=ExportFormat.JSON, description="Export format"),
     wine_type: str | None = Query(None, description="Filter by wine type"),

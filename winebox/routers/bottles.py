@@ -70,7 +70,8 @@ async def list_bottles(
         except InvalidId:
             raise HTTPException(status_code=400, detail="Invalid wine_id")
 
-    items = await cellar_col.find(query).sort("created_at", -1).to_list(length=None)
+    from winebox.services.rate_limit import MAX_USER_RESULTSET
+    items = await cellar_col.find(query).sort("created_at", -1).to_list(length=MAX_USER_RESULTSET)
 
     result = []
     for item in items:

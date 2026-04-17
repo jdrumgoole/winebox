@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 
+from fastapi import Request
 from starlette.responses import StreamingResponse
 
 from winebox.models.wine import Wine
@@ -13,8 +14,12 @@ from winebox.services.background_enrichment import (
     enrich_unenriched_wines,
     get_enrichment_progress,
 )
+from winebox.services.rate_limit import make_limiter
 
 logger = logging.getLogger(__name__)
+
+# Anthropic-bound and cost-bound; bursts of triggers are wasteful.
+limiter = make_limiter()
 
 
 async def enrichment_progress(current_user: RequireAuth) -> StreamingResponse:
@@ -67,7 +72,8 @@ async def enrichment_progress(current_user: RequireAuth) -> StreamingResponse:
     )
 
 
-async def enrich_wines(current_user: RequireAuth) -> dict:
+@limiter.limit("20/minute;100/hour")
+async def enrich_wines(request: Request, current_user: RequireAuth) -> dict:
     """Trigger background enrichment for unenriched wines.
 
     Returns the count of unenriched wines and starts the background task.

@@ -397,6 +397,39 @@ class TestTokenInvalidationOnCredentialRotation:
         assert (await client.get("/api/auth/me", headers=existing_headers)).status_code == 401
 
 
+class TestFastapiUsersRateLimits:
+    """Verify fastapi-users mounted endpoints are rate-limited.
+
+    Functional limit-tripping is impractical to test deterministically (the
+    in-memory slowapi store is per-process, all test requests share one IP,
+    and concurrent xdist tests would race on the same counter). Instead we
+    assert structurally that each protected path has been wrapped by the
+    slowapi limiter. The wrapper sets `__wrapped__` (via functools.wraps)
+    on the endpoint.
+    """
+
+    def test_protected_paths_are_rate_limited(self):
+        """Each fastapi-users path we mount must have a slowapi wrapper."""
+        from winebox.main import app
+
+        protected = {
+            "/api/auth/login",
+            "/api/auth/register",
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
+            # Verification routes only mount when email_verification_required;
+            # don't assert on them so the test passes in either config.
+        }
+        wrapped = set()
+        for route in app.routes:
+            path = getattr(route, "path", None)
+            endpoint = getattr(route, "endpoint", None)
+            if path in protected and endpoint is not None and hasattr(endpoint, "__wrapped__"):
+                wrapped.add(path)
+        missing = protected - wrapped
+        assert not missing, f"Paths missing slowapi wrapper: {sorted(missing)}"
+
+
 class TestAccountLockout:
     """Tests for account lockout after failed login attempts."""
 

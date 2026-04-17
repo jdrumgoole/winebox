@@ -164,7 +164,7 @@ async def add_cases(request: AddCaseRequest, current_user: RequireAuth) -> dict:
         "cellar_id": current_user.id,
         "item_type": "case",
         "wine.wine_id": wine.id,
-    }).sort("created_at", -1).limit(request.num_cases).to_list(length=None)
+    }).sort("created_at", -1).limit(request.num_cases).to_list(length=request.num_cases)
 
     cases_created_list = [
         {"id": str(item["_id"]), "case_size": item.get("case_size", 0)}
@@ -190,9 +190,10 @@ async def list_cases(current_user: RequireAuth) -> dict:
     from winebox.models.cellar import CellarItem
     cellar_col = CellarItem.get_pymongo_collection()
 
+    from winebox.services.rate_limit import MAX_USER_RESULTSET
     items = await cellar_col.find(
         {"cellar_id": current_user.id, "item_type": "case"}
-    ).sort("created_at", -1).to_list(length=None)
+    ).sort("created_at", -1).to_list(length=MAX_USER_RESULTSET)
 
     result = []
     for item in items:

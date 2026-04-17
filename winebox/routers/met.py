@@ -1,11 +1,12 @@
 """Endpoints for listing and summarising wines the user has met."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from winebox.models import Wine
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
+from winebox.services.rate_limit import MAX_PAGE_SIZE
 
 router = APIRouter()
 
@@ -13,8 +14,8 @@ router = APIRouter()
 @router.get("", response_model=list[WineWithInventory])
 async def get_met_wines(
     current_user: RequireAuth,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=MAX_PAGE_SIZE),
 ) -> list[WineWithInventory]:
     """List wines the current user has encountered."""
     wines = await Wine.find(

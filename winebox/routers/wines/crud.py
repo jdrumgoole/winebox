@@ -5,12 +5,13 @@ from datetime import datetime, timezone
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Query, status
 from pydantic import ValidationError
 
 from winebox.models import ImportBatch, Transaction, Wine
 from winebox.schemas.wine import WineResponse, WineUpdate, WineWithInventory
 from winebox.services.auth import RequireAuth
+from winebox.services.rate_limit import MAX_PAGE_SIZE, MAX_USER_RESULTSET
 
 from ._common import image_storage
 
@@ -19,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 async def list_wines(
     current_user: RequireAuth,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=MAX_PAGE_SIZE),
     in_stock: bool | None = None,
     collection: str | None = None,
 ) -> list[WineWithInventory]:
@@ -115,8 +116,8 @@ async def delete_all_wines(
     current_user: RequireAuth,
 ) -> dict:
     """Delete all wines, transactions, images, and import batches for the current user."""
-    # Find all wines belonging to the current user
-    wines = await Wine.find({"owner_id": current_user.id}).to_list()
+    # Find all wines belonging to the current user (bounded — see MAX_USER_RESULTSET).
+    wines = await Wine.find({"owner_id": current_user.id}).to_list(length=MAX_USER_RESULTSET)
 
     # Delete label images for all wines
     deleted_images = 0
