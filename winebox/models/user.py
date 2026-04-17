@@ -47,6 +47,12 @@ class User(MongoDocument):
     updated_at: datetime = Field(default_factory=_utc_now)
     last_login: Optional[datetime] = None
 
+    # Bulk token invalidation cutoff. When set, any JWT whose `iat` claim is
+    # earlier than this timestamp is treated as revoked by `get_current_user`.
+    # Bumped on password change, password reset, and admin password reset so a
+    # stolen session cannot survive a credential rotation.
+    tokens_invalidated_after: Optional[datetime] = None
+
     class Settings:
         name = "users"
 

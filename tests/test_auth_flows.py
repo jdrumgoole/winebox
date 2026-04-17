@@ -319,6 +319,84 @@ class TestPasswordChange:
         assert "6 characters" in str(body)
 
 
+class TestTokenInvalidationOnCredentialRotation:
+    """Bulk JWT invalidation when a credential is rotated.
+
+    Each flow (user-driven password change, password reset, admin password
+    reset) must bump the user's `tokens_invalidated_after` cutoff so every
+    pre-existing JWT — not just the current session — is rejected.
+    """
+
+    @pytest.mark.asyncio
+    async def test_password_change_invalidates_all_tokens(
+        self, client: AsyncClient, auth_headers, test_user
+    ):
+        """A second outstanding token must be rejected after password change."""
+        from winebox.services.auth import create_access_token
+
+        # Mint a second token for the same user (e.g. another active session).
+        second_token = create_access_token(data={"sub": test_user["email"]})
+        second_headers = {"Authorization": f"Bearer {second_token}"}
+
+        # Both tokens work before the change.
+        assert (await client.get("/api/auth/me", headers=auth_headers)).status_code == 200
+        assert (await client.get("/api/auth/me", headers=second_headers)).status_code == 200
+
+        # Change the password.
+        resp = await client.put(
+            "/api/auth/password",
+            headers=auth_headers,
+            json={"current_password": test_user["password"], "new_password": "newpw1234"},
+        )
+        assert resp.status_code == 200
+
+        # Both old tokens must now be rejected — not just the one that did the change.
+        assert (await client.get("/api/auth/me", headers=auth_headers)).status_code == 401
+        assert (await client.get("/api/auth/me", headers=second_headers)).status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_on_after_reset_password_invalidates_all_tokens(
+        self, client: AsyncClient, test_user
+    ):
+        """The fastapi-users `on_after_reset_password` hook must invalidate
+        every JWT for the user. We invoke the hook directly rather than going
+        through `/api/auth/reset-password` because that endpoint requires a
+        valid `password_fgpt` in the reset token, which is derived from the
+        user's hashed password and is awkward to mint correctly in a test.
+        Wiring is covered: any test that exercises the hook covers the flow.
+        """
+        from winebox.services.auth import create_access_token
+        from winebox.auth.users import UserManager
+        from winebox.models import User
+
+        existing_token = create_access_token(data={"sub": test_user["email"]})
+        existing_headers = {"Authorization": f"Bearer {existing_token}"}
+        assert (await client.get("/api/auth/me", headers=existing_headers)).status_code == 200
+
+        user = await User.find_one({"email": test_user["email"]})
+        manager = UserManager(user_db=None)  # type: ignore[arg-type]
+        await manager.on_after_reset_password(user)
+
+        assert (await client.get("/api/auth/me", headers=existing_headers)).status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_admin_password_change_invalidates_all_tokens(
+        self, client: AsyncClient, test_user
+    ):
+        """CLI admin password change must invalidate every JWT for the user."""
+        from winebox.services.auth import create_access_token
+        from winebox.cli.user_admin import change_password as cli_change_password
+
+        existing_token = create_access_token(data={"sub": test_user["email"]})
+        existing_headers = {"Authorization": f"Bearer {existing_token}"}
+        assert (await client.get("/api/auth/me", headers=existing_headers)).status_code == 200
+
+        # Run the CLI handler directly (skip its own init_db — already initialised).
+        await cli_change_password(test_user["email"], "rotated1234", skip_db_init=True)
+
+        assert (await client.get("/api/auth/me", headers=existing_headers)).status_code == 401
+
+
 class TestAccountLockout:
     """Tests for account lockout after failed login attempts."""
 

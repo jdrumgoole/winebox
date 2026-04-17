@@ -167,7 +167,13 @@ async def change_password(
     current_user.updated_at = datetime.now(timezone.utc)
     await current_user.save()
 
-    # Revoke current token to force re-login with new password
+    # Invalidate every JWT for this user — not just the current session —
+    # so a stolen-but-not-yet-used token cannot survive a password change.
+    from winebox.services.auth import revoke_all_user_tokens
+    await revoke_all_user_tokens(current_user, reason="password_change")
+
+    # Also blacklist the current token's jti immediately for short-circuit
+    # rejection without a User document round-trip.
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]

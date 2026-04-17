@@ -182,6 +182,12 @@ async def change_password(email: str, password: str, skip_db_init: bool = False)
     user.hashed_password = get_password_hash(password)
     user.updated_at = datetime.now(timezone.utc)
     await user.save()
+
+    # Admin-driven password change — invalidate every existing JWT for this
+    # user so an attacker holding a stolen session cannot survive the reset.
+    from winebox.services.auth import revoke_all_user_tokens
+    await revoke_all_user_tokens(user, reason="admin_password_change")
+
     print(f"Password for user '{email}' has been updated.")
 
 

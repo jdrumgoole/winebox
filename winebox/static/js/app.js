@@ -1932,8 +1932,8 @@ function renderActivityList(transactions) {
             </div>
             <div class="activity-content">
                 <div class="activity-title">
-                    ${t.wine ? t.wine.name : 'Unknown Wine'}
-                    ${t.wine && t.wine.vintage ? `(${t.wine.vintage})` : ''}
+                    ${t.wine ? escapeHtml(t.wine.name) : 'Unknown Wine'}
+                    ${t.wine && t.wine.vintage ? `(${escapeHtml(t.wine.vintage)})` : ''}
                 </div>
                 <div class="activity-meta">
                     ${t.quantity} bottle${t.quantity > 1 ? 's' : ''} &middot;
@@ -2558,15 +2558,15 @@ function renderWineGrid(containerId, wines) {
             <div class="wine-card" data-wine-id="${wine.id}">
                 <div class="wine-card-image">
                     ${wine.front_label_image_path
-                        ? `<img src="/api/images/${wine.front_label_image_path}" alt="${wine.name}">`
+                        ? `<img src="/api/images/${escapeHtml(wine.front_label_image_path)}" alt="${escapeHtml(wine.name)}">`
                         : '<span style="color: white; opacity: 0.6;">No Image</span>'
                     }
                 </div>
                 <div class="wine-card-content">
-                    <div class="wine-card-title">${wine.name}</div>
+                    <div class="wine-card-title">${escapeHtml(wine.name)}</div>
                     <div class="wine-card-subtitle">
                         ${wine.winery ? `<span class="${ef.includes('winery') ? 'enriched' : ''}">${escapeHtml(wine.winery)}</span>` : ''}
-                        ${wine.vintage ? ` - ${wine.vintage}` : ''}
+                        ${wine.vintage ? ` - ${escapeHtml(wine.vintage)}` : ''}
                     </div>
                     <div class="wine-card-fields">
                         <div class="wine-card-field">
@@ -2707,19 +2707,19 @@ async function showWineDetail(wineId) {
         document.getElementById('wine-detail').innerHTML = `
             <div class="wine-detail-images">
                 ${wine.front_label_image_path
-                    ? `<div class="wine-detail-image"><img src="/api/images/${wine.front_label_image_path}" alt="Front label"></div>`
+                    ? `<div class="wine-detail-image"><img src="/api/images/${escapeHtml(wine.front_label_image_path)}" alt="Front label"></div>`
                     : ''
                 }
                 ${wine.back_label_image_path
-                    ? `<div class="wine-detail-image"><img src="/api/images/${wine.back_label_image_path}" alt="Back label"></div>`
+                    ? `<div class="wine-detail-image"><img src="/api/images/${escapeHtml(wine.back_label_image_path)}" alt="Back label"></div>`
                     : ''
                 }
             </div>
             <div class="wine-detail-info">
-                <h3>${wine.name}</h3>
+                <h3>${escapeHtml(wine.name)}</h3>
                 <div class="wine-detail-meta">
-                    ${wine.winery ? `<span class="${enrichedClass('winery')}">${wine.winery}</span>` : ''}
-                    ${wine.vintage ? ` - ${wine.vintage}` : ''}
+                    ${wine.winery ? `<span class="${enrichedClass('winery')}">${escapeHtml(wine.winery)}</span>` : ''}
+                    ${wine.vintage ? ` - ${escapeHtml(wine.vintage)}` : ''}
                 </div>
 
                 <div class="wine-detail-fields">
@@ -2733,49 +2733,49 @@ async function showWineDetail(wineId) {
                     ${wine.grape_variety ? `
                         <div class="wine-detail-field">
                             <div class="label">Grape Variety</div>
-                            <div class="value${enrichedClass('grape_variety')}">${wine.grape_variety}</div>
+                            <div class="value${enrichedClass('grape_variety')}">${escapeHtml(wine.grape_variety)}</div>
                         </div>
                     ` : ''}
 
                     ${wine.region ? `
                         <div class="wine-detail-field">
                             <div class="label">Region</div>
-                            <div class="value${enrichedClass('region')}">${wine.region}</div>
+                            <div class="value${enrichedClass('region')}">${escapeHtml(wine.region)}</div>
                         </div>
                     ` : ''}
 
                     ${wine.sub_region ? `
                         <div class="wine-detail-field">
                             <div class="label">Sub-Region</div>
-                            <div class="value">${wine.sub_region}</div>
+                            <div class="value">${escapeHtml(wine.sub_region)}</div>
                         </div>
                     ` : ''}
 
                     ${wine.appellation ? `
                         <div class="wine-detail-field">
                             <div class="label">Appellation</div>
-                            <div class="value">${wine.appellation}</div>
+                            <div class="value">${escapeHtml(wine.appellation)}</div>
                         </div>
                     ` : ''}
 
                     ${wine.country ? `
                         <div class="wine-detail-field">
                             <div class="label">Country</div>
-                            <div class="value${enrichedClass('country')}">${wine.country}</div>
+                            <div class="value${enrichedClass('country')}">${escapeHtml(wine.country)}</div>
                         </div>
                     ` : ''}
 
                     ${wine.classification ? `
                         <div class="wine-detail-field">
                             <div class="label">Classification</div>
-                            <div class="value">${wine.classification}</div>
+                            <div class="value">${escapeHtml(wine.classification)}</div>
                         </div>
                     ` : ''}
 
                     ${wine.alcohol_percentage ? `
                         <div class="wine-detail-field">
                             <div class="label">Alcohol</div>
-                            <div class="value${enrichedClass('alcohol_percentage')}">${wine.alcohol_percentage}%</div>
+                            <div class="value${enrichedClass('alcohol_percentage')}">${escapeHtml(wine.alcohol_percentage)}%</div>
                         </div>
                     ` : ''}
                 </div>
@@ -2835,7 +2835,7 @@ async function showWineDetail(wineId) {
                                 <span class="transaction-quantity">${t.quantity} bottle${t.quantity > 1 ? 's' : ''}</span>
                                 <span class="transaction-date">${formatDate(t.transaction_date)}</span>
                                 ${detail ? `<span class="transaction-detail">${detail}</span>` : ''}
-                                ${t.notes ? `<span>${t.notes}</span>` : ''}
+                                ${t.notes ? `<span>${escapeHtml(t.notes)}</span>` : ''}
                             </div>
                         `;}).join('')}
                     </div>
@@ -3016,8 +3016,8 @@ function renderTransactionList(transactions) {
                 ${badge.label}
             </span>
             <span class="transaction-wine">
-                ${t.wine ? t.wine.name : 'Unknown Wine'}
-                ${t.wine && t.wine.vintage ? `<span class="vintage">(${t.wine.vintage})</span>` : ''}
+                ${t.wine ? escapeHtml(t.wine.name) : 'Unknown Wine'}
+                ${t.wine && t.wine.vintage ? `<span class="vintage">(${escapeHtml(t.wine.vintage)})</span>` : ''}
                 ${detail ? `<span class="transaction-detail">${detail}</span>` : ''}
             </span>
             <span class="transaction-quantity">${t.quantity} bottle${t.quantity > 1 ? 's' : ''}</span>
@@ -3239,9 +3239,16 @@ function formatDate(dateString) {
 }
 
 function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    // Safe in BOTH text and attribute contexts. The previous textContent →
+    // innerHTML trick only escaped <, >, & — leaving " and ' untouched, which
+    // breaks out of attribute values like alt="${wine.name}".
+    if (text == null) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function formatXWinesPrice(wine) {

@@ -93,6 +93,11 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PyObjectId]):
         """Called after password was reset successfully."""
         logger.info("User password reset successfully (id=%s)", user.id)
 
+        # Invalidate all existing JWTs — a forgotten/leaked password is the
+        # exact threat model password reset exists for.
+        from winebox.services.auth import revoke_all_user_tokens
+        await revoke_all_user_tokens(user, reason="password_reset")
+
     async def on_after_request_verify(
         self, user: User, token: str, request: Optional[Request] = None
     ) -> None:

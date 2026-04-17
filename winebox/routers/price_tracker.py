@@ -51,47 +51,58 @@ def _photo_storage_path() -> Path:
     return path
 
 
-def _entry_to_out(entry: PriceEntry) -> PriceEntryOut:
-    """Convert a PriceEntry to the API output schema."""
-    photo_url = None
-    if entry.photo_path:
-        photo_url = f"/api/prices/photos/{entry.photo_path}"
+def _entry_to_out(entry: PriceEntry, current_user_id: ObjectId | None = None) -> PriceEntryOut:
+    """Convert a PriceEntry to the API output schema.
 
+    `WinePrice` is a global crowdsourced document — many users contribute
+    entries for the same wine. To avoid leaking other users' PII via
+    `GET /api/prices/{wine_price_id}`, sensitive fields (owner_id, GPS
+    coordinates, town/state, free-form notes, and the photo URL — which
+    is gated by ownership anyway) are only emitted when the requester
+    owns the entry. Aggregate fields (price, currency, timestamp, shop
+    name, country) are always emitted so price comparison still works.
+    """
+    is_owner = current_user_id is not None and entry.owner_id == current_user_id
+
+    photo_url = None
     coords = None
-    if entry.coordinates:
-        coords = {
-            "latitude": entry.coordinates.latitude,
-            "longitude": entry.coordinates.longitude,
-            "accuracy_metres": entry.coordinates.accuracy_metres,
-        }
+    if is_owner:
+        if entry.photo_path:
+            photo_url = f"/api/prices/photos/{entry.photo_path}"
+        if entry.coordinates:
+            coords = {
+                "latitude": entry.coordinates.latitude,
+                "longitude": entry.coordinates.longitude,
+                "accuracy_metres": entry.coordinates.accuracy_metres,
+            }
 
     return PriceEntryOut(
         timestamp=entry.timestamp,
         source=entry.source.value,
         price=entry.price,
         currency=entry.currency,
-        owner_id=str(entry.owner_id) if entry.owner_id else None,
+        owner_id=str(entry.owner_id) if (is_owner and entry.owner_id) else None,
         location={
             "shop_name": entry.location.shop_name,
-            "town_city": entry.location.town_city,
-            "state_county": entry.location.state_county,
+            "town_city": entry.location.town_city if is_owner else None,
+            "state_county": entry.location.state_county if is_owner else None,
             "country": entry.location.country,
         },
         coordinates=coords,
-        notes=entry.notes,
+        notes=entry.notes if is_owner else None,
         photo_url=photo_url,
         capture_type=entry.capture_type.value if entry.capture_type else None,
     )
 
 
-def _wine_price_to_out(doc: WinePrice) -> WinePriceOut:
+def _wine_price_to_out(doc: WinePrice, current_user_id: ObjectId | None = None) -> WinePriceOut:
     """Convert a WinePrice document to the API output schema."""
     return WinePriceOut(
         id=str(doc.id),
         wine_name=doc.wine_name,
         vintage=doc.vintage,
         wine_type=doc.wine_type,
-        prices=[_entry_to_out(e) for e in doc.prices],
+        prices=[_entry_to_out(e, current_user_id) for e in doc.prices],
         created_at=doc.created_at,
         updated_at=doc.updated_at,
     )
@@ -216,7 +227,7 @@ async def create_price_capture(
         wine_type=wine_type,
         entry=entry,
     )
-    return _wine_price_to_out(doc)
+    return _wine_price_to_out(doc, current_user.id)
 
 
 @router.get("", response_model=list[WinePriceSummaryOut])
@@ -247,7 +258,7 @@ async def get_wine_price(
     doc = await WinePrice.find_one({"_id": ObjectId(wine_price_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="Wine price not found.")
-    return _wine_price_to_out(doc)
+    return _wine_price_to_out(doc, current_user.id)
 
 
 @router.delete(

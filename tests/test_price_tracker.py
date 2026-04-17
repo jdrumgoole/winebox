@@ -491,6 +491,87 @@ async def test_two_users_contribute_to_same_wine(
     assert len(body2["prices"]) == 2
 
 
+@pytest.mark.asyncio
+async def test_get_wine_price_redacts_other_users_pii(
+    client: AsyncClient, sample_image_bytes: bytes, init_test_db
+) -> None:
+    """User B fetching a shared wine_price must not see User A's PII.
+
+    Crowdsourced WinePrice docs are read by every contributor, so non-owner
+    fields (owner_id, GPS coords, town/state, notes, photo URL) must be
+    redacted while aggregate fields (price, currency, shop name, country)
+    stay visible.
+    """
+    name = f"PIITest Wine {uuid.uuid4().hex[:6]}"
+    photo = ("label.png", io.BytesIO(sample_image_bytes), "image/png")
+    body_a = await _create_price(
+        client,
+        wine_name=name,
+        price="10.00",
+        notes="My private tasting notes",
+        shop_name="Vintners Cellar",
+        town_city="Dublin",
+        state_county="Leinster",
+        country="Ireland",
+        latitude="53.3498",
+        longitude="-6.2603",
+        accuracy_metres="5.0",
+        photo=photo,
+    )
+
+    # User A sees their own data fully
+    a_entry = body_a["prices"][0]
+    assert a_entry["owner_id"] is not None
+    assert a_entry["coordinates"] is not None
+    assert a_entry["coordinates"]["latitude"] == 53.3498
+    assert a_entry["notes"] == "My private tasting notes"
+    assert a_entry["photo_url"] is not None
+    assert a_entry["location"]["town_city"] == "Dublin"
+    assert a_entry["location"]["state_county"] == "Leinster"
+    assert a_entry["location"]["shop_name"] == "Vintners Cellar"  # always visible
+    assert a_entry["location"]["country"] == "Ireland"  # always visible
+
+    # User B fetches the same wine_price — must see redacted version
+    from winebox.models import User
+    from winebox.services.auth import create_access_token
+    from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
+
+    other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
+    other_user = User(
+        email=other_email,
+        hashed_password=_CACHED_TEST_PASSWORD_HASH,
+        is_active=True,
+        is_verified=True,
+        is_superuser=False,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    await other_user.insert()
+    other_token = create_access_token(data={"sub": other_email})
+    app = get_test_app()
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {other_token}"},
+    ) as other_client:
+        resp = await other_client.get(f"/api/prices/{body_a['id']}")
+        assert resp.status_code == 200
+        b_entry = resp.json()["prices"][0]
+
+    # Sensitive fields redacted for non-owner
+    assert b_entry["owner_id"] is None
+    assert b_entry["coordinates"] is None
+    assert b_entry["notes"] is None
+    assert b_entry["photo_url"] is None
+    assert b_entry["location"]["town_city"] is None
+    assert b_entry["location"]["state_county"] is None
+    # Aggregate fields still visible — price comparison must keep working
+    assert b_entry["price"] == 10.00
+    assert b_entry["currency"] == "EUR"
+    assert b_entry["location"]["shop_name"] == "Vintners Cellar"
+    assert b_entry["location"]["country"] == "Ireland"
+
+
 # ---------------------------------------------------------------------------
 # Authentication required
 # ---------------------------------------------------------------------------

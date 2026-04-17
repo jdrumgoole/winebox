@@ -44,15 +44,16 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
-    """Create a JWT access token with a unique JWT ID for revocation support."""
+    """Create a JWT access token with jti (per-token revocation) and iat
+    (issued-at, used by the bulk per-user invalidation cutoff)."""
     to_encode = data.copy()
+    now = datetime.now(timezone.utc)
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    # Add JWT ID for revocation support
+        expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     jti = str(uuid.uuid4())
-    to_encode.update({"exp": expire, "jti": jti})
+    to_encode.update({"exp": expire, "iat": now, "jti": jti})
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -168,6 +169,7 @@ async def get_current_user(
         payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
         subject: str | None = payload.get("sub")
         jti: str | None = payload.get("jti")
+        iat_raw = payload.get("iat")
         if subject is None:
             return None
     except jwt.PyJWTError:
@@ -193,6 +195,20 @@ async def get_current_user(
 
     if user is None or not user.is_active:
         return None
+
+    # Bulk per-user invalidation: any token issued before the cutoff is dead.
+    # Tokens minted before the iat claim was added (iat_raw is None) are
+    # treated as predating any cutoff, i.e. invalidated by any cutoff.
+    if user.tokens_invalidated_after is not None:
+        if iat_raw is None:
+            return None
+        iat = datetime.fromtimestamp(iat_raw, tz=timezone.utc)
+        cutoff = user.tokens_invalidated_after
+        # MongoDB returns BSON Dates as offset-naive UTC; normalise.
+        if cutoff.tzinfo is None:
+            cutoff = cutoff.replace(tzinfo=timezone.utc)
+        if iat < cutoff:
+            return None
 
     return user
 
@@ -264,6 +280,27 @@ async def revoke_token(token: str, user_id: str | None = None, reason: str = "lo
     except Exception as e:
         security_logger.error("Token revocation failed - error: user_id=%s, error=%s", user_id, str(e))
         return False
+
+
+async def revoke_all_user_tokens(user: User, reason: str = "credential_rotation") -> None:
+    """Invalidate every existing JWT for this user in one shot.
+
+    Sets `tokens_invalidated_after` to the current UTC time. `get_current_user`
+    rejects any token whose `iat` claim is earlier than this cutoff. We add
+    one second of slop so that newly-minted tokens issued in the same wall
+    clock instant (e.g. a fresh login immediately after a password change)
+    are not accidentally invalidated.
+    """
+    cutoff = datetime.now(timezone.utc) + timedelta(seconds=1)
+    user.tokens_invalidated_after = cutoff
+    user.updated_at = datetime.now(timezone.utc)
+    await user.save()
+    security_logger.info(
+        "All tokens invalidated: user_id=%s, reason=%s, cutoff=%s",
+        str(user.id),
+        reason,
+        cutoff.isoformat(),
+    )
 
 
 # Type aliases for dependency injection
