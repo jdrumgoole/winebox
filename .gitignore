@@ -47,6 +47,20 @@ data/
 # Environment variables
 .env
 .env.local
+secrets.env
+
+# Secrets / keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Playwright MCP working directory
+.playwright-mcp/
+
+# Emacs auto-save and lock files
+\#*\#
+.\#*
 
 # OS files
 .DS_Store

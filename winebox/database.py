@@ -34,12 +34,17 @@ async def init_db(
         # Use provided client (e.g., for testing)
         client = mongo_client
     else:
-        # Create new client from settings with connection pool configuration
+        # Create new client from settings with connection pool and timeout configuration.
+        # Defensive bounded timeouts so a wedged Mongo cannot hang request handlers
+        # for the driver's default of ~30s server-selection / unbounded socket reads.
         url = mongodb_url or settings.mongodb_url
         client = AsyncMongoClient(
             url,
             minPoolSize=settings.min_pool_size,
             maxPoolSize=settings.max_pool_size,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=10000,
+            socketTimeoutMS=30000,
         )
 
     db_name = mongodb_database or settings.mongodb_database

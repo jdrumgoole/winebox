@@ -150,7 +150,7 @@ async def match_wines_batch(
     try:
         import anthropic
 
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=api_key, timeout=60.0)
         message = client.messages.create(
             model=settings.claude_matching_model,
             max_tokens=1024,

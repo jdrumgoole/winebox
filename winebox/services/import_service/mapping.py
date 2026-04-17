@@ -188,7 +188,7 @@ async def suggest_column_mapping_ai(
     try:
         import anthropic
 
-        client = anthropic.AsyncAnthropic(api_key=api_key)
+        client = anthropic.AsyncAnthropic(api_key=api_key, timeout=60.0)
         prompt = _build_mapping_prompt(headers, preview_rows)
 
         message = await client.messages.create(

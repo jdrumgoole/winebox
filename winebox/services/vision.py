@@ -76,7 +76,7 @@ class ClaudeVisionService:
                 raise ValueError("No Anthropic API key configured")
 
             if self._default_client is None:
-                self._default_client = anthropic.Anthropic(api_key=api_key)
+                self._default_client = anthropic.Anthropic(api_key=api_key, timeout=60.0)
             return self._default_client
         except ImportError:
             logger.error("anthropic package is not installed")
