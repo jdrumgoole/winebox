@@ -1,101 +1,26 @@
-"""Demo data API for loading and removing sample wines.
+"""HTTP wrapper for the demo-data service.
 
-Lets new users populate their cellar with curated sample wines to explore
-the app. Demo wines are tagged with custom_fields._demo = "true" so they
-can be removed without affecting the user's real wines.
-
-Pulls real wines from the X-Wines reference dataset (xwines_wines) so the
-demo cellar looks authentic, with actual wine names, regions, and ratings.
+Business logic (wine selection, install/remove, progress tracking) lives in
+:mod:`winebox.services.demo_service`.
 """
 
-import ast
 import asyncio
 import json
 import logging
-import random
-from datetime import datetime, timedelta, timezone
-from typing import Any
 
-from bson import ObjectId
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
-from winebox.database import get_database
-from winebox.db import PyObjectId
-from winebox.services.rate_limit import make_limiter
-from winebox.models.transaction import Transaction, TransactionType
-from winebox.models.wine import InventoryInfo, Wine
+from winebox.services import demo_service
 from winebox.services.auth import RequireAuth
+from winebox.services.rate_limit import make_limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 limiter = make_limiter()
-
-DEMO_TAG = {"_demo": "true"}
-
-# How many wines to load
-DEMO_WINE_COUNT = 500
-
-# Target distribution by wine type
-_TYPE_TARGETS = {
-    "Red": 250,
-    "White": 120,
-    "Rosé": 30,
-    "Sparkling": 50,
-    "Dessert": 25,
-    "Fortified": 25,
-}
-
-# Wine type mapping from X-Wines wine_type to our wine_type_id
-_TYPE_MAP = {
-    "Red": "red",
-    "White": "white",
-    "Rosé": "rose",
-    "Sparkling": "sparkling",
-    "Dessert": "dessert",
-    "Fortified": "fortified",
-}
-
-# Checkout notes for realistic transaction history
-_CHECKOUT_NOTES = [
-    "Tuesday night pasta dinner",
-    "Summer barbecue with friends",
-    "Picnic at the park",
-    "Birthday celebration",
-    "Date night",
-    "Holiday dinner",
-    "Book club meeting",
-    "Housewarming gift",
-    "Friday night in",
-    "Sunday roast",
-    "Dinner party",
-    "Cheese and wine evening",
-    "Celebration dinner",
-    "Weekend lunch",
-    "Just because",
-]
-
-# Provenance sources for demo cases
-_PROVENANCE_SOURCES = [
-    "Berry Bros & Rudd",
-    "Majestic Wine",
-    "The Wine Society",
-    "Laithwaites",
-    "Corney & Barrow",
-    "Justerini & Brooks",
-    "Tanners Wines",
-    "Averys of Bristol",
-    "Lay & Wheeler",
-    "Direct from winery",
-    "Auction",
-    "Wine fair",
-]
-
-# In-memory progress tracking per user (keyed by str(owner_id))
-_install_progress: dict[str, dict[str, Any]] = {}
 
 
 # --- Response models ---
@@ -116,319 +41,16 @@ class DemoRemoveResponse(BaseModel):
     transactions_removed: int
 
 
-def _parse_grapes(grapes_str: str | None) -> str | None:
-    """Parse X-Wines grapes field into a primary grape name."""
-    if not grapes_str:
-        return None
-    try:
-        parsed = ast.literal_eval(grapes_str)
-        if isinstance(parsed, list) and parsed:
-            return str(parsed[0])
-    except (ValueError, SyntaxError):
-        pass
-    stripped = grapes_str.strip()
-    if stripped and not stripped.startswith("["):
-        return stripped
-    return None
-
-
-def _parse_vintages(vintages_str: str | None) -> list[int]:
-    """Parse X-Wines vintages field into a list of ints."""
-    if not vintages_str:
-        return []
-    try:
-        parsed = ast.literal_eval(vintages_str)
-        if isinstance(parsed, list):
-            return [int(v) for v in parsed if v]
-    except (ValueError, SyntaxError):
-        pass
-    return []
-
-
-async def _select_demo_wines() -> list[dict[str, Any]]:
-    """Select diverse wines from xwines_wines for the demo cellar.
-
-    Stratifies by wine type, prefers popular wines (high rating_count),
-    and picks a random vintage for each wine.
-    """
-    db = get_database()
-    xwines_col = db["xwines_wines"]
-    prices_col = db["xwines_prices"]
-
-    selected: list[dict[str, Any]] = []
-
-    for wine_type, target in _TYPE_TARGETS.items():
-        cursor = xwines_col.find(
-            {"wine_type": wine_type, "rating_count": {"$gte": 25}},
-            {
-                "xwines_id": 1, "name": 1, "wine_type": 1, "grapes": 1,
-                "abv": 1, "country": 1, "region_name": 1, "winery_name": 1,
-                "avg_rating": 1, "rating_count": 1, "vintages": 1,
-            },
-        ).sort([("rating_count", -1)]).limit(target * 3)
-
-        candidates = await cursor.to_list(length=target * 3)
-        random.shuffle(candidates)
-        chosen = candidates[:target]
-
-        for doc in chosen:
-            vintages = _parse_vintages(doc.get("vintages"))
-            vintage = random.choice(vintages) if vintages else None
-            quantity = random.choices([1, 2, 3, 6, 12], weights=[30, 25, 20, 15, 10])[0]
-
-            # Wines with quantity 6 or 12 become cases
-            case_size = None
-            provenance = None
-            purchase_price = None
-            if quantity in (6, 12):
-                case_size = quantity
-                provenance = random.choice(_PROVENANCE_SOURCES)
-                purchase_price = round(random.uniform(40, 300), 2)
-
-            wine_data: dict[str, Any] = {
-                "name": doc["name"],
-                "winery": doc.get("winery_name"),
-                "vintage": vintage,
-                "grape_variety": _parse_grapes(doc.get("grapes")),
-                "region": doc.get("region_name"),
-                "country": doc.get("country"),
-                "alcohol_percentage": doc.get("abv"),
-                "wine_type_id": _TYPE_MAP.get(wine_type, "red"),
-                "xwines_id": doc.get("xwines_id"),
-                "quantity": quantity,
-                "case_size": case_size,
-                "provenance": provenance,
-                "purchase_price": purchase_price,
-            }
-            selected.append(wine_data)
-
-    # Batch price lookup
-    xwines_ids = [w["xwines_id"] for w in selected if w.get("xwines_id")]
-    if xwines_ids:
-        price_cursor = prices_col.find(
-            {"xwines_id": {"$in": xwines_ids}, "vintage": None},
-            {"_id": 0, "xwines_id": 1, "price_low_usd": 1, "price_high_usd": 1, "price_tier": 1},
-        )
-        price_map: dict[int, dict] = {
-            doc["xwines_id"]: doc async for doc in price_cursor
-        }
-        for wine_data in selected:
-            xid = wine_data.get("xwines_id")
-            if xid and xid in price_map:
-                p = price_map[xid]
-                wine_data["estimated_price_low"] = p.get("price_low_usd")
-                wine_data["estimated_price_high"] = p.get("price_high_usd")
-                wine_data["price_tier"] = p.get("price_tier")
-
-    random.shuffle(selected)
-    return selected[:DEMO_WINE_COUNT]
-
-
-async def _flush_wine_batch(
-    owner_id: PyObjectId,
-    wine_batch: list[Wine],
-    batch_meta: list[tuple[int, datetime, int | None, str | None, float | None]],
-) -> None:
-    """Insert a batch of wines with their transactions, bottles, cases, and events."""
-    await Wine.insert_many(wine_batch)
-
-    txn_batch = [
-        Transaction(
-            owner_id=owner_id,
-            wine_id=w.id,
-            transaction_type=TransactionType.CHECK_IN,
-            quantity=q,
-            transaction_date=ca,
-            created_at=ca,
-        )
-        for w, (q, ca, _cs, _prov, _pp) in zip(wine_batch, batch_meta)
-    ]
-    await Transaction.insert_many(txn_batch)
-
-    from winebox.models.cellar import CellarItem, EmbeddedWine
-    from winebox.models.cellar_event import CellarEvent, CellarEventType
-
-    cellar_items: list[CellarItem] = []
-    cellar_events: list[CellarEvent] = []
-
-    for w, (q, ca, case_size, provenance, purchase_price) in zip(wine_batch, batch_meta):
-        embedded = EmbeddedWine(
-            wine_id=w.id, name=w.name, winery=w.winery,
-            vintage=w.vintage, grape_variety=w.grape_variety,
-            country=w.country, region=w.region, wine_type=w.wine_type_id,
-            estimated_price_low=w.estimated_price_low,
-            estimated_price_high=w.estimated_price_high,
-            price_tier=w.price_tier,
-        )
-
-        if case_size and case_size > 0:
-            item_id = ObjectId()
-            cellar_items.append(CellarItem(
-                id=item_id, cellar_id=owner_id, item_type="case",
-                wine=embedded, quantity=q, case_size=case_size,
-                purchase_price=purchase_price, purchase_date=ca,
-                provenance=provenance, created_at=ca, updated_at=ca,
-            ))
-            cellar_events.append(CellarEvent(
-                cellar_id=owner_id, cellar_item_id=item_id,
-                item_type="case", event_type=CellarEventType.ADDED,
-                quantity=q, event_date=ca, created_at=ca,
-            ))
-        else:
-            item_id = ObjectId()
-            cellar_items.append(CellarItem(
-                id=item_id, cellar_id=owner_id, item_type="bottle",
-                wine=embedded, quantity=q,
-                created_at=ca, updated_at=ca,
-            ))
-            cellar_events.append(CellarEvent(
-                cellar_id=owner_id, cellar_item_id=item_id,
-                item_type="bottle", event_type=CellarEventType.ADDED,
-                quantity=q, event_date=ca, created_at=ca,
-            ))
-
-    if cellar_items:
-        await CellarItem.insert_many(cellar_items)
-        await CellarEvent.insert_many(cellar_events)
-
-
-async def _do_install(owner_id: PyObjectId, sample_wines: list[dict[str, Any]]) -> None:
-    """Background task: insert demo wines and update progress."""
-    owner_str = str(owner_id)
-    total = len(sample_wines)
-    now = datetime.now(timezone.utc)
-    wines_created = 0
-    total_bottles = 0
-    countries: set[str] = set()
-    wine_types: set[str] = set()
-    checkout_candidates: list[tuple[Any, int]] = []
-
-    _install_progress[owner_str] = {
-        "phase": "loading",
-        "created": 0,
-        "total": total,
-    }
-
-    BATCH_SIZE = 50
-    wine_batch: list[Wine] = []
-    batch_meta: list[tuple[int, datetime, int | None, str | None, float | None]] = []
-
-    for i, wine_data in enumerate(sample_wines):
-        data = dict(wine_data)
-        quantity = data.pop("quantity", 1)
-        xwines_id = data.pop("xwines_id", None)
-        case_size = data.pop("case_size", None)
-        provenance = data.pop("provenance", None)
-        purchase_price = data.pop("purchase_price", None)
-
-        days_ago = total - i
-        created_at = now - timedelta(days=days_ago)
-
-        wine_id = ObjectId()
-        wine = Wine(
-            id=wine_id,
-            owner_id=owner_id,
-            custom_fields=DEMO_TAG,
-            xwines_id=xwines_id,
-            created_at=created_at,
-            updated_at=created_at,
-            inventory=InventoryInfo(quantity=quantity, updated_at=created_at),
-            **data,
-        )
-        wine_batch.append(wine)
-        batch_meta.append((quantity, created_at, case_size, provenance, purchase_price))
-
-        total_bottles += quantity
-        if data.get("country"):
-            countries.add(data["country"])
-        if data.get("wine_type_id"):
-            wine_types.add(data["wine_type_id"])
-
-        if quantity >= 3:
-            checkout_candidates.append((wine_id, quantity))
-
-        # Flush batch
-        if len(wine_batch) >= BATCH_SIZE:
-            await _flush_wine_batch(owner_id, wine_batch, batch_meta)
-            wines_created += len(wine_batch)
-            wine_batch.clear()
-            batch_meta.clear()
-
-            _install_progress[owner_str] = {
-                "phase": "loading",
-                "created": wines_created,
-                "total": total,
-            }
-
-    # Flush remaining
-    if wine_batch:
-        await _flush_wine_batch(owner_id, wine_batch, batch_meta)
-        wines_created += len(wine_batch)
-
-    # Create checkout transactions in batch
-    checkout_count = min(len(checkout_candidates), max(20, total // 10))
-    random.shuffle(checkout_candidates)
-    checkout_txns: list[Transaction] = []
-    wine_updates: list[tuple[Any, int, datetime]] = []  # (wine_id, qty, date)
-
-    for wine_id, max_qty in checkout_candidates[:checkout_count]:
-        qty = random.randint(1, max(1, max_qty - 1))
-        notes = random.choice(_CHECKOUT_NOTES)
-        checkout_date = now - timedelta(days=random.randint(1, 60))
-
-        checkout_txns.append(Transaction(
-            owner_id=owner_id,
-            wine_id=wine_id,
-            transaction_type=TransactionType.CHECK_OUT,
-            quantity=qty,
-            notes=notes,
-            transaction_date=checkout_date,
-            created_at=checkout_date,
-        ))
-        wine_updates.append((wine_id, qty, checkout_date))
-        total_bottles -= qty
-
-    if checkout_txns:
-        await Transaction.insert_many(checkout_txns)
-        # Batch update wine quantities
-        wines_col = Wine.get_pymongo_collection()
-        for wine_id, qty, checkout_date in wine_updates:
-            await wines_col.update_one(
-                {"_id": wine_id},
-                {"$inc": {"inventory.quantity": -qty},
-                 "$set": {"inventory.updated_at": checkout_date, "updated_at": checkout_date}},
-            )
-
-    _install_progress[owner_str] = {
-        "phase": "done",
-        "created": wines_created,
-        "total": total,
-        "bottles": total_bottles,
-        "countries": len(countries),
-        "wine_types": len(wine_types),
-    }
-
-    logger.info(
-        "Demo data installed for user %s: %d wines, %d bottles",
-        owner_id, wines_created, total_bottles,
-    )
-
-
 # --- Endpoints ---
 
 @router.get("/status", response_model=DemoStatusResponse)
 async def demo_status(current_user: RequireAuth) -> DemoStatusResponse:
     """Check whether sample wines are installed for the current user."""
-    demo_wines = await Wine.find(
-        {"owner_id": current_user.id, "custom_fields._demo": "true"}
-    ).to_list()
-
-    bottle_count = sum(w.inventory.quantity for w in demo_wines)
-
+    status = await demo_service.get_demo_status(current_user.id)
     return DemoStatusResponse(
-        installed=len(demo_wines) > 0,
-        wine_count=len(demo_wines),
-        bottle_count=bottle_count,
+        installed=status.installed,
+        wine_count=status.wine_count,
+        bottle_count=status.bottle_count,
     )
 
 
@@ -439,28 +61,22 @@ async def install_demo(request: Request, current_user: RequireAuth) -> DemoInsta
 
     Returns immediately. Use GET /api/demo/install/progress to monitor.
     """
-    existing = await Wine.find_one(
-        {"owner_id": current_user.id, "custom_fields._demo": "true"}
-    )
-    if existing:
+    try:
+        total = await demo_service.start_install(current_user.id)
+    except demo_service.DemoAlreadyInstalledError:
         raise HTTPException(
             status_code=409,
             detail="Sample wines are already loaded. Remove them first to reload.",
         )
-
-    sample_wines = await _select_demo_wines()
-    if not sample_wines:
+    except demo_service.NoReferenceDataError:
         raise HTTPException(
             status_code=503,
             detail="No reference wine data available. The X-Wines dataset may not be loaded.",
         )
 
-    # Start background install
-    asyncio.create_task(_do_install(current_user.id, sample_wines))
-
     return DemoInstallResponse(
-        message=f"Loading {len(sample_wines)} sample wines...",
-        total=len(sample_wines),
+        message=f"Loading {total} sample wines...",
+        total=total,
     )
 
 
@@ -471,14 +87,12 @@ async def install_progress(current_user: RequireAuth) -> StreamingResponse:
     Events contain: phase (loading/done/idle), created, total, and
     on completion: bottles, countries, wine_types.
     """
-    owner_str = str(current_user.id)
-
     async def event_generator():
         max_polls = 300  # 2.5 minutes at 0.5s intervals
         polls = 0
 
         while polls < max_polls:
-            progress = _install_progress.get(owner_str)
+            progress = demo_service.get_install_progress(current_user.id)
 
             if progress is None:
                 yield f"data: {json.dumps({'phase': 'idle'})}\n\n"
@@ -487,7 +101,7 @@ async def install_progress(current_user: RequireAuth) -> StreamingResponse:
             yield f"data: {json.dumps(progress)}\n\n"
 
             if progress.get("phase") == "done":
-                _install_progress.pop(owner_str, None)
+                demo_service.pop_install_progress(current_user.id)
                 return
 
             await asyncio.sleep(0.5)
@@ -511,50 +125,8 @@ async def remove_demo(current_user: RequireAuth) -> DemoRemoveResponse:
 
     Only removes wines tagged as demo data. Your own wines are not affected.
     """
-    demo_wines = await Wine.find(
-        {"owner_id": current_user.id, "custom_fields._demo": "true"}
-    ).to_list()
-
-    if not demo_wines:
-        return DemoRemoveResponse(wines_removed=0, transactions_removed=0)
-
-    demo_wine_ids = [w.id for w in demo_wines]
-
-    # Delete cellar items and events for demo wines
-    from winebox.models.cellar import CellarItem
-    from winebox.models.cellar_event import CellarEvent
-    cellar_col = CellarItem.get_pymongo_collection()
-    event_col = CellarEvent.get_pymongo_collection()
-
-    demo_items = await cellar_col.find(
-        {"cellar_id": current_user.id, "wine.wine_id": {"$in": demo_wine_ids}},
-        {"_id": 1},
-    ).to_list(length=None)
-    demo_item_ids = [item["_id"] for item in demo_items]
-
-    if demo_item_ids:
-        await event_col.delete_many(
-            {"cellar_id": current_user.id, "cellar_item_id": {"$in": demo_item_ids}}
-        )
-    await cellar_col.delete_many(
-        {"cellar_id": current_user.id, "wine.wine_id": {"$in": demo_wine_ids}}
-    )
-
-    txn_result = await Transaction.get_pymongo_collection().delete_many(
-        {"owner_id": current_user.id, "wine_id": {"$in": demo_wine_ids}}
-    )
-
-    wine_result = await Wine.get_pymongo_collection().delete_many(
-        {"owner_id": current_user.id, "custom_fields._demo": "true"}
-    )
-
-    logger.info(
-        "Demo data removed for user %s: %d wines, %d transactions, %d cellar items",
-        current_user.id, wine_result.deleted_count, txn_result.deleted_count,
-        len(demo_item_ids),
-    )
-
+    result = await demo_service.remove_demo_wines(current_user.id)
     return DemoRemoveResponse(
-        wines_removed=wine_result.deleted_count,
-        transactions_removed=txn_result.deleted_count,
+        wines_removed=result.wines_removed,
+        transactions_removed=result.transactions_removed,
     )
