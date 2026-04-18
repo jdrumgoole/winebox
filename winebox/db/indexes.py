@@ -47,7 +47,7 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("winery", ASCENDING)]),
         IndexModel([("vintage", ASCENDING)]),
         IndexModel([("country", ASCENDING)]),
-        IndexModel([("wine_type_id", ASCENDING)]),
+        IndexModel([("wine_type", ASCENDING)]),
         IndexModel([("owner_id", ASCENDING), ("inventory.quantity", ASCENDING)]),
         IndexModel([("owner_id", ASCENDING), ("collection", ASCENDING)]),
         IndexModel([("owner_id", ASCENDING), ("collection", ASCENDING), ("inventory.quantity", ASCENDING)]),

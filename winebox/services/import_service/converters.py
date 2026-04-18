@@ -19,7 +19,7 @@ _NON_WINE_RE = re.compile(
 def is_non_wine_row(row: dict[str, Any], mapping: dict[str, str]) -> bool:
     """Check if a row appears to be a non-wine item (spirits, beer, etc.).
 
-    Checks columns mapped to wine_type_id or name for non-wine keywords.
+    Checks columns mapped to wine_type or name for non-wine keywords.
     Uses word-boundary matching to avoid false positives from keywords
     embedded inside wine names (e.g. 'ale' inside 'NeroBufaleffj').
 
@@ -33,7 +33,7 @@ def is_non_wine_row(row: dict[str, Any], mapping: dict[str, str]) -> bool:
     # Find columns mapped to type or name
     cols_to_check = []
     for header, field in mapping.items():
-        if field in ("wine_type_id", "name"):
+        if field in ("wine_type", "name"):
             cols_to_check.append(header)
 
     for col in cols_to_check:

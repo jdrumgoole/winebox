@@ -38,7 +38,7 @@ async def test_custom_fields_roundtrip(client: AsyncClient) -> None:
         "Country": "country",
         "Region": "region",
         "Vintage": "vintage",
-        "Colour": "wine_type_id",
+        "Colour": "wine_type",
         "Quantity in Bottles": "quantity",
         # Custom fields
         "Parent ID": "custom:Parent ID",
@@ -103,7 +103,7 @@ async def test_custom_fields_roundtrip(client: AsyncClient) -> None:
         assert exported["country"] == orig["Country"]
         assert exported["region"] == orig["Region"]
         assert exported["vintage"] == orig["Vintage"]
-        assert exported["wine_type_id"] == orig["Colour"]
+        assert exported["wine_type"] == orig["Colour"]
         assert exported["quantity"] == orig["Quantity in Bottles"]
 
         # Custom fields — each should be its own column

@@ -132,10 +132,10 @@ async def enrich_unenriched_wines(
                     update_dict[parsed_key] = xwines_value
                     enriched_fields.append(parsed_key)
 
-            if not doc.get("wine_type_id") and match.wine_type:
+            if not doc.get("wine_type") and match.wine_type:
                 wt = str(match.wine_type).lower()
-                update_dict["wine_type_id"] = wt
-                enriched_fields.append("wine_type_id")
+                update_dict["wine_type"] = wt
+                enriched_fields.append("wine_type")
 
             update_dict["xwines_id"] = match.xwines_id
             update_dict["enriched_fields"] = enriched_fields

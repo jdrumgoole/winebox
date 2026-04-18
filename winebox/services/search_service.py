@@ -183,7 +183,7 @@ def _apply_scalar_filters(conditions: dict[str, Any], filters: WineSearchFilters
             "$regex": re.compile(re.escape(filters.country), re.IGNORECASE)
         }
     if filters.wine_type:
-        conditions["wine_type_id"] = filters.wine_type
+        conditions["wine_type"] = filters.wine_type
     if filters.price_tier:
         conditions["price_tier"] = filters.price_tier
 

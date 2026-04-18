@@ -226,8 +226,8 @@ async def summarize_batch_wines(
     vintages: dict[str, int] = {}
 
     for wine in wines:
-        if wine.wine_type_id:
-            wine_types[wine.wine_type_id] = wine_types.get(wine.wine_type_id, 0) + 1
+        if wine.wine_type:
+            wine_types[wine.wine_type] = wine_types.get(wine.wine_type, 0) + 1
         if wine.country:
             countries[wine.country] = countries.get(wine.country, 0) + 1
         if wine.grape_variety:

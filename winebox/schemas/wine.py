@@ -23,7 +23,7 @@ class WineBase(BaseModel):
     alcohol_percentage: float | None = Field(None, ge=0, le=100)
 
     # New taxonomy fields (v2)
-    wine_type_id: str | None = Field(None, description="Wine type (red, white, etc.)")
+    wine_type: str | None = Field(None, description="Wine type (red, white, etc.)")
     wine_subtype: str | None = Field(None, max_length=50, description="Subtype (e.g., full_bodied, champagne)")
     classification: str | None = Field(None, max_length=255, description="e.g., Grand Cru, DOCG, Reserve")
     price_tier: str | None = Field(None, description="Price tier: budget, value, mid_range, premium, luxury, ultra_premium")
@@ -60,7 +60,7 @@ class WineUpdate(BaseModel):
     alcohol_percentage: float | None = Field(None, ge=0, le=100)
 
     # New taxonomy fields (v2)
-    wine_type_id: str | None = Field(None, description="Wine type (red, white, etc.)")
+    wine_type: str | None = Field(None, description="Wine type (red, white, etc.)")
     wine_subtype: str | None = Field(None, max_length=50)
     classification: str | None = Field(None, max_length=255, description="e.g., Grand Cru, DOCG, Reserve")
     price_tier: str | None = Field(None)

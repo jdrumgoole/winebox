@@ -28,7 +28,7 @@
 │ row_count           │    │ vintage               │    │   source, location,  │
 │ wines_created       │    │ grape_variety          │    │   owner_id ──► users │
 │ rows (embedded)     │    │ region / country      │    │ }                    │
-│ preview_rows        │    │ wine_type_id ──► ref  │    └──────────────────────┘
+│ preview_rows        │    │ wine_type ──► ref  │    └──────────────────────┘
 └────────┬────────────┘    │ collection (cellar|met)│
          │                 │ inventory {qty, case}  │    ┌──────────────────────┐
          │ batch_id        │ scores[] (embedded)    │    │  wine_prices_history │

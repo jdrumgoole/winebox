@@ -198,7 +198,7 @@ async def test_import_skips_non_wine(client: AsyncClient) -> None:
     # Map and process
     await client.post(
         f"/api/import/{batch_id}/mapping",
-        json={"mapping": {"Name": "name", "Type": "wine_type_id"}},
+        json={"mapping": {"Name": "name", "Type": "wine_type"}},
     )
     process_resp = await client.post(
         f"/api/import/{batch_id}/process",

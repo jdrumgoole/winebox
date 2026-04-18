@@ -400,13 +400,13 @@ async def test_scan_returns_xwines_fields(client: AsyncClient, init_test_db, sam
 
 
 # ---------------------------------------------------------------------------
-# Check-in endpoint wine_type_id — integration tests
+# Check-in endpoint wine_type — integration tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_checkin_accepts_wine_type_id(client: AsyncClient, init_test_db, sample_image_bytes: bytes) -> None:
-    """wine_type_id form field is saved on the Wine document."""
+async def test_checkin_accepts_wine_type(client: AsyncClient, init_test_db, sample_image_bytes: bytes) -> None:
+    """wine_type form field is saved on the Wine document."""
     # Mock vision to not be available, and OCR to return minimal data
     with patch("winebox.routers.wines.checkin.vision_service") as mock_vision, \
          patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
@@ -419,7 +419,7 @@ async def test_checkin_accepts_wine_type_id(client: AsyncClient, init_test_db, s
             "/api/wines/checkin",
             data={
                 "name": "Checkin Wine Type Test",
-                "wine_type_id": "red",
+                "wine_type": "red",
                 "quantity": "1",
             },
             files={"front_label": ("label.png", io.BytesIO(sample_image_bytes), "image/png")},
@@ -428,9 +428,9 @@ async def test_checkin_accepts_wine_type_id(client: AsyncClient, init_test_db, s
     assert response.status_code == 201
     wine_data = response.json()
     assert wine_data["name"] == "Checkin Wine Type Test"
-    assert wine_data["wine_type_id"] == "red"
+    assert wine_data["wine_type"] == "red"
 
     # Verify in database
     wine = await Wine.find_one({"name": "Checkin Wine Type Test"})
     assert wine is not None
-    assert wine.wine_type_id == "red"
+    assert wine.wine_type == "red"

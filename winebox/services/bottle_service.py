@@ -48,7 +48,7 @@ def _wine_to_embedded(wine: Wine) -> EmbeddedWine:
         grape_variety=wine.grape_variety,
         country=wine.country,
         region=wine.region,
-        wine_type=wine.wine_type_id,
+        wine_type=wine.wine_type,
         estimated_price_low=wine.estimated_price_low,
         estimated_price_high=wine.estimated_price_high,
         price_tier=wine.price_tier,

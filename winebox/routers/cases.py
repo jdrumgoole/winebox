@@ -105,7 +105,7 @@ async def _find_or_create_wine(
         grape_variety=grape_variety,
         country=country,
         region=region,
-        wine_type_id=wine_type,
+        wine_type=wine_type,
         front_label_text="",
     )
     await wine.insert()

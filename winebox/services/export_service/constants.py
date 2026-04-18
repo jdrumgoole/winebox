@@ -17,7 +17,7 @@ WINE_HEADERS = [
     "region",
     "country",
     "alcohol_percentage",
-    "wine_type_id",
+    "wine_type",
     "price_tier",
     "quantity",
     "inventory_updated_at",

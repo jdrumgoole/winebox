@@ -64,7 +64,7 @@ def test_table_detail_row_shows_custom_fields(app_js_source: str) -> None:
 def test_table_detail_row_shows_additional_standard_fields(app_js_source: str) -> None:
     """The table detail row must reference all additional standard fields."""
     for field in ["sub_region", "appellation", "classification",
-                  "alcohol_percentage", "wine_type_id", "price_tier", "notes"]:
+                  "alcohol_percentage", "wine_type", "price_tier", "notes"]:
         assert f"wine.{field}" in app_js_source, f"Missing field: wine.{field}"
 
 

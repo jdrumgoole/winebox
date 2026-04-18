@@ -60,12 +60,12 @@ HEADER_ALIASES: dict[str, str] = {
     "abv": "alcohol_percentage",
     "alcohol percentage": "alcohol_percentage",
     "alc": "alcohol_percentage",
-    # wine_type_id
-    "type": "wine_type_id",
-    "wine type": "wine_type_id",
-    "wine_type": "wine_type_id",
-    "color": "wine_type_id",
-    "colour": "wine_type_id",
+    # wine_type
+    "type": "wine_type",
+    "wine type": "wine_type",
+    "wine_type": "wine_type",
+    "color": "wine_type",
+    "colour": "wine_type",
     # classification
     "classification": "classification",
     "class": "classification",
@@ -107,7 +107,7 @@ HEADER_ALIASES: dict[str, str] = {
 # Valid wine field names that can be mapped to
 VALID_WINE_FIELDS = {
     "name", "winery", "vintage", "grape_variety", "region", "sub_region",
-    "appellation", "country", "alcohol_percentage", "wine_type_id",
+    "appellation", "country", "alcohol_percentage", "wine_type",
     "classification", "price_tier", "quantity", "num_cases", "case_size", "purchase_date",
     "notes",
 }
@@ -126,7 +126,7 @@ WINE_FIELD_DESCRIPTIONS: dict[str, str] = {
     "appellation": "The specific appellation, AOC, DOC, DOCG, or AVA",
     "country": "The country of origin",
     "alcohol_percentage": "The alcohol percentage (numeric, e.g. 13.5)",
-    "wine_type_id": "The wine type: red, white, rosé, sparkling, fortified, or dessert",
+    "wine_type": "The wine type: red, white, rosé, sparkling, fortified, or dessert",
     "classification": "Quality classification (e.g. Grand Cru, Reserva, DOCG)",
     "price_tier": "Price or price tier",
     "quantity": "Total number of bottles (integer)",
