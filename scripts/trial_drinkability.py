@@ -10,7 +10,7 @@ into background enrichment.
 
 Usage:
     source .env && WINEBOX_USE_CLAUDE_VISION=false \\
-        uv run python scripts/test_drinkability_trial.py
+        uv run python scripts/trial_drinkability.py
 
 Options:
     --sample-size N   Number of wines to sample (default: 10)

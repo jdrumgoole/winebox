@@ -8,7 +8,7 @@ the UI, and enrich the X-Wines reference data once for shared use.
 
 **Status**: trial complete, plan written, implementation deferred.
 
-**Trial results** (see `scripts/test_drinkability_trial.py`):
+**Trial results** (see `scripts/trial_drinkability.py`):
 - Claude Sonnet 4.5 produces well-calibrated drinkability estimates from
   X-Wines fields (grape, body, acidity, region, rating)
 - Haiku 4.5 is too optimistic — over-recommends ageing for mid-market wines
