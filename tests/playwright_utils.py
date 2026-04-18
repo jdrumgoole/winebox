@@ -132,9 +132,10 @@ def create_cli_worker_user(
 def preflight_check(timeout_seconds: int = 10) -> None:
     """Fail fast if the E2E test server is not reachable.
 
-    This performs a simple HTTP GET against the /health endpoint if available,
-    otherwise the root URL. Any failure raises pytest.skip with a clear message
-    so users immediately see that the server must be running.
+    Raises via ``pytest.fail`` rather than ``pytest.skip`` so a misconfigured
+    CI run doesn't silently no-op the whole E2E suite. Running the E2E
+    marker intentionally requires a live server — use ``pytest -m "not e2e"``
+    to skip these tests structurally.
     """
     start = time.time()
     urls = [f"{BASE_URL}/health", BASE_URL]
@@ -156,7 +157,7 @@ def preflight_check(timeout_seconds: int = 10) -> None:
     )
     if last_error is not None:
         msg += f" Last error: {last_error!r}"
-    pytest.skip(msg)
+    pytest.fail(msg)
 
 
 def login_via_ui(
