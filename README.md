@@ -65,16 +65,16 @@ See the [Configuration Guide](https://winebox.readthedocs.io/configuration.html)
 
 ```bash
 # Development mode with auto-reload
-invoke start --reload
+uv run python -m invoke start --reload
 
 # Background mode
-invoke start-background
+uv run python -m invoke start-background
 
 # Check status
-invoke status
+uv run python -m invoke status
 
 # Stop server
-invoke stop
+uv run python -m invoke stop
 ```
 
 ### Access the Application
@@ -335,16 +335,16 @@ See the [Deployment Guide](https://winebox.readthedocs.io/deployment.html) for f
 
 ```bash
 # Run all tests
-invoke test
+uv run python -m invoke test
 
 # With verbose output
-invoke test --verbose
+uv run python -m invoke test --verbose
 
 # With coverage
-invoke test --coverage
+uv run python -m invoke test --coverage
 
 # Run without Claude Vision (save API costs)
-WINEBOX_USE_CLAUDE_VISION=false invoke test
+WINEBOX_USE_CLAUDE_VISION=false uv run python -m invoke test
 ```
 
 ### Project Structure
@@ -369,8 +369,8 @@ winebox/
 ### Building Documentation
 
 ```bash
-invoke docs-build
-invoke docs-serve
+uv run python -m invoke docs-build
+uv run python -m invoke docs-serve
 ```
 
 ## Tech Stack

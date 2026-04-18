@@ -17,7 +17,7 @@ from fastapi.responses import Response
 
 from winebox.database import get_database
 from winebox.models import XWinesMetadata, XWinesWine
-from winebox.services.xwines_enrichment import _tokenize
+from winebox.services.xwines_enrichment import tokenize
 from winebox.schemas.export import ExportFormat
 from winebox.schemas.xwines import (
     FacetBucket,
@@ -63,7 +63,7 @@ def invalidate_filter_cache() -> None:
     _filter_cache["updated_at"] = 0.0
 
 
-async def _refresh_filter_cache() -> None:
+async def refresh_filter_cache() -> None:
     """Populate the types/countries cache from the database."""
     try:
         collection = XWinesWine.get_pymongo_collection()
@@ -155,9 +155,9 @@ async def _atlas_search(
     collection = db["xwines_wines"]
 
     # Split query into clean tokens - each term MUST appear (AND logic)
-    # _tokenize strips commas/punctuation so composite names like
+    # tokenize strips commas/punctuation so composite names like
     # "Chateau Lynch-Bages, Pauillac, Bordeaux" produce clean terms.
-    terms = _tokenize(q)
+    terms = tokenize(q)
 
     # Build term clauses for each token.
     # For short queries (<=3 terms) use must (AND all).
@@ -336,7 +336,7 @@ async def _regex_search(
     Results are combined and deduplicated, preserving priority order.
     """
     escaped_q = re.escape(q)
-    terms = _tokenize(q)
+    terms = tokenize(q)
 
     # Build filter conditions for wine_type and country
     filter_conditions: dict = {}
@@ -632,7 +632,7 @@ async def get_stats() -> XWinesStats:
 async def list_wine_types() -> list[str]:
     """List distinct wine types in the X-Wines dataset (cached)."""
     if not _cache_is_valid():
-        await _refresh_filter_cache()
+        await refresh_filter_cache()
     return _filter_cache["types"] or []
 
 
@@ -640,7 +640,7 @@ async def list_wine_types() -> list[str]:
 async def list_countries() -> list[dict]:
     """List countries with wine counts in the X-Wines dataset (cached)."""
     if not _cache_is_valid():
-        await _refresh_filter_cache()
+        await refresh_filter_cache()
     return _filter_cache["countries"] or []
 
 

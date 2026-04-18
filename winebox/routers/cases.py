@@ -55,18 +55,6 @@ class AddBottlesRequest(BaseModel):
     quantity: int = Field(..., ge=1, le=1000)
 
 
-class AddEventRequest(BaseModel):
-    """Request to record a bottle (wine) event."""
-
-    event_type: CellarEventType
-    event_date: Optional[datetime] = None
-    notes: Optional[str] = Field(None, max_length=2000)
-    tasting_notes: Optional[str] = Field(None, max_length=2000)
-    sale_price: Optional[float] = Field(None, ge=0)
-    buyer: Optional[str] = Field(None, max_length=500)
-    gift_recipient: Optional[str] = Field(None, max_length=500)
-
-
 class AddCaseEventRequest(BaseModel):
     """Request to record a case-level event (sold, gifted, etc.)."""
 
@@ -76,6 +64,12 @@ class AddCaseEventRequest(BaseModel):
     sale_price: Optional[float] = Field(None, ge=0)
     buyer: Optional[str] = Field(None, max_length=500)
     gift_recipient: Optional[str] = Field(None, max_length=500)
+
+
+class AddEventRequest(AddCaseEventRequest):
+    """Request to record a bottle (wine) event — adds tasting_notes."""
+
+    tasting_notes: Optional[str] = Field(None, max_length=2000)
 
 
 # ---------------------------------------------------------------------------

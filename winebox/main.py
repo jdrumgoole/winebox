@@ -203,8 +203,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Pre-warm the X-Wines filter cache so first page load is instant
     try:
-        from winebox.routers.xwines import _refresh_filter_cache
-        await _refresh_filter_cache()
+        from winebox.routers.xwines import refresh_filter_cache
+        await refresh_filter_cache()
     except Exception:
         logger.warning("Failed to pre-warm X-Wines filter cache (data may not be loaded yet)")
 

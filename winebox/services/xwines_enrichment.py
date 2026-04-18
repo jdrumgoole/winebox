@@ -180,7 +180,7 @@ async def _find_best_xwines_match(name: str) -> XWinesWine | None:
     Returns:
         Best matching XWinesWine, or None if no match found.
     """
-    terms = _tokenize(name)
+    terms = tokenize(name)
 
     # Try Atlas Search first with AND logic for all terms
     try:
@@ -314,7 +314,7 @@ def _normalize(s: str) -> str:
     )
 
 
-def _tokenize(s: str) -> list[str]:
+def tokenize(s: str) -> list[str]:
     """Split a string into search tokens, stripping punctuation.
 
     Splits on commas/semicolons first, then whitespace, and strips trailing
@@ -338,7 +338,7 @@ def _score_candidate(query_name: str, candidate: XWinesWine) -> float:
     Returns a float score; higher is better.  0 means no match.
     """
     q = _normalize(query_name)
-    q_terms = set(_tokenize(q))
+    q_terms = set(tokenize(q))
     c_name = _normalize(candidate.name or "")
     c_winery = _normalize(candidate.winery_name or "")
     score = 0.0

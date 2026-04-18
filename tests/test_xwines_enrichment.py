@@ -12,7 +12,7 @@ from winebox.config import settings
 from winebox.models import XWinesWine, Wine
 from winebox.services.xwines_enrichment import (
     _score_candidate,
-    _tokenize,
+    tokenize,
     enrich_parsed_with_xwines,
     parse_xwines_grapes,
 )
@@ -73,31 +73,31 @@ def test_parse_xwines_grapes_empty_list() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _tokenize
+# tokenize
 # ---------------------------------------------------------------------------
 
 
-def test_tokenize_composite_name() -> None:
+def testtokenize_composite_name() -> None:
     """Composite CSV-style name is split into clean tokens."""
-    result = _tokenize("Chateau Lynch-Bages, Pauillac, Bordeaux")
+    result = tokenize("Chateau Lynch-Bages, Pauillac, Bordeaux")
     assert result == ["Chateau", "Lynch-Bages", "Pauillac", "Bordeaux"]
 
 
-def test_tokenize_strips_trailing_punctuation() -> None:
+def testtokenize_strips_trailing_punctuation() -> None:
     """Trailing punctuation is removed from each token."""
-    result = _tokenize("Lynch-Bages, Pauillac;")
+    result = tokenize("Lynch-Bages, Pauillac;")
     assert result == ["Lynch-Bages", "Pauillac"]
 
 
-def test_tokenize_simple_name() -> None:
+def testtokenize_simple_name() -> None:
     """Simple space-separated name returns individual words."""
-    result = _tokenize("Chateau Margaux")
+    result = tokenize("Chateau Margaux")
     assert result == ["Chateau", "Margaux"]
 
 
-def test_tokenize_empty() -> None:
+def testtokenize_empty() -> None:
     """Empty string returns empty list."""
-    assert _tokenize("") == []
+    assert tokenize("") == []
 
 
 # ---------------------------------------------------------------------------

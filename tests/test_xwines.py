@@ -239,9 +239,9 @@ async def test_xwines_types_endpoint(client: AsyncClient, init_test_db) -> None:
         await wine.insert()
 
     # Invalidate cache and force refresh so freshly inserted data is picked up
-    from winebox.routers.xwines import invalidate_filter_cache, _refresh_filter_cache
+    from winebox.routers.xwines import invalidate_filter_cache, refresh_filter_cache
     invalidate_filter_cache()
-    await _refresh_filter_cache()
+    await refresh_filter_cache()
 
     response = await client.get("/api/xwines/types")
     assert response.status_code == 200
@@ -265,9 +265,9 @@ async def test_xwines_countries_endpoint(client: AsyncClient, init_test_db) -> N
         await wine.insert()
 
     # Invalidate cache and force refresh so freshly inserted data is picked up
-    from winebox.routers.xwines import invalidate_filter_cache, _refresh_filter_cache
+    from winebox.routers.xwines import invalidate_filter_cache, refresh_filter_cache
     invalidate_filter_cache()
-    await _refresh_filter_cache()
+    await refresh_filter_cache()
 
     response = await client.get("/api/xwines/countries")
     assert response.status_code == 200
