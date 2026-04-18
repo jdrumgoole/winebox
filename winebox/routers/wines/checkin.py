@@ -73,11 +73,21 @@ async def checkin_wine(
     # Only scan if no pre-scanned text was provided and no name given
     if not front_label_text and not name:
         logger.info("No pre-scanned text provided, scanning labels...")
+
+        await front_label.seek(0)
+        front_bytes = await front_label.read()
+        back_bytes: bytes | None = None
+        back_fname: str | None = None
+        if back_label and back_label.filename:
+            await back_label.seek(0)
+            back_bytes = await back_label.read()
+            back_fname = back_label.filename
+
         scanned = await scan_wine_labels(
-            front_label=front_label,
-            back_label=back_label,
-            front_image_path=front_image_path,
-            back_image_path=back_image_path,
+            front_data=front_bytes,
+            back_data=back_bytes,
+            front_filename=front_label.filename,
+            back_filename=back_fname,
             vision_service=vision_service,
             ocr_service=ocr_service,
             wine_parser=wine_parser,

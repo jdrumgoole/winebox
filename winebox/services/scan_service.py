@@ -1,25 +1,43 @@
 """Wine label scanning: dispatches between Claude Vision and Tesseract.
 
-Previously inlined in ``routers/wines/checkin.py`` as ~60 lines of
-branching logic. Centralising it here keeps the scan strategy in one
-place (so e.g. a future "always use Vision" or "prefer local OCR for
-offline deployments" change lands once) and makes the router a thin
-HTTP-plus-persistence layer.
+Centralises the "try Vision first, fall back to Tesseract if it's off
+or returned no usable name" strategy that both the /wines/scan endpoint
+(scan-only, no persistence) and the /wines/checkin endpoint
+(scan + persist) need.
+
+Inputs are raw bytes + a filename (for media-type inference) so the
+service is agnostic to whether the caller already saved the image to
+disk or kept it in memory.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import UploadFile
-
-from winebox.routers.wines._common import get_media_type
 from winebox.services.ocr import OCRService
 from winebox.services.vision import ClaudeVisionService
 from winebox.services.wine_parser import WineParserService
+
+
+# Inlined (rather than imported from routers.wines._common) to avoid a
+# circular import — scan_service is a dependency of the routers, not the
+# other way round.
+_MEDIA_TYPE_BY_EXT = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "gif": "image/gif",
+    "webp": "image/webp",
+}
+
+
+def _media_type_for(filename: str | None) -> str:
+    if not filename:
+        return "image/jpeg"
+    ext = filename.lower().rsplit(".", 1)[-1]
+    return _MEDIA_TYPE_BY_EXT.get(ext, "image/jpeg")
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +56,8 @@ class ScannedLabels:
     country: str | None = None
     classification: str | None = None
     alcohol_percentage: float | None = None
+    wine_type: str | None = None
+    xwines_id: int | None = None
     front_text: str = ""
     back_text: str | None = None
     method: str = "none"  # "claude_vision" | "tesseract" | "none"
@@ -45,50 +65,33 @@ class ScannedLabels:
 
 
 async def scan_wine_labels(
-    front_label: UploadFile,
-    back_label: UploadFile | None,
-    front_image_path: str,
-    back_image_path: str | None,
+    front_data: bytes,
+    back_data: bytes | None,
+    front_filename: str | None,
+    back_filename: str | None,
     vision_service: ClaudeVisionService,
     ocr_service: OCRService,
     wine_parser: WineParserService,
 ) -> ScannedLabels:
-    """Extract wine metadata from label images.
+    """Extract wine metadata from label image bytes.
 
     Prefers Claude Vision when available. On failure (or if Vision
-    returned no usable name) falls back to Tesseract OCR + the
-    heuristic wine parser. Reads the uploaded file payloads
-    concurrently so the Vision call doesn't block on I/O.
+    returned no usable name) falls back to Tesseract OCR on the same
+    bytes plus the heuristic wine parser.
     """
-    async def read_front() -> bytes:
-        await front_label.seek(0)
-        return await front_label.read()
-
-    async def read_back() -> bytes | None:
-        if back_label and back_label.filename:
-            await back_label.seek(0)
-            return await back_label.read()
-        return None
-
-    front_data, back_data = await asyncio.gather(read_front(), read_back())
-
     parsed_data: dict[str, Any] = {}
     front_text = ""
     back_text: str | None = None
     method = "none"
 
     if vision_service.is_available():
-        logger.info("Using Claude Vision for checkin analysis")
+        logger.info("Using Claude Vision for label analysis")
         try:
-            front_media_type = get_media_type(front_label.filename)
-            back_media_type = get_media_type(
-                back_label.filename if back_label else None
-            )
             result = await vision_service.analyze_labels(
                 front_image_data=front_data,
                 back_image_data=back_data,
-                front_media_type=front_media_type,
-                back_media_type=back_media_type,
+                front_media_type=_media_type_for(front_filename),
+                back_media_type=_media_type_for(back_filename),
             )
             parsed_data = result
             front_text = result.get("raw_text", "")
@@ -99,12 +102,12 @@ async def scan_wine_labels(
                 "Claude Vision failed, falling back to Tesseract: %s", exc
             )
 
-    # Fall back to Tesseract when Vision unavailable or yielded no name.
+    # Fall back to Tesseract when Vision is disabled or yielded no name.
     if not parsed_data.get("name"):
-        logger.info("Using Tesseract OCR for checkin analysis")
-        front_text = await ocr_service.extract_text(front_image_path)
-        if back_image_path:
-            back_text = await ocr_service.extract_text(back_image_path)
+        logger.info("Using Tesseract OCR for label analysis")
+        front_text = await ocr_service.extract_text_from_bytes(front_data)
+        if back_data is not None:
+            back_text = await ocr_service.extract_text_from_bytes(back_data)
 
         combined_text = front_text
         if back_text:
@@ -123,6 +126,8 @@ async def scan_wine_labels(
         country=parsed_data.get("country"),
         classification=parsed_data.get("classification"),
         alcohol_percentage=parsed_data.get("alcohol_percentage"),
+        wine_type=parsed_data.get("wine_type"),
+        xwines_id=parsed_data.get("xwines_id"),
         front_text=front_text,
         back_text=back_text,
         method=method,

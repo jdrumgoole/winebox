@@ -8,10 +8,10 @@ from fastapi import File, Request, UploadFile
 
 from winebox.services.auth import RequireAuth
 from winebox.services.rate_limit import make_limiter
+from winebox.services.scan_service import scan_wine_labels
 from winebox.services.xwines_enrichment import enrich_parsed_with_xwines
 
 from ._common import (
-    get_media_type,
     ocr_service,
     validate_upload_size,
     vision_service,
@@ -22,6 +22,24 @@ logger = logging.getLogger(__name__)
 
 # Vision-bound and cost-bound — every scan can hit Claude.
 limiter = make_limiter()
+
+
+# Parsed fields that the /scan response exposes. Centralised so any
+# future additions land in the response dict without code duplication.
+_PARSED_KEYS = (
+    "name",
+    "winery",
+    "vintage",
+    "grape_variety",
+    "region",
+    "sub_region",
+    "appellation",
+    "country",
+    "classification",
+    "alcohol_percentage",
+    "wine_type",
+    "xwines_id",
+)
 
 
 @limiter.limit("20/minute;200/hour")
@@ -47,92 +65,25 @@ async def scan_label(
 
     front_data, back_data = await asyncio.gather(validate_front(), validate_back())
 
-    # Try Claude Vision first
-    if vision_service.is_available():
-        logger.info("Using Claude Vision for label analysis")
-        try:
-            front_media_type = get_media_type(front_label.filename)
-            back_media_type = get_media_type(back_label.filename if back_label else None)
+    scanned = await scan_wine_labels(
+        front_data=front_data,
+        back_data=back_data,
+        front_filename=front_label.filename,
+        back_filename=back_label.filename if back_label else None,
+        vision_service=vision_service,
+        ocr_service=ocr_service,
+        wine_parser=wine_parser,
+    )
 
-            result = await vision_service.analyze_labels(
-                front_image_data=front_data,
-                back_image_data=back_data,
-                front_media_type=front_media_type,
-                back_media_type=back_media_type,
-            )
-
-            # Build parsed dict and enrich with X-Wines data
-            parsed = {
-                "name": result.get("name"),
-                "winery": result.get("winery"),
-                "vintage": result.get("vintage"),
-                "grape_variety": result.get("grape_variety"),
-                "region": result.get("region"),
-                "sub_region": result.get("sub_region"),
-                "appellation": result.get("appellation"),
-                "country": result.get("country"),
-                "classification": result.get("classification"),
-                "alcohol_percentage": result.get("alcohol_percentage"),
-            }
-            parsed = await enrich_parsed_with_xwines(parsed)
-
-            return {
-                "parsed": {
-                    "name": parsed.get("name"),
-                    "winery": parsed.get("winery"),
-                    "vintage": parsed.get("vintage"),
-                    "grape_variety": parsed.get("grape_variety"),
-                    "region": parsed.get("region"),
-                    "sub_region": parsed.get("sub_region"),
-                    "appellation": parsed.get("appellation"),
-                    "country": parsed.get("country"),
-                    "classification": parsed.get("classification"),
-                    "alcohol_percentage": parsed.get("alcohol_percentage"),
-                    "wine_type": parsed.get("wine_type"),
-                    "xwines_id": parsed.get("xwines_id"),
-                },
-                "ocr": {
-                    "front_label_text": result.get("raw_text", ""),
-                    "back_label_text": result.get("back_label_text"),
-                },
-                "method": "claude_vision",
-            }
-        except Exception as e:
-            logger.warning(f"Claude Vision failed, falling back to Tesseract: {e}")
-
-    # Fall back to Tesseract OCR
-    logger.info("Using Tesseract OCR for label analysis")
-    front_text = await ocr_service.extract_text_from_bytes(front_data)
-
-    back_text = None
-    if back_data:
-        back_text = await ocr_service.extract_text_from_bytes(back_data)
-
-    # Parse wine details from OCR text
-    combined_text = front_text
-    if back_text:
-        combined_text = f"{front_text}\n{back_text}"
-    parsed_data = wine_parser.parse(combined_text)
-    parsed_data = await enrich_parsed_with_xwines(parsed_data)
+    # Enrich with X-Wines reference data (fills missing fields only).
+    parsed = {k: scanned.parsed_data.get(k) for k in _PARSED_KEYS}
+    parsed = await enrich_parsed_with_xwines(parsed)
 
     return {
-        "parsed": {
-            "name": parsed_data.get("name"),
-            "winery": parsed_data.get("winery"),
-            "vintage": parsed_data.get("vintage"),
-            "grape_variety": parsed_data.get("grape_variety"),
-            "region": parsed_data.get("region"),
-            "sub_region": parsed_data.get("sub_region"),
-            "appellation": parsed_data.get("appellation"),
-            "country": parsed_data.get("country"),
-            "classification": parsed_data.get("classification"),
-            "alcohol_percentage": parsed_data.get("alcohol_percentage"),
-            "wine_type": parsed_data.get("wine_type"),
-            "xwines_id": parsed_data.get("xwines_id"),
-        },
+        "parsed": {k: parsed.get(k) for k in _PARSED_KEYS},
         "ocr": {
-            "front_label_text": front_text,
-            "back_label_text": back_text,
+            "front_label_text": scanned.front_text,
+            "back_label_text": scanned.back_text,
         },
-        "method": "tesseract",
+        "method": scanned.method,
     }

@@ -53,7 +53,7 @@ async def test_checkin_enriches_empty_fields(
          patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
          patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
-        mock_ocr.extract_text = AsyncMock(return_value=wine_name)
+        mock_ocr.extract_text_from_bytes = AsyncMock(return_value=wine_name)
         mock_parser.parse.return_value = {"name": wine_name}
 
         response = await client.post(
@@ -98,7 +98,7 @@ async def test_checkin_enrichment_preserves_existing_values(
          patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
          patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
-        mock_ocr.extract_text = AsyncMock(return_value=wine_name)
+        mock_ocr.extract_text_from_bytes = AsyncMock(return_value=wine_name)
         mock_parser.parse.return_value = {"name": wine_name}
 
         response = await client.post(
@@ -146,7 +146,7 @@ async def test_checkin_no_enrichment_when_no_match(
          patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
          patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
-        mock_ocr.extract_text = AsyncMock(return_value="Totally Unknown Wine XYZZY")
+        mock_ocr.extract_text_from_bytes = AsyncMock(return_value="Totally Unknown Wine XYZZY")
         mock_parser.parse.return_value = {"name": "Totally Unknown Wine XYZZY"}
 
         response = await client.post(
@@ -179,7 +179,7 @@ async def test_enriched_fields_in_wine_detail_api(
          patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
          patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
-        mock_ocr.extract_text = AsyncMock(return_value=wine_name)
+        mock_ocr.extract_text_from_bytes = AsyncMock(return_value=wine_name)
         mock_parser.parse.return_value = {"name": wine_name}
 
         checkin_resp = await client.post(
@@ -218,7 +218,7 @@ async def test_checkin_enrichment_persisted_in_db(
          patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
          patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
-        mock_ocr.extract_text = AsyncMock(return_value=wine_name)
+        mock_ocr.extract_text_from_bytes = AsyncMock(return_value=wine_name)
         mock_parser.parse.return_value = {"name": wine_name}
 
         response = await client.post(
