@@ -30,7 +30,7 @@ def _navigate_to_checkin(page: Page) -> None:
     page.click("a[data-page='met']")
     page.wait_for_selector("#page-met", state="visible", timeout=10000)
     page.click("#met-record-wine-btn")
-    page.wait_for_selector("#page-checkin", state="visible", timeout=15000)
+    page.wait_for_selector("#page-record-wine", state="visible", timeout=15000)
 
 # Test data directory containing wine label images
 TEST_DATA_DIR = Path(__file__).parent / "data" / "wine_labels"
@@ -109,7 +109,7 @@ class TestCheckinFlow:
         _navigate_to_checkin(page)
 
         # Should show checkin page
-        expect(page.locator("#page-checkin")).to_be_visible()
+        expect(page.locator("#page-record-wine")).to_be_visible()
         expect(page.locator("#front-label")).to_be_visible()
 
     def test_upload_image_triggers_scan(self, authenticated_page: Page, wine_images: list[Path]) -> None:
@@ -145,14 +145,14 @@ class TestCheckinFlow:
         page.wait_for_timeout(3000)
 
         # Click Record Wine button
-        page.click("#checkin-form button[type='submit']")
+        page.click("#record-wine-form button[type='submit']")
 
         # Confirmation dialog should appear
-        expect(page.locator("#checkin-confirm-modal")).to_have_class(re.compile(r"active"))
+        expect(page.locator("#record-wine-confirm-modal")).to_have_class(re.compile(r"active"))
 
         # Save and Cancel buttons should be visible
-        expect(page.locator("#checkin-confirm-btn")).to_be_visible()
-        expect(page.locator("#checkin-cancel-btn")).to_be_visible()
+        expect(page.locator("#record-wine-confirm-btn")).to_be_visible()
+        expect(page.locator("#record-wine-cancel-btn")).to_be_visible()
 
     def test_cancel_closes_dialog_without_saving(
         self, authenticated_page: Page, wine_images: list[Path]
@@ -169,19 +169,19 @@ class TestCheckinFlow:
         page.wait_for_timeout(3000)
 
         # Click Record Wine
-        page.click("#checkin-form button[type='submit']")
+        page.click("#record-wine-form button[type='submit']")
 
         # Wait for confirmation dialog
-        page.wait_for_selector("#checkin-confirm-modal.active", state="visible")
+        page.wait_for_selector("#record-wine-confirm-modal.active", state="visible")
 
         # Click Cancel
-        page.click("#checkin-cancel-btn")
+        page.click("#record-wine-cancel-btn")
 
         # Dialog should close
-        expect(page.locator("#checkin-confirm-modal")).not_to_have_class(re.compile(r"active"))
+        expect(page.locator("#record-wine-confirm-modal")).not_to_have_class(re.compile(r"active"))
 
         # Should still be on checkin page
-        expect(page.locator("#page-checkin")).to_be_visible()
+        expect(page.locator("#page-record-wine")).to_be_visible()
 
     def test_confirm_saves_wine_to_met(
         self, authenticated_page: Page, wine_images: list[Path]
@@ -201,13 +201,13 @@ class TestCheckinFlow:
         page.fill("#wine-name", f"E2E Test Wine - {image_path.stem}")
 
         # Click Record Wine
-        page.click("#checkin-form button[type='submit']")
+        page.click("#record-wine-form button[type='submit']")
 
         # Wait for confirmation dialog
-        page.wait_for_selector("#checkin-confirm-modal.active", state="visible")
+        page.wait_for_selector("#record-wine-confirm-modal.active", state="visible")
 
         # Click Save
-        page.click("#checkin-confirm-btn")
+        page.click("#record-wine-confirm-btn")
 
         # Should navigate to met page after successful record
         page.wait_for_selector("#page-met", state="visible", timeout=10000)
@@ -230,8 +230,8 @@ class TestCheckinFlow:
         page.fill("#wine-name", "Initial Name")
 
         # Open confirmation dialog
-        page.click("#checkin-form button[type='submit']")
-        page.wait_for_selector("#checkin-confirm-modal.active", state="visible")
+        page.click("#record-wine-form button[type='submit']")
+        page.wait_for_selector("#record-wine-confirm-modal.active", state="visible")
 
         # Edit fields in the confirmation dialog
         confirm_name_field = page.locator("#confirm-wine-name")
@@ -241,7 +241,7 @@ class TestCheckinFlow:
         confirm_name_field.fill("Modified Name in Dialog")
 
         # Click Save
-        page.click("#checkin-confirm-btn")
+        page.click("#record-wine-confirm-btn")
 
         # Wait for save and navigation to met page
         page.wait_for_selector("#page-met", state="visible", timeout=10000)
@@ -278,10 +278,10 @@ class TestWineImageUploads:
         page.wait_for_timeout(2000)
 
         # Click Record Wine
-        page.click("#checkin-form button[type='submit']")
+        page.click("#record-wine-form button[type='submit']")
 
         # Confirmation dialog should appear
-        expect(page.locator("#checkin-confirm-modal")).to_have_class(re.compile(r"active"))
+        expect(page.locator("#record-wine-confirm-modal")).to_have_class(re.compile(r"active"))
 
         # Cancel to clean up (don't actually save during parameterized tests)
-        page.click("#checkin-cancel-btn")
+        page.click("#record-wine-cancel-btn")

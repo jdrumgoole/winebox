@@ -240,10 +240,10 @@
         <!-- Dashboard removed — analytics are now on the My Cellar page -->
 
         <!-- Check In Page -->
-        <section id="page-checkin" class="page" aria-labelledby="page-checkin-title">
-            <h2 id="page-checkin-title">Add Wine</h2>
+        <section id="page-record-wine" class="page" aria-labelledby="page-record-wine-title">
+            <h2 id="page-record-wine-title">Add Wine</h2>
             <p class="page-subtitle">Scan a label to record a wine you've encountered</p>
-            <form id="checkin-form" enctype="multipart/form-data">
+            <form id="record-wine-form" enctype="multipart/form-data">
                 <div class="form-section">
                     <h3>Label Images</h3>
                     <div class="image-upload-grid">
@@ -1326,17 +1326,17 @@
     </div>
 
     <!-- Checkin Confirmation Modal -->
-    <div id="checkin-confirm-modal" class="modal">
+    <div id="record-wine-confirm-modal" class="modal">
         <div class="modal-content modal-large">
             <span class="modal-close">&times;</span>
-            <div class="checkin-confirm">
-                <div class="checkin-confirm-header">
+            <div class="record-wine-confirm">
+                <div class="record-wine-confirm-header">
                     <h3>Confirm Wine Details</h3>
-                    <p class="checkin-confirm-subtitle">Review and edit the details before saving</p>
+                    <p class="record-wine-confirm-subtitle">Review and edit the details before saving</p>
                 </div>
-                <div class="checkin-confirm-content">
-                    <div class="checkin-confirm-image" id="checkin-confirm-image"></div>
-                    <div class="checkin-confirm-form">
+                <div class="record-wine-confirm-content">
+                    <div class="record-wine-confirm-image" id="record-wine-confirm-image"></div>
+                    <div class="record-wine-confirm-form">
                         <div class="form-grid">
                             <div class="form-group">
                                 <label for="confirm-wine-name">Wine Name</label>
@@ -1424,7 +1424,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="checkin-confirm-ocr collapsible" id="confirm-ocr-section" style="display: none;">
+                <div class="record-wine-confirm-ocr collapsible" id="confirm-ocr-section" style="display: none;">
                     <div class="collapsible-header" id="confirm-ocr-toggle">
                         <span class="label">Show Raw Label Text</span>
                         <span class="collapse-icon">+</span>
@@ -1433,11 +1433,11 @@
                         <div class="ocr-text-container">
                             <div class="ocr-section">
                                 <strong>Front Label:</strong>
-                                <pre id="checkin-confirm-front-ocr"></pre>
+                                <pre id="record-wine-confirm-front-ocr"></pre>
                             </div>
-                            <div class="ocr-section" id="checkin-confirm-back-ocr-section" style="display: none;">
+                            <div class="ocr-section" id="record-wine-confirm-back-ocr-section" style="display: none;">
                                 <strong>Back Label:</strong>
-                                <pre id="checkin-confirm-back-ocr"></pre>
+                                <pre id="record-wine-confirm-back-ocr"></pre>
                             </div>
                         </div>
                     </div>
@@ -1447,8 +1447,8 @@
                     <input type="number" id="confirm-quantity" min="1" max="9999" value="1" style="width:6rem;">
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-primary" id="checkin-confirm-btn">Save</button>
-                    <button type="button" class="btn btn-secondary" id="checkin-cancel-btn">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="record-wine-confirm-btn">Save</button>
+                    <button type="button" class="btn btn-secondary" id="record-wine-cancel-btn">Cancel</button>
                 </div>
             </div>
         </div>
