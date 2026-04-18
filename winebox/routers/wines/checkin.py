@@ -1,6 +1,5 @@
 """Wine check-in and check-out endpoints."""
 
-import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -12,6 +11,7 @@ from winebox.models import InventoryInfo, RemovalReason, Transaction, Transactio
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.analytics import posthog_service
 from winebox.services.auth import RequireAuth
+from winebox.services.scan_service import scan_wine_labels
 from winebox.services.xwines_enrichment import enrich_parsed_with_xwines
 
 from ._common import (
@@ -19,7 +19,6 @@ from ._common import (
     MAX_NAME_LENGTH,
     MAX_NOTES_LENGTH,
     MAX_OCR_TEXT_LENGTH,
-    get_media_type,
     get_wine_or_404,
     image_storage,
     ocr_service,
@@ -74,64 +73,29 @@ async def checkin_wine(
     # Only scan if no pre-scanned text was provided and no name given
     if not front_label_text and not name:
         logger.info("No pre-scanned text provided, scanning labels...")
+        scanned = await scan_wine_labels(
+            front_label=front_label,
+            back_label=back_label,
+            front_image_path=front_image_path,
+            back_image_path=back_image_path,
+            vision_service=vision_service,
+            ocr_service=ocr_service,
+            wine_parser=wine_parser,
+        )
+        front_text = scanned.front_text
+        back_text = scanned.back_text
 
-        # Read image data for analysis concurrently
-        async def read_front() -> bytes:
-            await front_label.seek(0)
-            return await front_label.read()
-
-        async def read_back() -> bytes | None:
-            if back_label and back_label.filename:
-                await back_label.seek(0)
-                return await back_label.read()
-            return None
-
-        front_data, back_data = await asyncio.gather(read_front(), read_back())
-
-        # Try Claude Vision first
-        parsed_data = {}
-
-        if vision_service.is_available():
-            logger.info("Using Claude Vision for checkin analysis")
-            try:
-                front_media_type = get_media_type(front_label.filename)
-                back_media_type = get_media_type(back_label.filename if back_label else None)
-
-                result = await vision_service.analyze_labels(
-                    front_image_data=front_data,
-                    back_image_data=back_data,
-                    front_media_type=front_media_type,
-                    back_media_type=back_media_type,
-                )
-                parsed_data = result
-                front_text = result.get("raw_text", "")
-                back_text = result.get("back_label_text")
-            except Exception as e:
-                logger.warning(f"Claude Vision failed, falling back to Tesseract: {e}")
-
-        # Fall back to Tesseract if needed
-        if not parsed_data.get("name"):
-            logger.info("Using Tesseract OCR for checkin analysis")
-            front_text = await ocr_service.extract_text(front_image_path)
-            if back_image_path:
-                back_text = await ocr_service.extract_text(back_image_path)
-
-            combined_text = front_text
-            if back_text:
-                combined_text = f"{front_text}\n{back_text}"
-            parsed_data = wine_parser.parse(combined_text)
-
-        # Use parsed values for fields not provided
-        name = name or parsed_data.get("name")
-        winery = winery or parsed_data.get("winery")
-        vintage = vintage or parsed_data.get("vintage")
-        grape_variety = grape_variety or parsed_data.get("grape_variety")
-        region = region or parsed_data.get("region")
-        sub_region = sub_region or parsed_data.get("sub_region")
-        appellation = appellation or parsed_data.get("appellation")
-        country = country or parsed_data.get("country")
-        classification = classification or parsed_data.get("classification")
-        alcohol_percentage = alcohol_percentage or parsed_data.get("alcohol_percentage")
+        # Fill any caller-omitted field with whatever the scan recovered.
+        name = name or scanned.name
+        winery = winery or scanned.winery
+        vintage = vintage or scanned.vintage
+        grape_variety = grape_variety or scanned.grape_variety
+        region = region or scanned.region
+        sub_region = sub_region or scanned.sub_region
+        appellation = appellation or scanned.appellation
+        country = country or scanned.country
+        classification = classification or scanned.classification
+        alcohol_percentage = alcohol_percentage or scanned.alcohol_percentage
 
     # Enrich with X-Wines reference data (fills empty fields only)
     enrichment_input = {
