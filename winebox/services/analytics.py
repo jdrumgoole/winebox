@@ -81,7 +81,7 @@ class PostHogService:
 
         Args:
             distinct_id: Unique identifier for the user (typically user ID).
-            event: Event name (e.g., "user_login", "wine_checkin").
+            event: Event name (e.g., "user_login", "wine_added").
             properties: Optional dictionary of event properties.
         """
         if not self._ensure_initialized():

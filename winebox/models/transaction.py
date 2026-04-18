@@ -10,10 +10,14 @@ from winebox.db import MongoDocument, PyObjectId
 
 
 class TransactionType(str, enum.Enum):
-    """Type of transaction."""
+    """Type of transaction.
 
-    CHECK_IN = "CHECK_IN"
-    CHECK_OUT = "CHECK_OUT"
+    Values match ``CellarEventType.ADDED`` / ``.REMOVED`` so audit queries
+    across the two collections can use the same token set.
+    """
+
+    ADDED = "ADDED"
+    REMOVED = "REMOVED"
 
 
 class RemovalReason(str, enum.Enum):
@@ -36,7 +40,7 @@ class Transaction(MongoDocument):
     transaction_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    # Removal metadata (only for CHECK_OUT transactions)
+    # Removal metadata (only valid when transaction_type is REMOVED)
     removal_reason: Optional[RemovalReason] = None
     tasting_notes: Optional[str] = None
     sale_price_usd: Optional[float] = Field(default=None, ge=0)
@@ -46,17 +50,17 @@ class Transaction(MongoDocument):
     @model_validator(mode="after")
     def validate_removal_fields(self) -> "Transaction":
         """Enforce cross-field validation for removal metadata."""
-        if self.transaction_type == TransactionType.CHECK_IN:
+        if self.transaction_type == TransactionType.ADDED:
             if self.removal_reason is not None:
-                raise ValueError("removal_reason is only valid for CHECK_OUT transactions")
+                raise ValueError("removal_reason is only valid for REMOVED transactions")
             if self.tasting_notes is not None:
-                raise ValueError("tasting_notes is only valid for CHECK_OUT transactions")
+                raise ValueError("tasting_notes is only valid for REMOVED transactions")
             if self.sale_price_usd is not None:
-                raise ValueError("sale_price_usd is only valid for CHECK_OUT transactions")
+                raise ValueError("sale_price_usd is only valid for REMOVED transactions")
             if self.gift_recipient is not None:
-                raise ValueError("gift_recipient is only valid for CHECK_OUT transactions")
+                raise ValueError("gift_recipient is only valid for REMOVED transactions")
             if self.removal_notes is not None:
-                raise ValueError("removal_notes is only valid for CHECK_OUT transactions")
+                raise ValueError("removal_notes is only valid for REMOVED transactions")
 
         if self.removal_reason == RemovalReason.SELL and self.sale_price_usd is None:
             raise ValueError("sale_price_usd is required when removal_reason is SELL")

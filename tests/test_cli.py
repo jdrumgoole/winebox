@@ -256,7 +256,7 @@ class TestPurgeData:
         transaction = Transaction(
             owner_id=TEST_OWNER_ID,
             wine_id=wine.id,
-            transaction_type=TransactionType.CHECK_IN,
+            transaction_type=TransactionType.ADDED,
             quantity=3,
             created_at=datetime.now(timezone.utc),
         )
@@ -303,7 +303,7 @@ class TestPurgeData:
         transaction = Transaction(
             owner_id=user.id,
             wine_id=wine.id,
-            transaction_type=TransactionType.CHECK_IN,
+            transaction_type=TransactionType.ADDED,
             quantity=1,
             created_at=datetime.now(timezone.utc),
         )
@@ -387,7 +387,7 @@ class TestPurgeData:
             transaction = Transaction(
                 owner_id=user.id,
                 wine_id=wine.id,
-                transaction_type=TransactionType.CHECK_IN,
+                transaction_type=TransactionType.ADDED,
                 quantity=1,
                 created_at=datetime.now(timezone.utc),
             )
@@ -442,7 +442,7 @@ class TestPurgeData:
         transaction = Transaction(
             owner_id=user.id,
             wine_id=wine.id,
-            transaction_type=TransactionType.CHECK_IN,
+            transaction_type=TransactionType.ADDED,
             quantity=1,
             created_at=datetime.now(timezone.utc),
         )

@@ -232,7 +232,7 @@ async def _flush_wine_batch(
         Transaction(
             owner_id=owner_id,
             wine_id=w.id,
-            transaction_type=TransactionType.CHECK_IN,
+            transaction_type=TransactionType.ADDED,
             quantity=q,
             transaction_date=ca,
             created_at=ca,
@@ -372,7 +372,7 @@ async def install_demo_data(owner_id: PyObjectId, sample_wines: list[dict[str, A
         checkout_txns.append(Transaction(
             owner_id=owner_id,
             wine_id=wine_id,
-            transaction_type=TransactionType.CHECK_OUT,
+            transaction_type=TransactionType.REMOVED,
             quantity=qty,
             notes=notes,
             transaction_date=checkout_date,

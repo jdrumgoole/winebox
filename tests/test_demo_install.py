@@ -150,7 +150,7 @@ async def test_install_twice_blocked(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_demo_creates_transactions(client: AsyncClient) -> None:
-    """Test that demo wines create CHECK_IN transactions."""
+    """Test that demo wines create ADDED transactions."""
     await _ensure_no_demo(client)
 
     await client.post("/api/demo/install")
@@ -159,6 +159,6 @@ async def test_demo_creates_transactions(client: AsyncClient) -> None:
     txn_resp = await client.get("/api/transactions?limit=100")
     transactions = txn_resp.json()
     assert len(transactions) > 0
-    assert any(t["transaction_type"] == "CHECK_IN" for t in transactions)
+    assert any(t["transaction_type"] == "ADDED" for t in transactions)
 
     await client.delete("/api/demo/remove")

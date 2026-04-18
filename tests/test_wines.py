@@ -122,7 +122,7 @@ async def test_get_wine_detail(client: AsyncClient, sample_image_bytes: bytes) -
     assert wine["name"] == "Test Wine"
     assert wine["inventory"]["quantity"] == 3
     assert len(wine["transactions"]) == 1
-    assert wine["transactions"][0]["transaction_type"] == "CHECK_IN"
+    assert wine["transactions"][0]["transaction_type"] == "ADDED"
 
 
 @pytest.mark.asyncio

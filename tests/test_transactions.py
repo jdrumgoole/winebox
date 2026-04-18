@@ -30,7 +30,7 @@ async def test_list_transactions(client: AsyncClient, sample_image_bytes: bytes)
 
     transactions = response.json()
     assert len(transactions) == 1
-    assert transactions[0]["transaction_type"] == "CHECK_IN"
+    assert transactions[0]["transaction_type"] == "ADDED"
     assert transactions[0]["quantity"] == 3
 
 
@@ -48,19 +48,19 @@ async def test_filter_transactions_by_type(client: AsyncClient, sample_image_byt
     # Check out some
     await client.post(f"/api/wines/{wine_id}/checkout", data={"quantity": "2"})
 
-    # Filter by CHECK_IN
-    response = await client.get("/api/transactions?transaction_type=CHECK_IN")
+    # Filter by ADDED
+    response = await client.get("/api/transactions?transaction_type=ADDED")
     assert response.status_code == 200
     transactions = response.json()
     assert len(transactions) == 1
-    assert all(t["transaction_type"] == "CHECK_IN" for t in transactions)
+    assert all(t["transaction_type"] == "ADDED" for t in transactions)
 
-    # Filter by CHECK_OUT
-    response = await client.get("/api/transactions?transaction_type=CHECK_OUT")
+    # Filter by REMOVED
+    response = await client.get("/api/transactions?transaction_type=REMOVED")
     assert response.status_code == 200
     transactions = response.json()
     assert len(transactions) == 1
-    assert all(t["transaction_type"] == "CHECK_OUT" for t in transactions)
+    assert all(t["transaction_type"] == "REMOVED" for t in transactions)
 
 
 @pytest.mark.asyncio
@@ -83,7 +83,7 @@ async def test_get_transaction_detail(client: AsyncClient, sample_image_bytes: b
 
     transaction = response.json()
     assert transaction["id"] == transaction_id
-    assert transaction["transaction_type"] == "CHECK_IN"
+    assert transaction["transaction_type"] == "ADDED"
 
 
 @pytest.mark.asyncio
