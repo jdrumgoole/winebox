@@ -44,10 +44,19 @@ function getTokenStorage() {
     return localStorage.getItem('winebox_remember') === 'true' ? localStorage : sessionStorage;
 }
 
+// Read the current auth token from storage. Checked on each call so
+// SSE handlers that fire after login see the freshly-saved value.
+// Prefer fetchWithAuth() for regular HTTP requests; this helper exists
+// for the few places that need the raw string (SSE via fetch+ReadableStream,
+// since EventSource doesn't support Authorization headers).
+function getAuthToken() {
+    return localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
+}
+
 // State
 let currentPage = 'dashboard';
 let isHandlingPopState = false;
-let authToken = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
+let authToken = getAuthToken();
 let currentUser = null;
 let lastScanResult = null;  // Store last scan result to avoid rescanning on checkin
 let cellarViewMode = 'cards';
@@ -5560,7 +5569,7 @@ function startEnrichmentProgress() {
     toast.textContent = 'Enriching wines with reference data...';
     container.appendChild(toast);
 
-    const token = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
+    const token = getAuthToken();
 
     // Use fetch + ReadableStream for SSE since EventSource doesn't support auth headers
     fetch(`${API_BASE}/wines/enrichment-progress`, {
@@ -5632,7 +5641,7 @@ function startDashboardEnrichmentProgress(batchId) {
 
     container.style.display = 'block';
 
-    const token = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
+    const token = getAuthToken();
 
     fetch(`${API_BASE}/wines/enrichment-progress`, {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -6407,7 +6416,7 @@ async function installDemoData() {
         const total = result.total;
 
         // Follow progress via SSE
-        const token = localStorage.getItem('winebox_token') || sessionStorage.getItem('winebox_token');
+        const token = getAuthToken();
         const progressResponse = await fetch(`${API_BASE}/demo/install/progress`, {
             headers: { 'Authorization': `Bearer ${token}` },
         });
