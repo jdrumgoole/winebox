@@ -68,15 +68,20 @@ def test_user(worker_user: tuple[str, str]) -> tuple[str, str]:
 
 @pytest.fixture
 def wine_images() -> list[Path]:
-    """Return list of wine label image paths from test data."""
+    """Return list of wine label image paths from test data.
+
+    The wine labels in tests/data/wine_labels/ are committed to the repo
+    — a missing directory or empty listing means the checkout is broken,
+    not that the test should be skipped. Fail loudly.
+    """
     if not TEST_DATA_DIR.exists():
-        pytest.skip(f"Test data directory not found: {TEST_DATA_DIR}")
+        pytest.fail(f"Test data directory not found: {TEST_DATA_DIR}")
 
     images = list(TEST_DATA_DIR.glob("*"))
     images = [img for img in images if img.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")]
 
     if not images:
-        pytest.skip(f"No wine images found in {TEST_DATA_DIR}")
+        pytest.fail(f"No wine images found in {TEST_DATA_DIR}")
 
     return images
 
@@ -261,7 +266,7 @@ class TestWineImageUploads:
         """Test uploading a specific wine label image."""
         image_path = TEST_DATA_DIR / image_name
         if not image_path.exists():
-            pytest.skip(f"Image not found: {image_path}")
+            pytest.fail(f"Image not found: {image_path}")
 
         page = authenticated_page
 
