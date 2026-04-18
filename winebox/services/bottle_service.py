@@ -3,9 +3,20 @@
 Whenever wine bottles enter the cellar (checkin, import, demo, met-to-cellar),
 this service creates CellarItem documents (one per case or loose bottle)
 and corresponding CellarEvent records.
+
+The import pipeline batches thousands of rows per round-trip, so the shape
+below is split into two layers:
+
+- :func:`build_cellar_items_and_events` — pure function, no DB access.
+  Returns the records to insert so callers can accumulate many wines'
+  worth and issue a single ``insert_many``.
+- :func:`create_cellar_items_for_wine` — convenience wrapper that calls
+  the builder and inserts. Used by the one-wine-at-a-time paths
+  (checkin, add-to-cellar, case add-via-API).
 """
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -17,6 +28,14 @@ from winebox.models.cellar_event import CellarEvent, CellarEventType
 from winebox.models.wine import Wine
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CellarRecords:
+    """The CellarItem + CellarEvent pair produced for one wine addition."""
+
+    items: list[CellarItem]
+    events: list[CellarEvent]
 
 
 def _wine_to_embedded(wine: Wine) -> EmbeddedWine:
@@ -36,6 +55,77 @@ def _wine_to_embedded(wine: Wine) -> EmbeddedWine:
     )
 
 
+def build_cellar_items_and_events(
+    owner_id: PyObjectId,
+    wine: Wine,
+    quantity: int,
+    case_size: Optional[int] = None,
+    num_cases: int = 1,
+    purchase_date: Optional[datetime] = None,
+    purchase_price: Optional[float] = None,
+    provenance: Optional[str] = None,
+    created_at: Optional[datetime] = None,
+    import_batch_id: Optional[PyObjectId] = None,
+) -> CellarRecords:
+    """Build CellarItem + CellarEvent records without inserting them.
+
+    Rules:
+      - ``case_size`` set and positive → ``num_cases`` cases plus a loose
+        remainder for any bottles beyond ``num_cases * case_size``.
+      - ``case_size`` unset → one loose-bottle item holding all ``quantity``.
+
+    The ``import_batch_id`` tag on every record is what lets
+    ``batch_ops.rollback_batch`` undo the cellar side of an import.
+    """
+    now = created_at or datetime.now(timezone.utc)
+    embedded_wine = _wine_to_embedded(wine)
+    items: list[CellarItem] = []
+    events: list[CellarEvent] = []
+
+    def _add(item_type: str, qty: int, **extra: Any) -> None:
+        item_id = ObjectId()
+        items.append(CellarItem(
+            id=item_id,
+            cellar_id=owner_id,
+            item_type=item_type,
+            wine=embedded_wine,
+            quantity=qty,
+            import_batch_id=import_batch_id,
+            created_at=now,
+            updated_at=now,
+            **extra,
+        ))
+        events.append(CellarEvent(
+            cellar_id=owner_id,
+            cellar_item_id=item_id,
+            item_type=item_type,
+            event_type=CellarEventType.ADDED,
+            quantity=qty,
+            import_batch_id=import_batch_id,
+            event_date=now,
+            created_at=now,
+        ))
+
+    if case_size and case_size > 0:
+        for _ in range(num_cases):
+            _add(
+                "case", case_size,
+                case_size=case_size,
+                purchase_price=purchase_price,
+                purchase_date=purchase_date,
+                provenance=provenance,
+            )
+
+        # 14 bottles with case_size=12 → 1 case + 2 loose
+        loose_remainder = quantity - (num_cases * case_size)
+        if loose_remainder > 0:
+            _add("bottle", loose_remainder)
+    else:
+        _add("bottle", quantity)
+
+    return CellarRecords(items=items, events=events)
+
+
 async def create_cellar_items_for_wine(
     owner_id: PyObjectId,
     wine: Wine,
@@ -48,122 +138,46 @@ async def create_cellar_items_for_wine(
     created_at: Optional[datetime] = None,
     import_batch_id: Optional[PyObjectId] = None,
 ) -> dict[str, Any]:
-    """Create CellarItem and CellarEvent records for wine entering the cellar.
+    """Build and insert CellarItem + CellarEvent records for one wine.
 
-    Args:
-        owner_id: Owner's ID.
-        wine: The Wine record (identity).
-        quantity: Number of bottles (if loose) or bottles per case.
-        case_size: If set, creates cases of this size.
-        num_cases: Number of cases to create (ignored if case_size is None).
-        purchase_date: When the wine was purchased.
-        purchase_price: Price paid per case (or per bottle if loose).
-        provenance: Where the wine was bought.
-        created_at: Override creation timestamp (for demo data).
-        import_batch_id: Link to import batch (for undo).
+    Used by the one-wine-at-a-time paths (checkin, add-to-cellar,
+    case add-via-API). High-volume paths (import processor) should call
+    :func:`build_cellar_items_and_events` directly and batch their own
+    ``insert_many`` across many wines.
 
-    Returns:
-        Dict with items_created, cases_created, cellar_item_ids.
+    Returns a dict with ``items_created``, ``cases_created``,
+    ``bottles_created``, and the list of generated ``cellar_item_ids``.
     """
-    now = created_at or datetime.now(timezone.utc)
-    embedded_wine = _wine_to_embedded(wine)
-    cellar_items: list[CellarItem] = []
-    cellar_events: list[CellarEvent] = []
-
-    if case_size and case_size > 0:
-        for _ in range(num_cases):
-            item = CellarItem(
-                id=ObjectId(),
-                cellar_id=owner_id,
-                item_type="case",
-                wine=embedded_wine,
-                quantity=case_size,
-                case_size=case_size,
-                purchase_price=purchase_price,
-                purchase_date=purchase_date,
-                provenance=provenance,
-                import_batch_id=import_batch_id,
-                created_at=now,
-                updated_at=now,
-            )
-            cellar_items.append(item)
-            cellar_events.append(CellarEvent(
-                cellar_id=owner_id,
-                cellar_item_id=item.id,
-                item_type="case",
-                event_type=CellarEventType.ADDED,
-                quantity=case_size,
-                import_batch_id=import_batch_id,
-                event_date=now,
-                created_at=now,
-            ))
-
-        # Handle loose remainder (e.g. 14 bottles with case_size=12 → 1 case + 2 loose)
-        loose_remainder = quantity - (num_cases * case_size)
-        if loose_remainder > 0:
-            item = CellarItem(
-                id=ObjectId(),
-                cellar_id=owner_id,
-                item_type="bottle",
-                wine=embedded_wine,
-                quantity=loose_remainder,
-                import_batch_id=import_batch_id,
-                created_at=now,
-                updated_at=now,
-            )
-            cellar_items.append(item)
-            cellar_events.append(CellarEvent(
-                cellar_id=owner_id,
-                cellar_item_id=item.id,
-                item_type="bottle",
-                event_type=CellarEventType.ADDED,
-                quantity=loose_remainder,
-                import_batch_id=import_batch_id,
-                event_date=now,
-                created_at=now,
-            ))
-    else:
-        # Loose bottles — one cellar item
-        item = CellarItem(
-            id=ObjectId(),
-            cellar_id=owner_id,
-            item_type="bottle",
-            wine=embedded_wine,
-            quantity=quantity,
-            import_batch_id=import_batch_id,
-            created_at=now,
-            updated_at=now,
-        )
-        cellar_items.append(item)
-        cellar_events.append(CellarEvent(
-            cellar_id=owner_id,
-            cellar_item_id=item.id,
-            item_type="bottle",
-            event_type=CellarEventType.ADDED,
-            quantity=quantity,
-            import_batch_id=import_batch_id,
-            event_date=now,
-            created_at=now,
-        ))
+    records = build_cellar_items_and_events(
+        owner_id=owner_id,
+        wine=wine,
+        quantity=quantity,
+        case_size=case_size,
+        num_cases=num_cases,
+        purchase_date=purchase_date,
+        purchase_price=purchase_price,
+        provenance=provenance,
+        created_at=created_at,
+        import_batch_id=import_batch_id,
+    )
 
     # Batch insert — 2 round-trips total
-    await CellarItem.insert_many(cellar_items)
-    await CellarEvent.insert_many(cellar_events)
+    await CellarItem.insert_many(records.items)
+    await CellarEvent.insert_many(records.events)
 
-    cases_created = sum(1 for i in cellar_items if i.item_type == "case")
-    total_bottles = sum(i.quantity for i in cellar_items)
-
+    cases_created = sum(1 for i in records.items if i.item_type == "case")
+    total_bottles = sum(i.quantity for i in records.items)
 
     logger.info(
         "Created %d cellar items (%d cases, %d bottles) for wine %s (owner %s)",
-        len(cellar_items), cases_created, total_bottles, wine.name, owner_id,
+        len(records.items), cases_created, total_bottles, wine.name, owner_id,
     )
 
     return {
-        "items_created": len(cellar_items),
+        "items_created": len(records.items),
         "cases_created": cases_created,
         "bottles_created": total_bottles,
-        "cellar_item_ids": [item.id for item in cellar_items],
+        "cellar_item_ids": [item.id for item in records.items],
     }
 
 

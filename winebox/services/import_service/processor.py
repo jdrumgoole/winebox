@@ -225,9 +225,13 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
         await Wine.insert_many(wine_docs)
         wines_created = len(wine_docs)
 
-        # Create cellar items (cases + loose bottles) and events
-        from winebox.models.cellar import CellarItem, EmbeddedWine
-        from winebox.models.cellar_event import CellarEvent, CellarEventType
+        # Build cellar items + events for the whole chunk, then issue one
+        # insert_many per collection. Uses the same builder as bottle_service
+        # so the import and checkin paths can't drift.
+        from winebox.models.cellar import CellarItem
+        from winebox.models.cellar_event import CellarEvent
+        from winebox.services.bottle_service import build_cellar_items_and_events
+
         cellar_items: list[CellarItem] = []
         cellar_events: list[CellarEvent] = []
         now = datetime.now(timezone.utc)
@@ -237,69 +241,19 @@ async def _write_chunk(chunk: _Chunk) -> tuple[int, list[str]]:
             if qty <= 0:
                 continue
 
-            embedded_wine = EmbeddedWine(
-                wine_id=wine_doc.id, name=wine_doc.name, winery=wine_doc.winery,
-                vintage=wine_doc.vintage, grape_variety=wine_doc.grape_variety,
-                country=wine_doc.country, region=wine_doc.region,
-                wine_type=wine_doc.wine_type_id,
-                estimated_price_low=wine_doc.estimated_price_low,
-                estimated_price_high=wine_doc.estimated_price_high,
-                price_tier=wine_doc.price_tier,
+            num_cases, case_size = case_meta.get(wine_doc.id, (1, None))
+            records = build_cellar_items_and_events(
+                owner_id=wine_doc.owner_id,
+                wine=wine_doc,
+                quantity=qty,
+                case_size=case_size,
+                num_cases=num_cases,
+                purchase_date=getattr(wine_doc, "purchase_date", None),
+                created_at=now,
+                import_batch_id=chunk.batch_id,
             )
-
-            meta = case_meta.get(wine_doc.id)
-            if meta:
-                num_cases, case_size = meta
-                loose_remainder = qty - (num_cases * case_size)
-
-                for _ in range(num_cases):
-                    item_id = _OID()
-                    cellar_items.append(CellarItem(
-                        id=item_id, cellar_id=wine_doc.owner_id,
-                        item_type="case", wine=embedded_wine,
-                        quantity=case_size, case_size=case_size,
-                        purchase_date=getattr(wine_doc, 'purchase_date', None),
-                        import_batch_id=chunk.batch_id,
-                        created_at=now, updated_at=now,
-                    ))
-                    cellar_events.append(CellarEvent(
-                        cellar_id=wine_doc.owner_id, cellar_item_id=item_id,
-                        item_type="case", event_type=CellarEventType.ADDED,
-                        quantity=case_size, import_batch_id=chunk.batch_id,
-                        event_date=now, created_at=now,
-                    ))
-
-                if loose_remainder > 0:
-                    item_id = _OID()
-                    cellar_items.append(CellarItem(
-                        id=item_id, cellar_id=wine_doc.owner_id,
-                        item_type="bottle", wine=embedded_wine,
-                        quantity=loose_remainder,
-                        import_batch_id=chunk.batch_id,
-                        created_at=now, updated_at=now,
-                    ))
-                    cellar_events.append(CellarEvent(
-                        cellar_id=wine_doc.owner_id, cellar_item_id=item_id,
-                        item_type="bottle", event_type=CellarEventType.ADDED,
-                        quantity=loose_remainder, import_batch_id=chunk.batch_id,
-                        event_date=now, created_at=now,
-                    ))
-            else:
-                # Loose bottles — one cellar item per wine
-                item_id = _OID()
-                cellar_items.append(CellarItem(
-                    id=item_id, cellar_id=wine_doc.owner_id,
-                    item_type="bottle", wine=embedded_wine,
-                    quantity=qty,
-                    import_batch_id=chunk.batch_id,
-                    created_at=now, updated_at=now,
-                ))
-                cellar_events.append(CellarEvent(
-                    cellar_id=wine_doc.owner_id, cellar_item_id=item_id,
-                    item_type="bottle", event_type=CellarEventType.ADDED,
-                    quantity=qty, import_batch_id=chunk.batch_id,
-                    event_date=now, created_at=now,
-                ))
+            cellar_items.extend(records.items)
+            cellar_events.extend(records.events)
 
         if cellar_items:
             await CellarItem.insert_many(cellar_items)
