@@ -422,7 +422,8 @@ function showLoginPage() {
     document.getElementById('user-info').style.display = 'none';
 }
 
-const APP_PAGES = ['dashboard', 'import', 'checkin', 'cellar', 'met', 'add-to-cellar', 'history', 'search', 'xwines', 'settings'];
+// 'checkin' accepted for backward compat with old bookmarks — navigateTo redirects to 'record-wine'
+const APP_PAGES = ['dashboard', 'import', 'checkin', 'record-wine', 'cellar', 'met', 'add-to-cellar', 'history', 'search', 'xwines', 'settings'];
 // 'dashboard' kept in APP_PAGES for backward compat with old bookmarks — redirects to cellar
 
 async function showMainApp() {
@@ -847,12 +848,12 @@ function initNavigation() {
 
         const page = link.dataset.page;
 
-        // Handle mode flag for checkin page (met vs cellar)
-        if (link.dataset.mode === 'met' && page === 'checkin') {
-            currentCheckinMode = 'met';
-            navigateTo('checkin');
-            const heading = document.querySelector('#page-checkin h2');
-            const subtitle = document.querySelector('#page-checkin .page-subtitle');
+        // Handle mode flag for record-wine page (met vs cellar)
+        if (link.dataset.mode === 'met' && (page === 'record-wine' || page === 'checkin')) {
+            currentRecordWineMode = 'met';
+            navigateTo('record-wine');
+            const heading = document.querySelector('#page-record-wine h2');
+            const subtitle = document.querySelector('#page-record-wine .page-subtitle');
             if (heading) heading.textContent = 'Record a Wine';
             if (subtitle) subtitle.textContent = 'Scan a label to record a wine you\'ve encountered';
             return;
@@ -875,6 +876,9 @@ function initNavigation() {
 function navigateTo(page) {
     // Redirect old dashboard bookmarks to cellar
     if (page === 'dashboard') page = 'cellar';
+
+    // Redirect legacy 'checkin' bookmarks to the renamed 'record-wine' page
+    if (page === 'checkin') page = 'record-wine';
 
     // Redirect search/history to cellar sub-tabs
     if (page === 'search') {
@@ -946,9 +950,9 @@ function navigateTo(page) {
 // Forms
 function initForms() {
     // Check-in form
-    const checkinForm = document.getElementById('checkin-form');
-    checkinForm.addEventListener('submit', handleCheckin);
-    checkinForm.addEventListener('reset', () => {
+    const recordWineForm = document.getElementById('record-wine-form');
+    recordWineForm.addEventListener('submit', handleRecordWine);
+    recordWineForm.addEventListener('reset', () => {
         document.getElementById('front-preview').innerHTML = 'Tap to take photo or select image';
         document.getElementById('back-preview').innerHTML = 'Tap to take photo or select image';
         clearRawLabelText();
@@ -1220,8 +1224,8 @@ function clearRawLabelText() {
 }
 
 function showScanningIndicator(show) {
-    const submitBtn = document.querySelector('#checkin-form button[type="submit"]');
-    const formNote = document.querySelector('#checkin-form .form-note');
+    const submitBtn = document.querySelector('#record-wine-form button[type="submit"]');
+    const formNote = document.querySelector('#record-wine-form .form-note');
 
     if (show) {
         if (submitBtn) {
@@ -1247,10 +1251,10 @@ function showScanningIndicator(show) {
 }
 
 // Store pending checkin data for confirmation
-let pendingCheckinData = null;
-let currentCheckinMode = 'met'; // 'met' or 'cellar' — determines where the wine is saved
+let pendingRecordWineData = null;
+let currentRecordWineMode = 'met'; // 'met' or 'cellar' — determines where the wine is saved
 
-function handleCheckin(e) {
+function handleRecordWine(e) {
     e.preventDefault();
 
     const frontLabel = document.getElementById('front-label');
@@ -1260,7 +1264,7 @@ function handleCheckin(e) {
     }
 
     // Store the form data for later submission
-    pendingCheckinData = {
+    pendingRecordWineData = {
         frontLabel: frontLabel.files[0],
         backLabel: document.getElementById('back-label').files?.[0] || null,
         name: document.getElementById('wine-name').value,
@@ -1281,20 +1285,20 @@ function handleCheckin(e) {
     };
 
     // Show the confirmation modal with editable fields
-    showCheckinConfirmation();
+    showRecordWineConfirmation();
 }
 
-function showCheckinConfirmation() {
-    const modal = document.getElementById('checkin-confirm-modal');
-    const data = pendingCheckinData;
+function showRecordWineConfirmation() {
+    const modal = document.getElementById('record-wine-confirm-modal');
+    const data = pendingRecordWineData;
 
     // Adapt modal for cellar vs met mode
-    const headerEl = modal.querySelector('.checkin-confirm-header h3');
-    const subtitleEl = modal.querySelector('.checkin-confirm-subtitle');
-    const confirmBtn = document.getElementById('checkin-confirm-btn');
+    const headerEl = modal.querySelector('.record-wine-confirm-header h3');
+    const subtitleEl = modal.querySelector('.record-wine-confirm-subtitle');
+    const confirmBtn = document.getElementById('record-wine-confirm-btn');
     const qtySection = document.getElementById('confirm-quantity-section');
 
-    if (currentCheckinMode === 'cellar') {
+    if (currentRecordWineMode === 'cellar') {
         headerEl.textContent = 'Add to Cellar';
         subtitleEl.textContent = 'Review the details and set the quantity';
         confirmBtn.textContent = 'Add to Cellar';
@@ -1307,7 +1311,7 @@ function showCheckinConfirmation() {
     }
 
     // Set image preview
-    const imageContainer = document.getElementById('checkin-confirm-image');
+    const imageContainer = document.getElementById('record-wine-confirm-image');
     if (data.frontLabel) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -1352,7 +1356,7 @@ function showCheckinConfirmation() {
     const ocrToggle = document.getElementById('confirm-ocr-toggle');
 
     if (data.frontLabelText) {
-        document.getElementById('checkin-confirm-front-ocr').textContent = data.frontLabelText;
+        document.getElementById('record-wine-confirm-front-ocr').textContent = data.frontLabelText;
         ocrSection.style.display = 'block';
         ocrContent.style.display = 'none';  // Hidden by default
         ocrSection.classList.remove('open');
@@ -1362,10 +1366,10 @@ function showCheckinConfirmation() {
         ocrSection.style.display = 'none';
     }
 
-    const backOcrSection = document.getElementById('checkin-confirm-back-ocr-section');
+    const backOcrSection = document.getElementById('record-wine-confirm-back-ocr-section');
     if (data.backLabelText) {
         backOcrSection.style.display = 'block';
-        document.getElementById('checkin-confirm-back-ocr').textContent = data.backLabelText;
+        document.getElementById('record-wine-confirm-back-ocr').textContent = data.backLabelText;
     } else {
         backOcrSection.style.display = 'none';
     }
@@ -1388,13 +1392,13 @@ function showCheckinConfirmation() {
     };
 
     // Set up button handlers
-    document.getElementById('checkin-confirm-btn').onclick = submitCheckin;
-    document.getElementById('checkin-cancel-btn').onclick = cancelCheckin;
+    document.getElementById('record-wine-confirm-btn').onclick = submitRecordWine;
+    document.getElementById('record-wine-cancel-btn').onclick = cancelRecordWine;
 }
 
-async function submitCheckin() {
-    const modal = document.getElementById('checkin-confirm-modal');
-    const data = pendingCheckinData;
+async function submitRecordWine() {
+    const modal = document.getElementById('record-wine-confirm-modal');
+    const data = pendingRecordWineData;
 
     // Build form data from confirmation modal fields
     const formData = new FormData();
@@ -1435,13 +1439,13 @@ async function submitCheckin() {
     }
 
     // Add quantity for cellar mode
-    if (currentCheckinMode === 'cellar') {
+    if (currentRecordWineMode === 'cellar') {
         const qty = document.getElementById('confirm-quantity')?.value || '1';
         formData.append('quantity', qty);
     }
 
     try {
-        const endpoint = currentCheckinMode === 'cellar' ? 'wines/checkin' : 'wines/met';
+        const endpoint = currentRecordWineMode === 'cellar' ? 'wines/checkin' : 'wines/met';
         const response = await fetchWithAuth(`${API_BASE}/${endpoint}`, {
             method: 'POST',
             body: formData
@@ -1449,15 +1453,15 @@ async function submitCheckin() {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || (currentCheckinMode === 'cellar' ? 'Failed to add wine' : 'Failed to record wine'));
+            throw new Error(error.detail || (currentRecordWineMode === 'cellar' ? 'Failed to add wine' : 'Failed to record wine'));
         }
 
         const wine = await response.json();
-        const toastMsg = currentCheckinMode === 'cellar' ? `Added to cellar: ${wine.name}` : `Recorded: ${wine.name}`;
+        const toastMsg = currentRecordWineMode === 'cellar' ? `Added to cellar: ${wine.name}` : `Recorded: ${wine.name}`;
         showToast(toastMsg, 'success');
 
         // Track event
-        const eventName = currentCheckinMode === 'cellar' ? 'frontend_wine_cellar_added' : 'frontend_wine_met_recorded';
+        const eventName = currentRecordWineMode === 'cellar' ? 'frontend_wine_cellar_added' : 'frontend_wine_met_recorded';
         analytics.capture(eventName, {
             wine_name: wine.name,
             country: document.getElementById('confirm-country').value || null
@@ -1465,22 +1469,22 @@ async function submitCheckin() {
 
         // Close modal and reset form
         modal.classList.remove('active');
-        document.getElementById('checkin-form').reset();
+        document.getElementById('record-wine-form').reset();
         document.getElementById('front-preview').innerHTML = 'Tap to take photo or select image';
         document.getElementById('back-preview').innerHTML = 'Tap to take photo or select image';
         clearRawLabelText();
         lastScanResult = null;
-        pendingCheckinData = null;
+        pendingRecordWineData = null;
 
         // Navigate to the appropriate page
-        navigateTo(currentCheckinMode === 'cellar' ? 'cellar' : 'met');
+        navigateTo(currentRecordWineMode === 'cellar' ? 'cellar' : 'met');
     } catch (error) {
         showToast(error.message, 'error');
     }
 }
 
-function cancelCheckin() {
-    const modal = document.getElementById('checkin-confirm-modal');
+function cancelRecordWine() {
+    const modal = document.getElementById('record-wine-confirm-modal');
     modal.classList.remove('active');
     // Keep the form data so user can make changes and try again
 }
@@ -5736,11 +5740,11 @@ function initMetPage() {
     document.getElementById('met-view-cards')?.addEventListener('click', () => setMetViewMode('cards'));
     document.getElementById('met-view-table')?.addEventListener('click', () => setMetViewMode('table'));
     document.getElementById('met-record-wine-btn')?.addEventListener('click', () => {
-        currentCheckinMode = 'met';
-        navigateTo('checkin');
-        // Update checkin page heading for met mode
-        const heading = document.querySelector('#page-checkin h2');
-        const subtitle = document.querySelector('#page-checkin .page-subtitle');
+        currentRecordWineMode = 'met';
+        navigateTo('record-wine');
+        // Update record-wine page heading for met mode
+        const heading = document.querySelector('#page-record-wine h2');
+        const subtitle = document.querySelector('#page-record-wine .page-subtitle');
         if (heading) heading.textContent = 'Record a Wine';
         if (subtitle) subtitle.textContent = 'Scan a label to record a wine you\'ve encountered';
     });

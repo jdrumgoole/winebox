@@ -92,6 +92,7 @@ class TestCoreNavigation:
         page = authenticated_page
         expect(page.locator("nav a[data-page='add-to-cellar']")).to_have_count(0)
         expect(page.locator("nav a[data-page='checkin']")).to_have_count(0)
+        expect(page.locator("nav a[data-page='record-wine']")).to_have_count(0)
 
     def test_no_search_or_history_nav_links(self, authenticated_page: Page) -> None:
         """Search and History are now sub-tabs under My Cellar, not top-level nav."""
@@ -110,10 +111,10 @@ class TestCoreNavigation:
         expect(page.locator("#add-cellar-scan")).to_be_visible()
 
     def test_record_wine_on_met_page(self, authenticated_page: Page) -> None:
-        """Test that 'Record a Wine' button on Wines I've Met navigates to checkin form."""
+        """Test that 'Record a Wine' button on Wines I've Met navigates to the record-wine form."""
         page = authenticated_page
         page.click("a[data-page='met']")
         expect(page.locator("#page-met")).to_be_visible()
         page.click("#met-record-wine-btn")
-        expect(page.locator("#page-checkin")).to_be_visible()
+        expect(page.locator("#page-record-wine")).to_be_visible()
         expect(page.locator("#front-label")).to_be_visible()

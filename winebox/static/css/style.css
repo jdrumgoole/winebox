@@ -1129,29 +1129,29 @@ details.advanced-fields .form-grid {
 }
 
 /* Checkin Confirmation Modal */
-.checkin-confirm-header {
+.record-wine-confirm-header {
     text-align: center;
     margin-bottom: 1.5rem;
 }
 
-.checkin-confirm-header h3 {
+.record-wine-confirm-header h3 {
     color: var(--primary-color);
     margin-bottom: 0.25rem;
 }
 
-.checkin-confirm-subtitle {
+.record-wine-confirm-subtitle {
     color: var(--text-muted);
     font-size: 0.9rem;
 }
 
-.checkin-confirm-content {
+.record-wine-confirm-content {
     display: grid;
     grid-template-columns: 200px 1fr;
     gap: 1.5rem;
     margin-bottom: 1.5rem;
 }
 
-.checkin-confirm-image {
+.record-wine-confirm-image {
     width: 200px;
     height: 250px;
     border-radius: var(--radius);
@@ -1160,35 +1160,35 @@ details.advanced-fields .form-grid {
     background: var(--background-color);
 }
 
-.checkin-confirm-image img {
+.record-wine-confirm-image img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.checkin-confirm-form .form-grid {
+.record-wine-confirm-form .form-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
 }
 
-.checkin-confirm-form .form-group {
+.record-wine-confirm-form .form-group {
     margin-bottom: 0;
 }
 
-.checkin-confirm-form .form-group.full-width {
+.record-wine-confirm-form .form-group.full-width {
     grid-column: 1 / -1;
 }
 
-.checkin-confirm-form label {
+.record-wine-confirm-form label {
     display: block;
     font-size: 0.85rem;
     color: var(--text-muted);
     margin-bottom: 0.25rem;
 }
 
-.checkin-confirm-form input,
-.checkin-confirm-form textarea {
+.record-wine-confirm-form input,
+.record-wine-confirm-form textarea {
     width: 100%;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--border-color);
@@ -1196,17 +1196,17 @@ details.advanced-fields .form-grid {
     font-size: 0.95rem;
 }
 
-.checkin-confirm-form textarea {
+.record-wine-confirm-form textarea {
     resize: vertical;
 }
 
-.checkin-confirm-ocr {
+.record-wine-confirm-ocr {
     margin-bottom: 1.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
 }
 
-.checkin-confirm-ocr .collapsible-header {
+.record-wine-confirm-ocr .collapsible-header {
     padding: 0.75rem 1rem;
     cursor: pointer;
     display: flex;
@@ -1216,21 +1216,21 @@ details.advanced-fields .form-grid {
     border-radius: var(--radius);
 }
 
-.checkin-confirm-ocr .collapsible-header:hover {
+.record-wine-confirm-ocr .collapsible-header:hover {
     background: #f0ede8;
 }
 
-.checkin-confirm-ocr .collapsible-content {
+.record-wine-confirm-ocr .collapsible-content {
     padding: 1rem;
     border-top: 1px solid var(--border-color);
 }
 
-.checkin-confirm-ocr .ocr-text-container {
+.record-wine-confirm-ocr .ocr-text-container {
     max-height: 200px;
     overflow-y: auto;
 }
 
-.checkin-confirm-ocr pre {
+.record-wine-confirm-ocr pre {
     white-space: pre-wrap;
     font-size: 0.85rem;
     background: var(--background-color);
@@ -1240,16 +1240,16 @@ details.advanced-fields .form-grid {
 }
 
 @media (max-width: 768px) {
-    .checkin-confirm-content {
+    .record-wine-confirm-content {
         grid-template-columns: 1fr;
     }
 
-    .checkin-confirm-image {
+    .record-wine-confirm-image {
         width: 100%;
         height: 200px;
     }
 
-    .checkin-confirm-form .form-grid {
+    .record-wine-confirm-form .form-grid {
         grid-template-columns: 1fr;
     }
 
@@ -2361,15 +2361,15 @@ body.logged-out #user-info {
 }
 
 /* Checkin Confirmation Modal */
-.checkin-confirm {
+.record-wine-confirm {
     text-align: center;
 }
 
-.checkin-confirm-header {
+.record-wine-confirm-header {
     margin-bottom: 1.5rem;
 }
 
-.checkin-confirm-icon {
+.record-wine-confirm-icon {
     width: 60px;
     height: 60px;
     background: var(--success-color);
@@ -2382,12 +2382,12 @@ body.logged-out #user-info {
     margin-bottom: 1rem;
 }
 
-.checkin-confirm-header h3 {
+.record-wine-confirm-header h3 {
     color: var(--success-color);
     margin: 0;
 }
 
-.checkin-confirm-content {
+.record-wine-confirm-content {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 1.5rem;
@@ -2395,7 +2395,7 @@ body.logged-out #user-info {
     margin-bottom: 1.5rem;
 }
 
-.checkin-confirm-image {
+.record-wine-confirm-image {
     width: 150px;
     height: 200px;
     border-radius: var(--radius);
@@ -2404,54 +2404,54 @@ body.logged-out #user-info {
     border: 1px solid var(--border-color);
 }
 
-.checkin-confirm-image img {
+.record-wine-confirm-image img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.checkin-confirm-details h4 {
+.record-wine-confirm-details h4 {
     color: var(--primary-color);
     margin-bottom: 1rem;
     font-size: 1.25rem;
 }
 
-.checkin-confirm-fields {
+.record-wine-confirm-fields {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
 }
 
-.checkin-confirm-field {
+.record-wine-confirm-field {
     background: var(--background-color);
     padding: 0.5rem 0.75rem;
     border-radius: var(--radius);
 }
 
-.checkin-confirm-field .label {
+.record-wine-confirm-field .label {
     font-size: 0.75rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
-.checkin-confirm-field .value {
+.record-wine-confirm-field .value {
     font-weight: 500;
     color: var(--text-color);
 }
 
-.checkin-confirm-field .value.empty {
+.record-wine-confirm-field .value.empty {
     color: var(--text-muted);
     font-style: italic;
     font-weight: normal;
 }
 
-.checkin-confirm-ocr {
+.record-wine-confirm-ocr {
     text-align: left;
     margin-bottom: 1.5rem;
 }
 
-.checkin-confirm-ocr h5 {
+.record-wine-confirm-ocr h5 {
     color: var(--text-color);
     margin-bottom: 0.75rem;
     font-size: 0.9rem;
@@ -2489,21 +2489,21 @@ body.logged-out #user-info {
     color: var(--text-color);
 }
 
-.checkin-confirm .form-actions {
+.record-wine-confirm .form-actions {
     justify-content: center;
 }
 
 @media (max-width: 600px) {
-    .checkin-confirm-content {
+    .record-wine-confirm-content {
         grid-template-columns: 1fr;
     }
 
-    .checkin-confirm-image {
+    .record-wine-confirm-image {
         width: 100%;
         height: 150px;
     }
 
-    .checkin-confirm-fields {
+    .record-wine-confirm-fields {
         grid-template-columns: 1fr;
     }
 }
