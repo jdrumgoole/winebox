@@ -46,7 +46,7 @@ async def main() -> None:
         label_path = os.path.join(os.path.dirname(__file__), "..", "tests", "data", "wine_labels", "Jo_Pithon_Clos_des_Bois_SGN_1994_label.jpg")
         with open(label_path, "rb") as f:
             await client.post(
-                "/api/wines/checkin",
+                "/api/wines/record",
                 headers={"Authorization": f"Bearer {token}"},
                 data={"name": "Hash Test Wine", "quantity": "1"},
                 files={"front_label": ("label.jpg", f, "image/jpeg")},

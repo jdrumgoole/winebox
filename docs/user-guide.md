@@ -490,7 +490,7 @@ curl -H "Authorization: Bearer <token>" http://localhost:8000/api/wines
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/wines/checkin` | Add wine(s) to cellar |
+| POST | `/api/wines/record` | Add wine(s) to cellar |
 | POST | `/api/wines/{id}/checkout` | Remove wine(s) from cellar |
 | GET | `/api/wines` | List all wines |
 | GET | `/api/wines/{id}` | Get wine details |
@@ -525,7 +525,7 @@ curl -H "Authorization: Bearer <token>" http://localhost:8000/api/wines
 ### Example: Check In via API
 
 ```bash
-curl -X POST http://localhost:8000/api/wines/checkin \
+curl -X POST http://localhost:8000/api/wines/record \
   -H "Authorization: Bearer <token>" \
   -F "front_label=@wine_front.jpg" \
   -F "back_label=@wine_back.jpg" \

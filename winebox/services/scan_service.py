@@ -2,7 +2,7 @@
 
 Centralises the "try Vision first, fall back to Tesseract if it's off
 or returned no usable name" strategy that both the /wines/scan endpoint
-(scan-only, no persistence) and the /wines/checkin endpoint
+(scan-only, no persistence) and the /wines/record endpoint
 (scan + persist) need.
 
 Inputs are raw bytes + a filename (for media-type inference) so the

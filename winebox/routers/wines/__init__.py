@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 from .add_to_cellar import add_met_wine_to_cellar
-from .checkin import checkin_wine, checkout_wine
+from .checkin import checkout_wine, record_wine
 from .crud import delete_all_wines, delete_wine, get_wine, list_wines, update_wine
 from .enrichment import enrich_wines, enrichment_progress
 from .grapes import get_wine_grapes, set_wine_grapes
@@ -25,10 +25,10 @@ router.add_api_route("/scan", scan_label, methods=["POST"])
 router.add_api_route("/enrich", enrich_wines, methods=["POST"])
 router.add_api_route("/enrichment-progress", enrichment_progress, methods=["GET"])
 
-# Check-in/check-out endpoints
+# Record-a-wine / remove-a-bottle endpoints
 router.add_api_route(
-    "/checkin",
-    checkin_wine,
+    "/record",
+    record_wine,
     methods=["POST"],
     status_code=201,
 )

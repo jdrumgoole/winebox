@@ -29,7 +29,7 @@ from ._common import (
 logger = logging.getLogger(__name__)
 
 
-async def checkin_wine(
+async def record_wine(
     current_user: RequireAuth,
     front_label: Annotated[UploadFile, File(description="Front label image")],
     quantity: Annotated[int, Form(ge=1, le=10000, description="Number of bottles")] = 1,

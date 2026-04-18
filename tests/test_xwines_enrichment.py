@@ -416,7 +416,7 @@ async def test_checkin_accepts_wine_type(client: AsyncClient, init_test_db, samp
         mock_parser.parse.return_value = {"name": "Test Wine"}
 
         response = await client.post(
-            "/api/wines/checkin",
+            "/api/wines/record",
             data={
                 "name": "Checkin Wine Type Test",
                 "wine_type": "red",

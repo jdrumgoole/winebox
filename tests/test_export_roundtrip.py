@@ -126,7 +126,7 @@ async def test_export_csv_no_custom_fields_still_works(
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Plain Wine", "country": "Spain", "quantity": "2"}
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     export_resp = await client.get("/api/export/wines?format=csv")
     assert export_resp.status_code == 200

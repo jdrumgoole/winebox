@@ -22,7 +22,7 @@ async def test_list_transactions(client: AsyncClient, sample_image_bytes: bytes)
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "quantity": "3"}
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # List transactions
     response = await client.get("/api/transactions")
@@ -42,7 +42,7 @@ async def test_filter_transactions_by_type(client: AsyncClient, sample_image_byt
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "quantity": "5"}
-    checkin_response = await client.post("/api/wines/checkin", files=files, data=data)
+    checkin_response = await client.post("/api/wines/record", files=files, data=data)
     wine_id = checkin_response.json()["id"]
 
     # Check out some
@@ -71,7 +71,7 @@ async def test_get_transaction_detail(client: AsyncClient, sample_image_bytes: b
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "quantity": "1"}
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # Get transaction ID
     list_response = await client.get("/api/transactions")

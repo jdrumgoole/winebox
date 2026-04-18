@@ -23,7 +23,7 @@ async def test_search_by_text(client: AsyncClient, sample_image_bytes: bytes) ->
             "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
         }
         data = {"name": name, "quantity": "1"}
-        await client.post("/api/wines/checkin", files=files, data=data)
+        await client.post("/api/wines/record", files=files, data=data)
 
     # Search for "Chateau"
     response = await client.get("/api/search?q=Chateau")
@@ -42,7 +42,7 @@ async def test_search_by_vintage(client: AsyncClient, sample_image_bytes: bytes)
             "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
         }
         data = {"name": f"Wine {vintage}", "vintage": str(vintage), "quantity": "1"}
-        await client.post("/api/wines/checkin", files=files, data=data)
+        await client.post("/api/wines/record", files=files, data=data)
 
     # Search for 2019 vintage
     response = await client.get("/api/search?vintage=2019")
@@ -62,7 +62,7 @@ async def test_search_by_grape(client: AsyncClient, sample_image_bytes: bytes) -
             "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
         }
         data = {"name": f"Wine {i}", "grape_variety": grape, "quantity": "1"}
-        await client.post("/api/wines/checkin", files=files, data=data)
+        await client.post("/api/wines/record", files=files, data=data)
 
     # Search for Cabernet
     response = await client.get("/api/search?grape=Cabernet")
@@ -80,7 +80,7 @@ async def test_search_by_region(client: AsyncClient, sample_image_bytes: bytes) 
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "region": "Napa Valley", "quantity": "1"}
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # Search for Napa
     response = await client.get("/api/search?region=Napa")
@@ -100,7 +100,7 @@ async def test_search_by_country(client: AsyncClient, sample_image_bytes: bytes)
             "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
         }
         data = {"name": f"Wine {i}", "country": country, "quantity": "1"}
-        await client.post("/api/wines/checkin", files=files, data=data)
+        await client.post("/api/wines/record", files=files, data=data)
 
     # Search for France
     response = await client.get("/api/search?country=France")
@@ -119,7 +119,7 @@ async def test_search_in_stock_filter(client: AsyncClient, sample_image_bytes: b
             "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
         }
         data = {"name": f"Wine {i}", "quantity": "2"}
-        await client.post("/api/wines/checkin", files=files, data=data)
+        await client.post("/api/wines/record", files=files, data=data)
 
     # Check out all of first wine
     list_response = await client.get("/api/wines")
@@ -148,7 +148,7 @@ async def test_search_combined_filters(client: AsyncClient, sample_image_bytes: 
             "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
         }
         data["quantity"] = "1"
-        await client.post("/api/wines/checkin", files=files, data=data)
+        await client.post("/api/wines/record", files=files, data=data)
 
     # Search for 2019 French wine
     response = await client.get("/api/search?vintage=2019&country=France")
@@ -165,7 +165,7 @@ async def test_search_by_winery(client: AsyncClient, sample_image_bytes: bytes) 
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "winery": "Opus One Winery", "quantity": "1"}
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     response = await client.get("/api/search?winery=Opus")
     assert response.status_code == 200
@@ -182,7 +182,7 @@ async def test_search_out_of_stock_filter(client: AsyncClient, sample_image_byte
             "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
         }
         data = {"name": f"Wine {i}", "quantity": "2"}
-        await client.post("/api/wines/checkin", files=files, data=data)
+        await client.post("/api/wines/record", files=files, data=data)
 
     # Check out all of first wine
     list_response = await client.get("/api/wines")
@@ -205,7 +205,7 @@ async def test_search_pagination(client: AsyncClient, sample_image_bytes: bytes)
             "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
         }
         data = {"name": f"Wine {i}", "quantity": "1"}
-        await client.post("/api/wines/checkin", files=files, data=data)
+        await client.post("/api/wines/record", files=files, data=data)
 
     response = await client.get("/api/search?limit=2")
     assert response.status_code == 200
@@ -223,7 +223,7 @@ async def test_search_no_results(client: AsyncClient, sample_image_bytes: bytes)
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "quantity": "1"}
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     response = await client.get("/api/search?q=NonexistentWine")
     assert response.status_code == 200
