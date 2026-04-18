@@ -1104,13 +1104,48 @@ def rebuild_droplet(
 
 
 # Production User Management Tasks
-PROD_HOST = "104.248.46.96"
+#
+# The production droplet IP is resolved dynamically via the DigitalOcean API
+# (matching how `invoke deploy` and the oat-* tasks work) rather than being
+# pinned to a literal so a droplet rebuild/re-IP doesn't silently break these
+# tasks. Fall back to WINEBOX_DROPLET_IP env override for offline use.
+PROD_DROPLET_NAME = "winebox-production"
 PROD_WINEBOX_ADMIN = "/opt/winebox/.venv/bin/winebox-admin"
+
+
+def _resolve_prod_host() -> str:
+    """Return the current production droplet IP."""
+    override = os.environ.get("WINEBOX_DROPLET_IP")
+    if override:
+        return override
+    try:
+        from dotenv import load_dotenv
+
+        from deploy.common import get_droplet_ip
+
+        load_dotenv(".env")
+        token = os.environ.get("WINEBOX_DO_TOKEN")
+        if not token:
+            print(
+                "Error: WINEBOX_DO_TOKEN not set. Put it in .env or export it, "
+                "or pass WINEBOX_DROPLET_IP to bypass DO API lookup.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        ip = get_droplet_ip(token, PROD_DROPLET_NAME)
+    except Exception as exc:  # pragma: no cover - operational failure path
+        print(f"Error resolving production droplet IP: {exc}", file=sys.stderr)
+        sys.exit(1)
+    if not ip:
+        print(f"Error: could not find droplet '{PROD_DROPLET_NAME}'", file=sys.stderr)
+        sys.exit(1)
+    return ip
 
 
 def _ssh_cmd(cmd: str) -> str:
     """Build SSH command for production server."""
-    return f'ssh -o StrictHostKeyChecking=accept-new root@{PROD_HOST} "{cmd}"'
+    host = _resolve_prod_host()
+    return f'ssh -o StrictHostKeyChecking=accept-new root@{host} "{cmd}"'
 
 
 @task(name="prod-list-users")
