@@ -2,7 +2,7 @@
 
 import pytest
 
-from winebox.routers.demo import (
+from winebox.services.demo_service import (
     DEMO_TAG,
     DEMO_WINE_COUNT,
     _CHECKOUT_NOTES,

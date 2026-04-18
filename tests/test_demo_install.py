@@ -15,7 +15,16 @@ from winebox.database import get_database
 
 @pytest_asyncio.fixture(autouse=True)
 async def seed_xwines(init_test_db):
-    """Seed synthetic xwines data for demo install to work."""
+    """Seed synthetic xwines reference data.
+
+    ``xwines_wines`` is shared across all xdist workers (it's reference
+    data, not user data). Previously this fixture also ran a teardown
+    that deleted every doc with ``xwines_id >= 900000`` — fine in
+    isolation, racy under xdist because one worker's teardown would
+    wipe another worker's seed mid-test. We now write idempotently on
+    setup and leave the rows in place; the shared test database is
+    dropped before the next run.
+    """
     db = get_database()
     col = db["xwines_wines"]
 
@@ -46,8 +55,6 @@ async def seed_xwines(init_test_db):
         pass  # Ignore duplicates from parallel workers
 
     yield
-
-    await col.delete_many({"xwines_id": {"$gte": 900000}})
 
 
 async def _wait_for_install(client: AsyncClient, timeout: int = 30) -> dict:
