@@ -23,8 +23,12 @@ router = APIRouter()
 # Request/Response schemas
 # ---------------------------------------------------------------------------
 
-class AddCaseRequest(BaseModel):
-    """Request to add one or more cases of wine."""
+class _WineIdentity(BaseModel):
+    """Fields that identify the wine a case or loose bottle refers to.
+
+    Split out so AddCaseRequest and AddBottlesRequest can't drift on
+    field constraints (they already had identical validation).
+    """
 
     name: str = Field(..., max_length=500)
     winery: Optional[str] = Field(None, max_length=500)
@@ -33,6 +37,10 @@ class AddCaseRequest(BaseModel):
     country: Optional[str] = Field(None, max_length=255)
     region: Optional[str] = Field(None, max_length=255)
     wine_type: Optional[str] = Field(None, max_length=50)
+
+
+class AddCaseRequest(_WineIdentity):
+    """Request to add one or more cases of wine."""
 
     case_size: int = Field(..., ge=1, le=100)
     num_cases: int = Field(1, ge=1, le=100)
@@ -41,16 +49,8 @@ class AddCaseRequest(BaseModel):
     provenance: Optional[str] = Field(None, max_length=500)
 
 
-class AddBottlesRequest(BaseModel):
+class AddBottlesRequest(_WineIdentity):
     """Request to add loose bottles (no case)."""
-
-    name: str = Field(..., max_length=500)
-    winery: Optional[str] = Field(None, max_length=500)
-    vintage: Optional[int] = Field(None, ge=1900, le=2100)
-    grape_variety: Optional[str] = Field(None, max_length=500)
-    country: Optional[str] = Field(None, max_length=255)
-    region: Optional[str] = Field(None, max_length=255)
-    wine_type: Optional[str] = Field(None, max_length=50)
 
     quantity: int = Field(..., ge=1, le=1000)
 

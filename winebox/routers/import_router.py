@@ -489,7 +489,7 @@ async def process_batch_stream(
         # Trigger background enrichment after stream completes
         # (doing this here instead of inside the generator ensures
         # the task is created in the response's event loop context)
-        if last_progress.get("enrichment_started"):
+        if last_progress.get("trigger_post_import_enrichment"):
             from winebox.services.background_enrichment import enrich_unenriched_wines
             asyncio.create_task(enrich_unenriched_wines(user_id))
 

@@ -4910,7 +4910,7 @@ async function showImportDashboard(batchId, filename, importResult) {
         }
 
         // Start enrichment countdown if background enrichment was triggered
-        if (importResult && importResult.enrichment_started) {
+        if (importResult && importResult.trigger_post_import_enrichment) {
             startDashboardEnrichmentProgress(batchId);
         }
 
@@ -5552,7 +5552,7 @@ function showImportResults(result) {
     }
 
     // Start enrichment progress tracking if background enrichment was triggered
-    if (result.enrichment_started) {
+    if (result.trigger_post_import_enrichment) {
         startEnrichmentProgress();
     }
 }
