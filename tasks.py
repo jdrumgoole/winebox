@@ -521,6 +521,40 @@ def purge(ctx: Context, include_images: bool = True, yes: bool = False) -> None:
     ctx.run(cmd, pty=not yes)
 
 
+@task
+def backup(ctx: Context, profile: str = "winebox_backup", database: str | None = None) -> None:
+    """Back up the MongoDB database to S3 via scripts/mongodb_backup.py.
+
+    Args:
+        ctx: Invoke context.
+        profile: AWS profile for the S3 upload (default: winebox_backup).
+        database: Override the database name; defaults to the connection URL's db.
+    """
+    url = os.environ.get("WINEBOX_MONGODB_URL")
+    if not url:
+        print("Error: WINEBOX_MONGODB_URL is not set", file=sys.stderr)
+        sys.exit(1)
+    cmd = f"uv run python scripts/mongodb_backup.py --profile {profile} backup '{url}'"
+    if database:
+        cmd += f" --database {database}"
+    ctx.run(cmd, pty=True)
+
+
+@task
+def seed_reference(ctx: Context, database: str | None = None, yes: bool = False) -> None:
+    """Seed reference tables (wine types, grapes, regions, classifications).
+
+    Thin wrapper around scripts/seed_reference_data.py so operators don't
+    need to remember the full path.
+    """
+    cmd = "uv run python scripts/seed_reference_data.py"
+    if database:
+        cmd += f" --database {database}"
+    if yes:
+        cmd += " --yes"
+    ctx.run(cmd, pty=True)
+
+
 @task(name="purge-wines")
 def purge_wines(ctx: Context, include_images: bool = True, yes: bool = False) -> None:
     """Purge all wine data from the database without affecting users.

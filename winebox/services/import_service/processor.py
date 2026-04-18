@@ -616,7 +616,11 @@ async def _process_chunks(
         "skipped_rows": skipped_rows,
         "errors": errors,
         "status": "completed",
-        "enrichment_started": wines_created > 0 and skip_enrichment,
+        # True when the caller deferred enrichment with skip_enrichment=True
+        # and at least one wine was created — tells the router to kick off
+        # async enrichment after the SSE stream closes. The frontend reads
+        # this flag to show a "Enriching wines…" banner.
+        "trigger_post_import_enrichment": wines_created > 0 and skip_enrichment,
     }
 
 
