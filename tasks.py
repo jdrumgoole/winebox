@@ -14,7 +14,7 @@ from invoke.context import Context
 PID_FILE = Path("data/winebox.pid")
 
 
-@task
+@task(aliases=["server-start"])
 def start(ctx: Context, host: str = "0.0.0.0", port: int = 8000, reload: bool = False) -> None:
     """Start the WineBox FastAPI server.
 
@@ -47,13 +47,13 @@ def start_background(ctx: Context, host: str = "0.0.0.0", port: int = 8000) -> N
     ctx.run(f"uv run winebox-server start --host {host} --port {port}")
 
 
-@task
+@task(aliases=["server-stop"])
 def stop(ctx: Context) -> None:
     """Stop the WineBox FastAPI server."""
     ctx.run("uv run winebox-server stop")
 
 
-@task
+@task(aliases=["server-restart"])
 def restart(ctx: Context, host: str = "0.0.0.0", port: int = 8000) -> None:
     """Restart the WineBox FastAPI server.
 
@@ -65,13 +65,13 @@ def restart(ctx: Context, host: str = "0.0.0.0", port: int = 8000) -> None:
     ctx.run(f"uv run winebox-server restart --host {host} --port {port}")
 
 
-@task
+@task(aliases=["server-status"])
 def status(ctx: Context) -> None:
     """Check the status of the WineBox server."""
     ctx.run("uv run winebox-server status")
 
 
-@task
+@task(aliases=["server-logs"])
 def logs(ctx: Context, follow: bool = False, lines: int = 50) -> None:
     """View the WineBox server logs.
 
@@ -467,7 +467,7 @@ def _drop_e2e_database(ctx: Context, db_name: str) -> None:
         script.unlink(missing_ok=True)
 
 
-@task(name="init-db")
+@task(name="init-db", aliases=["db-init"])
 def init_db(ctx: Context) -> None:
     """Initialize the database."""
     print("Initializing database...")
@@ -504,7 +504,7 @@ def clean(ctx: Context, all: bool = False) -> None:
     print("Cleanup complete")
 
 
-@task
+@task(aliases=["db-purge"])
 def purge(ctx: Context, include_images: bool = True, yes: bool = False) -> None:
     """Purge the entire database. Stops the server if running.
 
@@ -521,7 +521,7 @@ def purge(ctx: Context, include_images: bool = True, yes: bool = False) -> None:
     ctx.run(cmd, pty=not yes)
 
 
-@task
+@task(aliases=["db-backup"])
 def backup(ctx: Context, profile: str = "winebox_backup", database: str | None = None) -> None:
     """Back up the MongoDB database to S3 via scripts/mongodb_backup.py.
 
@@ -540,7 +540,7 @@ def backup(ctx: Context, profile: str = "winebox_backup", database: str | None =
     ctx.run(cmd, pty=True)
 
 
-@task
+@task(name="seed-reference", aliases=["db-seed"])
 def seed_reference(ctx: Context, database: str | None = None, yes: bool = False) -> None:
     """Seed reference tables (wine types, grapes, regions, classifications).
 
@@ -555,7 +555,7 @@ def seed_reference(ctx: Context, database: str | None = None, yes: bool = False)
     ctx.run(cmd, pty=True)
 
 
-@task(name="purge-wines")
+@task(name="purge-wines", aliases=["db-purge-wines"])
 def purge_wines(ctx: Context, include_images: bool = True, yes: bool = False) -> None:
     """Purge all wine data from the database without affecting users.
 
@@ -575,7 +575,7 @@ def purge_wines(ctx: Context, include_images: bool = True, yes: bool = False) ->
     ctx.run(cmd, pty=not yes)
 
 
-@task(name="purge-user")
+@task(name="purge-user", aliases=["db-purge-user"])
 def purge_user(ctx: Context, email: str, yes: bool = False) -> None:
     """Purge all data for a specific user.
 
@@ -594,7 +594,7 @@ def purge_user(ctx: Context, email: str, yes: bool = False) -> None:
 
 
 # User Management Tasks
-@task(name="add-user")
+@task(name="add-user", aliases=["user-add"])
 def add_user(
     ctx: Context,
     email: str,
@@ -615,7 +615,7 @@ def add_user(
     ctx.run(cmd)
 
 
-@task(name="remove-user")
+@task(name="remove-user", aliases=["user-remove"])
 def remove_user(ctx: Context, email: str, force: bool = False) -> None:
     """Remove a user from the system.
 
@@ -630,13 +630,13 @@ def remove_user(ctx: Context, email: str, force: bool = False) -> None:
     ctx.run(cmd, pty=True)
 
 
-@task(name="list-users")
+@task(name="list-users", aliases=["user-list"])
 def list_users(ctx: Context) -> None:
     """List all users in the system."""
     ctx.run("uv run winebox-admin list")
 
 
-@task(name="disable-user")
+@task(name="disable-user", aliases=["user-disable"])
 def disable_user(ctx: Context, email: str) -> None:
     """Disable a user account.
 
@@ -647,7 +647,7 @@ def disable_user(ctx: Context, email: str) -> None:
     ctx.run(f"uv run winebox-admin disable {email}")
 
 
-@task(name="enable-user")
+@task(name="enable-user", aliases=["user-enable"])
 def enable_user(ctx: Context, email: str) -> None:
     """Enable a user account.
 
@@ -658,7 +658,7 @@ def enable_user(ctx: Context, email: str) -> None:
     ctx.run(f"uv run winebox-admin enable {email}")
 
 
-@task(name="passwd")
+@task(name="passwd", aliases=["user-passwd"])
 def change_password(ctx: Context, email: str, password: str) -> None:
     """Change a user's password.
 
