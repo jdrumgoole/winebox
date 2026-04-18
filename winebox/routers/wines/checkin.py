@@ -175,7 +175,10 @@ async def checkin_wine(
         purchase_price=purchase_price,
     )
 
-    # Create transaction (legacy — kept for backward compatibility)
+    # Record a CHECK_IN transaction for the history log. Cellar items
+    # (created above by bottle_service) track per-bottle/per-case state;
+    # Transaction is the flat append-only audit trail used by the
+    # transactions router and the CSV/Excel exports.
     transaction = Transaction(
         owner_id=current_user.id,
         wine_id=wine.id,
