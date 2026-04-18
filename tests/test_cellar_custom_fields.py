@@ -142,7 +142,7 @@ async def test_wine_api_returns_custom_fields(
         "custom_fields": json.dumps(custom),
     }
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     wine = response.json()

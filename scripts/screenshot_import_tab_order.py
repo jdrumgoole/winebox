@@ -101,7 +101,7 @@ async def main() -> None:
         async with httpx.AsyncClient(base_url=BASE_URL) as client:
             with open(LABEL_PATH, "rb") as f:
                 await client.post(
-                    "/api/wines/checkin",
+                    "/api/wines/record",
                     headers={"Authorization": f"Bearer {token2}"},
                     data={"name": "Test Wine", "quantity": "1"},
                     files={"front_label": ("label.jpg", f, "image/jpeg")},

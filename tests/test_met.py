@@ -58,7 +58,7 @@ async def test_list_met_wines(client: AsyncClient, sample_image_bytes: bytes) ->
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data2 = {"name": "Cellar Wine", "quantity": "1"}
-    await client.post("/api/wines/checkin", files=files2, data=data2)
+    await client.post("/api/wines/record", files=files2, data=data2)
 
     # List met wines
     response = await client.get("/api/met")
@@ -113,7 +113,7 @@ async def test_list_wines_collection_filter(client: AsyncClient, sample_image_by
     files2 = {
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
-    await client.post("/api/wines/checkin", files=files2, data={"name": "Cellar Wine", "quantity": "1"})
+    await client.post("/api/wines/record", files=files2, data={"name": "Cellar Wine", "quantity": "1"})
 
     # Filter for cellar only
     response = await client.get("/api/wines?collection=cellar")
@@ -143,7 +143,7 @@ async def test_record_met_wine_with_custom_fields(client: AsyncClient, sample_im
         "mode": "met",
         "custom_fields": custom,
     }
-    response = await client.post("/api/wines/checkin", data=data, files=files)
+    response = await client.post("/api/wines/record", data=data, files=files)
     assert response.status_code == 201
     wine = response.json()
     assert wine["custom_fields"]["Tasting Room"] == "Excellent"
@@ -161,7 +161,7 @@ async def test_record_met_wine_invalid_custom_fields(client: AsyncClient, sample
         "mode": "met",
         "custom_fields": "not valid json{{{",
     }
-    response = await client.post("/api/wines/checkin", data=data, files=files)
+    response = await client.post("/api/wines/record", data=data, files=files)
     assert response.status_code == 400
 
 
@@ -176,7 +176,7 @@ async def test_record_met_wine_with_back_label(client: AsyncClient, sample_image
         "name": "Two Label Wine",
         "mode": "met",
     }
-    response = await client.post("/api/wines/checkin", data=data, files=files)
+    response = await client.post("/api/wines/record", data=data, files=files)
     assert response.status_code == 201
     wine = response.json()
     assert wine.get("back_label_image_path") is not None

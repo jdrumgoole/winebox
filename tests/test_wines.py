@@ -42,7 +42,7 @@ async def test_checkin_wine(client: AsyncClient, sample_image_bytes: bytes) -> N
         "quantity": "2",
     }
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     wine = response.json()
@@ -62,7 +62,7 @@ async def test_checkin_wine_minimal(client: AsyncClient, sample_image_bytes: byt
         "quantity": "1",
     }
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     wine = response.json()
@@ -90,7 +90,7 @@ async def test_list_wines(client: AsyncClient, sample_image_bytes: bytes) -> Non
         "name": "Test Wine",
         "quantity": "1",
     }
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # List wines
     response = await client.get("/api/wines")
@@ -111,7 +111,7 @@ async def test_get_wine_detail(client: AsyncClient, sample_image_bytes: bytes) -
         "name": "Test Wine",
         "quantity": "3",
     }
-    checkin_response = await client.post("/api/wines/checkin", files=files, data=data)
+    checkin_response = await client.post("/api/wines/record", files=files, data=data)
     wine_id = checkin_response.json()["id"]
 
     # Get wine details
@@ -140,7 +140,7 @@ async def test_update_wine(client: AsyncClient, sample_image_bytes: bytes) -> No
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Original Name", "quantity": "1"}
-    checkin_response = await client.post("/api/wines/checkin", files=files, data=data)
+    checkin_response = await client.post("/api/wines/record", files=files, data=data)
     wine_id = checkin_response.json()["id"]
 
     # Update wine
@@ -163,7 +163,7 @@ async def test_checkout_wine(client: AsyncClient, sample_image_bytes: bytes) -> 
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "quantity": "5"}
-    checkin_response = await client.post("/api/wines/checkin", files=files, data=data)
+    checkin_response = await client.post("/api/wines/record", files=files, data=data)
     wine_id = checkin_response.json()["id"]
 
     # Check out 2 bottles
@@ -183,7 +183,7 @@ async def test_checkout_exceeds_stock(client: AsyncClient, sample_image_bytes: b
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "quantity": "2"}
-    checkin_response = await client.post("/api/wines/checkin", files=files, data=data)
+    checkin_response = await client.post("/api/wines/record", files=files, data=data)
     wine_id = checkin_response.json()["id"]
 
     # Try to check out more than available
@@ -201,7 +201,7 @@ async def test_delete_wine(client: AsyncClient, sample_image_bytes: bytes) -> No
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "quantity": "1"}
-    checkin_response = await client.post("/api/wines/checkin", files=files, data=data)
+    checkin_response = await client.post("/api/wines/record", files=files, data=data)
     wine_id = checkin_response.json()["id"]
 
     # Delete wine
@@ -229,7 +229,7 @@ async def test_checkin_rejects_oversized_file(client: AsyncClient) -> None:
     }
     data = {"name": "Test Wine", "quantity": "1"}
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 413
     assert "exceeds maximum allowed size" in response.json()["detail"]
 
@@ -245,7 +245,7 @@ async def test_checkin_rejects_invalid_file_type(client: AsyncClient) -> None:
     }
     data = {"name": "Test Wine", "quantity": "1"}
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 400
     assert "Invalid file type" in response.json()["detail"]
 
@@ -286,7 +286,7 @@ async def test_checkin_with_prescanned_text(client: AsyncClient, sample_image_by
         "back_label_text": "This is the pre-scanned back label text",
     }
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     wine = response.json()
@@ -335,7 +335,7 @@ async def test_checkin_rejects_fake_image_with_wrong_magic_bytes(client: AsyncCl
     }
     data = {"name": "Test Wine", "quantity": "1"}
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 400
     assert "Invalid file content" in response.json()["detail"]
 
@@ -382,7 +382,7 @@ async def test_checkin_accepts_jpeg_with_correct_magic_bytes(client: AsyncClient
     }
     data = {"name": "Test Wine", "quantity": "1"}
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
 
@@ -401,7 +401,7 @@ async def test_checkin_with_custom_fields(client: AsyncClient, sample_image_byte
         "custom_fields": json.dumps(custom),
     }
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     wine = response.json()
@@ -419,7 +419,7 @@ async def test_wine_without_image_path(client: AsyncClient, sample_image_bytes: 
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Test Wine", "quantity": "1"}
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     # The wine should have an image path from checkin
@@ -441,7 +441,7 @@ async def test_delete_all_wines(client: AsyncClient, sample_image_bytes: bytes) 
             "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
         }
         data = {"name": f"Wine {i}", "quantity": "1"}
-        response = await client.post("/api/wines/checkin", files=files, data=data)
+        response = await client.post("/api/wines/record", files=files, data=data)
         assert response.status_code == 201
 
     # Verify 3 wines exist

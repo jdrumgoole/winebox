@@ -26,7 +26,7 @@ async def test_checkin_with_region_fields(
         "quantity": "1",
     }
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     wine = response.json()
@@ -51,7 +51,7 @@ async def test_checkin_without_region_fields(
         "quantity": "1",
     }
 
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     wine = response.json()
@@ -80,7 +80,7 @@ async def test_wine_detail_includes_region_fields(
     }
 
     checkin_response = await client.post(
-        "/api/wines/checkin", files=files, data=data
+        "/api/wines/record", files=files, data=data
     )
     assert checkin_response.status_code == 201
     wine_id = checkin_response.json()["id"]
@@ -111,7 +111,7 @@ async def test_update_wine_region_fields(
     }
 
     checkin_response = await client.post(
-        "/api/wines/checkin", files=files, data=data
+        "/api/wines/record", files=files, data=data
     )
     assert checkin_response.status_code == 201
     wine_id = checkin_response.json()["id"]
@@ -146,7 +146,7 @@ async def test_search_by_sub_region(
         "sub_region": "Côte de Nuits",
         "quantity": "1",
     }
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # Search by sub_region text
     response = await client.get("/api/search?q=Côte de Nuits")
@@ -169,7 +169,7 @@ async def test_search_by_appellation(
         "appellation": "Pomerol",
         "quantity": "1",
     }
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # Search by appellation text
     response = await client.get("/api/search?q=Pomerol")

@@ -71,7 +71,7 @@ async def checkin_wine_via_api(token: str) -> dict:
     async with httpx.AsyncClient(base_url=BASE_URL) as client:
         with open(LABEL_PATH, "rb") as f:
             response = await client.post(
-                "/api/wines/checkin",
+                "/api/wines/record",
                 headers={"Authorization": f"Bearer {token}"},
                 data={
                     "name": "Pinot Noir",

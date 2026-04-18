@@ -1454,7 +1454,7 @@ async function submitRecordWine() {
     }
 
     try {
-        const endpoint = currentRecordWineMode === 'cellar' ? 'wines/checkin' : 'wines/met';
+        const endpoint = currentRecordWineMode === 'cellar' ? 'wines/record' : 'wines/met';
         const response = await fetchWithAuth(`${API_BASE}/${endpoint}`, {
             method: 'POST',
             body: formData
@@ -6181,7 +6181,7 @@ async function handleScanCellarSubmit() {
     }
 
     try {
-        const response = await fetchWithAuth(`${API_BASE}/wines/checkin`, {
+        const response = await fetchWithAuth(`${API_BASE}/wines/record`, {
             method: 'POST',
             body: formData
         });
@@ -6253,7 +6253,7 @@ async function handleManualCellarSubmit(e) {
     }
 
     try {
-        const response = await fetchWithAuth(`${API_BASE}/wines/checkin`, {
+        const response = await fetchWithAuth(`${API_BASE}/wines/record`, {
             method: 'POST',
             body: formData
         });

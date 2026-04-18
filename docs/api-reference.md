@@ -62,7 +62,7 @@ Check if the server is running.
 
 ## Wine Endpoints
 
-### POST /api/wines/checkin
+### POST /api/wines/record
 
 Check in wine bottles to the cellar.
 

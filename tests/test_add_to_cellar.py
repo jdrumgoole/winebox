@@ -64,7 +64,7 @@ async def test_cannot_add_cellar_wine_to_cellar(client: AsyncClient, sample_imag
     files = {
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
-    response = await client.post("/api/wines/checkin", files=files, data={"name": "Cellar Wine", "quantity": "1"})
+    response = await client.post("/api/wines/record", files=files, data={"name": "Cellar Wine", "quantity": "1"})
     cellar_wine = response.json()
 
     response = await client.post(f"/api/wines/{cellar_wine['id']}/add-to-cellar", data={"quantity": "1"})

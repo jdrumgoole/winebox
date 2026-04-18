@@ -91,7 +91,7 @@ async def test_export_wines_json_with_data(client: AsyncClient, sample_image_byt
         "country": "United States",
         "quantity": "3",
     }
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # Export wines
     response = await client.get("/api/export/wines?format=json")
@@ -119,7 +119,7 @@ async def test_export_wines_csv_with_data(client: AsyncClient, sample_image_byte
         "country": "France",
         "quantity": "5",
     }
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # Export wines
     response = await client.get("/api/export/wines?format=csv")
@@ -146,13 +146,13 @@ async def test_export_wines_filter_in_stock(client: AsyncClient, sample_image_by
         "front_label": ("test1.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data1 = {"name": "In Stock Wine", "quantity": "5"}
-    await client.post("/api/wines/checkin", files=files1, data=data1)
+    await client.post("/api/wines/record", files=files1, data=data1)
 
     files2 = {
         "front_label": ("test2.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data2 = {"name": "Out Of Stock Wine", "quantity": "1"}
-    checkin_response = await client.post("/api/wines/checkin", files=files2, data=data2)
+    checkin_response = await client.post("/api/wines/record", files=files2, data=data2)
     wine_id = checkin_response.json()["id"]
 
     # Checkout the second wine to make it out of stock
@@ -177,13 +177,13 @@ async def test_export_wines_filter_country(client: AsyncClient, sample_image_byt
         "front_label": ("test1.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data1 = {"name": "French Wine", "country": "France", "quantity": "1"}
-    await client.post("/api/wines/checkin", files=files1, data=data1)
+    await client.post("/api/wines/record", files=files1, data=data1)
 
     files2 = {
         "front_label": ("test2.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data2 = {"name": "Italian Wine", "country": "Italy", "quantity": "1"}
-    await client.post("/api/wines/checkin", files=files2, data=data2)
+    await client.post("/api/wines/record", files=files2, data=data2)
 
     # Export only French wines
     response = await client.get("/api/export/wines?format=json&country=France")
@@ -203,7 +203,7 @@ async def test_export_wines_exclude_blends_and_scores(client: AsyncClient, sampl
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Simple Wine", "quantity": "1"}
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # Export without blends and scores
     response = await client.get("/api/export/wines?format=json&include_blends=false&include_scores=false")
@@ -261,7 +261,7 @@ async def test_export_transactions_with_data(client: AsyncClient, sample_image_b
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Transaction Test Wine", "quantity": "5"}
-    checkin_response = await client.post("/api/wines/checkin", files=files, data=data)
+    checkin_response = await client.post("/api/wines/record", files=files, data=data)
     wine_id = checkin_response.json()["id"]
 
     # Checkout some wine (creates a CHECK_OUT transaction)
@@ -288,7 +288,7 @@ async def test_export_transactions_csv_with_data(client: AsyncClient, sample_ima
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "CSV Export Wine", "quantity": "3"}
-    await client.post("/api/wines/checkin", files=files, data=data)
+    await client.post("/api/wines/record", files=files, data=data)
 
     # Export transactions
     response = await client.get("/api/export/transactions?format=csv")
@@ -313,7 +313,7 @@ async def test_export_transactions_filter_type(client: AsyncClient, sample_image
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
     data = {"name": "Filter Test Wine", "quantity": "5"}
-    checkin_response = await client.post("/api/wines/checkin", files=files, data=data)
+    checkin_response = await client.post("/api/wines/record", files=files, data=data)
     wine_id = checkin_response.json()["id"]
 
     await client.post(f"/api/wines/{wine_id}/checkout", data={"quantity": "1"})
@@ -335,13 +335,13 @@ async def test_export_transactions_filter_wine_id(client: AsyncClient, sample_im
     files1 = {
         "front_label": ("test1.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
-    checkin1 = await client.post("/api/wines/checkin", files=files1, data={"name": "Wine 1", "quantity": "1"})
+    checkin1 = await client.post("/api/wines/record", files=files1, data={"name": "Wine 1", "quantity": "1"})
     wine1_id = checkin1.json()["id"]
 
     files2 = {
         "front_label": ("test2.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
-    await client.post("/api/wines/checkin", files=files2, data={"name": "Wine 2", "quantity": "1"})
+    await client.post("/api/wines/record", files=files2, data={"name": "Wine 2", "quantity": "1"})
 
     # Export transactions for wine 1 only
     response = await client.get(f"/api/export/transactions?format=json&wine_id={wine1_id}")
@@ -359,7 +359,7 @@ async def test_export_transactions_without_wine_details(client: AsyncClient, sam
     files = {
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
-    await client.post("/api/wines/checkin", files=files, data={"name": "No Details Wine", "quantity": "1"})
+    await client.post("/api/wines/record", files=files, data={"name": "No Details Wine", "quantity": "1"})
 
     # Export without wine details
     response = await client.get("/api/export/transactions?format=json&include_wine_details=false")
@@ -378,7 +378,7 @@ async def test_export_transactions_xlsx(client: AsyncClient, sample_image_bytes:
     files = {
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
-    await client.post("/api/wines/checkin", files=files, data={"name": "Excel Test Wine", "quantity": "2"})
+    await client.post("/api/wines/record", files=files, data={"name": "Excel Test Wine", "quantity": "2"})
 
     response = await client.get("/api/export/transactions?format=xlsx")
     assert response.status_code == 200
@@ -397,7 +397,7 @@ async def test_export_transactions_yaml(client: AsyncClient, sample_image_bytes:
     files = {
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
-    await client.post("/api/wines/checkin", files=files, data={"name": "YAML Test Wine", "quantity": "1"})
+    await client.post("/api/wines/record", files=files, data={"name": "YAML Test Wine", "quantity": "1"})
 
     response = await client.get("/api/export/transactions?format=yaml")
     assert response.status_code == 200

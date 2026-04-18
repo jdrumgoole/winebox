@@ -57,7 +57,7 @@ async def test_checkin_enriches_empty_fields(
         mock_parser.parse.return_value = {"name": wine_name}
 
         response = await client.post(
-            "/api/wines/checkin",
+            "/api/wines/record",
             data={"quantity": "1"},
             files={"front_label": ("label.png", io.BytesIO(sample_image_bytes), "image/png")},
         )
@@ -102,7 +102,7 @@ async def test_checkin_enrichment_preserves_existing_values(
         mock_parser.parse.return_value = {"name": wine_name}
 
         response = await client.post(
-            "/api/wines/checkin",
+            "/api/wines/record",
             data={
                 "name": wine_name,
                 "winery": "My Own Winery",
@@ -150,7 +150,7 @@ async def test_checkin_no_enrichment_when_no_match(
         mock_parser.parse.return_value = {"name": "Totally Unknown Wine XYZZY"}
 
         response = await client.post(
-            "/api/wines/checkin",
+            "/api/wines/record",
             data={"quantity": "1"},
             files={"front_label": ("label.png", io.BytesIO(sample_image_bytes), "image/png")},
         )
@@ -183,7 +183,7 @@ async def test_enriched_fields_in_wine_detail_api(
         mock_parser.parse.return_value = {"name": wine_name}
 
         checkin_resp = await client.post(
-            "/api/wines/checkin",
+            "/api/wines/record",
             data={"quantity": "1"},
             files={"front_label": ("label.png", io.BytesIO(sample_image_bytes), "image/png")},
         )
@@ -222,7 +222,7 @@ async def test_checkin_enrichment_persisted_in_db(
         mock_parser.parse.return_value = {"name": wine_name}
 
         response = await client.post(
-            "/api/wines/checkin",
+            "/api/wines/record",
             data={"quantity": "1"},
             files={"front_label": ("label.png", io.BytesIO(sample_image_bytes), "image/png")},
         )

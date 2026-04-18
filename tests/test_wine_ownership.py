@@ -110,7 +110,7 @@ async def test_user_cannot_see_other_users_wines(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "3"}
-    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    response = await client1.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
     user1_wine_id = response.json()["id"]
 
@@ -142,7 +142,7 @@ async def test_user_cannot_modify_other_users_wines(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "3"}
-    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    response = await client1.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
     user1_wine_id = response.json()["id"]
 
@@ -173,7 +173,7 @@ async def test_user_cannot_checkout_other_users_wines(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "5"}
-    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    response = await client1.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
     user1_wine_id = response.json()["id"]
 
@@ -201,7 +201,7 @@ async def test_user_cannot_see_other_users_transactions(
     # User 1 checks in a wine (creates a transaction)
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "3"}
-    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    response = await client1.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     # User 1 can see their transactions
@@ -228,12 +228,12 @@ async def test_cellar_summary_shows_only_own_wines(
     # User 1 checks in 3 bottles
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "3"}
-    await client1.post("/api/wines/checkin", files=files, data=data)
+    await client1.post("/api/wines/record", files=files, data=data)
 
     # User 2 checks in 2 bottles
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User2 Wine", "quantity": "2"}
-    await client2.post("/api/wines/checkin", files=files, data=data)
+    await client2.post("/api/wines/record", files=files, data=data)
 
     # User 1's cellar summary should show 3 bottles
     response = await client1.get("/api/cellar/summary")
@@ -260,12 +260,12 @@ async def test_cellar_inventory_shows_only_own_wines(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "1"}
-    await client1.post("/api/wines/checkin", files=files, data=data)
+    await client1.post("/api/wines/record", files=files, data=data)
 
     # User 2 checks in a different wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User2 Wine", "quantity": "1"}
-    await client2.post("/api/wines/checkin", files=files, data=data)
+    await client2.post("/api/wines/record", files=files, data=data)
 
     # User 1's cellar should only show their wine
     response = await client1.get("/api/cellar")
@@ -292,12 +292,12 @@ async def test_search_only_searches_own_wines(
     # User 1 checks in a Bordeaux wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "Bordeaux Classic", "region": "Bordeaux", "quantity": "1"}
-    await client1.post("/api/wines/checkin", files=files, data=data)
+    await client1.post("/api/wines/record", files=files, data=data)
 
     # User 2 checks in a different Bordeaux wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "Bordeaux Reserve", "region": "Bordeaux", "quantity": "1"}
-    await client2.post("/api/wines/checkin", files=files, data=data)
+    await client2.post("/api/wines/record", files=files, data=data)
 
     # User 1 searches for Bordeaux - should only find their wine
     response = await client1.get("/api/search?region=Bordeaux")
@@ -324,12 +324,12 @@ async def test_export_only_exports_own_wines(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Export Wine", "quantity": "1"}
-    await client1.post("/api/wines/checkin", files=files, data=data)
+    await client1.post("/api/wines/record", files=files, data=data)
 
     # User 2 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User2 Export Wine", "quantity": "1"}
-    await client2.post("/api/wines/checkin", files=files, data=data)
+    await client2.post("/api/wines/record", files=files, data=data)
 
     # User 1 exports wines - should only include their wine
     response = await client1.get("/api/export/wines?format=json")
@@ -356,12 +356,12 @@ async def test_export_transactions_only_exports_own(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "1"}
-    await client1.post("/api/wines/checkin", files=files, data=data)
+    await client1.post("/api/wines/record", files=files, data=data)
 
     # User 2 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User2 Wine", "quantity": "1"}
-    await client2.post("/api/wines/checkin", files=files, data=data)
+    await client2.post("/api/wines/record", files=files, data=data)
 
     # User 1 exports transactions - should only include their transaction
     response = await client1.get("/api/export/transactions?format=json")
@@ -386,7 +386,7 @@ async def test_user_cannot_access_other_users_wine_grapes(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "1"}
-    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    response = await client1.post("/api/wines/record", files=files, data=data)
     user1_wine_id = response.json()["id"]
 
     # User 1 can access their wine's grape info
@@ -408,7 +408,7 @@ async def test_user_cannot_access_other_users_wine_scores(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "1"}
-    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    response = await client1.post("/api/wines/record", files=files, data=data)
     user1_wine_id = response.json()["id"]
 
     # User 1 can access their wine's scores
@@ -430,7 +430,7 @@ async def test_user_cannot_add_scores_to_other_users_wines(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "1"}
-    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    response = await client1.post("/api/wines/record", files=files, data=data)
     user1_wine_id = response.json()["id"]
 
     # User 2 cannot add a score to user1's wine
@@ -456,14 +456,14 @@ async def test_both_users_can_manage_their_own_wines_independently(
     # User 1 checks in and manages a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "5"}
-    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    response = await client1.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
     user1_wine_id = response.json()["id"]
 
     # User 2 checks in and manages their own wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User2 Wine", "quantity": "3"}
-    response = await client2.post("/api/wines/checkin", files=files, data=data)
+    response = await client2.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
     user2_wine_id = response.json()["id"]
 
@@ -517,13 +517,13 @@ async def test_delete_all_wines_only_deletes_own_wines(
     # User 1 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User1 Wine", "quantity": "2"}
-    response = await client1.post("/api/wines/checkin", files=files, data=data)
+    response = await client1.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     # User 2 checks in a wine
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": "User2 Wine", "quantity": "3"}
-    response = await client2.post("/api/wines/checkin", files=files, data=data)
+    response = await client2.post("/api/wines/record", files=files, data=data)
     assert response.status_code == 201
 
     # User 1 deletes all their wines

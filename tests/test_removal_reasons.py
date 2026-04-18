@@ -10,7 +10,7 @@ async def _checkin_wine(client: AsyncClient, sample_image_bytes: bytes, name: st
     """Helper to check in a wine and return its ID."""
     files = {"front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png")}
     data = {"name": name, "quantity": str(quantity)}
-    response = await client.post("/api/wines/checkin", files=files, data=data)
+    response = await client.post("/api/wines/record", files=files, data=data)
     assert response.status_code in (200, 201)
     return response.json()["id"]
 
