@@ -186,6 +186,72 @@ export WINEBOX_DEBUG=true
 export WINEBOX_USE_CLAUDE_VISION=false
 ```
 
+## All Environment Variables
+
+A full reference of every `WINEBOX_*` variable the code reads, where it's
+used, and whether it's required.
+
+### Runtime — required
+
+| Variable | Used by | Purpose |
+|----------|---------|---------|
+| `WINEBOX_SECRET_KEY` | server | Signs JWT tokens. **Must be set in production** or JWTs are invalidated on every restart. |
+| `WINEBOX_MONGODB_URL` | server | MongoDB connection string (e.g. `mongodb+srv://…`). |
+| `WINEBOX_DATABASE` | server | Database name. Use `winebox-oat` for OAT and local dev; `winebox` for production. |
+
+### Runtime — optional
+
+| Variable | Used by | Purpose |
+|----------|---------|---------|
+| `WINEBOX_HOST` / `WINEBOX_SERVER_HOST` | server | Bind address (default `127.0.0.1`). |
+| `WINEBOX_PORT` | server | Bind port (default `8000`). |
+| `WINEBOX_DEBUG` | server | Enable debug mode. |
+| `WINEBOX_USE_CLAUDE_VISION` | server | `false` disables Claude Vision and forces Tesseract (saves API spend in tests). |
+| `WINEBOX_REGISTRATION_ENABLED` / `WINEBOX_AUTH_REGISTRATION_ENABLED` | server | Allow self-service registration. |
+| `WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED` | server | Require email verification before login. |
+| `WINEBOX_ANTHROPIC_API_KEY` | Claude Vision, AI column mapping | Anthropic API key. Vision falls back to Tesseract when absent. |
+| `WINEBOX_POSTHOG_API_KEY` | analytics | PostHog project key (no-op if empty). |
+| `WINEBOX_POSTHOG_ENABLED` | analytics | Disable PostHog without removing the key. |
+| `WINEBOX_RATE_LIMIT_DISABLED` | rate limiter | Disable per-IP/per-user limits (tests use this). |
+| `WINEBOX_ALLOW_PRODUCTION_DB` | startup safety guard | Set to `1` to explicitly allow connecting to `winebox`. Without this, production-db connections from non-production hostnames raise. |
+
+### Backups (S3)
+
+| Variable | Used by | Purpose |
+|----------|---------|---------|
+| `WINEBOX_S3_BUCKET` | `scripts/mongodb_backup.py` | S3 bucket for mongodump tarballs. |
+| `WINEBOX_S3_PREFIX` | `scripts/mongodb_backup.py` | Optional key prefix within the bucket. |
+
+AWS credentials use the `winebox_backup` profile — see the backup script
+for details.
+
+### Deployment (DigitalOcean)
+
+| Variable | Used by | Purpose |
+|----------|---------|---------|
+| `WINEBOX_DO_TOKEN` | `tasks.py` | DigitalOcean API token used to look up droplet IPs. |
+| `WINEBOX_DROPLET_NAME` | `tasks.py` | Which droplet to target (e.g. `winebox-oat`). |
+| `WINEBOX_DROPLET_IP` | `tasks.py` | Override the droplet IP lookup. |
+| `WINEBOX_DROPLET_USER` | `tasks.py` | SSH user on the droplet (default `winebox`). |
+| `WINEBOX_DOMAIN` | `tasks.py` | Public domain (e.g. `booze.winebox.app`). |
+| `WINEBOX_NGINX_CONF` | `tasks.py` | Which nginx site config to sync. |
+
+### Testing
+
+| Variable | Used by | Purpose |
+|----------|---------|---------|
+| `WINEBOX_TEST_URL` | E2E tests | Base URL under test (when running E2E against remote servers like OAT). |
+| `WINEBOX_TEST_USER` / `WINEBOX_TEST_PASSWORD` | E2E tests | Pre-provisioned account used when `WINEBOX_TEST_URL` is set. |
+| `WINEBOX_PROD_TEST_USER` / `WINEBOX_PROD_TEST_PASSWORD` | `tests/test_production_login.py` | Production smoke-test credentials. |
+| `WINEBOX_URL` | CLI scripts | Base URL for manual ad-hoc scripts in `scripts/`. |
+| `WINEBOX_ADMIN` | CLI | Admin email for `winebox-admin` CLI. |
+
+### Legacy / migration-only
+
+| Variable | Used by | Purpose |
+|----------|---------|---------|
+| `WINEBOX_SQLITE_PATH` | `scripts/migrations/migrate_sqlite_to_mongo.py` | Path to the pre-migration SQLite database. Kept for historical migrations. |
+
 ## Configuration Sections
 
 ### Server
