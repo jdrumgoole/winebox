@@ -27,6 +27,16 @@ from .mapping import (
     suggest_column_mapping,
     suggest_column_mapping_ai,
 )
+from .batch_ops import (
+    BatchNotCompletedError,
+    BatchNotRollbackableError,
+    InvalidMappingError,
+    RemapResult,
+    RollbackResult,
+    apply_column_remap,
+    rollback_batch,
+    summarize_batch_wines,
+)
 from .parsers import parse_csv, parse_xlsx
 from .processor import process_import_batch, process_import_batch_streaming
 from .utils import chunked
@@ -62,6 +72,15 @@ __all__ = [
     # Processor
     "process_import_batch",
     "process_import_batch_streaming",
+    # Batch operations
+    "apply_column_remap",
+    "rollback_batch",
+    "summarize_batch_wines",
+    "BatchNotCompletedError",
+    "BatchNotRollbackableError",
+    "InvalidMappingError",
+    "RemapResult",
+    "RollbackResult",
     # Utils
     "chunked",
 ]

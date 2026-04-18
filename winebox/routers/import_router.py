@@ -31,13 +31,19 @@ from winebox.services.rate_limit import make_limiter
 from winebox.services.import_service import (
     UPLOAD_CHUNK_SIZE,
     VALID_WINE_FIELDS,
+    BatchNotCompletedError,
+    BatchNotRollbackableError,
+    InvalidMappingError,
+    apply_column_remap,
     assess_mapping_confidence,
     parse_csv,
     parse_xlsx,
     process_import_batch,
     process_import_batch_streaming,
+    rollback_batch,
     suggest_column_mapping,
     suggest_column_mapping_ai,
+    summarize_batch_wines,
 )
 
 logger = logging.getLogger(__name__)
@@ -564,49 +570,21 @@ async def undo_import(
     """Undo an import by deleting all wines created from a batch.
 
     Allowed for COMPLETED or PROCESSING batches (partial imports).
-    Deletes all wines where import_batch_id matches and sets batch
-    status to ROLLED_BACK.
     """
     batch = await _get_user_batch(batch_id, current_user.id)
 
-    if batch.status not in (ImportStatus.COMPLETED, ImportStatus.PROCESSING):
+    try:
+        result = await rollback_batch(batch)
+    except BatchNotRollbackableError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only completed or in-progress imports can be undone",
+            detail=str(exc),
         )
 
-    # Delete all wines created by this batch for this user
-    wines_col = Wine.get_pymongo_collection()
-    result = await wines_col.delete_many({
-        "owner_id": batch.owner_id,
-        "import_batch_id": batch.id,
-    })
-
-    # Delete corresponding cellar items and events
-    from winebox.models.cellar import CellarItem
-    from winebox.models.cellar_event import CellarEvent
-    await CellarItem.get_pymongo_collection().delete_many({
-        "cellar_id": batch.owner_id,
-        "import_batch_id": batch.id,
-    })
-    await CellarEvent.get_pymongo_collection().delete_many({
-        "cellar_id": batch.owner_id,
-        "import_batch_id": batch.id,
-    })
-
-    # Mark batch as rolled back
-    batch.status = ImportStatus.ROLLED_BACK
-    await batch.save()
-
-    logger.info(
-        "Undid import batch %s: deleted %d wines for user %s",
-        batch_id, result.deleted_count, current_user.id,
-    )
-
     return {
-        "wines_deleted": result.deleted_count,
+        "wines_deleted": result.wines_deleted,
         "batch_id": batch_id,
-        "status": ImportStatus.ROLLED_BACK.value,
+        "status": result.status,
     }
 
 
@@ -652,121 +630,25 @@ async def remap_unmapped_columns(
     current_user: RequireAuth,
     request: ColumnMappingRequest,
 ) -> dict:
-    """Remap previously-unmapped columns: load raw rows, find wines by batch, update them."""
+    """Remap previously-unmapped columns into wine or custom fields."""
     batch = await _get_user_batch(batch_id, current_user.id)
 
-    if batch.status != ImportStatus.COMPLETED:
+    try:
+        result = await apply_column_remap(batch, current_user.id, request.mapping)
+    except BatchNotCompletedError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Batch must be completed before remapping",
+            detail=str(exc),
+        )
+    except InvalidMappingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
         )
 
-    # Validate new mapping targets
-    for header, field in request.mapping.items():
-        if field == "skip":
-            continue
-        if field.startswith("custom:"):
-            if not field[7:]:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Custom field name cannot be empty for column '{header}'",
-                )
-            continue
-        if field not in VALID_WINE_FIELDS:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid mapping target '{field}' for column '{header}'",
-            )
-
-    # Find all wines from this batch
-    wines = await Wine.find(
-        {"import_batch_id": batch.id, "owner_id": current_user.id}
-    ).to_list()
-
-    if not wines:
-        return {"wines_updated": 0, "fields_added": []}
-
-    # Build a lookup from raw_uploads: index -> row data
-    collection = RawUploadRow.get_pymongo_collection()
-    cursor = collection.find({"batch_id": batch.id}).sort("index", 1)
-    raw_rows_by_index: dict[int, dict] = {}
-    async for doc in cursor:
-        raw_rows_by_index[doc["index"]] = doc.get("row", {})
-
-    # We need to match wines to raw rows. Since wines were created in order,
-    # we'll iterate raw rows and match by wine name as a best effort.
-    # Build index: (name, row_index) -> raw row
-    wines_updated = 0
-    fields_added = set()
-
-    # Create a mapping from wine name to wine objects for matching
-    # Since multiple wines could have the same name, we use a list
-    from collections import defaultdict
-    wine_by_name: dict[str, list[Wine]] = defaultdict(list)
-    for wine in wines:
-        wine_by_name[wine.name].append(wine)
-
-    # Process raw rows in order
-    name_header = None
-    if batch.column_mapping:
-        for h, f in batch.column_mapping.items():
-            if f == "name":
-                name_header = h
-                break
-
-    from pymongo import UpdateOne
-    bulk_ops = []
-
-    for idx in sorted(raw_rows_by_index.keys()):
-        raw_row = raw_rows_by_index[idx]
-        if not name_header:
-            continue
-
-        row_name = str(raw_row.get(name_header, "")).strip()
-        if not row_name or row_name not in wine_by_name or not wine_by_name[row_name]:
-            continue
-
-        wine = wine_by_name[row_name].pop(0)
-        updates: dict[str, Any] = {}
-
-        for header, field in request.mapping.items():
-            if field == "skip":
-                continue
-            value = str(raw_row.get(header, "")).strip()
-            if not value:
-                continue
-
-            if field.startswith("custom:"):
-                custom_name = field[7:]
-                updates[f"custom_fields.{custom_name}"] = value
-                fields_added.add(custom_name)
-            elif field in VALID_WINE_FIELDS:
-                current_val = getattr(wine, field, None)
-                if current_val is None or current_val == "" or current_val == 0:
-                    updates[field] = value
-                    fields_added.add(field)
-
-        if updates:
-            bulk_ops.append(UpdateOne({"_id": wine.id}, {"$set": updates}))
-            wines_updated += 1
-
-    # Execute all updates in one round-trip
-    if bulk_ops:
-        wines_col = Wine.get_pymongo_collection()
-        await wines_col.bulk_write(bulk_ops, ordered=False)
-
-    # Update batch to remove remapped headers from unmapped_headers
-    remapped_headers = [h for h, f in request.mapping.items() if f != "skip"]
-    batch.unmapped_headers = [h for h in batch.unmapped_headers if h not in remapped_headers]
-
-    # Merge the new mapping into the batch's column_mapping
-    if batch.column_mapping:
-        batch.column_mapping.update(request.mapping)
-    await batch.save()
-
     return {
-        "wines_updated": wines_updated,
-        "fields_added": sorted(fields_added),
+        "wines_updated": result.wines_updated,
+        "fields_added": result.fields_added,
     }
 
 
@@ -777,64 +659,7 @@ async def get_batch_wines(
 ) -> dict:
     """Return wines created by this import batch with summary stats."""
     batch = await _get_user_batch(batch_id, current_user.id)
-
-    wines = await Wine.find(
-        {"import_batch_id": batch.id, "owner_id": current_user.id}
-    ).to_list()
-
-    # Build summary stats
-    wine_types: dict[str, int] = {}
-    countries: dict[str, int] = {}
-    grapes: dict[str, int] = {}
-    vintages: dict[str, int] = {}
-
-    for wine in wines:
-        if wine.wine_type_id:
-            wine_types[wine.wine_type_id] = wine_types.get(wine.wine_type_id, 0) + 1
-        if wine.country:
-            countries[wine.country] = countries.get(wine.country, 0) + 1
-        if wine.grape_variety:
-            grapes[wine.grape_variety] = grapes.get(wine.grape_variety, 0) + 1
-        if wine.vintage:
-            vintages[str(wine.vintage)] = vintages.get(str(wine.vintage), 0) + 1
-
-    # Serialize wines (match cellar format). Strip owner_id — the requester
-    # already owns these wines (we filter by current_user.id), so leaking the
-    # raw ObjectId in the response only adds enumeration surface.
-    wine_list = []
-    for wine in wines:
-        wine_dict = wine.model_dump(mode="json")
-        wine_dict["id"] = str(wine.id)
-        wine_dict.pop("owner_id", None)
-        wine_list.append(wine_dict)
-
-    total_bottles = sum(
-        (w.inventory.quantity if w.inventory else 0) for w in wines
-    )
-
-    # Count cases created for this batch from cellars collection
-    from winebox.models.cellar import CellarItem
-    total_cases = 0
-    if batch.id:
-        total_cases = await CellarItem.get_pymongo_collection().count_documents(
-            {"cellar_id": current_user.id, "item_type": "case", "import_batch_id": batch.id}
-        )
-
-    return {
-        "batch_id": str(batch.id),
-        "filename": batch.filename,
-        "wines": wine_list,
-        "summary": {
-            "wines_created": len(wines),
-            "total_bottles": total_bottles,
-            "total_cases": total_cases,
-            "by_wine_type": wine_types,
-            "by_country": countries,
-            "by_grape_variety": grapes,
-            "by_vintage": vintages,
-        },
-        "unmapped_headers": batch.unmapped_headers,
-    }
+    return await summarize_batch_wines(batch, current_user.id)
 
 
 async def _get_user_batch(batch_id: str, owner_id: PyObjectId) -> ImportBatch:
