@@ -69,7 +69,7 @@ AUTO_MAPPED = {
     "Country": "country",
     "Region": "region",
     "Vintage": "vintage",
-    "Colour": "wine_type_id",
+    "Colour": "wine_type",
 }
 
 # Columns expected to default to custom fields (not auto-mapped)

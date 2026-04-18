@@ -113,7 +113,7 @@ async def migrate(database: str, dry_run: bool = False) -> None:
                 "grape_variety": wine.get("grape_variety"),
                 "country": wine.get("country"),
                 "region": wine.get("region"),
-                "wine_type": wine.get("wine_type_id"),
+                "wine_type": wine.get("wine_type"),
                 "created_at": now,
             })
             event_docs.append({

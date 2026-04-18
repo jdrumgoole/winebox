@@ -1430,7 +1430,7 @@ async function submitRecordWine() {
     const alcohol = document.getElementById('confirm-alcohol').value;
     if (alcohol) formData.append('alcohol_percentage', alcohol);
     const wineTypeId = document.getElementById('confirm-wine-type').value;
-    if (wineTypeId) formData.append('wine_type_id', wineTypeId);
+    if (wineTypeId) formData.append('wine_type', wineTypeId);
     formData.append('notes', document.getElementById('confirm-notes').value);
 
     // Include pre-scanned OCR text to avoid rescanning (saves API costs)
@@ -2500,7 +2500,7 @@ function renderCellarTable(containerId, wines) {
         if (wine.appellation) additionalFields.push(['Appellation', `<span class="${ef.includes('appellation') ? 'enriched' : ''}">${escapeHtml(wine.appellation)}</span>`]);
         if (wine.classification) additionalFields.push(['Classification', `<span class="${ef.includes('classification') ? 'enriched' : ''}">${escapeHtml(wine.classification)}</span>`]);
         if (wine.alcohol_percentage) additionalFields.push(['Alcohol', `<span class="${ef.includes('alcohol_percentage') ? 'enriched' : ''}">${escapeHtml(String(wine.alcohol_percentage))}%</span>`]);
-        if (wine.wine_type_id) additionalFields.push(['Wine Type', `<span class="${ef.includes('wine_type_id') ? 'enriched' : ''}">${escapeHtml(wine.wine_type_id)}</span>`]);
+        if (wine.wine_type) additionalFields.push(['Wine Type', `<span class="${ef.includes('wine_type') ? 'enriched' : ''}">${escapeHtml(wine.wine_type)}</span>`]);
         if (wine.price_tier) additionalFields.push(['Price Tier', `<span class="${ef.includes('price_tier') ? 'enriched' : ''}">${escapeHtml(wine.price_tier)}</span>`]);
         if (wine.notes) additionalFields.push(['Notes', escapeHtml(wine.notes)]);
         if (wine.custom_fields) {
@@ -4724,7 +4724,7 @@ async function showAugmentUI(batchId) {
             region:              { label: 'Region', group: 'basics' },
             sub_region:          { label: 'Sub-Region', group: 'details' },
             appellation:         { label: 'Appellation', group: 'details' },
-            wine_type_id:        { label: 'Wine Style', group: 'details' },
+            wine_type:        { label: 'Wine Style', group: 'details' },
             classification:      { label: 'Classification', group: 'details' },
             alcohol_percentage:  { label: 'Alcohol (ABV)', group: 'details' },
             price_tier:          { label: 'Price Range', group: 'details' },
@@ -4988,7 +4988,7 @@ function renderMappingStep(data) {
         region:              { label: 'Region',               hint: 'The wine region, e.g. "Bordeaux", "Napa Valley"', group: 'basics' },
         sub_region:          { label: 'Sub-Region',           hint: 'A smaller area within the region, e.g. "Pauillac" within Bordeaux', group: 'details' },
         appellation:         { label: 'Appellation',          hint: 'The official wine-growing designation, e.g. "AOC Saint-Émilion"', group: 'details' },
-        wine_type_id:        { label: 'Wine Style',           hint: 'Red, White, Rosé, Sparkling, Dessert, etc.', group: 'details' },
+        wine_type:        { label: 'Wine Style',           hint: 'Red, White, Rosé, Sparkling, Dessert, etc.', group: 'details' },
         classification:      { label: 'Classification',       hint: 'Quality ranking, e.g. "Grand Cru", "Reserva", "First Growth"', group: 'details' },
         alcohol_percentage:  { label: 'Alcohol (ABV)',        hint: 'Alcohol by volume as a number, e.g. "13.5"', group: 'details' },
         price_tier:          { label: 'Price Range',          hint: 'Budget, Mid-range, Premium, or Luxury', group: 'details' },
@@ -6161,7 +6161,7 @@ async function handleScanCellarSubmit() {
     const country = document.getElementById('scan-country').value;
     if (country) formData.append('country', country);
     const wineType = document.getElementById('scan-wine-type').value;
-    if (wineType) formData.append('wine_type_id', wineType);
+    if (wineType) formData.append('wine_type', wineType);
     let scanQty = parseInt(document.getElementById('scan-quantity').value) || 1;
     const scanUnit = document.getElementById('scan-quantity-unit').value;
     if (scanUnit === 'cases') {
@@ -6237,7 +6237,7 @@ async function handleManualCellarSubmit(e) {
     const country = document.getElementById('manual-country').value;
     if (country) formData.append('country', country);
     const wineType = document.getElementById('manual-wine-type').value;
-    if (wineType) formData.append('wine_type_id', wineType);
+    if (wineType) formData.append('wine_type', wineType);
     let manualQty = parseInt(document.getElementById('manual-quantity').value) || 1;
     const manualUnit = document.getElementById('manual-quantity-unit').value;
     if (manualUnit === 'cases') {

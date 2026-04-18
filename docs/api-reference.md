@@ -373,7 +373,7 @@ Export wine collection in various formats.
 | include_blends | boolean | No | Include grape blend summaries (default: true) |
 | include_scores | boolean | No | Include score summaries (default: true) |
 
-**CSV/XLSX columns**: `id`, `name`, `winery`, `vintage`, `grape_variety`, `region`, `country`, `alcohol_percentage`, `wine_type_id`, `price_tier`, `quantity`, `inventory_updated_at`, `grape_blend_summary`, `scores_summary`, `average_score`, `created_at`, `updated_at`, plus any custom field columns.
+**CSV/XLSX columns**: `id`, `name`, `winery`, `vintage`, `grape_variety`, `region`, `country`, `alcohol_percentage`, `wine_type`, `price_tier`, `quantity`, `inventory_updated_at`, `grape_blend_summary`, `scores_summary`, `average_score`, `created_at`, `updated_at`, plus any custom field columns.
 
 Custom fields are expanded into individual columns (sorted alphabetically) rather than a single JSON blob. For example, if wines have custom fields "Purchase Price" and "Cellar Location", those appear as separate columns in the export.
 
@@ -449,7 +449,7 @@ Set or update column mapping for an import batch.
 }
 ```
 
-Valid mapping targets: `name`, `winery`, `vintage`, `grape_variety`, `region`, `sub_region`, `appellation`, `country`, `alcohol_percentage`, `wine_type_id`, `classification`, `price_tier`, `quantity`, `notes`, `custom:<field_name>`, or `skip`.
+Valid mapping targets: `name`, `winery`, `vintage`, `grape_variety`, `region`, `sub_region`, `appellation`, `country`, `alcohol_percentage`, `wine_type`, `classification`, `price_tier`, `quantity`, `notes`, `custom:<field_name>`, or `skip`.
 
 **Response**: `200 OK` (updated batch info)
 

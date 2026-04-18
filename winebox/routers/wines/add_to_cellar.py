@@ -58,7 +58,7 @@ async def add_met_wine_to_cellar(
         country=met_wine.country,
         classification=met_wine.classification,
         alcohol_percentage=met_wine.alcohol_percentage,
-        wine_type_id=met_wine.wine_type_id,
+        wine_type=met_wine.wine_type,
         wine_subtype=met_wine.wine_subtype,
         price_tier=met_wine.price_tier,
         drink_window_start=met_wine.drink_window_start,

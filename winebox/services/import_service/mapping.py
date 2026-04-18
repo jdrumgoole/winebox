@@ -137,7 +137,7 @@ Instructions:
   name (REQUIRED), winery, vintage, grape_variety, country, region.
   Rows without "name" mapped will be skipped entirely.
 - Consider typos, abbreviations, and non-English headers (French, Italian, Spanish, German, etc.).
-- Use sample values to disambiguate ambiguous headers (e.g. "Type" with values "Red", "White" -> "wine_type_id").
+- Use sample values to disambiguate ambiguous headers (e.g. "Type" with values "Red", "White" -> "wine_type").
 - If a column doesn't match any wine field, use "custom:<original header name>" to preserve it as a custom field.
 - Do NOT use "skip". Map every column to either a wine field or a custom field.
 - Return ONLY a JSON object mapping each header to its target field. No extra text.

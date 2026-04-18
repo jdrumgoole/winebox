@@ -28,7 +28,7 @@ class WineFlatExport(BaseModel):
     region: str | None = None
     country: str | None = None
     alcohol_percentage: float | None = None
-    wine_type_id: str | None = None
+    wine_type: str | None = None
     price_tier: str | None = None
     quantity: int = 0
     inventory_updated_at: datetime | None = None
@@ -95,7 +95,7 @@ class WineFlatExport(BaseModel):
             region=wine.region,
             country=wine.country,
             alcohol_percentage=wine.alcohol_percentage,
-            wine_type_id=wine.wine_type_id,
+            wine_type=wine.wine_type,
             price_tier=wine.price_tier,
             quantity=wine.inventory.quantity if wine.inventory else 0,
             inventory_updated_at=wine.inventory.updated_at if wine.inventory else None,

@@ -31,7 +31,7 @@ def _wine_to_base_row(wine: WineFlatExport) -> list[Any]:
         wine.region or "",
         wine.country or "",
         wine.alcohol_percentage or "",
-        wine.wine_type_id or "",
+        wine.wine_type or "",
         wine.price_tier or "",
         wine.quantity,
         format_datetime(wine.inventory_updated_at),

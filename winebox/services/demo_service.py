@@ -189,7 +189,7 @@ async def select_demo_wines() -> list[dict[str, Any]]:
                 "region": doc.get("region_name"),
                 "country": doc.get("country"),
                 "alcohol_percentage": doc.get("abv"),
-                "wine_type_id": _TYPE_MAP.get(wine_type, "red"),
+                "wine_type": _TYPE_MAP.get(wine_type, "red"),
                 "xwines_id": doc.get("xwines_id"),
                 "quantity": quantity,
                 "case_size": case_size,
@@ -248,7 +248,7 @@ async def _flush_wine_batch(
         embedded = EmbeddedWine(
             wine_id=w.id, name=w.name, winery=w.winery,
             vintage=w.vintage, grape_variety=w.grape_variety,
-            country=w.country, region=w.region, wine_type=w.wine_type_id,
+            country=w.country, region=w.region, wine_type=w.wine_type,
             estimated_price_low=w.estimated_price_low,
             estimated_price_high=w.estimated_price_high,
             price_tier=w.price_tier,
@@ -336,8 +336,8 @@ async def install_demo_data(owner_id: PyObjectId, sample_wines: list[dict[str, A
         total_bottles += quantity
         if data.get("country"):
             countries.add(data["country"])
-        if data.get("wine_type_id"):
-            wine_types.add(data["wine_type_id"])
+        if data.get("wine_type"):
+            wine_types.add(data["wine_type"])
 
         if quantity >= 3:
             checkout_candidates.append((wine_id, quantity))

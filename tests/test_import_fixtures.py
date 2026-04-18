@@ -68,7 +68,7 @@ async def test_standard_collection_full_import(client: AsyncClient) -> None:
         "Country": "country",
         "Region": "region",
         "Grape": "grape_variety",
-        "Type": "wine_type_id",
+        "Type": "wine_type",
         "Quantity": "quantity",
         "Price": "price_tier",
         "Notes": "notes",
@@ -87,7 +87,7 @@ async def test_standard_collection_full_import(client: AsyncClient) -> None:
     assert margaux["country"] == "France"
     assert margaux["region"] == "Bordeaux"
     assert margaux["grape_variety"] == "Cabernet Sauvignon"
-    assert margaux["wine_type_id"] == "Red"
+    assert margaux["wine_type"] == "Red"
     assert margaux["inventory"]["quantity"] == 2
     assert margaux["price_tier"] == "$850"
 
@@ -99,7 +99,7 @@ async def test_standard_collection_full_import(client: AsyncClient) -> None:
     }
 
     # Verify all wine types
-    types = {w["wine_type_id"] for w in wines.values() if w.get("wine_type_id")}
+    types = {w["wine_type"] for w in wines.values() if w.get("wine_type")}
     assert types == {"Red", "White", "Sparkling", "Dessert", "Rose", "Fortified"}
 
 
@@ -139,7 +139,7 @@ async def test_mixed_beverages_filtering(client: AsyncClient) -> None:
         "Producer": "winery",
         "Year": "vintage",
         "Country": "country",
-        "Type": "wine_type_id",
+        "Type": "wine_type",
         "Quantity": "quantity",
     }, skip_non_wine=True)
 
@@ -167,7 +167,7 @@ async def test_mixed_beverages_no_filtering(client: AsyncClient) -> None:
         "Producer": "winery",
         "Year": "vintage",
         "Country": "country",
-        "Type": "wine_type_id",
+        "Type": "wine_type",
         "Quantity": "quantity",
     }, skip_non_wine=False)
 
@@ -294,7 +294,7 @@ async def test_duplicates_cross_import_partial(client: AsyncClient) -> None:
         "Country": "country",
         "Region": "region",
         "Grape": "grape_variety",
-        "Type": "wine_type_id",
+        "Type": "wine_type",
         "Quantity": "quantity",
         "Price": "price_tier",
         "Notes": "notes",
@@ -397,7 +397,7 @@ async def test_custom_fields_rich(client: AsyncClient) -> None:
         "Producer": "winery",
         "Vintage": "vintage",
         "Country": "country",
-        "Type": "wine_type_id",
+        "Type": "wine_type",
         "Quantity": "quantity",
         "Cellar Location": "custom:Cellar Location",
         "Purchase Price": "custom:Purchase Price",
@@ -471,7 +471,7 @@ async def test_auto_mapping_standard_headers(client: AsyncClient) -> None:
     assert suggested["Country"] == "country"
     assert suggested["Region"] == "region"
     assert suggested["Grape"] == "grape_variety"  # "grape" alias
-    assert suggested["Type"] == "wine_type_id"  # "type" alias
+    assert suggested["Type"] == "wine_type"  # "type" alias
     assert suggested["Quantity"] == "quantity"
     assert suggested["Price"] == "price_tier"  # "price" alias
     assert suggested["Notes"] == "notes"
@@ -517,7 +517,7 @@ async def test_undo_standard_collection(client: AsyncClient) -> None:
         "Country": "country",
         "Region": "region",
         "Grape": "grape_variety",
-        "Type": "wine_type_id",
+        "Type": "wine_type",
         "Quantity": "quantity",
         "Price": "price_tier",
         "Notes": "notes",
@@ -547,7 +547,7 @@ async def test_case_import_creates_cases(client: AsyncClient) -> None:
         "Producer": "winery",
         "Vintage": "vintage",
         "Country": "country",
-        "Type": "wine_type_id",
+        "Type": "wine_type",
         "Quantity": "quantity",
         "Case Size": "case_size",
         "Purchase Date": "purchase_date",
@@ -589,7 +589,7 @@ async def test_case_import_bottles_per_case(client: AsyncClient) -> None:
         "Producer": "winery",
         "Vintage": "vintage",
         "Country": "country",
-        "Type": "wine_type_id",
+        "Type": "wine_type",
         "Quantity": "quantity",
         "Case Size": "case_size",
     })

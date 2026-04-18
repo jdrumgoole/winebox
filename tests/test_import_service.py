@@ -177,21 +177,21 @@ def test_suggest_mapping_unknown_custom() -> None:
 def test_non_wine_whiskey() -> None:
     """Test whiskey row is flagged as non-wine."""
     row = {"Type": "Whiskey", "Name": "Jameson"}
-    mapping = {"Type": "wine_type_id", "Name": "name"}
+    mapping = {"Type": "wine_type", "Name": "name"}
     assert is_non_wine_row(row, mapping) is True
 
 
 def test_non_wine_bourbon_in_name() -> None:
     """Test bourbon in name column is flagged."""
     row = {"Type": "Spirit", "Name": "Maker's Mark Bourbon"}
-    mapping = {"Type": "wine_type_id", "Name": "name"}
+    mapping = {"Type": "wine_type", "Name": "name"}
     assert is_non_wine_row(row, mapping) is True
 
 
 def test_non_wine_passes_red() -> None:
     """Test that red wine is not flagged."""
     row = {"Type": "Red", "Name": "Chateau Margaux"}
-    mapping = {"Type": "wine_type_id", "Name": "name"}
+    mapping = {"Type": "wine_type", "Name": "name"}
     assert is_non_wine_row(row, mapping) is False
 
 
@@ -208,7 +208,7 @@ def test_non_wine_keyword_embedded_in_name() -> None:
     Regression test: 'ale' was matching inside 'NeroBufaleffj' (Gulfi wine).
     """
     row = {"Name": "NeroBufaleffj, Gulfi, Sicily, Italy", "Type": "Red"}
-    mapping = {"Name": "name", "Type": "wine_type_id"}
+    mapping = {"Name": "name", "Type": "wine_type"}
     assert is_non_wine_row(row, mapping) is False
 
 

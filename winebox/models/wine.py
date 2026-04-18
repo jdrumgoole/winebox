@@ -93,7 +93,7 @@ class Wine(MongoDocument):
     back_label_image_path: Optional[str] = None
 
     # Taxonomy fields
-    wine_type_id: Optional[str] = None  # Reference to WineType
+    wine_type: Optional[str] = None  # Reference to WineType
     wine_subtype: Optional[str] = None  # e.g., 'full_bodied', 'champagne'
     classification: Optional[str] = None  # e.g., Grand Cru, DOCG, Reserve
     price_tier: Optional[str] = None  # 'budget', 'value', etc.
