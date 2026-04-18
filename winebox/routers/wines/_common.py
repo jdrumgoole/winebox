@@ -1,10 +1,15 @@
 """Common utilities and service instances for wine endpoints."""
 
 import logging
+from typing import Any
 
+from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import HTTPException, UploadFile, status
+from pydantic import ValidationError
 
 from winebox.config import settings
+from winebox.models import Wine
 from winebox.services.image_storage import ImageStorageService
 from winebox.services.ocr import OCRService
 from winebox.services.vision import ClaudeVisionService
@@ -48,6 +53,27 @@ async def validate_upload_size(upload_file: UploadFile, field_name: str) -> byte
             detail=f"{field_name} exceeds maximum allowed size of {max_mb:.1f} MB",
         )
     return content
+
+
+async def get_wine_or_404(wine_id: str, owner_id: Any) -> Wine:
+    """Look up a wine by ID for the given owner, or raise 404.
+
+    Centralises the InvalidId/ValidationError → 404 translation so every
+    wine endpoint returns the same shape of error for a missing or
+    malformed ID.
+    """
+    try:
+        wine = await Wine.find_one({"_id": ObjectId(wine_id), "owner_id": owner_id})
+    except (InvalidId, ValidationError) as e:
+        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
+        wine = None
+
+    if not wine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Wine with ID {wine_id} not found",
+        )
+    return wine
 
 
 def get_media_type(filename: str | None) -> str:

@@ -16,6 +16,7 @@ from .constants import (
     HEADER_FILL,
     HEADER_FONT,
     XWINES_HEADERS,
+    format_exported_at,
 )
 
 
@@ -115,7 +116,7 @@ def export_xwines_to_yaml(
     export_data = {
         "xwines": xwines,
         "export_info": {
-            "exported_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "exported_at": format_exported_at(),
             "total_count": len(xwines),
             "format": "yaml",
             "filters_applied": filters_applied,

@@ -68,6 +68,16 @@ def format_datetime(dt: datetime | None) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def format_exported_at() -> str:
+    """Return the current UTC time as an ISO 8601 string with a Z suffix.
+
+    Produces a form like ``2026-04-17T12:34:56.789012Z`` — ``.isoformat()``
+    alone on a timezone-aware datetime emits ``+00:00``, which some
+    downstream parsers do not accept.
+    """
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
 def generate_filename(export_type: str, export_format: ExportFormat) -> str:
     """Generate a standardized filename for exports.
 

@@ -28,7 +28,7 @@ class AddCaseRequest(BaseModel):
 
     name: str = Field(..., max_length=500)
     winery: Optional[str] = Field(None, max_length=500)
-    vintage: Optional[int] = Field(None, ge=1000, le=2100)
+    vintage: Optional[int] = Field(None, ge=1900, le=2100)
     grape_variety: Optional[str] = Field(None, max_length=500)
     country: Optional[str] = Field(None, max_length=255)
     region: Optional[str] = Field(None, max_length=255)
@@ -46,7 +46,7 @@ class AddBottlesRequest(BaseModel):
 
     name: str = Field(..., max_length=500)
     winery: Optional[str] = Field(None, max_length=500)
-    vintage: Optional[int] = Field(None, ge=1000, le=2100)
+    vintage: Optional[int] = Field(None, ge=1900, le=2100)
     grape_variety: Optional[str] = Field(None, max_length=500)
     country: Optional[str] = Field(None, max_length=255)
     region: Optional[str] = Field(None, max_length=255)

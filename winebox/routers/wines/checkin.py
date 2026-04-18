@@ -6,10 +6,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
-from bson import ObjectId
-from bson.errors import InvalidId
 from fastapi import File, Form, HTTPException, UploadFile, status
-from pydantic import ValidationError
 
 from winebox.models import InventoryInfo, RemovalReason, Transaction, TransactionType, Wine
 from winebox.schemas.wine import WineWithInventory
@@ -23,6 +20,7 @@ from ._common import (
     MAX_NOTES_LENGTH,
     MAX_OCR_TEXT_LENGTH,
     get_media_type,
+    get_wine_or_404,
     image_storage,
     ocr_service,
     vision_service,
@@ -267,19 +265,7 @@ async def checkout_wine(
         )
 
     # Get wine - must belong to current user
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
 
     if wine.inventory.quantity < quantity:
         raise HTTPException(

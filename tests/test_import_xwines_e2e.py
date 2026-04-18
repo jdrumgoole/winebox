@@ -22,9 +22,9 @@ from playwright.sync_api import Page, expect
 
 from .playwright_utils import (
     BASE_URL,
+    authenticated_page,  # noqa: F401 — imported fixture
     create_cli_worker_user,
-    login_via_ui,
-    preflight_check,
+    e2e_preflight,  # noqa: F401 — imported autouse fixture
 )
 
 # --- CSV column names from xwines-test-data.csv ---
@@ -197,12 +197,6 @@ def _confirm_and_wait_for_import(page: Page, timeout_ms: int = 180000) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _e2e_preflight() -> None:
-    """Fail fast if the E2E server is not reachable."""
-    preflight_check()
-
-
 @pytest.fixture(scope="session")
 def base_url() -> str:
     """Return the base URL for the test server."""
@@ -240,14 +234,6 @@ def worker_user(
 def test_user(worker_user: tuple[str, str]) -> tuple[str, str]:
     """Return the worker's test user credentials."""
     return worker_user
-
-
-@pytest.fixture(scope="function")
-def authenticated_page(page: Page, test_user: tuple[str, str]) -> Page:
-    """Log in and return an authenticated page."""
-    email, password = test_user
-    login_via_ui(page, email=email, password=password)
-    return page
 
 
 # ---------------------------------------------------------------------------

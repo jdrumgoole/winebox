@@ -4,12 +4,9 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from bson import ObjectId
-from bson.errors import InvalidId
 from fastapi import HTTPException, status
-from pydantic import ValidationError
 
-from winebox.models import ScoreEntry, Wine
+from winebox.models import ScoreEntry
 from winebox.schemas.reference import (
     WineScoreCreate,
     WineScoreResponse,
@@ -18,7 +15,19 @@ from winebox.schemas.reference import (
 )
 from winebox.services.auth import RequireAuth
 
+from ._common import get_wine_or_404
+
 logger = logging.getLogger(__name__)
+
+VALID_SCORE_TYPES = ("100_point", "20_point", "5_star")
+
+
+def _validate_score_type(score_type: str) -> None:
+    if score_type not in VALID_SCORE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid score_type. Must be one of: {list(VALID_SCORE_TYPES)}",
+        )
 
 
 async def get_wine_scores(
@@ -26,20 +35,7 @@ async def get_wine_scores(
     current_user: RequireAuth,
 ) -> WineScoresResponse:
     """Get all scores for a wine."""
-    # Verify wine exists and belongs to current user
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
 
     # Build response from embedded scores
     scores_response = []
@@ -76,28 +72,8 @@ async def add_wine_score(
     score_data: WineScoreCreate,
 ) -> WineScoreResponse:
     """Add a score/rating for a wine."""
-    # Verify wine exists and belongs to current user
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
-
-    # Validate score type
-    valid_score_types = ["100_point", "20_point", "5_star"]
-    if score_data.score_type not in valid_score_types:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid score_type. Must be one of: {valid_score_types}",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
+    _validate_score_type(score_data.score_type)
 
     # Create score entry
     score = ScoreEntry(
@@ -137,20 +113,7 @@ async def update_wine_score(
     score_update: WineScoreUpdate,
 ) -> WineScoreResponse:
     """Update a score for a wine."""
-    # Get wine - must belong to current user
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
 
     # Find score
     score_index = None
@@ -170,12 +133,7 @@ async def update_wine_score(
 
     # Validate score type if updating
     if "score_type" in update_data:
-        valid_score_types = ["100_point", "20_point", "5_star"]
-        if update_data["score_type"] not in valid_score_types:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid score_type. Must be one of: {valid_score_types}",
-            )
+        _validate_score_type(update_data["score_type"])
 
     # Update the score entry
     score = wine.scores[score_index]
@@ -205,19 +163,7 @@ async def delete_wine_score(
     current_user: RequireAuth,
 ) -> None:
     """Delete a score from a wine."""
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
 
     # Find and remove score
     original_count = len(wine.scores)

@@ -12,13 +12,12 @@ from typing import Generator
 import pytest
 from playwright.sync_api import Page, expect
 
-from .playwright_utils import BASE_URL, create_cli_worker_user, login_via_ui, preflight_check
-
-
-@pytest.fixture(scope="session", autouse=True)
-def _e2e_preflight() -> None:
-    """Fail fast if the E2E server is not reachable."""
-    preflight_check()
+from .playwright_utils import (
+    BASE_URL,
+    authenticated_page,  # noqa: F401 — imported fixture
+    create_cli_worker_user,
+    e2e_preflight,  # noqa: F401 — imported autouse fixture
+)
 
 
 @pytest.fixture(scope="session")
@@ -57,14 +56,6 @@ def xwines_data_available() -> bool:
             return len(data) > 0
     except Exception:
         return False
-
-
-@pytest.fixture(scope="function")
-def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
-    """Log in via UI and return an authenticated page."""
-    email, password = worker_user
-    login_via_ui(page, email=email, password=password)
-    return page
 
 
 @pytest.mark.e2e

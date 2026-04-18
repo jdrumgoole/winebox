@@ -2,7 +2,6 @@
 
 import csv
 import io
-from datetime import datetime, timezone
 from typing import Any
 
 import yaml
@@ -17,6 +16,7 @@ from .constants import (
     HEADER_FONT,
     TRANSACTION_HEADERS,
     format_datetime,
+    format_exported_at,
 )
 
 
@@ -117,7 +117,7 @@ def export_transactions_to_yaml(
     export_data = {
         "transactions": transactions,
         "export_info": {
-            "exported_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "exported_at": format_exported_at(),
             "total_count": len(transactions),
             "format": "yaml",
             "filters_applied": filters_applied,

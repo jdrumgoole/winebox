@@ -206,6 +206,34 @@ def login_via_ui(
             raise
 
 
+# ---------------------------------------------------------------------------
+# Shared E2E fixtures
+#
+# These were previously duplicated verbatim in every ``test_*_e2e.py`` file.
+# Each E2E test module now imports them:
+#
+#     from .playwright_utils import authenticated_page, e2e_preflight
+#
+# Each module is still responsible for providing its own session-scoped
+# ``worker_user`` fixture with a module-specific ``email_prefix`` so each
+# suite gets an isolated user under xdist ``--dist loadfile``.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session", autouse=True)
+def e2e_preflight() -> None:
+    """Verify the E2E server is reachable before any tests in the module run."""
+    preflight_check()
+
+
+@pytest.fixture(scope="function")
+def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
+    """A Playwright page already logged in as the module's ``worker_user``."""
+    email, password = worker_user
+    login_via_ui(page, email=email, password=password)
+    return page
+
+
 def capture_artifacts(page: Page, name: str) -> None:
     """Capture best-effort diagnostics (screenshot + HTML) for a failing test.
 

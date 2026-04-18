@@ -8,7 +8,7 @@ from bson.errors import InvalidId
 from fastapi import HTTPException, status
 from pydantic import ValidationError
 
-from winebox.models import GrapeBlendEntry, GrapeVariety, Wine
+from winebox.models import GrapeBlendEntry, GrapeVariety
 from winebox.schemas.reference import (
     GrapeVarietyResponse,
     WineGrapeBlend,
@@ -16,6 +16,8 @@ from winebox.schemas.reference import (
     WineGrapeResponse,
 )
 from winebox.services.auth import RequireAuth
+
+from ._common import get_wine_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -25,20 +27,7 @@ async def get_wine_grapes(
     current_user: RequireAuth,
 ) -> WineGrapeBlend:
     """Get the grape blend for a wine."""
-    # Verify wine exists and belongs to current user
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
 
     # Build response from embedded grape_blends
     grapes_response = []
@@ -76,20 +65,7 @@ async def set_wine_grapes(
     blend: WineGrapeBlendUpdate,
 ) -> WineGrapeBlend:
     """Set the grape blend for a wine (replaces all existing grapes)."""
-    # Verify wine exists and belongs to current user
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
 
     # Verify all grape varieties exist and get their details
     new_blends = []

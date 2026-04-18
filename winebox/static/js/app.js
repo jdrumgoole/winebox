@@ -1653,6 +1653,58 @@ function openModal(modalId) {
     document.getElementById(modalId).classList.add('active');
 }
 
+// Styled replacement for the browser's native confirm() dialog. Resolves to
+// true when the user clicks the OK button, false on Cancel or dismiss.
+// Options: { title, message, okLabel, okClass }. okClass defaults to
+// 'btn-danger' (destructive); pass 'btn-primary' for neutral confirmations.
+function showConfirmModal({ title = 'Are you sure?', message = '', okLabel = 'Confirm', okClass = 'btn-danger' } = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal');
+        const titleEl = document.getElementById('confirm-modal-title');
+        const messageEl = document.getElementById('confirm-modal-message');
+        const oldBtn = document.getElementById('confirm-modal-ok-btn');
+
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+
+        // Clone the OK button to strip any previously-attached handlers so that
+        // the promise from a prior invocation can't fire on this new prompt.
+        const newBtn = oldBtn.cloneNode(true);
+        newBtn.textContent = okLabel;
+        newBtn.className = `btn ${okClass}`;
+        oldBtn.replaceWith(newBtn);
+
+        let settled = false;
+        const resolveOnce = (value) => {
+            if (settled) return;
+            settled = true;
+            modal.removeEventListener('click', onBackdrop);
+            document.removeEventListener('keydown', onKey);
+            resolve(value);
+        };
+
+        const onBackdrop = (e) => {
+            // Cancel if user clicks the backdrop, the X close, or the cancel button.
+            if (e.target === modal || e.target.classList.contains('modal-close')
+                    || e.target.classList.contains('modal-cancel')) {
+                resolveOnce(false);
+            }
+        };
+        const onKey = (e) => {
+            if (e.key === 'Escape') resolveOnce(false);
+        };
+
+        newBtn.addEventListener('click', () => {
+            resolveOnce(true);
+            closeModals();
+        });
+        modal.addEventListener('click', onBackdrop);
+        document.addEventListener('keydown', onKey);
+
+        openModal('confirm-modal');
+    });
+}
+
 // (Dashboard removed — loadCellar at line ~1902 is the cellar loader)
 
 // Active Chart.js instances (destroy before re-creating)
@@ -2060,9 +2112,11 @@ function renderImportBatchAnalytics(batchData) {
 }
 
 async function handleUndoLastImport(batch) {
-    const confirmed = confirm(
-        `Remove all ${batch.wines_created} wines from "${batch.filename}"?\n\nThis will permanently delete the wines added by this import.`
-    );
+    const confirmed = await showConfirmModal({
+        title: 'Remove imported wines?',
+        message: `Remove all ${batch.wines_created} wines from "${batch.filename}"? This will permanently delete the wines added by this import.`,
+        okLabel: 'Remove Wines',
+    });
     if (!confirmed) return;
 
     try {
@@ -5161,7 +5215,11 @@ async function checkIncompleteBatches() {
 
 async function handleIncompleteUndo() {
     if (!_incompleteBatchId) return;
-    const confirmed = confirm('This will remove all wines from the incomplete import. Are you sure?');
+    const confirmed = await showConfirmModal({
+        title: 'Remove partial import?',
+        message: 'This will remove all wines from the incomplete import. Are you sure?',
+        okLabel: 'Remove Wines',
+    });
     if (!confirmed) return;
 
     try {
@@ -5186,7 +5244,11 @@ async function handleUndoImport() {
     if (!currentImportBatchId) return;
 
     const wineCount = document.getElementById('import-dashboard-title')?.textContent?.match(/\d+/)?.[0] || 'these';
-    const confirmed = confirm(`This will remove all ${wineCount} wines from this import. This cannot be undone.\n\nAre you sure?`);
+    const confirmed = await showConfirmModal({
+        title: 'Undo this import?',
+        message: `This will remove all ${wineCount} wines from this import. This cannot be undone.`,
+        okLabel: 'Remove Wines',
+    });
     if (!confirmed) return;
 
     try {

@@ -120,7 +120,7 @@ def test(ctx: Context, verbose: bool = False, coverage: bool = False, no_purge: 
     # Purge test data after E2E tests
     if not no_purge:
         print("\nPurging test data...")
-        purge_wines(ctx, include_images=True, force=True)
+        purge_wines(ctx, include_images=True, yes=True)
 
 
 @task(name="test-unit")
@@ -179,7 +179,7 @@ def test_e2e(ctx: Context, verbose: bool = False, workers: int = 4, no_purge: bo
     # Purge test data after E2E tests
     if not no_purge:
         print("\nPurging test data...")
-        purge_wines(ctx, include_images=True, force=True)
+        purge_wines(ctx, include_images=True, yes=True)
 
 
 @task(name="test-e2e-fast")

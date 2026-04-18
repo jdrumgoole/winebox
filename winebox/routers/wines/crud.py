@@ -3,10 +3,7 @@
 import logging
 from datetime import datetime, timezone
 
-from bson import ObjectId
-from bson.errors import InvalidId
-from fastapi import HTTPException, Query, status
-from pydantic import ValidationError
+from fastapi import Query
 
 from winebox.models import ImportBatch, Transaction, Wine
 from winebox.models.wine import WineCollection
@@ -14,7 +11,7 @@ from winebox.schemas.wine import WineResponse, WineUpdate, WineWithInventory
 from winebox.services.auth import RequireAuth
 from winebox.services.rate_limit import MAX_PAGE_SIZE, MAX_USER_RESULTSET
 
-from ._common import image_storage
+from ._common import get_wine_or_404, image_storage
 
 logger = logging.getLogger(__name__)
 
@@ -49,19 +46,7 @@ async def get_wine(
     current_user: RequireAuth,
 ) -> WineResponse:
     """Get wine details with full transaction history."""
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
 
     # Get transactions for this wine (owner already verified via wine ownership)
     transactions = await Transaction.find(
@@ -81,19 +66,7 @@ async def update_wine(
     wine_update: WineUpdate,
 ) -> WineWithInventory:
     """Update wine metadata."""
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
 
     # Update only provided fields
     update_data = wine_update.model_dump(exclude_unset=True)
@@ -166,19 +139,7 @@ async def delete_wine(
     current_user: RequireAuth,
 ) -> None:
     """Delete wine and all associated history."""
-    try:
-        wine = await Wine.find_one(
-            {"_id": ObjectId(wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid wine ID format: %s - %s", wine_id, e)
-        wine = None
-
-    if not wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {wine_id} not found",
-        )
+    wine = await get_wine_or_404(wine_id, current_user.id)
 
     # Delete associated images
     if wine.front_label_image_path:

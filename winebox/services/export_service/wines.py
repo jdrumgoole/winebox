@@ -2,7 +2,6 @@
 
 import csv
 import io
-from datetime import datetime, timezone
 from typing import Any
 
 import yaml
@@ -17,6 +16,7 @@ from .constants import (
     HEADER_FONT,
     WINE_HEADERS,
     format_datetime,
+    format_exported_at,
 )
 
 
@@ -160,7 +160,7 @@ def export_wines_to_yaml(
     export_data = {
         "wines": wines,
         "export_info": {
-            "exported_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "exported_at": format_exported_at(),
             "total_count": len(wines),
             "format": "yaml",
             "filters_applied": filters_applied,

@@ -13,15 +13,10 @@ from playwright.sync_api import Page, expect
 
 from .playwright_utils import (
     BASE_URL,
+    authenticated_page,  # noqa: F401 — imported fixture
     create_cli_worker_user,
-    login_via_ui,
-    preflight_check,
+    e2e_preflight,  # noqa: F401 — imported autouse fixture
 )
-
-
-@pytest.fixture(scope="session", autouse=True)
-def _e2e_preflight() -> None:
-    preflight_check()
 
 
 @pytest.fixture(scope="session")
@@ -37,13 +32,6 @@ def worker_user(request: pytest.FixtureRequest) -> Generator[tuple[str, str], No
         password="testpass123",
     )
     yield email, password
-
-
-@pytest.fixture(scope="function")
-def authenticated_page(page: Page, worker_user: tuple[str, str]) -> Page:
-    email, password = worker_user
-    login_via_ui(page, email=email, password=password)
-    return page
 
 
 def _add_case_via_api(page: Page) -> str:

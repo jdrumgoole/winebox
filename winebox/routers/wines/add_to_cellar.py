@@ -4,16 +4,15 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
-from bson import ObjectId
-from bson.errors import InvalidId
 from fastapi import Form, HTTPException, status
-from pydantic import ValidationError
 
 from winebox.models import InventoryInfo, Transaction, TransactionType, Wine
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.analytics import posthog_service
 from winebox.services.auth import RequireAuth
+
+from ._common import get_wine_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -29,19 +28,7 @@ async def add_met_wine_to_cellar(
     then links the two together.
     """
     # Load the met wine
-    try:
-        met_wine = await Wine.find_one(
-            {"_id": ObjectId(met_wine_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid met wine ID format: %s - %s", met_wine_id, e)
-        met_wine = None
-
-    if not met_wine:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Wine with ID {met_wine_id} not found",
-        )
+    met_wine = await get_wine_or_404(met_wine_id, current_user.id)
 
     if met_wine.collection != WineCollection.MET:
         raise HTTPException(

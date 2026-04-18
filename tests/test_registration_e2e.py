@@ -11,12 +11,11 @@ import uuid
 import pytest
 from playwright.sync_api import Page, expect
 
-from .playwright_utils import BASE_URL, PROJECT_DIR, preflight_check
-@pytest.fixture(scope="session", autouse=True)
-def _e2e_preflight() -> None:
-    """Fail fast if the E2E server is not reachable."""
-    preflight_check()
-
+from .playwright_utils import (
+    BASE_URL,
+    PROJECT_DIR,
+    e2e_preflight,  # noqa: F401 — imported autouse fixture
+)
 
 
 def generate_unique_email() -> str:

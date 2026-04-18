@@ -35,7 +35,7 @@ TEST_PASSWORD = "TestPassword123!"
 async def get_auth_token() -> str:
     """Register a user, verify via DB, and get an auth token."""
     mongodb_url = os.environ.get("WINEBOX_MONGODB_URL", "mongodb://localhost:27017")
-    db_name = os.environ.get("WINEBOX_DATABASE", "winebox")
+    db_name = os.environ.get("WINEBOX_DATABASE", "winebox-oat")
 
     async with httpx.AsyncClient(base_url=BASE_URL) as client:
         # Register
