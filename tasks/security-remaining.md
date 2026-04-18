@@ -122,7 +122,7 @@ first within each tier.
 | #16 ObjectId try/except in price_tracker | `routers/price_tracker.py:247,267,304` — wrap in try/except, return 404 | 10 min |
 | #17 `max_length` on price_tracker form fields | `routers/price_tracker.py:118-132` | 5 min |
 | #18 Photo upload size check before read | `routers/price_tracker.py:168-170` — use `Content-Length` header or chunked read | 20 min |
-| #21 Auth gate on `/api/images/` | `winebox/main.py:341` — replace static mount with a router that checks ownership against the wine's `owner_id` | 1 hour |
+| ~~#21 Auth gate on `/api/images/`~~ | DONE — `winebox/routers/images.py` replaces the StaticFiles mount with a `RequireAuth` router that verifies the requested filename is referenced by a wine the requester owns; 5 tests in `tests/test_image_serving.py`. | done |
 | #23 Import file upload size limit | `routers/import_router.py:130` | 10 min |
 | #24 Min password length 6 → 8 (NIST) | `winebox/auth/schemas.py:10`; align with admin path | 5 min |
 | #25 Tighten `jinja2>=3.1.6` lower bound | `pyproject.toml` | 2 min |

@@ -327,6 +327,7 @@ from winebox.routers import (
     cellar,
     demo,
     export,
+    images,
     import_router,
     met,
     price_tracker,
@@ -352,12 +353,13 @@ app.include_router(cases.router, prefix="/api/cases", tags=["Cases"])
 app.include_router(bottles.router, prefix="/api/bottles", tags=["Bottles"])
 app.include_router(price_tracker.router, prefix="/api/prices", tags=["Price Tracker"])
 
+# Wine label images — auth-gated and ownership-checked. Was previously
+# served via app.mount(StaticFiles), which let anyone with the UUID
+# filename fetch the image; now every request requires the wine to belong
+# to the authenticated user.
+app.include_router(images.router, prefix="/api/images", tags=["Images"])
+
 # Serve static files - mounted after routes to avoid conflicts
 static_path = Path(__file__).parent / "static"
 if static_path.exists():
     app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
-
-# Serve images
-images_path = settings.image_storage_path
-if images_path.exists():
-    app.mount("/api/images", StaticFiles(directory=str(images_path)), name="images")
