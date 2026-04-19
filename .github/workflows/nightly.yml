@@ -5,10 +5,49 @@ on:
     # Run at 2:17 AM UTC every night (avoid :00/:30 stampede)
     - cron: "17 2 * * *"
   workflow_dispatch:
+    inputs:
+      skip_deploy:
+        description: "Skip deploy, only run tests"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
-  deploy-and-test:
-    name: Deploy to OAT and run full test suite
+  deploy:
+    name: Deploy latest to OAT
+    if: ${{ !inputs.skip_deploy && github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, oat]
+    environment: oat-deploy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Deploy to OAT (loopback)
+        env:
+          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_OAT_MONGODB_URL }}
+          WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
+          WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
+          WINEBOX_POSTHOG_API_KEY: ${{ secrets.WINEBOX_POSTHOG_API_KEY }}
+          WINEBOX_POSTHOG_ENABLED: ${{ secrets.WINEBOX_POSTHOG_ENABLED }}
+          WINEBOX_DO_TOKEN: ${{ secrets.WINEBOX_DO_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          WINEBOX_TEST_USER: ${{ secrets.WINEBOX_TEST_USER }}
+          WINEBOX_TEST_PASSWORD: ${{ secrets.WINEBOX_TEST_PASSWORD }}
+        run: |
+          uv run python -m invoke deploy-oat --host 127.0.0.1
+
+  test:
+    name: Run full test suite against OAT
+    needs: deploy
+    if: always() && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -63,7 +102,7 @@ jobs:
         continue-on-error: true
         env:
           WINEBOX_TEST_URL: "https://oat.winebox.app"
-          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
+          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_OAT_MONGODB_URL }}
           WINEBOX_DATABASE: "winebox-oat"
           WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
           WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
@@ -106,8 +145,8 @@ jobs:
 
   auto-fix:
     name: Auto-fix failing tests with Claude Code
-    needs: deploy-and-test
-    if: needs.deploy-and-test.outputs.tests_passed == 'false'
+    needs: test
+    if: needs.test.outputs.tests_passed == 'false'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -183,10 +222,10 @@ jobs:
 
   create-issue:
     name: Create issue for unresolved failures
-    needs: [deploy-and-test, auto-fix]
+    needs: [test, auto-fix]
     if: |
       always() &&
-      needs.deploy-and-test.outputs.tests_passed == 'false' &&
+      needs.test.outputs.tests_passed == 'false' &&
       (needs.auto-fix.result == 'failure' || needs.auto-fix.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:

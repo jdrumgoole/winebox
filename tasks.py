@@ -1517,6 +1517,32 @@ def oat_logs(ctx: Context, host: str = "", lines: int = 50, follow: bool = False
     )
 
 
+@task(name="oat-install-runner")
+def oat_install_runner(ctx: Context, host: str = "", token: str = "", repo: str = "jdrumgoole/winebox") -> None:
+    """Install a GitHub Actions self-hosted runner on the OAT droplet.
+
+    Get --token from GitHub: Repo -> Settings -> Actions -> Runners ->
+    New self-hosted runner (Linux/x64). The token expires in ~1 hour.
+
+    Args:
+        ctx: Invoke context
+        host: Override droplet IP
+        token: Runner registration token from GitHub
+        repo: GitHub owner/repo
+    """
+    if not token:
+        print("Error: --token is required. Get one from GitHub:")
+        print("  Repo -> Settings -> Actions -> Runners -> New self-hosted runner")
+        sys.exit(1)
+
+    oat_host = _resolve_oat_host(ctx, host or None)
+    ctx.run(
+        f"uv run python -m deploy.install_oat_runner "
+        f"--host {oat_host} --token {token} --repo {repo}",
+        pty=True,
+    )
+
+
 @task(name="test-e2e-oat")
 def test_e2e_oat(
     ctx: Context,
