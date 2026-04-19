@@ -1077,6 +1077,31 @@ def deploy_xwines(
     ctx.run(cmd, pty=True)
 
 
+@task(name="enrich-xwines-drinkability")
+def enrich_xwines_drinkability_task(
+    ctx: Context,
+    limit: int = 0,
+    model: str = "claude-sonnet-4-5",
+) -> None:
+    """Enrich XWinesWine docs with Claude-estimated drinkability windows.
+
+    Streams reference wines that have no `drinkability` set, batches them
+    through Claude, and writes the result back. Idempotent — re-runs only
+    process docs still missing the field.
+
+    Args:
+        ctx: Invoke context
+        limit: Cap total docs considered (0 = no cap; useful for smoke runs)
+        model: Claude model to use (default: claude-sonnet-4-5)
+    """
+    limit_arg = f"--limit {limit}" if limit > 0 else ""
+    model_arg = f"--model {model}" if model else ""
+    ctx.run(
+        f"uv run python -m winebox.cli.enrich_drinkability {limit_arg} {model_arg}".strip(),
+        pty=True,
+    )
+
+
 @task(name="initialise-droplet")
 def initialise_droplet(
     ctx: Context,

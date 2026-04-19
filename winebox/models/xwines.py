@@ -10,6 +10,7 @@ from typing import Optional
 from pydantic import Field
 
 from winebox.db import MongoDocument
+from winebox.models.drinkability import DrinkabilityEstimate
 
 
 class XWinesWine(MongoDocument):
@@ -39,6 +40,9 @@ class XWinesWine(MongoDocument):
     vintages: Optional[str] = None
     avg_rating: Optional[float] = None
     rating_count: int = 0
+    # Release-relative drinkability estimate (Phase 2 of drinkability plan).
+    # Computed once per reference wine via `enrich-xwines-drinkability`.
+    drinkability: Optional[DrinkabilityEstimate] = None
 
     class Settings:
         name = "xwines_wines"
