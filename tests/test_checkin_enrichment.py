@@ -16,7 +16,7 @@ from winebox.models import Wine, XWinesWine
 
 async def _insert_xwines_wine(**kwargs) -> XWinesWine:
     """Insert an XWinesWine with sensible defaults."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     defaults = {
         "xwines_id": uid,
         "name": f"Enrichment Test Wine {uid}",

@@ -29,7 +29,7 @@ async def test_xwines_search_query_too_short(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_xwines_search_with_data(client: AsyncClient, init_test_db) -> None:
     """Test search with X-Wines data in database."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     # Add test wines to database using PyMongo
     test_wines = [
         XWinesWine(
@@ -84,7 +84,7 @@ async def test_xwines_search_with_data(client: AsyncClient, init_test_db) -> Non
 @pytest.mark.asyncio
 async def test_xwines_search_by_winery(client: AsyncClient, init_test_db) -> None:
     """Test search matches winery name."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wine = XWinesWine(
         xwines_id=uid,
         name="Reserve Red",
@@ -108,7 +108,7 @@ async def test_xwines_search_by_winery(client: AsyncClient, init_test_db) -> Non
 @pytest.mark.asyncio
 async def test_xwines_search_with_filters(client: AsyncClient, init_test_db) -> None:
     """Test search with wine_type and country filters."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wines = [
         XWinesWine(
             xwines_id=uid,
@@ -145,7 +145,7 @@ async def test_xwines_search_with_filters(client: AsyncClient, init_test_db) -> 
 @pytest.mark.asyncio
 async def test_xwines_get_wine_detail(client: AsyncClient, init_test_db) -> None:
     """Test getting full wine details."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wine = XWinesWine(
         xwines_id=uid,
         name="Test Wine",
@@ -196,7 +196,7 @@ async def test_xwines_stats_empty(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_xwines_stats_with_data(client: AsyncClient, init_test_db) -> None:
     """Test stats endpoint with data."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     # Add wines
     for i in range(5):
         wine = XWinesWine(
@@ -228,7 +228,7 @@ async def test_xwines_stats_with_data(client: AsyncClient, init_test_db) -> None
 @pytest.mark.asyncio
 async def test_xwines_types_endpoint(client: AsyncClient, init_test_db) -> None:
     """Test listing wine types."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wines = [
         XWinesWine(xwines_id=uid, name="Red Wine", wine_type="Red"),
         XWinesWine(xwines_id=uid + 1, name="White Wine", wine_type="White"),
@@ -255,7 +255,7 @@ async def test_xwines_types_endpoint(client: AsyncClient, init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_xwines_countries_endpoint(client: AsyncClient, init_test_db) -> None:
     """Test listing countries with wine counts."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wines = [
         XWinesWine(xwines_id=uid, name="Wine 1", wine_type="Red", country="France", country_code="FR"),
         XWinesWine(xwines_id=uid + 1, name="Wine 2", wine_type="Red", country="France", country_code="FR"),
@@ -289,7 +289,7 @@ async def test_xwines_search_response_has_facets_field(
     client: AsyncClient, init_test_db
 ) -> None:
     """Test that search response includes the facets key (null when Atlas Search unavailable)."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wine = XWinesWine(
         xwines_id=uid,
         name="Facet Test Wine",
@@ -314,7 +314,7 @@ async def test_xwines_search_response_has_facets_field(
 @pytest.mark.asyncio
 async def test_xwines_search_ordering(client: AsyncClient, init_test_db) -> None:
     """Test search results are ordered by popularity then rating."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     # Use unique names to avoid interference from other tests
     wines = [
         XWinesWine(
@@ -363,7 +363,7 @@ async def test_xwines_search_ordering(client: AsyncClient, init_test_db) -> None
 @pytest.mark.asyncio
 async def test_xwines_search_pagination(client: AsyncClient, init_test_db) -> None:
     """Test search pagination with skip and limit parameters."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     # Use unique prefix to avoid interference from other tests
     prefix = f"PagWine{uid}"
     # Create 10 wines
@@ -411,7 +411,7 @@ async def test_xwines_search_skip_validation(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_xwines_export_json(client: AsyncClient, init_test_db) -> None:
     """Test X-Wines export in JSON format."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wines = [
         XWinesWine(
             xwines_id=uid,
@@ -444,7 +444,7 @@ async def test_xwines_export_json(client: AsyncClient, init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_xwines_export_csv(client: AsyncClient, init_test_db) -> None:
     """Test X-Wines export in CSV format."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wine = XWinesWine(
         xwines_id=uid,
         name="CSV Export Wine",
@@ -470,7 +470,7 @@ async def test_xwines_export_csv(client: AsyncClient, init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_xwines_export_xlsx(client: AsyncClient, init_test_db) -> None:
     """Test X-Wines export in XLSX format."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wine = XWinesWine(
         xwines_id=uid,
         name="Excel Export Wine",
@@ -497,7 +497,7 @@ async def test_xwines_export_xlsx(client: AsyncClient, init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_xwines_export_yaml(client: AsyncClient, init_test_db) -> None:
     """Test X-Wines export in YAML format."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wine = XWinesWine(
         xwines_id=uid,
         name="YAML Export Wine",
@@ -524,7 +524,7 @@ async def test_xwines_export_yaml(client: AsyncClient, init_test_db) -> None:
 @pytest.mark.asyncio
 async def test_xwines_export_with_filters(client: AsyncClient, init_test_db) -> None:
     """Test X-Wines export with wine_type and country filters."""
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wines = [
         XWinesWine(
             xwines_id=uid,
@@ -566,7 +566,7 @@ async def test_xwines_search_prioritizes_exact_match(client: AsyncClient, init_t
     When searching for "Chateau Madelaine", the exact match should appear first
     even if other "Chateau" wines have higher popularity (rating_count).
     """
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wines = [
         # High popularity but only partial match (just "Chateau")
         XWinesWine(
@@ -622,7 +622,7 @@ async def test_xwines_search_phrase_vs_token(client: AsyncClient, init_test_db) 
     When searching for "Silver Oak", a wine with "Silver Oak" as a phrase
     should rank higher than a wine with just "Silver" or just "Oak".
     """
-    uid = random.randint(100000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     wines = [
         # Contains "Oak" but not "Silver Oak" phrase
         XWinesWine(
@@ -674,7 +674,7 @@ async def test_xwines_search_phrase_vs_token(client: AsyncClient, init_test_db) 
 @pytest.mark.asyncio
 async def test_xwines_search_start_of_name_priority(client: AsyncClient, init_test_db) -> None:
     """Test that matches at the start of name rank higher than matches elsewhere."""
-    uid = random.randint(900000, 999999)
+    uid = random.randint(10_000_000, 99_999_999)
     # Use a unique term to avoid contamination from other test data
     term = f"Zinfandel{uid}"
     wines = [

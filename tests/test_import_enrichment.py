@@ -25,7 +25,7 @@ async def _insert_xwines_wine(**kwargs) -> XWinesWine:
     Uses a random xwines_id and a unique name to avoid collisions
     with XWinesWine documents from other tests in a shared database.
     """
-    unique_suffix = random.randint(900_000, 999_999)
+    unique_suffix = random.randint(10_000_000, 99_999_999)
     defaults = {
         "xwines_id": unique_suffix,
         "name": f"ImportTestWine Zinfandel Reserve {unique_suffix}",
