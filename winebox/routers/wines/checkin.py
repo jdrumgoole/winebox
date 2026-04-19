@@ -185,14 +185,14 @@ async def record_wine(
         purchase_price=purchase_price,
     )
 
-    # Record a CHECK_IN transaction for the history log. Cellar items
+    # Record a ADDED transaction for the history log. Cellar items
     # (created above by bottle_service) track per-bottle/per-case state;
     # Transaction is the flat append-only audit trail used by the
     # transactions router and the CSV/Excel exports.
     transaction = Transaction(
         owner_id=current_user.id,
         wine_id=wine.id,
-        transaction_type=TransactionType.CHECK_IN,
+        transaction_type=TransactionType.ADDED,
         quantity=quantity,
         notes=notes,
     )
@@ -201,7 +201,7 @@ async def record_wine(
     # Track check-in event
     posthog_service.capture(
         distinct_id=str(current_user.id),
-        event="wine_checkin",
+        event="wine_added",
         properties={
             "quantity": quantity,
             "scan_method": "claude_vision" if vision_service.is_available() else "tesseract",
@@ -254,7 +254,7 @@ async def checkout_wine(
     transaction_kwargs: dict = {
         "owner_id": current_user.id,
         "wine_id": wine.id,
-        "transaction_type": TransactionType.CHECK_OUT,
+        "transaction_type": TransactionType.REMOVED,
         "quantity": quantity,
         "notes": notes,
     }
@@ -300,7 +300,7 @@ async def checkout_wine(
         removal_properties["removal_reason"] = removal_reason.value
     posthog_service.capture(
         distinct_id=str(current_user.id),
-        event="wine_checkout",
+        event="wine_removed",
         properties=removal_properties,
     )
 

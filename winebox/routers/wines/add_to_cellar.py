@@ -92,7 +92,7 @@ async def add_met_wine_to_cellar(
     transaction = Transaction(
         owner_id=current_user.id,
         wine_id=cellar_wine.id,
-        transaction_type=TransactionType.CHECK_IN,
+        transaction_type=TransactionType.ADDED,
         quantity=quantity,
         notes="Added from Wines I've Met",
     )

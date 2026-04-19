@@ -143,7 +143,7 @@ async def _resolve_transaction_date_ids(
     if filters.checked_in_after or filters.checked_in_before:
         q = {
             "owner_id": owner_id,
-            "transaction_type": TransactionType.CHECK_IN,
+            "transaction_type": TransactionType.ADDED,
             "transaction_date": _date_range(filters.checked_in_after, filters.checked_in_before),
         }
         txns = await Transaction.find(q).to_list(length=MAX_USER_RESULTSET)
@@ -152,7 +152,7 @@ async def _resolve_transaction_date_ids(
     if filters.checked_out_after or filters.checked_out_before:
         q = {
             "owner_id": owner_id,
-            "transaction_type": TransactionType.CHECK_OUT,
+            "transaction_type": TransactionType.REMOVED,
             "transaction_date": _date_range(filters.checked_out_after, filters.checked_out_before),
         }
         txns = await Transaction.find(q).to_list(length=MAX_USER_RESULTSET)

@@ -33,7 +33,7 @@ async def test_removal_with_drink_reason(client: AsyncClient, sample_image_bytes
     assert wine["inventory"]["quantity"] == 4
 
     # Verify transaction stored with tasting_notes
-    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=CHECK_OUT")
+    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=REMOVED")
     txn = transactions.json()[0]
     assert txn["removal_reason"] == "DRINK"
     assert txn["tasting_notes"] == "Lovely with Sunday roast"
@@ -54,7 +54,7 @@ async def test_removal_with_sell_reason(client: AsyncClient, sample_image_bytes:
     )
     assert response.status_code == 200
 
-    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=CHECK_OUT")
+    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=REMOVED")
     txn = transactions.json()[0]
     assert txn["removal_reason"] == "SELL"
     assert txn["sale_price_usd"] == 85.0
@@ -75,7 +75,7 @@ async def test_removal_with_gift_reason(client: AsyncClient, sample_image_bytes:
     )
     assert response.status_code == 200
 
-    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=CHECK_OUT")
+    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=REMOVED")
     txn = transactions.json()[0]
     assert txn["removal_reason"] == "GIFT"
     assert txn["gift_recipient"] == "Sarah"
@@ -96,7 +96,7 @@ async def test_removal_with_other_reason(client: AsyncClient, sample_image_bytes
     )
     assert response.status_code == 200
 
-    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=CHECK_OUT")
+    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=REMOVED")
     txn = transactions.json()[0]
     assert txn["removal_reason"] == "OTHER"
     assert txn["removal_notes"] == "Cork was damaged"
@@ -175,7 +175,7 @@ async def test_legacy_checkout_backward_compat(client: AsyncClient, sample_image
     )
     assert response.status_code == 200
 
-    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=CHECK_OUT")
+    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=REMOVED")
     txn = transactions.json()[0]
     assert txn["removal_reason"] is None
     assert txn["tasting_notes"] is None
@@ -195,7 +195,7 @@ async def test_drink_without_notes(client: AsyncClient, sample_image_bytes: byte
     )
     assert response.status_code == 200
 
-    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=CHECK_OUT")
+    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=REMOVED")
     txn = transactions.json()[0]
     assert txn["removal_reason"] == "DRINK"
     assert txn["tasting_notes"] is None
@@ -212,7 +212,7 @@ async def test_other_without_notes(client: AsyncClient, sample_image_bytes: byte
     )
     assert response.status_code == 200
 
-    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=CHECK_OUT")
+    transactions = await client.get(f"/api/transactions?wine_id={wine_id}&transaction_type=REMOVED")
     txn = transactions.json()[0]
     assert txn["removal_reason"] == "OTHER"
     assert txn["removal_notes"] is None

@@ -1952,7 +1952,7 @@ function _renderVintageChart(canvasId, data) {
 }
 
 function getRemovalBadge(t) {
-    if (t.transaction_type === 'CHECK_IN') return { label: 'Added', cssClass: 'added' };
+    if (t.transaction_type === 'ADDED') return { label: 'Added', cssClass: 'added' };
     if (!t.removal_reason) return { label: 'Removed', cssClass: 'removed' };
     const map = {
         DRINK: { label: 'Drank', cssClass: 'drank' },
@@ -1964,7 +1964,7 @@ function getRemovalBadge(t) {
 }
 
 function getRemovalDetail(t) {
-    if (t.transaction_type === 'CHECK_IN' || !t.removal_reason) return '';
+    if (t.transaction_type === 'ADDED' || !t.removal_reason) return '';
     if (t.removal_reason === 'DRINK' && t.tasting_notes) {
         return `<span class="tasting-notes-display">${escapeHtml(t.tasting_notes)}</span>`;
     }
@@ -1992,8 +1992,8 @@ function renderActivityList(transactions) {
         const detail = getRemovalDetail(t);
         return `
         <div class="activity-item">
-            <div class="activity-icon ${t.transaction_type === 'CHECK_IN' ? 'check-in' : 'check-out'}">
-                ${t.transaction_type === 'CHECK_IN' ? '+' : '-'}
+            <div class="activity-icon ${t.transaction_type === 'ADDED' ? 'check-in' : 'check-out'}">
+                ${t.transaction_type === 'ADDED' ? '+' : '-'}
             </div>
             <div class="activity-content">
                 <div class="activity-title">
@@ -3046,10 +3046,10 @@ function deleteWine(wineId) {
 async function loadHistory() {
     const filter = document.getElementById('history-filter').value;
     let url = `${API_BASE}/transactions?limit=100`;
-    if (filter === 'CHECK_IN' || filter === 'CHECK_OUT') {
+    if (filter === 'ADDED' || filter === 'REMOVED') {
         url += `&transaction_type=${filter}`;
     } else if (filter === 'DRINK' || filter === 'SELL' || filter === 'GIFT' || filter === 'OTHER') {
-        url += `&transaction_type=CHECK_OUT&removal_reason=${filter}`;
+        url += `&transaction_type=REMOVED&removal_reason=${filter}`;
     }
 
     try {
@@ -3119,7 +3119,7 @@ function _renderTimelineChart(transactions) {
         const d = new Date(t.transaction_date);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         if (!monthsMap[key]) monthsMap[key] = { added: 0, removed: 0 };
-        if (t.transaction_type === 'CHECK_IN') {
+        if (t.transaction_type === 'ADDED') {
             monthsMap[key].added += t.quantity;
         } else {
             monthsMap[key].removed += t.quantity;
@@ -3196,7 +3196,7 @@ function _renderReasonsChart(transactions) {
     const canvas = document.getElementById('chart-history-reasons');
     if (!canvas) return;
 
-    const removals = transactions.filter(t => t.transaction_type === 'CHECK_OUT');
+    const removals = transactions.filter(t => t.transaction_type === 'REMOVED');
     if (removals.length === 0) {
         canvas.parentElement.parentElement.style.display = 'none';
         return;
@@ -3253,8 +3253,8 @@ function _renderHistoryStats(transactions) {
     const container = document.getElementById('history-stats');
     if (!container) return;
 
-    const totalAdded = transactions.filter(t => t.transaction_type === 'CHECK_IN').reduce((sum, t) => sum + t.quantity, 0);
-    const totalRemoved = transactions.filter(t => t.transaction_type === 'CHECK_OUT').reduce((sum, t) => sum + t.quantity, 0);
+    const totalAdded = transactions.filter(t => t.transaction_type === 'ADDED').reduce((sum, t) => sum + t.quantity, 0);
+    const totalRemoved = transactions.filter(t => t.transaction_type === 'REMOVED').reduce((sum, t) => sum + t.quantity, 0);
     const totalTransactions = transactions.length;
 
     // Calculate date range
@@ -3265,7 +3265,7 @@ function _renderHistoryStats(transactions) {
         ' \u2013 ' + latest.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 
     // Removal reason breakdown for stats
-    const removals = transactions.filter(t => t.transaction_type === 'CHECK_OUT');
+    const removals = transactions.filter(t => t.transaction_type === 'REMOVED');
     const drank = removals.filter(t => t.removal_reason === 'DRINK').reduce((s, t) => s + t.quantity, 0);
     const sold = removals.filter(t => t.removal_reason === 'SELL').reduce((s, t) => s + t.quantity, 0);
     const gifted = removals.filter(t => t.removal_reason === 'GIFT').reduce((s, t) => s + t.quantity, 0);
@@ -3666,10 +3666,10 @@ async function handleExport(type, format) {
             }
         } else if (type === 'transactions') {
             const historyFilter = document.getElementById('history-filter')?.value;
-            if (historyFilter === 'CHECK_IN' || historyFilter === 'CHECK_OUT') {
+            if (historyFilter === 'ADDED' || historyFilter === 'REMOVED') {
                 url += `&transaction_type=${historyFilter}`;
             } else if (historyFilter === 'DRINK' || historyFilter === 'SELL' || historyFilter === 'GIFT' || historyFilter === 'OTHER') {
-                url += `&transaction_type=CHECK_OUT&removal_reason=${historyFilter}`;
+                url += `&transaction_type=REMOVED&removal_reason=${historyFilter}`;
             }
         }
     }

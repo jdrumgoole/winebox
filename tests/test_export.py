@@ -256,7 +256,7 @@ async def test_export_transactions_csv_empty(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_export_transactions_with_data(client: AsyncClient, sample_image_bytes: bytes) -> None:
     """Test exporting transactions with actual data."""
-    # Create a wine (which creates a CHECK_IN transaction)
+    # Create a wine (which creates a ADDED transaction)
     files = {
         "front_label": ("test.png", io.BytesIO(sample_image_bytes), "image/png"),
     }
@@ -264,7 +264,7 @@ async def test_export_transactions_with_data(client: AsyncClient, sample_image_b
     checkin_response = await client.post("/api/wines/record", files=files, data=data)
     wine_id = checkin_response.json()["id"]
 
-    # Checkout some wine (creates a CHECK_OUT transaction)
+    # Checkout some wine (creates a REMOVED transaction)
     await client.post(f"/api/wines/{wine_id}/checkout", data={"quantity": "2"})
 
     # Export transactions
@@ -274,10 +274,10 @@ async def test_export_transactions_with_data(client: AsyncClient, sample_image_b
     export_data = response.json()
     assert export_data["export_info"]["total_count"] == 2
 
-    # Should have both CHECK_IN and CHECK_OUT
+    # Should have both ADDED and REMOVED
     transaction_types = [t["transaction_type"] for t in export_data["transactions"]]
-    assert "CHECK_IN" in transaction_types
-    assert "CHECK_OUT" in transaction_types
+    assert "ADDED" in transaction_types
+    assert "REMOVED" in transaction_types
 
 
 @pytest.mark.asyncio
@@ -300,7 +300,7 @@ async def test_export_transactions_csv_with_data(client: AsyncClient, sample_ima
     rows = list(reader)
 
     assert len(rows) == 1
-    assert rows[0]["transaction_type"] == "CHECK_IN"
+    assert rows[0]["transaction_type"] == "ADDED"
     assert rows[0]["quantity"] == "3"
     assert rows[0]["wine_name"] == "CSV Export Wine"
 
@@ -318,14 +318,14 @@ async def test_export_transactions_filter_type(client: AsyncClient, sample_image
 
     await client.post(f"/api/wines/{wine_id}/checkout", data={"quantity": "1"})
 
-    # Export only CHECK_OUT transactions
-    response = await client.get("/api/export/transactions?format=json&transaction_type=CHECK_OUT")
+    # Export only REMOVED transactions
+    response = await client.get("/api/export/transactions?format=json&transaction_type=REMOVED")
     assert response.status_code == 200
 
     export_data = response.json()
-    assert export_data["export_info"]["filters_applied"]["transaction_type"] == "CHECK_OUT"
+    assert export_data["export_info"]["filters_applied"]["transaction_type"] == "REMOVED"
     assert len(export_data["transactions"]) == 1
-    assert export_data["transactions"][0]["transaction_type"] == "CHECK_OUT"
+    assert export_data["transactions"][0]["transaction_type"] == "REMOVED"
 
 
 @pytest.mark.asyncio

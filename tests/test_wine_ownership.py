@@ -209,7 +209,7 @@ async def test_user_cannot_see_other_users_transactions(
     assert response.status_code == 200
     transactions = response.json()
     assert len(transactions) == 1
-    assert transactions[0]["transaction_type"] == "CHECK_IN"
+    assert transactions[0]["transaction_type"] == "ADDED"
 
     # User 2 cannot see user1's transactions
     response = await client2.get("/api/transactions")
