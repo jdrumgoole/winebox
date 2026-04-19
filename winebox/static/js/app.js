@@ -2223,10 +2223,7 @@ async function loadCellarAnalytics() {
             document.getElementById('stat-wines-met').textContent = '0';
         }
 
-        // Load recent activity
-        const transResponse = await fetchWithAuth(`${API_BASE}/transactions?limit=10`);
-        const transactions = await transResponse.json();
-        renderActivityList(transactions);
+        // Recent activity removed from dashboard — available via the History tab
     } catch (error) {
         console.error('Failed to load cellar analytics:', error);
     }

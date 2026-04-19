@@ -29,6 +29,8 @@
 - The email verification env var is `WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED` (not `WINEBOX_EMAIL_VERIFICATION_REQUIRED`)
 - Always use `WINEBOX_DATABASE=winebox_oat` for local development — never use production or invented database names
 - Pass `WINEBOX_SECRET_KEY` from `.env` so JWT tokens work correctly
+- When testing locally, create a test user with the admin script rather than trying to reuse OAT credentials (password hashes depend on the secret key):
+  `source .env && WINEBOX_MONGODB_URL="$WINEBOX_MONGODB_URL" WINEBOX_SECRET_KEY="$WINEBOX_SECRET_KEY" WINEBOX_DATABASE=winebox_oat uv run winebox-admin add localtest@test.com --password TestPass123!`
 
 ## Scripts
 - Always write Python scripts instead of bash/shell scripts
