@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import Form, HTTPException, status
 
-from winebox.models import RemovalReason, Transaction, TransactionType, Wine
+from winebox.models import RemovalReason, Wine
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.analytics import posthog_service
 from winebox.services.auth import RequireAuth
@@ -95,28 +95,12 @@ async def checkout_wine(
     except CellarDebitError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
-    # Build transaction kwargs, only including removal fields when relevant
-    transaction_kwargs: dict = {
-        "owner_id": current_user.id,
-        "wine_id": wine.id,
-        "transaction_type": TransactionType.REMOVED,
-        "quantity": quantity,
-        "notes": notes,
-    }
-    if removal_reason is not None:
-        transaction_kwargs["removal_reason"] = removal_reason
-        if removal_reason == RemovalReason.DRINK and tasting_notes:
-            transaction_kwargs["tasting_notes"] = tasting_notes
-        elif removal_reason == RemovalReason.SELL:
-            transaction_kwargs["sale_price_usd"] = sale_price_usd
-        elif removal_reason == RemovalReason.GIFT:
-            transaction_kwargs["gift_recipient"] = gift_recipient
-        elif removal_reason == RemovalReason.OTHER and removal_notes:
-            transaction_kwargs["removal_notes"] = removal_notes
-
-    # Create transaction (Phase 4 will converge this onto CellarEvent)
-    transaction = Transaction(**transaction_kwargs)
-    await transaction.insert()
+    # Phase 4 — `debit_cellar_for_wine` already wrote the matching
+    # CellarEvent rows with the same fields the legacy Transaction had
+    # (removal_reason, tasting_notes, sale_price, gift_recipient, etc.),
+    # so the Transaction.insert that used to live here is gone. The
+    # transactions API and CSV export read from cellar_events via the
+    # compatibility view.
 
     # Update aggregate inventory so the Wine doc stays consistent with
     # the per-row debits the debit service just applied.

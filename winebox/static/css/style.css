@@ -1000,6 +1000,16 @@ details.advanced-fields .form-grid {
     color: var(--primary-color);
 }
 
+/* Case context hint in the activity feed / history — appears next to a
+ * removal badge when the event was debited from a specific case, so the
+ * user's case-level provenance survives as readable text. */
+.case-context,
+.transaction-case-context {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.85em;
+}
+
 /* Remove-modal source picker — shown only when the wine has more than one
  * physical source (e.g. a case plus loose bottles). Each radio row lets the
  * user pick which source to debit so the case-level provenance survives. */

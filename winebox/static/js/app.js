@@ -1956,6 +1956,27 @@ function getRemovalDetail(t) {
     return '';
 }
 
+// Case-context hint for the activity feed / history — shows where a
+// case-level event came from ("from your Berry Bros case (12-bottle)").
+// Backed by `case_size_at_event` + `provenance_at_event` on the
+// TransactionResponse, which the Phase-4 compatibility view populates
+// from CellarEvent. `item_type` distinguishes case / bottle / legacy
+// (pre-Phase-4 rows with no snapshot).
+function getCaseContext(t) {
+    if (!t || t.item_type === 'legacy') return '';
+    if (t.item_type !== 'case') return '';
+    const size = t.case_size_at_event;
+    const prov = t.provenance_at_event;
+    if (!size && !prov) return '';
+    if (size && prov) {
+        return `<span class="case-context">from your ${escapeHtml(prov)} case (${size}-bottle)</span>`;
+    }
+    if (prov) {
+        return `<span class="case-context">from your ${escapeHtml(prov)} case</span>`;
+    }
+    return `<span class="case-context">from a ${size}-bottle case</span>`;
+}
+
 function renderActivityList(transactions) {
     const container = document.getElementById('recent-activity');
     if (!transactions || transactions.length === 0) {
@@ -1966,6 +1987,7 @@ function renderActivityList(transactions) {
     container.innerHTML = transactions.map(t => {
         const badge = getRemovalBadge(t);
         const detail = getRemovalDetail(t);
+        const caseCtx = getCaseContext(t);
         return `
         <div class="activity-item">
             <div class="activity-icon ${t.transaction_type === 'ADDED' ? 'check-in' : 'check-out'}">
@@ -1978,7 +2000,7 @@ function renderActivityList(transactions) {
                 </div>
                 <div class="activity-meta">
                     ${t.quantity} bottle${t.quantity > 1 ? 's' : ''} &middot;
-                    ${badge.label} &middot;
+                    ${badge.label}${caseCtx ? ` &middot; ${caseCtx}` : ''} &middot;
                     ${formatDate(t.transaction_date)}
                 </div>
                 ${detail ? `<div class="activity-detail">${detail}</div>` : ''}
@@ -2876,6 +2898,7 @@ async function showWineDetail(wineId) {
                         ${wine.transactions.map(t => {
                             const badge = getRemovalBadge(t);
                             const detail = getRemovalDetail(t);
+                            const caseCtx = getCaseContext(t);
                             return `
                             <div class="transaction-item">
                                 <span class="transaction-type ${badge.cssClass}">
@@ -2883,6 +2906,7 @@ async function showWineDetail(wineId) {
                                 </span>
                                 <span class="transaction-quantity">${t.quantity} bottle${t.quantity > 1 ? 's' : ''}</span>
                                 <span class="transaction-date">${formatDate(t.transaction_date)}</span>
+                                ${caseCtx ? `<span class="transaction-case-context">${caseCtx}</span>` : ''}
                                 ${detail ? `<span class="transaction-detail">${detail}</span>` : ''}
                                 ${t.notes ? `<span>${escapeHtml(t.notes)}</span>` : ''}
                             </div>
@@ -3145,6 +3169,7 @@ function renderTransactionList(transactions) {
     container.innerHTML = transactions.map(t => {
         const badge = getRemovalBadge(t);
         const detail = getRemovalDetail(t);
+        const caseCtx = getCaseContext(t);
         return `
         <div class="transaction-item">
             <span class="transaction-type ${badge.cssClass}">
@@ -3153,6 +3178,7 @@ function renderTransactionList(transactions) {
             <span class="transaction-wine">
                 ${t.wine ? escapeHtml(t.wine.name) : 'Unknown Wine'}
                 ${t.wine && t.wine.vintage ? `<span class="vintage">(${escapeHtml(t.wine.vintage)})</span>` : ''}
+                ${caseCtx ? `<span class="transaction-case-context">${caseCtx}</span>` : ''}
                 ${detail ? `<span class="transaction-detail">${detail}</span>` : ''}
             </span>
             <span class="transaction-quantity">${t.quantity} bottle${t.quantity > 1 ? 's' : ''}</span>

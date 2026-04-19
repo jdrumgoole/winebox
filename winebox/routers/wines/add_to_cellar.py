@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import Form, HTTPException, status
 
-from winebox.models import InventoryInfo, Transaction, TransactionType, Wine
+from winebox.models import InventoryInfo, Wine
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.analytics import posthog_service
@@ -82,21 +82,15 @@ async def add_met_wine_to_cellar(
 
     # Create bottle records
     from winebox.services.bottle_service import create_bottles_for_wine
+    # Phase 4 — `create_bottles_for_wine` writes the CellarEvent that
+    # the activity feed and transactions API now read. Notes carry the
+    # provenance hint that used to live on a separate Transaction row.
     await create_bottles_for_wine(
         owner_id=current_user.id,
         wine=cellar_wine,
         quantity=quantity,
-    )
-
-    # Create check-in transaction
-    transaction = Transaction(
-        owner_id=current_user.id,
-        wine_id=cellar_wine.id,
-        transaction_type=TransactionType.ADDED,
-        quantity=quantity,
         notes="Added from Wines I've Met",
     )
-    await transaction.insert()
 
     # Link met wine to cellar wine
     met_wine.added_to_cellar = True

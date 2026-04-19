@@ -1,4 +1,9 @@
-"""Transaction history endpoints."""
+"""Transaction history endpoints.
+
+Post-Phase-4d, these endpoints read `cellar_events` and map each row to
+a `TransactionResponse` via `services/cellar_event_view.py`. The `/api`
+path + payload shape are unchanged — clients don't notice the swap.
+"""
 
 import logging
 
@@ -7,9 +12,13 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
 
-from winebox.models import RemovalReason, Transaction, TransactionType, Wine
+from winebox.models import RemovalReason, TransactionType
 from winebox.schemas.transaction import TransactionResponse
 from winebox.services.auth import RequireAuth
+from winebox.services.cellar_event_view import (
+    get_event_as_transaction,
+    list_events_as_transactions,
+)
 from winebox.services.rate_limit import MAX_PAGE_SIZE
 
 logger = logging.getLogger(__name__)
@@ -27,49 +36,22 @@ async def list_transactions(
     removal_reason: RemovalReason | None = None,
 ) -> list[TransactionResponse]:
     """List all transactions with optional filtering."""
-    # Always filter by owner
-    conditions = {"owner_id": current_user.id}
-
-    if transaction_type:
-        conditions["transaction_type"] = transaction_type
-
-    if removal_reason:
-        conditions["removal_reason"] = removal_reason
-
+    wine_oid: ObjectId | None = None
     if wine_id:
         try:
-            conditions["wine_id"] = ObjectId(wine_id)
+            wine_oid = ObjectId(wine_id)
         except (InvalidId, ValidationError) as e:
             logger.debug("Invalid wine ID format in filter: %s - %s", wine_id, e)
+            wine_oid = None
 
-    transactions = await Transaction.find(
-        conditions
-    ).skip(skip).limit(limit).sort([("transaction_date", -1)]).to_list()
-
-    # Batch fetch all wine details (fixes N+1 query)
-    wine_ids = list({t.wine_id for t in transactions})
-    wines = await Wine.find({"_id": {"$in": wine_ids}}).to_list() if wine_ids else []
-    wines_by_id = {wine.id: wine for wine in wines}
-
-    # Build response with pre-fetched wine data
-    results = []
-    for t in transactions:
-        wine = wines_by_id.get(t.wine_id)
-        response_data = t.model_dump()
-        if wine:
-            response_data["wine"] = {
-                "id": str(wine.id),
-                "name": wine.name,
-                "vintage": wine.vintage,
-                "winery": wine.winery,
-            }
-        else:
-            response_data["wine"] = None
-        response_data["id"] = str(t.id)
-        response_data["wine_id"] = str(t.wine_id)
-        results.append(TransactionResponse.model_validate(response_data))
-
-    return results
+    return await list_events_as_transactions(
+        current_user.id,
+        skip=skip,
+        limit=limit,
+        transaction_type=transaction_type,
+        wine_id=wine_oid,
+        removal_reason=removal_reason,
+    )
 
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)
@@ -77,34 +59,15 @@ async def get_transaction(
     transaction_id: str,
     current_user: RequireAuth,
 ) -> TransactionResponse:
-    """Get a single transaction by ID."""
-    try:
-        transaction = await Transaction.find_one(
-            {"_id": ObjectId(transaction_id), "owner_id": current_user.id}
-        )
-    except (InvalidId, ValidationError) as e:
-        logger.debug("Invalid transaction ID format: %s - %s", transaction_id, e)
-        transaction = None
+    """Get a single transaction by ID.
 
-    if not transaction:
+    `transaction_id` is the CellarEvent id under the hood — the parameter
+    name stays for API back-compat.
+    """
+    result = await get_event_as_transaction(current_user.id, transaction_id)
+    if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Transaction with ID {transaction_id} not found",
         )
-
-    # Get wine details
-    wine = await Wine.get(transaction.wine_id)
-    response_data = transaction.model_dump()
-    if wine:
-        response_data["wine"] = {
-            "id": str(wine.id),
-            "name": wine.name,
-            "vintage": wine.vintage,
-            "winery": wine.winery,
-        }
-    else:
-        response_data["wine"] = None
-    response_data["id"] = str(transaction.id)
-    response_data["wine_id"] = str(transaction.wine_id)
-
-    return TransactionResponse.model_validate(response_data)
+    return result

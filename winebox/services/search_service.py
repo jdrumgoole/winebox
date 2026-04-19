@@ -140,23 +140,34 @@ async def _resolve_transaction_date_ids(
             rng["$lte"] = before
         return rng
 
+    # Phase 4 — read from cellar_events (CellarEvent) rather than the
+    # transactions collection. Owner scoping uses `$or` so events written
+    # before 4a (with only `cellar_id`, no `owner_id`) still match.
+    from winebox.models.cellar_event import CellarEvent, CellarEventType
+
+    owner_scope = {"$or": [{"owner_id": owner_id}, {"cellar_id": owner_id}]}
+
     if filters.checked_in_after or filters.checked_in_before:
         q = {
-            "owner_id": owner_id,
-            "transaction_type": TransactionType.ADDED,
-            "transaction_date": _date_range(filters.checked_in_after, filters.checked_in_before),
+            "$and": [
+                owner_scope,
+                {"event_type": CellarEventType.ADDED.value},
+                {"event_date": _date_range(filters.checked_in_after, filters.checked_in_before)},
+            ],
         }
-        txns = await Transaction.find(q).to_list(length=MAX_USER_RESULTSET)
-        result = {t.wine_id for t in txns}
+        evts = await CellarEvent.find(q).to_list(length=MAX_USER_RESULTSET)
+        result = {e.wine_id for e in evts if e.wine_id is not None}
 
     if filters.checked_out_after or filters.checked_out_before:
         q = {
-            "owner_id": owner_id,
-            "transaction_type": TransactionType.REMOVED,
-            "transaction_date": _date_range(filters.checked_out_after, filters.checked_out_before),
+            "$and": [
+                owner_scope,
+                {"event_type": {"$ne": CellarEventType.ADDED.value}},
+                {"event_date": _date_range(filters.checked_out_after, filters.checked_out_before)},
+            ],
         }
-        txns = await Transaction.find(q).to_list(length=MAX_USER_RESULTSET)
-        checkout_ids = {t.wine_id for t in txns}
+        evts = await CellarEvent.find(q).to_list(length=MAX_USER_RESULTSET)
+        checkout_ids = {e.wine_id for e in evts if e.wine_id is not None}
         result = checkout_ids if result is None else result & checkout_ids
 
     return result

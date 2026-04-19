@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from winebox.models import Transaction, TransactionType, Wine
+from winebox.models import TransactionType, Wine
 from winebox.schemas.export import (
     ExportFormat,
     TransactionFlatExport,
@@ -17,7 +17,10 @@ from winebox.schemas.export import (
 )
 from winebox.services import export_service
 from winebox.services.auth import RequireAuth
+from winebox.services.cellar_event_view import build_event_query, event_to_transaction_response
 from winebox.services.rate_limit import MAX_USER_RESULTSET, make_limiter
+
+from winebox.models.cellar_event import CellarEvent
 
 router = APIRouter()
 
@@ -146,28 +149,29 @@ async def export_transactions(
 
     Returns transaction data in the specified format (CSV, XLSX, YAML, or JSON).
     """
-    # Build query conditions - always filter by owner
-    conditions: dict[str, Any] = {"owner_id": current_user.id}
-
-    if transaction_type:
-        conditions["transaction_type"] = transaction_type
-
+    # Build Mongo filter on `cellar_events` with the same semantics as the
+    # old transactions-based export (owner scoped, optional type / wine /
+    # date range).
+    wine_oid: ObjectId | None = None
     if wine_id:
         try:
-            conditions["wine_id"] = ObjectId(wine_id)
+            wine_oid = ObjectId(wine_id)
         except (InvalidId, ValidationError):
-            pass  # Ignore invalid wine_id
+            wine_oid = None
+    conditions = build_event_query(
+        current_user.id,
+        transaction_type=transaction_type,
+        wine_id=wine_oid,
+        date_from=from_date,
+        date_to=to_date,
+    )
 
-    if from_date:
-        conditions.setdefault("transaction_date", {})
-        conditions["transaction_date"]["$gte"] = from_date
-
-    if to_date:
-        conditions.setdefault("transaction_date", {})
-        conditions["transaction_date"]["$lte"] = to_date
-
-    # Fetch transactions (bounded — see MAX_USER_RESULTSET)
-    transactions = await Transaction.find(conditions).sort([("transaction_date", -1)]).to_list(length=MAX_USER_RESULTSET)
+    # Fetch events and project them onto the TransactionResponse shape so
+    # the existing flat/hierarchical serialisers keep working unchanged.
+    events = await CellarEvent.find(conditions).sort([("event_date", -1)]).to_list(
+        length=MAX_USER_RESULTSET,
+    )
+    transactions = [event_to_transaction_response(e) for e in events]
 
     # Track applied filters
     filters_applied: dict[str, Any] = {}
@@ -180,12 +184,23 @@ async def export_transactions(
     if to_date:
         filters_applied["to_date"] = to_date.isoformat()
 
-    # Batch fetch wine details if needed
+    # Batch fetch wine details if needed. `TransactionResponse.wine_id` is a
+    # string here (post-Phase-4 the source is CellarEvent → view model),
+    # so we cast back to ObjectId for the DB filter and key the cache by
+    # string so lookups below work.
     wines_by_id: dict[str, Any] = {}
     if include_wine_details and transactions:
-        wine_ids = list({t.wine_id for t in transactions})
-        wines = await Wine.find({"_id": {"$in": wine_ids}}).to_list(length=MAX_USER_RESULTSET)
-        wines_by_id = {wine.id: wine for wine in wines}
+        wine_oids: list[ObjectId] = []
+        for t in transactions:
+            if not t.wine_id:
+                continue
+            try:
+                wine_oids.append(ObjectId(t.wine_id))
+            except (InvalidId, ValidationError):
+                pass
+        if wine_oids:
+            wines = await Wine.find({"_id": {"$in": wine_oids}}).to_list(length=MAX_USER_RESULTSET)
+            wines_by_id = {str(wine.id): wine for wine in wines}
 
     # Generate response based on format
     if format in (ExportFormat.CSV, ExportFormat.XLSX):
@@ -193,7 +208,7 @@ async def export_transactions(
         flat_transactions = [
             TransactionFlatExport.from_transaction(
                 txn,
-                wine=wines_by_id.get(txn.wine_id),
+                wine=wines_by_id.get(str(txn.wine_id)),
                 include_wine_details=include_wine_details,
             )
             for txn in transactions
@@ -223,7 +238,7 @@ async def export_transactions(
 
             # Add wine details if requested
             if include_wine_details:
-                wine = wines_by_id.get(txn.wine_id)
+                wine = wines_by_id.get(str(txn.wine_id))
                 if wine:
                     txn_dict["wine"] = {
                         "id": str(wine.id),

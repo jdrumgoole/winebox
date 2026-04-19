@@ -9,6 +9,7 @@ from winebox.models import ImportBatch, Transaction, Wine
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineResponse, WineUpdate, WineWithInventory
 from winebox.services.auth import RequireAuth
+from winebox.services.cellar_event_view import list_wine_transactions
 from winebox.services.cellar_inventory import attach_breakdowns
 from winebox.services.rate_limit import MAX_PAGE_SIZE, MAX_USER_RESULTSET
 
@@ -51,14 +52,13 @@ async def get_wine(
     """Get wine details with full transaction history."""
     wine = await get_wine_or_404(wine_id, current_user.id)
 
-    # Get transactions for this wine (owner already verified via wine ownership)
-    transactions = await Transaction.find(
-        {"wine_id": wine.id}
-    ).sort([("transaction_date", -1)]).to_list()
+    # Transaction history comes from `cellar_events` via the
+    # compatibility view — the Wine detail modal sees the same shape as
+    # before but with added case-context fields.
+    transactions = await list_wine_transactions(wine.id, current_user.id)
 
-    # Build response with transactions
     response_data = wine.model_dump()
-    response_data["transactions"] = transactions
+    response_data["transactions"] = [t.model_dump() for t in transactions]
 
     response = WineResponse.model_validate(response_data)
     await attach_breakdowns([response], [wine], current_user.id)
@@ -110,11 +110,23 @@ async def delete_all_wines(
             await image_storage.delete_image(wine.back_label_image_path)
             deleted_images += 1
 
-    # Delete all transactions for this user
-    delete_transactions_result = await Transaction.find(
+    # Delete the user's history. Post-Phase-4 every event is a
+    # CellarEvent, but legacy Transaction rows may still exist for
+    # accounts that pre-date the migration — drain both collections so
+    # `remove demo data` and admin "wipe my cellar" flows are clean.
+    from winebox.models.cellar_event import CellarEvent
+    delete_events_result = await CellarEvent.find(
+        {"$or": [{"owner_id": current_user.id}, {"cellar_id": current_user.id}]}
+    ).delete()
+    deleted_events = delete_events_result.deleted_count if delete_events_result else 0
+    delete_legacy_txns_result = await Transaction.find(
         {"owner_id": current_user.id}
     ).delete()
-    deleted_transactions = delete_transactions_result.deleted_count if delete_transactions_result else 0
+    deleted_legacy_txns = delete_legacy_txns_result.deleted_count if delete_legacy_txns_result else 0
+    # Total surfaced under the same key the API has always returned so
+    # clients don't notice the storage swap. Counts the union of new
+    # events and any legacy Transaction rows.
+    deleted_transactions = deleted_events + deleted_legacy_txns
 
     # Delete all import batches for this user
     delete_batches_result = await ImportBatch.find(
@@ -129,8 +141,8 @@ async def delete_all_wines(
     deleted_wines = delete_wines_result.deleted_count if delete_wines_result else 0
 
     logger.info(
-        "User %s deleted entire collection: %d wines, %d transactions, %d images, %d import batches",
-        current_user.id, deleted_wines, deleted_transactions, deleted_images, deleted_import_batches,
+        "User %s deleted entire collection: %d wines, %d events (+%d legacy transactions), %d images, %d import batches",
+        current_user.id, deleted_wines, deleted_events, deleted_legacy_txns, deleted_images, deleted_import_batches,
     )
 
     return {
@@ -154,7 +166,10 @@ async def delete_wine(
     if wine.back_label_image_path:
         await image_storage.delete_image(wine.back_label_image_path)
 
-    # Delete transactions
+    # Delete history — both the new CellarEvent rows and any pre-Phase-4
+    # Transaction rows that might still exist for legacy wines.
+    from winebox.models.cellar_event import CellarEvent
+    await CellarEvent.find({"wine_id": wine.id}).delete()
     await Transaction.find({"wine_id": wine.id}).delete()
 
     # Delete wine

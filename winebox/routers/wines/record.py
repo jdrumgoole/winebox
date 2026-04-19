@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import File, Form, HTTPException, UploadFile, status
 
-from winebox.models import InventoryInfo, Transaction, TransactionType, Wine
+from winebox.models import InventoryInfo, Wine
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.analytics import posthog_service
 from winebox.services.auth import RequireAuth
@@ -178,7 +178,11 @@ async def record_wine(
     )
     await wine.insert()
 
-    # Create bottle records (event-sourced tracking)
+    # Create bottle records (event-sourced tracking). After Phase 4 of
+    # the cases-first-class plan, the CellarEvent rows produced here are
+    # the sole audit trail — the legacy Transaction collection is no
+    # longer written. The transactions API and CSV exports read from
+    # cellar_events via the compatibility view.
     from winebox.services.bottle_service import create_bottles_for_wine
     await create_bottles_for_wine(
         owner_id=current_user.id,
@@ -187,20 +191,8 @@ async def record_wine(
         case_size=case_size,
         provenance=provenance,
         purchase_price=purchase_price,
-    )
-
-    # Record an ADDED transaction for the history log. Cellar items
-    # (created above by bottle_service) track per-bottle/per-case state;
-    # Transaction is the flat append-only audit trail used by the
-    # transactions router and the CSV/Excel exports.
-    transaction = Transaction(
-        owner_id=current_user.id,
-        wine_id=wine.id,
-        transaction_type=TransactionType.ADDED,
-        quantity=quantity,
         notes=notes,
     )
-    await transaction.insert()
 
     # Track record event
     posthog_service.capture(

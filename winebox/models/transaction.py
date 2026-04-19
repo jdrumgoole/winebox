@@ -1,4 +1,21 @@
-"""Transaction document model for tracking wine check-ins and check-outs."""
+"""Transaction document model for tracking wine check-ins and check-outs.
+
+DEPRECATED — kept so historical rows in the `transactions` collection
+still load. Phase 4 of the cases-first-class plan converged the event
+log onto :mod:`winebox.models.cellar_event`.
+
+Writes:    no live code path inserts into this collection any more.
+Reads:     served via :mod:`winebox.services.cellar_event_view`, which
+           projects `CellarEvent` rows onto the `TransactionResponse`
+           shape so the `/api/transactions` endpoint and CSV exports
+           keep working unchanged.
+
+Dropping the collection is a separate ticket — once Phase 4 has been
+live for a release and we're confident no readers remain we can
+schedule the drop. The class stays here meanwhile so the demo
+"remove demo data" cleanup and the migration script can keep
+referencing it.
+"""
 
 import enum
 from datetime import datetime, timezone

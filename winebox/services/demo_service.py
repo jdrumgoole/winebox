@@ -25,7 +25,7 @@ from winebox.database import get_database
 from winebox.db import PyObjectId
 from winebox.models.cellar import CellarItem, EmbeddedWine
 from winebox.models.cellar_event import CellarEvent, CellarEventType
-from winebox.models.transaction import Transaction, TransactionType
+from winebox.models.transaction import Transaction  # only for purge cleanup; writes use CellarEvent
 from winebox.models.wine import InventoryInfo, Wine
 
 logger = logging.getLogger(__name__)
@@ -225,21 +225,8 @@ async def _flush_wine_batch(
     wine_batch: list[Wine],
     batch_meta: list[tuple[int, datetime, int | None, str | None, float | None]],
 ) -> None:
-    """Insert a batch of wines with their transactions, cellar items, and events."""
+    """Insert a batch of wines with their cellar items and events."""
     await Wine.insert_many(wine_batch)
-
-    txn_batch = [
-        Transaction(
-            owner_id=owner_id,
-            wine_id=w.id,
-            transaction_type=TransactionType.ADDED,
-            quantity=q,
-            transaction_date=ca,
-            created_at=ca,
-        )
-        for w, (q, ca, _cs, _prov, _pp) in zip(wine_batch, batch_meta)
-    ]
-    await Transaction.insert_many(txn_batch)
 
     cellar_items: list[CellarItem] = []
     cellar_events: list[CellarEvent] = []
@@ -263,9 +250,13 @@ async def _flush_wine_batch(
                 provenance=provenance, created_at=ca, updated_at=ca,
             ))
             cellar_events.append(CellarEvent(
-                cellar_id=owner_id, cellar_item_id=item_id,
+                cellar_id=owner_id, owner_id=owner_id, wine_id=w.id,
+                cellar_item_id=item_id,
                 item_type="case", event_type=CellarEventType.ADDED,
-                quantity=q, event_date=ca, created_at=ca,
+                quantity=q,
+                case_size_at_event=case_size,
+                provenance_at_event=provenance,
+                event_date=ca, created_at=ca,
             ))
         else:
             cellar_items.append(CellarItem(
@@ -274,7 +265,8 @@ async def _flush_wine_batch(
                 created_at=ca, updated_at=ca,
             ))
             cellar_events.append(CellarEvent(
-                cellar_id=owner_id, cellar_item_id=item_id,
+                cellar_id=owner_id, owner_id=owner_id, wine_id=w.id,
+                cellar_item_id=item_id,
                 item_type="bottle", event_type=CellarEventType.ADDED,
                 quantity=q, event_date=ca, created_at=ca,
             ))
@@ -361,28 +353,41 @@ async def install_demo_data(owner_id: PyObjectId, sample_wines: list[dict[str, A
     # Create checkout transactions in batch for a realistic history
     checkout_count = min(len(checkout_candidates), max(20, total // 10))
     random.shuffle(checkout_candidates)
-    checkout_txns: list[Transaction] = []
+    checkout_events: list[CellarEvent] = []
     wine_updates: list[tuple[Any, int, datetime]] = []
+    cellar_col = CellarItem.get_pymongo_collection()
 
     for wine_id, max_qty in checkout_candidates[:checkout_count]:
         qty = random.randint(1, max(1, max_qty - 1))
         notes = random.choice(_CHECKOUT_NOTES)
         checkout_date = now - timedelta(days=random.randint(1, 60))
 
-        checkout_txns.append(Transaction(
-            owner_id=owner_id,
-            wine_id=wine_id,
-            transaction_type=TransactionType.REMOVED,
+        # Best-effort: find a CellarItem for this wine and snapshot its
+        # case context onto the simulated DRUNK event so the demo cellar
+        # behaves like a real one in the activity feed.
+        item = await cellar_col.find_one({"cellar_id": owner_id, "wine.wine_id": wine_id})
+        item_type = (item or {}).get("item_type", "bottle")
+        case_size_snap = (item or {}).get("case_size") if item_type == "case" else None
+        provenance_snap = (item or {}).get("provenance") if item_type == "case" else None
+
+        checkout_events.append(CellarEvent(
+            cellar_id=owner_id, owner_id=owner_id, wine_id=wine_id,
+            cellar_item_id=(item or {}).get("_id"),
+            item_type=item_type,
+            event_type=CellarEventType.DRUNK,
             quantity=qty,
             notes=notes,
-            transaction_date=checkout_date,
+            removal_reason=None,
+            case_size_at_event=case_size_snap,
+            provenance_at_event=provenance_snap,
+            event_date=checkout_date,
             created_at=checkout_date,
         ))
         wine_updates.append((wine_id, qty, checkout_date))
         total_bottles -= qty
 
-    if checkout_txns:
-        await Transaction.insert_many(checkout_txns)
+    if checkout_events:
+        await CellarEvent.insert_many(checkout_events)
         wines_col = Wine.get_pymongo_collection()
         for wine_id, qty, checkout_date in wine_updates:
             await wines_col.update_one(

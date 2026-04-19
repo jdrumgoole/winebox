@@ -245,14 +245,12 @@ async def test_cross_user_cellar_item_returns_404(
 
 
 @pytest.mark.asyncio
-async def test_specific_case_records_transaction_and_cellar_event(
+async def test_specific_case_records_cellar_event_only(
     client: AsyncClient
 ) -> None:
-    """A specific-case debit produces (for now) a Transaction + a CellarEvent.
-
-    Phase 4 of the plan converges these onto CellarEvent only; until then
-    both writes must succeed so the activity feed and case-history modal
-    both see the event.
+    """A specific-case debit writes one CellarEvent (with the case
+    snapshot + tasting notes) and zero new Transaction rows. Phase 4e
+    contract: the legacy `transactions` collection is read-only.
     """
     from winebox.models import Transaction
     from winebox.models.cellar_event import CellarEvent
@@ -261,6 +259,10 @@ async def test_specific_case_records_transaction_and_cellar_event(
     await _record_cases(client, name=name, case_size=6, provenance="EventCo")
     wine = await _get_wine(client, name)
     case = wine["inventory"]["cases"][0]
+
+    txs_before = await Transaction.find(
+        {"wine_id": ObjectId(wine["id"]), "transaction_type": "REMOVED"}
+    ).to_list()
 
     resp = await client.post(
         f"/api/wines/{wine['id']}/checkout",
@@ -273,13 +275,18 @@ async def test_specific_case_records_transaction_and_cellar_event(
     )
     assert resp.status_code == 200
 
-    txs = await Transaction.find(
+    txs_after = await Transaction.find(
         {"wine_id": ObjectId(wine["id"]), "transaction_type": "REMOVED"}
     ).to_list()
-    assert any(t.quantity == 2 and t.tasting_notes == "Decanted 30 min, plum and tobacco."
-               for t in txs)
+    # Phase 4e: no new Transaction row.
+    assert len(txs_after) == len(txs_before)
 
     events = await CellarEvent.find(
         {"cellar_item_id": ObjectId(case["cellar_item_id"]), "event_type": "drunk"}
     ).to_list()
-    assert any(e.quantity == 2 for e in events)
+    matched = [e for e in events if e.quantity == 2]
+    assert matched, "expected a DRUNK event for this case with quantity=2"
+    e = matched[0]
+    assert e.tasting_notes == "Decanted 30 min, plum and tobacco."
+    assert e.case_size_at_event == 6
+    assert e.provenance_at_event == "EventCo"

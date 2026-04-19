@@ -66,6 +66,7 @@ def build_cellar_items_and_events(
     provenance: Optional[str] = None,
     created_at: Optional[datetime] = None,
     import_batch_id: Optional[PyObjectId] = None,
+    notes: Optional[str] = None,
 ) -> CellarRecords:
     """Build CellarItem + CellarEvent records without inserting them.
 
@@ -106,6 +107,7 @@ def build_cellar_items_and_events(
             item_type=item_type,
             event_type=CellarEventType.ADDED,
             quantity=qty,
+            notes=notes,
             case_size_at_event=extra.get("case_size") if item_type == "case" else None,
             provenance_at_event=extra.get("provenance") if item_type == "case" else None,
             import_batch_id=import_batch_id,
@@ -144,6 +146,7 @@ async def create_cellar_items_for_wine(
     provenance: Optional[str] = None,
     created_at: Optional[datetime] = None,
     import_batch_id: Optional[PyObjectId] = None,
+    notes: Optional[str] = None,
 ) -> dict[str, Any]:
     """Build and insert CellarItem + CellarEvent records for one wine.
 
@@ -166,6 +169,7 @@ async def create_cellar_items_for_wine(
         provenance=provenance,
         created_at=created_at,
         import_batch_id=import_batch_id,
+        notes=notes,
     )
 
     # Batch insert — 2 round-trips total

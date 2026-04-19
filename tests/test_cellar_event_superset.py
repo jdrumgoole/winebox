@@ -115,6 +115,39 @@ async def test_checkout_writes_enriched_removal_event(client: AsyncClient) -> No
 
 
 @pytest.mark.asyncio
+async def test_transactions_api_surfaces_case_snapshot(client: AsyncClient) -> None:
+    """Phase 4f: /api/transactions returns item_type + case_size_at_event
+    + provenance_at_event so the activity feed can render the case
+    context on each event."""
+    name = f"ApiSnap {uuid.uuid4().hex[:6]}"
+    await _record_cases(client, name=name, case_size=12, provenance="Majestic")
+    wine = await _get_wine(client, name)
+    case = wine["inventory"]["cases"][0]
+
+    checkout = await client.post(
+        f"/api/wines/{wine['id']}/checkout",
+        data={
+            "quantity": "1",
+            "cellar_item_id": case["cellar_item_id"],
+            "removal_reason": "DRINK",
+        },
+    )
+    assert checkout.status_code == 200
+
+    listing = await client.get(f"/api/transactions?wine_id={wine['id']}")
+    assert listing.status_code == 200
+    rows = listing.json()
+    # Find the DRUNK row (it'll be the REMOVED / DRINK one).
+    drunk = next(
+        t for t in rows
+        if t["transaction_type"] == "REMOVED" and t.get("removal_reason") == "DRINK"
+    )
+    assert drunk["item_type"] == "case"
+    assert drunk["case_size_at_event"] == 12
+    assert drunk["provenance_at_event"] == "Majestic"
+
+
+@pytest.mark.asyncio
 async def test_sold_checkout_populates_sale_price_usd_and_reason(client: AsyncClient) -> None:
     """A SELL debit maps to event_type=SOLD and populates both price fields."""
     name = f"Sale {uuid.uuid4().hex[:6]}"
@@ -147,13 +180,12 @@ async def test_sold_checkout_populates_sale_price_usd_and_reason(client: AsyncCl
 
 
 @pytest.mark.asyncio
-async def test_checkout_still_writes_one_transaction_and_one_event_per_source(
+async def test_checkout_writes_event_only_no_transaction(
     client: AsyncClient
 ) -> None:
-    """Dual-write contract: one Transaction + one CellarEvent when the debit
-    hits exactly one physical source. Phase 4d will flip the UI to read
-    CellarEvent; until then the two must be parallel."""
-    name = f"Parallel {uuid.uuid4().hex[:6]}"
+    """Phase 4e contract: a checkout writes exactly one CellarEvent and
+    no new Transaction row. The legacy collection is read-only."""
+    name = f"EventOnly {uuid.uuid4().hex[:6]}"
     await _record_loose(client, name=name, quantity=4)
     wine = await _get_wine(client, name)
 
@@ -177,5 +209,6 @@ async def test_checkout_still_writes_one_transaction_and_one_event_per_source(
         {"wine_id": ObjectId(wine["id"]), "event_type": CellarEventType.DRUNK.value}
     ).to_list()
 
-    assert len(after_txs) == len(before_txs) + 1
+    # No new Transaction row; one new CellarEvent.
+    assert len(after_txs) == len(before_txs)
     assert len(after_events) == len(before_events) + 1
