@@ -198,8 +198,13 @@ async def migrate(
                     doc["provenance_at_event"] = matched.get("provenance")
                 totals["matched_with_cellar_item"] += 1
             else:
+                # No matching CellarItem (wine consumed/deleted, or the
+                # `cellars` collection was never populated on this
+                # account). Record as a generic bottle event with no
+                # cellar_item_id — the `legacy` item_type was retired
+                # once production was migrated to the per-row store.
                 doc["cellar_item_id"] = None
-                doc["item_type"] = "legacy"
+                doc["item_type"] = "bottle"
                 totals["legacy_unlinked"] += 1
 
             to_insert.append(doc)

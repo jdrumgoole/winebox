@@ -5,7 +5,7 @@ Covers the migration script's key invariants:
 - Re-running the script is a no-op (idempotency via
   `migrated_from_transaction_id`).
 - Transactions we *can* link back to a CellarItem get the case snapshot;
-  ones we can't get `item_type="legacy"` so the renderer can label them.
+  ones we can't get `item_type="bottle"` with cellar_item_id=None.
 - Event types are mapped from (transaction_type, removal_reason).
 - A `--since` cutoff skips older rows.
 """
@@ -98,8 +98,10 @@ async def test_backfill_matches_cellaritem_and_is_idempotent(isolated_db) -> Non
 
 
 @pytest.mark.asyncio
-async def test_backfill_legacy_row_with_no_matching_cellar_item(isolated_db) -> None:
-    """A Transaction with no matching CellarItem → item_type='legacy'."""
+async def test_backfill_unlinked_row_is_bottle_with_no_cellar_item(isolated_db) -> None:
+    """A Transaction with no matching CellarItem → `item_type="bottle"`,
+    `cellar_item_id=None`. The `legacy` item_type was retired once
+    production was migrated onto the per-row `cellars` collection."""
     from winebox.models import Transaction, TransactionType, RemovalReason
     from winebox.models.cellar_event import CellarEvent
     from winebox.models.wine import Wine, WineCollection
@@ -136,7 +138,7 @@ async def test_backfill_legacy_row_with_no_matching_cellar_item(isolated_db) -> 
     event = await CellarEvent.find_one({"migrated_from_transaction_id": tx.id})
     assert event is not None
     assert event.cellar_item_id is None
-    assert event.item_type == "legacy"
+    assert event.item_type == "bottle"
     assert event.event_type.value == "drunk"
     assert event.removal_reason is not None and event.removal_reason.value == "DRINK"
     assert event.tasting_notes == "Remembered fondly."

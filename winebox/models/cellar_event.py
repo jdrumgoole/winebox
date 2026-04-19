@@ -47,8 +47,10 @@ class CellarEvent(MongoDocument):
     """One event per action on a cellar item (case or bottle)."""
 
     cellar_id: PyObjectId  # = user._id
-    cellar_item_id: Optional[PyObjectId] = None  # nullable for legacy backfill rows
-    item_type: str  # "case" | "bottle" | "legacy" (for unmigrated Transaction rows)
+    # Optional because backfilled events for wines that no longer exist
+    # (fully consumed + deleted) have no CellarItem to point at.
+    cellar_item_id: Optional[PyObjectId] = None
+    item_type: str  # "case" | "bottle"
     event_type: CellarEventType
     quantity: int = 1  # Bottles affected
 

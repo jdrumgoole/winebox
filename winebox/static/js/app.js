@@ -1960,11 +1960,9 @@ function getRemovalDetail(t) {
 // case-level event came from ("from your Berry Bros case (12-bottle)").
 // Backed by `case_size_at_event` + `provenance_at_event` on the
 // TransactionResponse, which the Phase-4 compatibility view populates
-// from CellarEvent. `item_type` distinguishes case / bottle / legacy
-// (pre-Phase-4 rows with no snapshot).
+// from CellarEvent. `item_type` distinguishes case from bottle.
 function getCaseContext(t) {
-    if (!t || t.item_type === 'legacy') return '';
-    if (t.item_type !== 'case') return '';
+    if (!t || t.item_type !== 'case') return '';
     const size = t.case_size_at_event;
     const prov = t.provenance_at_event;
     if (!size && !prov) return '';
