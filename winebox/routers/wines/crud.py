@@ -96,7 +96,7 @@ async def update_wine(
 async def delete_all_wines(
     current_user: RequireAuth,
 ) -> dict:
-    """Delete all wines, transactions, images, and import batches for the current user."""
+    """Delete all wines, cellar items, events, images, and import batches for the current user."""
     # Find all wines belonging to the current user (bounded — see MAX_USER_RESULTSET).
     wines = await Wine.find({"owner_id": current_user.id}).to_list(length=MAX_USER_RESULTSET)
 
@@ -109,6 +109,20 @@ async def delete_all_wines(
         if wine.back_label_image_path:
             await image_storage.delete_image(wine.back_label_image_path)
             deleted_images += 1
+
+    # Collect import batch IDs before deleting (needed for raw_uploads cleanup)
+    batch_ids = [
+        b.id for b in await ImportBatch.find(
+            {"owner_id": current_user.id}
+        ).to_list(length=MAX_USER_RESULTSET)
+    ]
+
+    # Delete cellar items (bottles and cases) — the physical inventory
+    from winebox.models.cellar import CellarItem
+    delete_cellar_result = await CellarItem.find(
+        {"cellar_id": current_user.id}
+    ).delete()
+    deleted_cellar_items = delete_cellar_result.deleted_count if delete_cellar_result else 0
 
     # Delete the user's history. Post-Phase-4 every event is a
     # CellarEvent, but legacy Transaction rows may still exist for
@@ -123,16 +137,17 @@ async def delete_all_wines(
         {"owner_id": current_user.id}
     ).delete()
     deleted_legacy_txns = delete_legacy_txns_result.deleted_count if delete_legacy_txns_result else 0
-    # Total surfaced under the same key the API has always returned so
-    # clients don't notice the storage swap. Counts the union of new
-    # events and any legacy Transaction rows.
     deleted_transactions = deleted_events + deleted_legacy_txns
 
-    # Delete all import batches for this user
+    # Delete import batches and their raw upload rows
     delete_batches_result = await ImportBatch.find(
         {"owner_id": current_user.id}
     ).delete()
     deleted_import_batches = delete_batches_result.deleted_count if delete_batches_result else 0
+
+    if batch_ids:
+        from winebox.models.import_batch_row import RawUploadRow
+        await RawUploadRow.find({"batch_id": {"$in": batch_ids}}).delete()
 
     # Delete all wines for this user
     delete_wines_result = await Wine.find(
@@ -141,12 +156,13 @@ async def delete_all_wines(
     deleted_wines = delete_wines_result.deleted_count if delete_wines_result else 0
 
     logger.info(
-        "User %s deleted entire collection: %d wines, %d events (+%d legacy transactions), %d images, %d import batches",
-        current_user.id, deleted_wines, deleted_events, deleted_legacy_txns, deleted_images, deleted_import_batches,
+        "User %s deleted entire collection: %d wines, %d cellar items, %d events (+%d legacy transactions), %d images, %d import batches",
+        current_user.id, deleted_wines, deleted_cellar_items, deleted_events, deleted_legacy_txns, deleted_images, deleted_import_batches,
     )
 
     return {
         "deleted_wines": deleted_wines,
+        "deleted_cellar_items": deleted_cellar_items,
         "deleted_transactions": deleted_transactions,
         "deleted_images": deleted_images,
         "deleted_import_batches": deleted_import_batches,

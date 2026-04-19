@@ -453,11 +453,19 @@ async def test_delete_all_wines(client: AsyncClient, sample_image_bytes: bytes) 
     assert response.status_code == 200
     result = response.json()
     assert result["deleted_wines"] == 3
+    assert result["deleted_cellar_items"] == 3
     assert result["deleted_transactions"] == 3
 
     # Verify 0 wines remain
     response = await client.get("/api/wines")
     assert response.json() == []
+
+    # Verify cellar items are also gone (regression: previously only wines were deleted)
+    response = await client.get("/api/cellar/summary")
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["total_bottles"] == 0
+    assert summary["unique_wines"] == 0
 
 
 @pytest.mark.asyncio
