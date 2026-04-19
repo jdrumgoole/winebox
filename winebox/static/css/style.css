@@ -908,23 +908,18 @@ details.advanced-fields .form-grid {
 
 .wine-card-footer {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1.25rem;
     border-top: 1px solid var(--border-color);
     margin-top: auto;
-    overflow: hidden;
-}
-
-.wine-card-footer .inventory-breakdown {
-    min-width: 0;
-    flex: 1 1 auto;
-    overflow: hidden;
 }
 
 .wine-card-footer .remove-btn {
     flex-shrink: 0;
+    margin-left: auto;
 }
 
 .wine-quantity {
@@ -972,9 +967,6 @@ details.advanced-fields .form-grid {
     background: color-mix(in srgb, var(--primary-color, #7c2d3e) 8%, transparent);
     color: var(--primary-color, #7c2d3e);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
     line-height: 1.2;
 }
 
