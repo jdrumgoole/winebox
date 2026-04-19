@@ -3,8 +3,9 @@
 from fastapi import APIRouter
 
 from .add_to_cellar import add_met_wine_to_cellar
-from .checkin import checkout_wine, record_wine
+from .checkout import checkout_wine
 from .crud import delete_all_wines, delete_wine, get_wine, list_wines, update_wine
+from .record import record_wine
 from .enrichment import enrich_wines, enrichment_progress
 from .grapes import get_wine_grapes, set_wine_grapes
 from .met import record_met_wine
