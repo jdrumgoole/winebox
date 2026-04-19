@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query, Request
 
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
+from winebox.services.cellar_inventory import attach_breakdowns
 from winebox.services.auth import RequireAuth
 from winebox.services.rate_limit import MAX_PAGE_SIZE, make_limiter
 from winebox.services.search_service import WineSearchFilters, search_wines
@@ -70,4 +71,6 @@ async def search_wines_endpoint(
         enriched=enriched,
     )
     wines = await search_wines(current_user.id, filters, skip, limit)
-    return [WineWithInventory.model_validate(w) for w in wines]
+    results = [WineWithInventory.model_validate(w) for w in wines]
+    await attach_breakdowns(results, wines, current_user.id)
+    return results

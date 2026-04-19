@@ -70,11 +70,38 @@ class WineUpdate(BaseModel):
     custom_fields: dict[str, str] | None = Field(None, description="User-defined custom fields")
 
 
+class CaseBreakdown(BaseModel):
+    """One case of a wine in the cellar — physical item, not an abstract descriptor.
+
+    Mirrors the subset of `CellarItem` fields the UI needs to render a case chip
+    without joining back to the raw collection. Cases with the same wine but
+    different provenance appear as separate entries.
+    """
+
+    cellar_item_id: str
+    case_size: int = Field(..., ge=1)
+    bottles_remaining: int = Field(..., ge=0)
+    provenance: str | None = None
+    purchase_price: float | None = None
+    purchase_date: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class InventoryInfo(BaseModel):
-    """Schema for inventory information."""
+    """Schema for inventory information.
+
+    `quantity` is the aggregate bottle count (cases' remaining bottles +
+    loose). `cases` and `loose_bottles` are the case/loose decomposition so
+    every UI surface can render the breakdown without a second request.
+    `case_size` is retained for backward compatibility with clients that
+    predate the breakdown — it reflects the first case, if any.
+    """
 
     quantity: int = Field(..., ge=0)
     case_size: int | None = Field(None, ge=1, description="Bottles per case (None = single bottles)")
+    cases: list[CaseBreakdown] = Field(default_factory=list)
+    loose_bottles: int = Field(0, ge=0)
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -93,6 +93,7 @@ markers = [
 [tool.hatch.build]
 artifacts = [
     "winebox/static/logos/*.png",
+    "winebox/static/svg/*.svg",
 ]
 
 [tool.hatch.build.targets.wheel]

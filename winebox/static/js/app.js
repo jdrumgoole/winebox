@@ -2363,7 +2363,15 @@ function renderGroupedCellar(data) {
                     ${looseHtml}
                 </div>
                 <div class="wine-card-footer">
-                    <span class="wine-quantity">${wine.total_bottles} bottle${wine.total_bottles !== 1 ? 's' : ''}${wine.cases.length > 0 ? ` (${wine.cases.length} case${wine.cases.length !== 1 ? 's' : ''})` : ''}</span>
+                    ${renderInventoryBreakdown({
+                        quantity: wine.total_bottles,
+                        cases: wine.cases.map(c => ({
+                            case_size: c.case_size,
+                            bottles_remaining: c.bottles_remaining,
+                            provenance: c.provenance,
+                        })),
+                        loose_bottles: wine.loose_bottles,
+                    })}
                     ${wine.total_bottles > 0 ? `<button class="btn btn-small btn-primary remove-btn" data-wine-id="${wine.wine_id}" data-quantity="${wine.total_bottles}">Remove</button>` : ''}
                 </div>
             </div>
@@ -2534,7 +2542,7 @@ function renderCellarTable(containerId, wines) {
                 <td>${wine.grape_variety ? `<span class="${ef.includes('grape_variety') ? 'enriched' : ''}">${escapeHtml(wine.grape_variety)}</span>` : '-'}</td>
                 <td class="wine-table-hide-mobile">${wine.region ? `<span class="${ef.includes('region') ? 'enriched' : ''}">${escapeHtml(wine.region)}</span>` : '-'}</td>
                 <td class="wine-table-hide-mobile">${wine.country ? `<span class="${ef.includes('country') ? 'enriched' : ''}">${escapeHtml(wine.country)}</span>` : '-'}</td>
-                <td><span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">${inStock ? quantity : 'Out'}</span></td>
+                <td>${renderInventoryQty(wine.inventory)}</td>
                 <td>${inStock ? `<button class="btn btn-small btn-primary remove-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Remove</button>` : ''}</td>
             </tr>
             ${detailRow}
@@ -2652,9 +2660,7 @@ function renderWineGrid(containerId, wines) {
                         <span class="wine-card-expand-btn">More...</span>
                     ` : ''}
                     <div class="wine-card-footer">
-                        <span class="wine-quantity ${inStock ? '' : 'out-of-stock'}">
-                            ${inStock ? `${quantity} bottle${quantity > 1 ? 's' : ''}` : 'Out of stock'}
-                        </span>
+                        ${renderInventoryBreakdown(wine.inventory)}
                         ${inStock ? `<button class="btn btn-small btn-primary remove-btn" data-wine-id="${wine.id}" data-quantity="${quantity}">Remove</button>` : ''}
                     </div>
                 </div>
@@ -2792,7 +2798,7 @@ async function showWineDetail(wineId) {
                 <div class="wine-detail-fields">
                     <div class="wine-detail-field">
                         <div class="label">In Stock</div>
-                        <div class="value">${quantity} bottle${quantity !== 1 ? 's' : ''}</div>
+                        <div class="value">${renderInventoryBreakdown(wine.inventory)}</div>
                     </div>
 
                     ${bottleBreakdownHtml}
@@ -3316,6 +3322,74 @@ function escapeHtml(text) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+// ---- Inventory breakdown rendering ----------------------------------------
+// Single source of truth for "how do we show that this wine is N bottles
+// across M cases plus K loose?" — every wine card / row / cell calls one
+// of these so the visual language stays consistent.
+//
+// `inventory` is the InventoryInfo dict from the API:
+//   { quantity, cases: [{case_size, bottles_remaining, provenance, ...}],
+//     loose_bottles, ... }
+
+function _caseChipHtml(c) {
+    const remaining = c.bottles_remaining || 0;
+    const provBit = c.provenance ? ` &middot; ${escapeHtml(c.provenance)}` : '';
+    const tip = c.provenance
+        ? `Case of ${c.case_size} from ${escapeHtml(c.provenance)} (${remaining} left)`
+        : `Case of ${c.case_size} (${remaining} left)`;
+    return `<span class="case-chip" title="${tip}">Case of ${c.case_size} &middot; ${remaining} left${provBit}</span>`;
+}
+
+function _loosePillHtml(loose) {
+    return `<span class="loose-pill">${loose} loose bottle${loose !== 1 ? 's' : ''}</span>`;
+}
+
+function renderInventoryBreakdown(inventory) {
+    // Full chip strip for wine cards. Returns HTML for use in `.innerHTML`.
+    if (!inventory || (inventory.quantity || 0) === 0) {
+        return `<span class="inventory-breakdown out-of-stock" title="Out of stock">Out of stock</span>`;
+    }
+    const cases = inventory.cases || [];
+    const loose = inventory.loose_bottles || 0;
+    const total = inventory.quantity || 0;
+    const tip = `${total} bottle${total !== 1 ? 's' : ''} total`;
+
+    const parts = cases.map(_caseChipHtml);
+    if (loose > 0) parts.push(_loosePillHtml(loose));
+    if (parts.length === 0) {
+        // Aggregate > 0 but breakdown is empty (legacy /api/wines/record path
+        // hasn't synced CellarItem yet, or stale data). Fall back to a single
+        // pill so the user still sees the count.
+        parts.push(_loosePillHtml(total));
+    }
+    return `<span class="inventory-breakdown" title="${tip}">${parts.join('')}</span>`;
+}
+
+function renderInventoryQty(inventory) {
+    // Compact one-cell variant for table views — just the number, with a
+    // hover tooltip carrying the case/loose detail. Keeps the Qty column
+    // narrow but still surfaces case context on demand.
+    if (!inventory || (inventory.quantity || 0) === 0) {
+        return `<span class="wine-quantity out-of-stock" title="Out of stock">Out</span>`;
+    }
+    const cases = inventory.cases || [];
+    const loose = inventory.loose_bottles || 0;
+    const total = inventory.quantity || 0;
+
+    const tipParts = [];
+    for (const c of cases) {
+        const provBit = c.provenance ? ` from ${c.provenance}` : '';
+        tipParts.push(`Case of ${c.case_size}${provBit} \u2014 ${c.bottles_remaining} left`);
+    }
+    if (loose > 0) tipParts.push(`${loose} loose`);
+    const tip = tipParts.length > 0 ? tipParts.join('; ') : `${total} bottle${total !== 1 ? 's' : ''}`;
+    const caseCount = cases.length;
+    const annotation = caseCount > 0
+        ? ` <span class="wine-quantity-cases">(${caseCount}\u2009case${caseCount !== 1 ? 's' : ''})</span>`
+        : '';
+    return `<span class="wine-quantity" title="${escapeHtml(tip)}">${total}${annotation}</span>`;
 }
 
 function formatXWinesPrice(wine) {

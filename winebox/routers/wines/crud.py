@@ -9,6 +9,7 @@ from winebox.models import ImportBatch, Transaction, Wine
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineResponse, WineUpdate, WineWithInventory
 from winebox.services.auth import RequireAuth
+from winebox.services.cellar_inventory import attach_breakdowns
 from winebox.services.rate_limit import MAX_PAGE_SIZE, MAX_USER_RESULTSET
 
 from ._common import get_wine_or_404, image_storage
@@ -38,7 +39,9 @@ async def list_wines(
     query = Wine.find(conditions)
     wines = await query.skip(skip).limit(limit).sort([("created_at", -1)]).to_list()
 
-    return [WineWithInventory.model_validate(wine) for wine in wines]
+    results = [WineWithInventory.model_validate(wine) for wine in wines]
+    await attach_breakdowns(results, wines, current_user.id)
+    return results
 
 
 async def get_wine(
@@ -57,7 +60,9 @@ async def get_wine(
     response_data = wine.model_dump()
     response_data["transactions"] = transactions
 
-    return WineResponse.model_validate(response_data)
+    response = WineResponse.model_validate(response_data)
+    await attach_breakdowns([response], [wine], current_user.id)
+    return response
 
 
 async def update_wine(
@@ -83,7 +88,9 @@ async def update_wine(
     wine.updated_at = datetime.now(timezone.utc)
     await wine.save()
 
-    return WineWithInventory.model_validate(wine)
+    response = WineWithInventory.model_validate(wine)
+    await attach_breakdowns([response], [wine], current_user.id)
+    return response
 
 
 async def delete_all_wines(

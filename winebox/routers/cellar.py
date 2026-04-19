@@ -13,6 +13,7 @@ from winebox.models import Wine
 from winebox.models.wine import WineCollection
 from winebox.schemas.wine import WineWithInventory
 from winebox.services.auth import RequireAuth
+from winebox.services.cellar_inventory import attach_breakdowns
 from winebox.services.rate_limit import MAX_PAGE_SIZE, MAX_USER_RESULTSET
 
 router = APIRouter()
@@ -29,7 +30,9 @@ async def get_cellar_inventory(
         {"owner_id": current_user.id, "collection": WineCollection.CELLAR, "inventory.quantity": {"$gt": 0}}
     ).skip(skip).limit(limit).sort([("name", 1)]).to_list()
 
-    return [WineWithInventory.model_validate(wine) for wine in wines]
+    results = [WineWithInventory.model_validate(wine) for wine in wines]
+    await attach_breakdowns(results, wines, current_user.id)
+    return results
 
 
 @router.get("/summary")

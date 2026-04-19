@@ -924,6 +924,82 @@ details.advanced-fields .form-grid {
     color: var(--text-muted);
 }
 
+.wine-quantity-cases {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 0.85em;
+    margin-left: 0.25em;
+    white-space: nowrap;
+}
+
+/* Inventory breakdown chip strip — one component used on every wine card /
+ * detail / search result so the "case vs loose" split is always visible.
+ * See renderInventoryBreakdown() in app.js. */
+.inventory-breakdown {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.inventory-breakdown.out-of-stock {
+    color: var(--text-muted);
+    font-style: italic;
+    font-weight: 400;
+}
+
+.case-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--primary-color, #7c2d3e);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary-color, #7c2d3e) 8%, transparent);
+    color: var(--primary-color, #7c2d3e);
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.case-chip::before {
+    content: "";
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    background-image: url("/static/svg/case.svg");
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    flex-shrink: 0;
+}
+
+.loose-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: var(--bg-secondary, #f3efe7);
+    color: var(--text-muted, #6a6a6a);
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.stat-value-with-glyph {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    justify-content: center;
+}
+
+.stat-glyph {
+    width: 1.1em;
+    height: 1.1em;
+    opacity: 0.8;
+    color: var(--primary-color);
+}
+
 /* Grouped cellar cards — case/bottle breakdown */
 .wine-card-header {
     display: flex;
