@@ -43,39 +43,15 @@ jobs:
           WINEBOX_USE_CLAUDE_VISION: "false"
         run: uv run python -m pytest -v -m "not e2e"
 
-  e2e-fast:
-    name: Playwright E2E smoke tests (OAT)
-    runs-on: ubuntu-latest
-    needs: test
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Install dependencies
-        run: uv sync --all-extras
-
-      - name: Install Playwright browsers
-        run: uv run playwright install --with-deps
-
-      - name: Run E2E tests against OAT
-        env:
-          WINEBOX_TEST_URL: "https://oat.winebox.app"
-          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
-          WINEBOX_DATABASE: "winebox_oat"
-          WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
-          WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
-          WINEBOX_USE_CLAUDE_VISION: "false"
-          WINEBOX_TEST_USER: ${{ secrets.WINEBOX_TEST_USER }}
-          WINEBOX_TEST_PASSWORD: ${{ secrets.WINEBOX_TEST_PASSWORD }}
-        run: uv run python -m invoke test-e2e-fast --verbose
+  # NB: per-commit Playwright E2E against OAT was removed on 2026-04-19.
+  # GitHub Actions cloud runners (`ubuntu-latest`) consistently time out
+  # reaching https://oat.winebox.app, even though OAT is healthy and
+  # answers local curl in ~300ms. The nightly workflow runs the full
+  # E2E suite against OAT using a self-hosted runner that lives on the
+  # droplet itself (loopback path), so coverage is preserved there.
+  # If we want this back on per-commit CI the clean fix is to also
+  # move it to `runs-on: [self-hosted, oat]` with WINEBOX_TEST_URL
+  # pointing at localhost:8000 — not blocked on server reachability.
 
   lint:
     name: Lint
