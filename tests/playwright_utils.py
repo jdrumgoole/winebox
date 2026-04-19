@@ -129,30 +129,45 @@ def create_cli_worker_user(
     return email, password
 
 
-def preflight_check(timeout_seconds: int = 10) -> None:
+def preflight_check(timeout_seconds: int | None = None) -> None:
     """Fail fast if the E2E test server is not reachable.
 
     Raises via ``pytest.fail`` rather than ``pytest.skip`` so a misconfigured
     CI run doesn't silently no-op the whole E2E suite. Running the E2E
     marker intentionally requires a live server — use ``pytest -m "not e2e"``
     to skip these tests structurally.
+
+    The default budget is generous because CI runners (GitHub Actions) have
+    intermittent latency reaching the OAT droplet — short budgets produced
+    flaky preflight failures while the server was actually responsive. Local
+    dev answers in ~300ms so the upper bound doesn't slow down happy-path
+    runs. Override via ``WINEBOX_E2E_PREFLIGHT_TIMEOUT`` if a specific runner
+    needs longer or shorter.
     """
+    if timeout_seconds is None:
+        try:
+            timeout_seconds = int(os.environ.get("WINEBOX_E2E_PREFLIGHT_TIMEOUT", "60"))
+        except ValueError:
+            timeout_seconds = 60
+
     start = time.time()
     urls = [f"{BASE_URL}/health", BASE_URL]
+    per_request_timeout = 10.0
 
     last_error: Exception | None = None
     while time.time() - start < timeout_seconds:
         for url in urls:
             try:
-                with urllib.request.urlopen(url, timeout=3):
+                with urllib.request.urlopen(url, timeout=per_request_timeout):
                     return
             except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
                 last_error = exc
                 continue
-        time.sleep(0.5)
+        time.sleep(1.0)
 
     msg = (
-        f"E2E preflight failed: server at {BASE_URL!r} is not reachable. "
+        f"E2E preflight failed: server at {BASE_URL!r} is not reachable "
+        f"within {timeout_seconds}s. "
         "Start it with 'uv run python -m invoke start-background' or equivalent."
     )
     if last_error is not None:
