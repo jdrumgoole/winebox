@@ -1593,35 +1593,11 @@ async function handleRemoval(e) {
 
         const wine = await response.json();
         const reason = document.getElementById('remove-reason').value;
-        const qty = parseInt(formData.get('quantity')) || 1;
 
-        // Create bottle events for removed bottles
-        const eventType = { DRINK: 'drunk', SELL: 'sold', GIFT: 'gifted', BREAKAGE: 'breakage', OTHER: 'other' }[reason] || 'other';
-        try {
-            // Get bottles for this wine that are still in cellar
-            const bottlesResp = await fetchWithAuth(`${API_BASE}/bottles?wine_id=${wineId}`);
-            if (bottlesResp.ok) {
-                const bottlesData = await bottlesResp.json();
-                const inCellar = bottlesData.bottles.filter(b => b.in_cellar);
-                const toRemove = inCellar.slice(0, qty);
-
-                for (const bottle of toRemove) {
-                    await fetchWithAuth(`${API_BASE}/bottles/${bottle.id}/events`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            event_type: eventType,
-                            tasting_notes: formData.get('tasting_notes') || null,
-                            sale_price: formData.get('sale_price_usd') ? parseFloat(formData.get('sale_price_usd')) : null,
-                            gift_recipient: formData.get('gift_recipient') || null,
-                            notes: formData.get('removal_notes') || null,
-                        }),
-                    });
-                }
-            }
-        } catch (bottleErr) {
-            console.warn('Failed to create bottle events:', bottleErr);
-        }
+        // The server's checkout endpoint now decrements the CellarItem and
+        // writes the matching CellarEvent(s) in one atomic request — the
+        // frontend no longer needs to loop over /bottles/{id}/events to
+        // record the removal (that would double-decrement).
 
         const reasonLabels = { DRINK: 'Recorded', SELL: 'Sale recorded', GIFT: 'Gift recorded', BREAKAGE: 'Breakage recorded', OTHER: 'Removal recorded' };
         showToast(`${reasonLabels[reason] || 'Removed'}: ${wine.name}`, 'success');
@@ -2951,7 +2927,7 @@ async function showWineDetail(wineId) {
     }
 }
 
-function openRemoveModal(wineId, availableQuantity) {
+async function openRemoveModal(wineId, availableQuantity) {
     document.getElementById('remove-wine-id').value = wineId;
     document.getElementById('remove-quantity').max = availableQuantity;
     document.getElementById('remove-quantity').value = 1;
@@ -2961,8 +2937,94 @@ function openRemoveModal(wineId, availableQuantity) {
     document.getElementById('remove-sale-price').value = '';
     document.getElementById('remove-gift-recipient').value = '';
     document.getElementById('remove-removal-notes').value = '';
+    document.getElementById('remove-cellar-item-id').value = '';
+
+    // Populate the source picker from the wine's inventory breakdown. When
+    // the wine has only one source (all loose, or a single case), the picker
+    // is hidden and the server's fallback order handles routing; when there
+    // are multiple sources we make the user pick which one to debit so the
+    // case-level provenance they entered isn't silently thrown away.
+    resetSourcePicker();
+    try {
+        const resp = await fetchWithAuth(`${API_BASE}/wines/${wineId}`);
+        if (resp.ok) {
+            const wine = await resp.json();
+            renderSourcePicker(wine.inventory);
+        }
+    } catch (err) {
+        // Picker is hidden by default — if we can't load the breakdown,
+        // fall back to the quantity-only flow. The server decides the source.
+    }
+
     resetRemovalPicker();
     openModal('remove-modal');
+}
+
+function resetSourcePicker() {
+    const picker = document.getElementById('remove-source-picker');
+    const options = document.getElementById('remove-source-options');
+    if (picker) picker.style.display = 'none';
+    if (options) options.innerHTML = '';
+    const hidden = document.getElementById('remove-cellar-item-id');
+    if (hidden) hidden.value = '';
+}
+
+function renderSourcePicker(inventory) {
+    const picker = document.getElementById('remove-source-picker');
+    const options = document.getElementById('remove-source-options');
+    const hidden = document.getElementById('remove-cellar-item-id');
+    const qtyInput = document.getElementById('remove-quantity');
+    const availableEl = document.getElementById('remove-available');
+    if (!picker || !options || !hidden || !qtyInput) return;
+
+    const cases = (inventory && inventory.cases) || [];
+    const loose = (inventory && inventory.loose_bottles) || 0;
+    const totalSources = cases.length + (loose > 0 ? 1 : 0);
+
+    // Only one physical source → hide picker and let the server pick.
+    if (totalSources <= 1) {
+        resetSourcePicker();
+        return;
+    }
+
+    const rows = [];
+    cases.forEach((c, idx) => {
+        const id = `remove-src-case-${idx}`;
+        const label = c.provenance
+            ? `${escapeHtml(c.provenance)} &middot; Case of ${c.case_size} &middot; ${c.bottles_remaining} left`
+            : `Case of ${c.case_size} &middot; ${c.bottles_remaining} left`;
+        rows.push(`
+            <label class="remove-source-option" for="${id}">
+                <input type="radio" name="remove-source" id="${id}"
+                    data-cellar-item-id="${escapeHtml(c.cellar_item_id)}"
+                    data-available="${c.bottles_remaining}">
+                <span class="remove-source-label">${label}</span>
+            </label>
+        `);
+    });
+    if (loose > 0) {
+        rows.push(`
+            <label class="remove-source-option" for="remove-src-loose">
+                <input type="radio" name="remove-source" id="remove-src-loose"
+                    data-cellar-item-id=""
+                    data-available="${loose}">
+                <span class="remove-source-label">Loose bottles &middot; ${loose} left</span>
+            </label>
+        `);
+    }
+    options.innerHTML = rows.join('');
+    picker.style.display = '';
+
+    // Wire radio changes to update hidden cellar_item_id + qty max/hint.
+    options.querySelectorAll('input[type=radio]').forEach(input => {
+        input.addEventListener('change', () => {
+            hidden.value = input.dataset.cellarItemId || '';
+            const avail = parseInt(input.dataset.available, 10) || 0;
+            qtyInput.max = avail;
+            if ((parseInt(qtyInput.value, 10) || 0) > avail) qtyInput.value = avail;
+            if (availableEl) availableEl.textContent = `(${avail} available from this source)`;
+        });
+    });
 }
 
 function openCaseActionModal(caseId, remaining) {

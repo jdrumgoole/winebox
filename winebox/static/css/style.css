@@ -1000,6 +1000,50 @@ details.advanced-fields .form-grid {
     color: var(--primary-color);
 }
 
+/* Remove-modal source picker — shown only when the wine has more than one
+ * physical source (e.g. a case plus loose bottles). Each radio row lets the
+ * user pick which source to debit so the case-level provenance survives. */
+.remove-source-picker {
+    margin-bottom: 1rem;
+}
+
+.remove-source-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.remove-source-option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color, #e0d9cd);
+    border-radius: 6px;
+    background: var(--bg-secondary, #f3efe7);
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.remove-source-option:hover {
+    border-color: var(--primary-color, #7c2d3e);
+}
+
+.remove-source-option input[type=radio] {
+    margin: 0;
+    accent-color: var(--primary-color, #7c2d3e);
+}
+
+.remove-source-option:has(input:checked) {
+    border-color: var(--primary-color, #7c2d3e);
+    background: color-mix(in srgb, var(--primary-color, #7c2d3e) 6%, transparent);
+}
+
+.remove-source-label {
+    color: var(--text-color, #222);
+    line-height: 1.3;
+}
+
 /* Grouped cellar cards — case/bottle breakdown */
 .wine-card-header {
     display: flex;

@@ -1277,6 +1277,16 @@
                 <!-- Step 2: Details (hidden until reason picked) -->
                 <div id="remove-details" class="removal-details" style="display: none;">
                     <button type="button" id="remove-back-btn" class="btn btn-link remove-back-btn">&larr; Change reason</button>
+
+                    <!-- Source picker — only rendered when a wine has more than
+                         one physical source (case + loose, or multiple cases).
+                         `openRemoveModal` populates this from wine.inventory. -->
+                    <div id="remove-source-picker" class="form-group remove-source-picker" style="display: none;">
+                        <label class="reason-picker-label">Which bottles?</label>
+                        <div id="remove-source-options" class="remove-source-options"></div>
+                        <input type="hidden" id="remove-cellar-item-id" name="cellar_item_id" value="">
+                    </div>
+
                     <div class="form-group">
                         <label for="remove-quantity">Quantity</label>
                         <input type="number" id="remove-quantity" name="quantity" min="1" value="1" required>
