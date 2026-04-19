@@ -96,6 +96,87 @@ You are a security reviewer for the WineBox project (a FastAPI + MongoDB wine ce
 - Verify that webhook endpoints (if any) validate request signatures
 - Check for any external API calls without timeout configuration
 
+## 13. GitHub Actions Workflow Security
+
+Review every file in `.github/workflows/*.yml` (currently: ci.yml, deploy-oat.yml, nightly.yml, publish.yml).
+
+### 13a. Third-party action pinning
+- List every `uses:` directive. Flag any that reference a version tag (e.g. `actions/checkout@v4`) rather than a commit SHA. Tag references can be rewritten by the action author (malicious or otherwise) — SHA pinning defends against supply-chain swaps.
+- Specifically check `astral-sh/setup-uv`, `anthropics/claude-code-action`, and any action not maintained by GitHub itself. These third-party actions run with access to the repo and `secrets.*`.
+
+### 13b. Untrusted input injection
+- Search for `${{ github.event.* }}` interpolations inside `run:` blocks. Anything from `pull_request.title`, `pull_request.body`, `issue.title`, `issue.body`, `head_ref`, `head.ref`, `comment.body`, `review.body` is attacker-controlled and must NOT be expanded inline into a shell command.
+- Safe pattern: read via an env var, e.g. `env: { PR_TITLE: ${{ github.event.pull_request.title }} }` then use `$PR_TITLE` in the script.
+- Reference: https://securitylab.github.com/research/github-actions-untrusted-input/
+
+### 13c. Workflow permissions and GITHUB_TOKEN scope
+- Every workflow and job should declare `permissions:` at workflow or job level. Absence means default permissions, which are too broad.
+- Look for `permissions: write-all` or jobs that grant `contents: write` / `pull-requests: write` without needing them.
+- `deploy-oat.yml` and `publish.yml` are the highest-value targets — verify their permissions match what they actually do.
+
+### 13d. `pull_request_target` trigger
+- This trigger runs workflows in the context of the target repo with read/write secrets access and checks out the PR head by default — a known exploit vector. Flag any workflow using `pull_request_target`. If one exists, confirm it never checks out the untrusted PR head before validating authorship.
+
+### 13e. Self-hosted runner hardening
+- `nightly.yml` uses `runs-on: [self-hosted, oat]` (runner lives on the OAT droplet). Flag if:
+  - A self-hosted runner is attached to a public repo without `environment:` gating or a branch filter (`if: github.ref == 'refs/heads/main'`). Forks could otherwise run arbitrary code on the droplet.
+  - The runner service runs as root or with sudo NOPASSWD access.
+- Verify `nightly.yml` still has its main-branch guard on the deploy job.
+
+### 13f. Secrets exposure
+- List every `secrets.*` usage. Each should be justified — confirm that e.g. `WINEBOX_MONGODB_URL` and `WINEBOX_SECRET_KEY` are never logged, echoed, or passed to third-party actions that could exfiltrate them.
+- Check for `echo "::add-mask::"` usage when secrets flow into outputs.
+- Flag any `if: secrets.X != ''` patterns — those leak the existence of a secret.
+
+### 13g. Cache poisoning
+- Look for `actions/cache` usage that keys on user-controlled input (e.g. branch name). A poisoned cache can inject files into subsequent runs.
+
+### 13h. Deploy authorisation
+- `publish.yml` pushes to PyPI on tag push. Verify the trigger is `on: { push: { tags: [...] } }` and that only maintainers can push tags (branch/tag protection).
+- `deploy-oat.yml` / the self-hosted nightly deploy — check any `environment:` gate (e.g. `oat-deploy`) is still present and that its reviewers list is current.
+
+## 14. PyPI Package Integrity
+
+The project publishes as `winebox` on PyPI via `.github/workflows/publish.yml`. Review the published package surface.
+
+### 14a. Sdist/wheel contents
+- Read `pyproject.toml` `[tool.setuptools]` or `[tool.hatch]` / `[build-system]` sections and any `MANIFEST.in` to understand what files ship in the package.
+- Run `uv build` locally into a temp dir and list the sdist + wheel contents. Verify NONE of these end up in the package:
+  - `.env`, `secrets.env`, `.env.*`
+  - `tests/` (unless intentionally included for `winebox --test` style usage)
+  - `docs/`, `artifacts/`, `.playwright-mcp/`, `.pytest_cache/`, `.venv/`
+  - `deploy/` (contains nginx configs and infra — may leak operator IP allowlists)
+  - `tasks.py` (contains production IPs and droplet names)
+  - Any `.DS_Store`, `.idea/`, `.vscode/`
+- Flag any file that looks like an artifact, screenshot, or secret bleeding into the wheel.
+
+### 14b. Hardcoded environment leaks
+- Grep the built wheel for `booze.winebox.app`, `oat.winebox.app`, `104.248.46.96`, `46.101.134.8`, `2t22cum.mongodb.net` (the cluster subdomain), and the operator admin IP `109.255.27.13`. These should not appear in user-facing code that ships to PyPI.
+- It's fine for these to appear in infrastructure configs under `deploy/` IF deploy/ is correctly excluded from the sdist.
+
+### 14c. Dependency pinning in the shipped metadata
+- Read the `dependencies = [...]` block in pyproject.toml. Each entry should have a lower bound for known-CVE-fixed versions. Flag any dependency pinned to a version with an open advisory (cross-reference with section 1).
+- Check that optional/dev-only deps are NOT in the main `dependencies` list — they'd be forced on every downstream consumer.
+
+### 14d. Publication path
+- `publish.yml` should use PyPI Trusted Publishing via OpenID Connect (`pypa/gh-action-pypi-publish` without an API token input), not a long-lived `PYPI_API_TOKEN` secret. Token-based publishing is a standing theft risk.
+- Confirm the publishing job has `permissions: { id-token: write }` and nothing else.
+- Verify the workflow is triggered by tag push, not branch push, and that the tag pattern matches the release naming (e.g. `v*`).
+
+### 14e. Supply-chain bill of materials
+- Check whether the wheel or sdist includes a SBOM (`pyproject.toml` `project.urls` → `BOM` or similar). Not required but increasingly expected.
+- Check whether releases are signed with sigstore (`pypa/gh-action-pypi-publish` can do this with `attestations: true`). If not signed, note it as INFO.
+
+### 14f. Installed package surface
+- Verify what `pip install winebox` actually lets a consumer execute:
+  - Console scripts (`[project.scripts]` in pyproject.toml) — list them and confirm none are admin-only tools accidentally exposed.
+  - Post-install hooks — Python doesn't run arbitrary post-install scripts like npm does, but any `setup.py` with imperative code is a supply-chain concern. The project uses PEP 621 / `pyproject.toml` so this is typically a non-issue; verify.
+- If the package exposes CLI tools that default to production databases or production hostnames, flag that — a dev who pip-installs and runs the CLI should not be able to accidentally hit prod.
+
+### 14g. Version history review
+- `pip index versions winebox` or check PyPI directly. Any yanked versions? Note them.
+- Compare the latest PyPI version against `winebox/__init__.py` `__version__` and `pyproject.toml` `version`. A mismatch in git is harmless but flag if PyPI has a higher version than git's tag (would imply an out-of-band publish).
+
 ## Report & PR
 
 Write your full report to `docs/security-reports/YYYY-MM-DD.md` (using today's date).
