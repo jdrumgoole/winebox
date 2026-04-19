@@ -89,6 +89,9 @@
 - No inline scripts - use external JS files for CSP compliance
 - Admin-related static files should have short cache times
 
+### Warnings Policy
+- **Never dismiss warnings as "cosmetic" or "harmless."** Every warning in deploy logs, test output, or server startup must be investigated and resolved. Today's cosmetic warning is tomorrow's production outage. If a warning is truly benign, suppress it explicitly with a code comment explaining why — don't just ignore it in the output.
+
 ## Releases & Deployment
 
 There are two deployment environments:

@@ -194,25 +194,40 @@ async def ensure_indexes(db: AsyncDatabase) -> None:
             await collection.create_indexes(index_models)
             logger.debug("Indexes ensured for %s", collection_name)
         except OperationFailure as e:
-            if e.code == 86:  # IndexKeySpecsConflict
+            if e.code in (85, 86):  # IndexOptionsConflict, IndexKeySpecsConflict
                 logger.warning(
                     "Index conflict in %s, dropping and recreating: %s",
                     collection_name, e.details.get("errmsg", ""),
                 )
-                # Drop conflicting indexes and retry
+                # Drop conflicting indexes by their actual names in the database
+                existing = await collection.index_information()
                 for model in index_models:
-                    index_name = model.document.get("name")
-                    if not index_name:
-                        # Auto-generated name from key spec
-                        parts = []
-                        for field, direction in model.document["key"].items():
-                            parts.append(f"{field}_{direction}")
-                        index_name = "_".join(parts)
-                    try:
-                        await collection.drop_index(index_name)
-                        logger.info("Dropped conflicting index %s.%s", collection_name, index_name)
-                    except OperationFailure:
-                        pass  # Index may not exist or already dropped
+                    model_key = model.document["key"]
+                    is_text = any(v == "text" for _, v in model_key.items())
+
+                    for existing_name, existing_info in existing.items():
+                        if existing_name == "_id_":
+                            continue
+                        existing_key = existing_info["key"]
+                        existing_is_text = any(k == "_fts" for k, _ in existing_key)
+
+                        # Text indexes: only one per collection, so any existing
+                        # text index conflicts with the new one
+                        if is_text and existing_is_text:
+                            try:
+                                await collection.drop_index(existing_name)
+                                logger.info("Dropped conflicting text index %s.%s", collection_name, existing_name)
+                            except OperationFailure:
+                                pass
+                            break
+                        # Non-text: match by key spec
+                        if not is_text and dict(existing_key) == dict(model_key):
+                            try:
+                                await collection.drop_index(existing_name)
+                                logger.info("Dropped conflicting index %s.%s", collection_name, existing_name)
+                            except OperationFailure:
+                                pass
+                            break
                 # Retry creation
                 try:
                     await collection.create_indexes(index_models)
