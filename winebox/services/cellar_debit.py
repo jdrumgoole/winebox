@@ -60,13 +60,63 @@ class CellarDebitError(ValueError):
 
 @dataclass
 class DebitedSource:
-    """One (CellarItem, qty_debited) pair — the unit of a debit."""
+    """One (CellarItem, qty_debited) pair — the unit of a debit.
 
-    cellar_item_id: ObjectId
-    item_type: str  # "case" | "bottle"
+    `cellar_item_id` is None for legacy-typed debits (wines that
+    predate the per-row `cellars` collection).
+    """
+
+    cellar_item_id: Optional[ObjectId]
+    item_type: str  # "case" | "bottle" | "legacy"
     quantity_debited: int
     case_size: Optional[int] = None
     provenance: Optional[str] = None
+
+
+async def _record_legacy_debit(
+    *,
+    owner_id: ObjectId,
+    wine_id: ObjectId,
+    quantity: int,
+    event_type: CellarEventType,
+    removal_reason: Optional[RemovalReason],
+    event_notes: Optional[str],
+    removal_notes: Optional[str],
+    sale_price: Optional[float],
+    gift_recipient: Optional[str],
+    tasting_notes: Optional[str],
+) -> DebitedSource:
+    """Write a `legacy`-typed CellarEvent for a wine with no CellarItem rows.
+
+    Used when the database predates the per-row `cellars` collection
+    (pre-bottle-service accounts). Wine.inventory stays authoritative
+    for the aggregate; we just make sure the event log records the
+    removal so the activity feed is complete.
+    """
+    now = datetime.now(timezone.utc)
+    event = CellarEvent(
+        cellar_id=owner_id,
+        owner_id=owner_id,
+        wine_id=wine_id,
+        cellar_item_id=None,
+        item_type="legacy",
+        event_type=event_type,
+        quantity=quantity,
+        event_date=now,
+        removal_reason=removal_reason,
+        notes=event_notes,
+        removal_notes=removal_notes if event_type == CellarEventType.OTHER else None,
+        tasting_notes=tasting_notes if event_type == CellarEventType.DRUNK else None,
+        sale_price=sale_price,
+        sale_price_usd=sale_price,
+        gift_recipient=gift_recipient if event_type == CellarEventType.GIFTED else None,
+    )
+    await event.insert()
+    return DebitedSource(
+        cellar_item_id=None,  # type: ignore[arg-type]
+        item_type="legacy",
+        quantity_debited=quantity,
+    )
 
 
 async def debit_cellar_for_wine(
@@ -164,6 +214,38 @@ async def debit_cellar_for_wine(
             remaining -= take
 
         if remaining > 0:
+            # Two distinct cases when we can't find enough bottles in
+            # `cellar_items`:
+            #
+            # 1. The wine has *no* CellarItem rows at all. This is the
+            #    legacy production shape — those accounts have
+            #    Wine.inventory as the single source of truth and were
+            #    never migrated to the per-row cellars collection. Rather
+            #    than refuse the debit (and make legacy checkouts
+            #    impossible), we record a `legacy`-typed CellarEvent
+            #    with no cellar_item_id. The router's Wine.inventory
+            #    decrement still happens, so the aggregate stays
+            #    correct. The event lets the activity feed keep working.
+            #
+            # 2. The wine has CellarItem rows but they add up to less
+            #    than `quantity`. That's a real "not enough stock"
+            #    error (mid-PR-1 world where the user asked for more
+            #    than the cellar holds) — keep the 422.
+            if not items:
+                return [
+                    await _record_legacy_debit(
+                        owner_id=owner_id,
+                        wine_id=wine_id,
+                        quantity=quantity,
+                        event_type=event_type,
+                        removal_reason=removal_reason,
+                        event_notes=event_notes,
+                        removal_notes=removal_notes,
+                        sale_price=sale_price,
+                        gift_recipient=gift_recipient,
+                        tasting_notes=tasting_notes,
+                    )
+                ]
             # Not enough physical rows to cover the request. Surface the
             # total available so the caller's error is actionable.
             total_available = sum((i.get("quantity") or 0) for i in items)

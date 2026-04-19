@@ -245,6 +245,66 @@ async def test_cross_user_cellar_item_returns_404(
 
 
 @pytest.mark.asyncio
+async def test_legacy_wine_with_no_cellar_items_can_still_check_out(
+    client: AsyncClient
+) -> None:
+    """Wines that predate the `cellars` collection (production legacy
+    shape) can still be checked out.
+
+    Production before Phase 4 had Wine.inventory as the single source
+    of truth; no CellarItem rows existed for those wines. The debit
+    service must not refuse the checkout in that case — instead it
+    records a `legacy`-typed CellarEvent (cellar_item_id=None) and
+    lets Wine.inventory decrement normally.
+    """
+    from datetime import datetime, timezone
+    from bson import ObjectId as _OID
+
+    from winebox.models import Wine
+    from winebox.models.wine import WineCollection
+    from winebox.models.wine import InventoryInfo as WineInventoryInfo
+    from winebox.models.cellar_event import CellarEvent
+
+    # Identify the test user so we can create a Wine directly as if it
+    # were a legacy account.
+    me = await client.get("/api/auth/me")
+    assert me.status_code == 200
+    owner_id = _OID(me.json()["id"])
+
+    wine = Wine(
+        owner_id=owner_id,
+        collection=WineCollection.CELLAR,
+        name=f"Legacy {uuid.uuid4().hex[:6]}",
+        inventory=WineInventoryInfo(
+            quantity=5, case_size=None,
+            updated_at=datetime.now(timezone.utc),
+        ),
+    )
+    await wine.insert()
+
+    # No CellarItem is created — this is the legacy shape.
+    resp = await client.post(
+        f"/api/wines/{wine.id}/checkout",
+        data={"quantity": "2", "removal_reason": "DRINK"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Wine.inventory decremented to 3.
+    body = resp.json()
+    assert body["inventory"]["quantity"] == 3
+
+    # A legacy-typed CellarEvent was written so the activity feed sees
+    # the removal.
+    legacy = await CellarEvent.find_one(
+        {"wine_id": wine.id, "item_type": "legacy", "quantity": 2}
+    )
+    assert legacy is not None
+    assert legacy.cellar_item_id is None
+    assert legacy.event_type.value == "drunk"
+    assert legacy.owner_id == owner_id
+
+
+@pytest.mark.asyncio
 async def test_specific_case_records_cellar_event_only(
     client: AsyncClient
 ) -> None:
