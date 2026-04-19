@@ -161,7 +161,7 @@ def apply_env_overrides(config_dict: dict[str, Any], prefix: str = "WINEBOX") ->
         # Database
         f"{prefix}_DATABASE_MONGODB_URL": ("database", "mongodb_url"),
         f"{prefix}_MONGODB_URL": ("database", "mongodb_url"),  # Shorthand
-        f"{prefix}_DATABASE": ("database", "mongodb_database"),  # e.g. WINEBOX_DATABASE=winebox-oat
+        f"{prefix}_DATABASE": ("database", "mongodb_database"),  # e.g. WINEBOX_DATABASE=winebox_oat
         # Storage
         f"{prefix}_STORAGE_DATA_DIR": ("storage", "data_dir"),
         f"{prefix}_STORAGE_LOG_DIR": ("storage", "log_dir"),

@@ -30,7 +30,7 @@ LABEL_PATH = os.path.join(
 async def create_verified_user(email: str, password: str) -> str:
     """Register, verify, and get token for a user."""
     mongodb_url = os.environ.get("WINEBOX_MONGODB_URL", "mongodb://localhost:27017")
-    db_name = os.environ.get("WINEBOX_DATABASE", "winebox-oat")
+    db_name = os.environ.get("WINEBOX_DATABASE", "winebox_oat")
 
     async with httpx.AsyncClient(base_url=BASE_URL) as client:
         await client.post("/api/auth/register", json={"email": email, "password": password})

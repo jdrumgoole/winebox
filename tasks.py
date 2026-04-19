@@ -1268,7 +1268,7 @@ def generate_test_data(
 
 OAT_DROPLET_NAME = "winebox-oat"
 OAT_DOMAIN = "oat.winebox.app"
-OAT_DATABASE = "winebox-oat"
+OAT_DATABASE = "winebox_oat"
 OAT_NGINX_CONF = "nginx-winebox-oat.conf"
 OAT_WINEBOX_ADMIN = "/opt/winebox/.venv/bin/winebox-admin"
 
@@ -1301,7 +1301,7 @@ def oat_setup(ctx: Context, host: str = "", dry_run: bool = False) -> None:
 
     Runs initial server setup on the winebox-oat droplet with:
     - oat.winebox.app domain
-    - winebox-oat database
+    - winebox_oat database
     - OAT-specific nginx config (no landing page)
 
     Args:
@@ -1419,7 +1419,7 @@ def deploy_oat(
         cmd += "--dry-run "
 
     # Upload OAT-specific service file BEFORE deploy.app runs (so it uses
-    # the correct WINEBOX_DATABASE=winebox-oat when the service restarts)
+    # the correct WINEBOX_DATABASE=winebox_oat when the service restarts)
     if not dry_run:
         from deploy.common import run_ssh, upload_file
         service_file = Path("deploy/winebox-oat.service")
@@ -1554,7 +1554,7 @@ def test_e2e_oat(
     """Run E2E tests against the OAT server.
 
     Runs Playwright e2e tests against the live OAT server at oat.winebox.app.
-    Uses the winebox-oat database via the server's own config.
+    Uses the winebox_oat database via the server's own config.
 
     Args:
         ctx: Invoke context

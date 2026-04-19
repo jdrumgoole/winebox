@@ -13,7 +13,7 @@ Usage:
 Examples:
     uv run python scripts/import_kaggle_prices.py --dry-run
     uv run python scripts/import_kaggle_prices.py --path /tmp/wine-prices/
-    uv run python scripts/import_kaggle_prices.py --database winebox-oat
+    uv run python scripts/import_kaggle_prices.py --database winebox_oat
     uv run python scripts/import_kaggle_prices.py --status
     uv run python scripts/import_kaggle_prices.py --reset
 """
@@ -383,7 +383,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--database",
         default=None,
-        help="Override MongoDB database name (default: winebox-oat)",
+        help="Override MongoDB database name (default: winebox_oat)",
     )
     parser.add_argument(
         "--dry-run",
@@ -423,7 +423,7 @@ def main() -> int:
 
     # MongoDB setup
     mongo_url = get_mongodb_url()
-    db_name = args.database or os.environ.get("WINEBOX_DATABASE", "winebox-oat")
+    db_name = args.database or os.environ.get("WINEBOX_DATABASE", "winebox_oat")
     client: MongoClient = MongoClient(mongo_url)
     db = client[db_name]
     collection = db[COLLECTION_NAME]

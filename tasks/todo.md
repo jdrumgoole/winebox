@@ -27,7 +27,7 @@ the UI, and enrich the X-Wines reference data once for shared use.
 1. Re-read the plan file — design is complete
 2. Start with phase 1 (schema + pure compute + unit tests, no behaviour change)
 3. Run `invoke build-drinkability-profiles` locally first, inspect output
-4. Then `invoke enrich-xwines-drinkability --limit 100` on winebox-oat
+4. Then `invoke enrich-xwines-drinkability --limit 100` on winebox_oat
 5. Inspect results before running the full enrichment pass
 6. Phases 2–7 follow the plan sequentially
 

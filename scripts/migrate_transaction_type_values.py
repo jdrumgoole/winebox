@@ -13,7 +13,7 @@ Idempotent:
 Usage::
 
     uv run python scripts/migrate_transaction_type_values.py \\
-        --database winebox-oat
+        --database winebox_oat
 
 ``WINEBOX_MONGODB_URL`` is required.
 """

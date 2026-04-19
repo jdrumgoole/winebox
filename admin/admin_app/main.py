@@ -1,6 +1,6 @@
 """WineBox Admin Panel - Standalone FastAPI application.
 
-Defaults to the OAT database (winebox-oat) to prevent accidental
+Defaults to the OAT database (winebox_oat) to prevent accidental
 production access during local development. The production database
 can only be used when running on the production server (booze.winebox.app),
 enforced by winebox.config.settings._check_database_safety().
@@ -17,7 +17,7 @@ from typing import AsyncIterator
 # 1. Explicitly set WINEBOX_DATABASE=winebox, AND
 # 2. Be running on booze.winebox.app (FQDN check in winebox.config.settings)
 if "WINEBOX_DATABASE" not in os.environ:
-    os.environ["WINEBOX_DATABASE"] = "winebox-oat"
+    os.environ["WINEBOX_DATABASE"] = "winebox_oat"
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse

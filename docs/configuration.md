@@ -197,7 +197,7 @@ used, and whether it's required.
 |----------|---------|---------|
 | `WINEBOX_SECRET_KEY` | server | Signs JWT tokens. **Must be set in production** or JWTs are invalidated on every restart. |
 | `WINEBOX_MONGODB_URL` | server | MongoDB connection string (e.g. `mongodb+srv://…`). |
-| `WINEBOX_DATABASE` | server | Database name. Use `winebox-oat` for OAT and local dev; `winebox` for production. |
+| `WINEBOX_DATABASE` | server | Database name. Use `winebox_oat` for OAT and local dev; `winebox` for production. |
 
 ### Runtime — optional
 

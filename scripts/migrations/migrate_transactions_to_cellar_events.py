@@ -19,10 +19,10 @@ Approach:
   split), insert with `cellar_item_id=None`, `item_type="legacy"` so
   the activity-feed renderer can label it "(historic — pre-cases)".
 
-Run against winebox-oat first to confirm counts:
+Run against winebox_oat first to confirm counts:
 
     uv run python scripts/migrations/migrate_transactions_to_cellar_events.py \\
-        --database winebox-oat --dry-run
+        --database winebox_oat --dry-run
 
 Then without `--dry-run`, then repeat on the production database.
 

@@ -6,8 +6,8 @@ The initial migration ran with a buggy script that wrote events to the
 those documents to 'wine_events' and adds scope: "bottle".
 
 Usage:
-    uv run python scripts/fix_oat_migration_events.py --database winebox-oat
-    uv run python scripts/fix_oat_migration_events.py --database winebox-oat --dry-run
+    uv run python scripts/fix_oat_migration_events.py --database winebox_oat
+    uv run python scripts/fix_oat_migration_events.py --database winebox_oat --dry-run
 """
 
 import argparse

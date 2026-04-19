@@ -16,7 +16,7 @@ Idempotent:
 Usage::
 
     uv run python scripts/migrate_wine_type_id_to_wine_type.py \\
-        --database winebox-oat
+        --database winebox_oat
 
 The ``WINEBOX_MONGODB_URL`` environment variable is required. Set
 ``--database`` explicitly — defaulting to production is a recipe for a
@@ -97,7 +97,7 @@ def main() -> int:
     parser.add_argument(
         "--database",
         required=True,
-        help="MongoDB database name (e.g. winebox-oat, winebox).",
+        help="MongoDB database name (e.g. winebox_oat, winebox).",
     )
     parser.add_argument(
         "--dry-run",

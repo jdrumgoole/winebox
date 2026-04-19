@@ -24,10 +24,10 @@
 
 ## Local Development Server
 - When starting a local server for testing or previews, use the OAT database and disable email verification:
-  `source .env && WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false WINEBOX_DATABASE=winebox-oat WINEBOX_SECRET_KEY="$WINEBOX_SECRET_KEY" WINEBOX_MONGODB_URL="$WINEBOX_MONGODB_URL" uv run uvicorn winebox.main:app --host 127.0.0.1 --port 8899`
+  `source .env && WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED=false WINEBOX_DATABASE=winebox_oat WINEBOX_SECRET_KEY="$WINEBOX_SECRET_KEY" WINEBOX_MONGODB_URL="$WINEBOX_MONGODB_URL" uv run uvicorn winebox.main:app --host 127.0.0.1 --port 8899`
 - You MUST explicitly pass `WINEBOX_MONGODB_URL` — `source .env` makes it available in the shell but `uv run` does not automatically forward it to the Python process
 - The email verification env var is `WINEBOX_AUTH_EMAIL_VERIFICATION_REQUIRED` (not `WINEBOX_EMAIL_VERIFICATION_REQUIRED`)
-- Always use `WINEBOX_DATABASE=winebox-oat` for local development — never use production or invented database names
+- Always use `WINEBOX_DATABASE=winebox_oat` for local development — never use production or invented database names
 - Pass `WINEBOX_SECRET_KEY` from `.env` so JWT tokens work correctly
 
 ## Scripts
@@ -95,7 +95,7 @@ There are two deployment environments:
 
 ### OAT (Pre-release Testing)
 - **URL:** https://oat.winebox.app
-- **Database:** `winebox-oat` (isolated from production)
+- **Database:** `winebox_oat` (isolated from production)
 - **Droplet:** `winebox-oat` (46.101.134.8, 1 worker due to small memory)
 - **When the user says "make an OAT release"** or "deploy to OAT": run `invoke deploy-oat --release`
 

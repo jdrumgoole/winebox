@@ -69,7 +69,7 @@ jobs:
         env:
           WINEBOX_TEST_URL: "https://oat.winebox.app"
           WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
-          WINEBOX_DATABASE: "winebox-oat"
+          WINEBOX_DATABASE: "winebox_oat"
           WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
           WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
           WINEBOX_USE_CLAUDE_VISION: "false"

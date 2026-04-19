@@ -70,7 +70,7 @@ def _check_database_safety(database_name: str, mongodb_url: str) -> None:
         f"'{_PRODUCTION_DATABASE}' on remote MongoDB from FQDN '{fqdn}'. "
         f"Only '{_PRODUCTION_FQDN}' is allowed to use the production database. "
         f"Set WINEBOX_DATABASE to a different database name "
-        f"(e.g. 'winebox-oat', 'winebox-dev'). "
+        f"(e.g. 'winebox_oat', 'winebox_dev'). "
         f"If this is genuinely production, set WINEBOX_ALLOW_PRODUCTION_DB=1."
     )
 

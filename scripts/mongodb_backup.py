@@ -17,13 +17,13 @@ Environment variables (.env or shell):
 
 Usage:
     # Backup (uses default AWS credentials)
-    uv run python scripts/mongodb_backup.py backup "mongodb+srv://user:pass@host/winebox-oat"
+    uv run python scripts/mongodb_backup.py backup "mongodb+srv://user:pass@host/winebox_oat"
 
     # Backup with a named AWS profile
-    uv run python scripts/mongodb_backup.py backup "mongodb+srv://user:pass@host/winebox-oat" --profile winebox_backup
+    uv run python scripts/mongodb_backup.py backup "mongodb+srv://user:pass@host/winebox_oat" --profile winebox_backup
 
     # Restore latest backup
-    uv run python scripts/mongodb_backup.py restore "mongodb+srv://user:pass@host/winebox-oat" --latest
+    uv run python scripts/mongodb_backup.py restore "mongodb+srv://user:pass@host/winebox_oat" --latest
 
     # Restore to a different database
     uv run python scripts/mongodb_backup.py restore "mongodb+srv://user:pass@host/winebox-staging" --latest

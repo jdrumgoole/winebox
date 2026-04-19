@@ -111,8 +111,29 @@ def pytest_unconfigure(config: pytest.Config) -> None:
         emails = [u["email"] for u in test_users]
 
         # Delete all data owned by test users
-        for collection in ["wines", "transactions", "import_batches", "raw_uploads", "cellars", "cellar_events"]:
-            db[collection].delete_many({"owner_id": {"$in": user_ids}})
+        for collection in [
+            "bottles", "cases", "wine_events",  # large collections previously missed
+            "wines", "transactions", "import_batches", "cellar_events",
+        ]:
+            result = db[collection].delete_many({"owner_id": {"$in": user_ids}})
+            if result.deleted_count:
+                print(f"  cleaned {collection}: {result.deleted_count:,} docs")
+
+        # cellars uses cellar_id, not owner_id
+        result = db.cellars.delete_many({"cellar_id": {"$in": user_ids}})
+        if result.deleted_count:
+            print(f"  cleaned cellars: {result.deleted_count:,} docs")
+
+        # raw_uploads links via batch_id to import_batches
+        batch_ids = [
+            b["_id"] for b in db.import_batches.find(
+                {"owner_id": {"$in": user_ids}}, {"_id": 1},
+            )
+        ]
+        if batch_ids:
+            result = db.raw_uploads.delete_many({"batch_id": {"$in": batch_ids}})
+            if result.deleted_count:
+                print(f"  cleaned raw_uploads: {result.deleted_count:,} docs")
 
         # Delete the test users themselves
         result = db.users.delete_many({"_id": {"$in": user_ids}})

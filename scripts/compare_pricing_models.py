@@ -60,7 +60,7 @@ def main() -> int:
 
     # Setup
     mongo_url = get_mongodb_url()
-    db_name = args.database or os.environ.get("WINEBOX_DATABASE", "winebox-oat")
+    db_name = args.database or os.environ.get("WINEBOX_DATABASE", "winebox_oat")
     client: MongoClient = MongoClient(mongo_url)
     db = client[db_name]
 

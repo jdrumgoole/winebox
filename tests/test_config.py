@@ -507,7 +507,7 @@ class TestDatabaseSafetyCheck:
         """Non-production database name is always allowed."""
         from winebox.config.settings import _check_database_safety
         # Should not raise
-        _check_database_safety("winebox-oat", "mongodb+srv://atlas.example.com")
+        _check_database_safety("winebox_oat", "mongodb+srv://atlas.example.com")
         _check_database_safety("winebox-dev", "mongodb+srv://atlas.example.com")
         _check_database_safety("test_winebox_123", "mongodb://localhost:27017")
 

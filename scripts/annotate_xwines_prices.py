@@ -303,7 +303,7 @@ class PriceAnnotator:
 
         # MongoDB setup
         self.mongo_url = get_mongodb_url()
-        self.db_name = database or os.environ.get("WINEBOX_DATABASE", "winebox-oat")
+        self.db_name = database or os.environ.get("WINEBOX_DATABASE", "winebox_oat")
         self.client: MongoClient = MongoClient(self.mongo_url)
         self.db = self.client[self.db_name]
         self.wines_col = self.db["xwines_wines"]

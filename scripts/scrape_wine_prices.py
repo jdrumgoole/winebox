@@ -514,7 +514,7 @@ SCRAPERS = {
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Discover wine prices from retail websites.")
-    parser.add_argument("--database", default="winebox-oat", help="MongoDB database name (default: winebox-oat)")
+    parser.add_argument("--database", default="winebox_oat", help="MongoDB database name (default: winebox_oat)")
     parser.add_argument("--collect", type=int, default=None, help="Stop after discovering N unique wines")
     parser.add_argument("--retailer", default="all", choices=["all"] + list(SCRAPERS.keys()))
     parser.add_argument("--delay", type=float, default=DEFAULT_DELAY, help=f"Seconds between pages (default: {DEFAULT_DELAY})")

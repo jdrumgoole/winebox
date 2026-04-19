@@ -9,7 +9,7 @@ For each Wine record with quantity > 0:
 This is idempotent — wines that already have bottles are skipped.
 
 Usage:
-    uv run python scripts/migrate_to_bottles.py --database winebox-oat
+    uv run python scripts/migrate_to_bottles.py --database winebox_oat
     uv run python scripts/migrate_to_bottles.py --database winebox --dry-run
 """
 
@@ -141,7 +141,7 @@ async def migrate(database: str, dry_run: bool = False) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Migrate Wine.inventory to Bottles")
-    parser.add_argument("--database", required=True, help="Database name (e.g. winebox-oat)")
+    parser.add_argument("--database", required=True, help="Database name (e.g. winebox_oat)")
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing")
     args = parser.parse_args()
 

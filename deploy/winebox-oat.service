@@ -8,7 +8,7 @@ User=winebox
 Group=winebox
 WorkingDirectory=/opt/winebox
 Environment="PATH=/opt/winebox/.venv/bin:/usr/local/bin:/usr/bin"
-Environment="WINEBOX_DATABASE=winebox-oat"
+Environment="WINEBOX_DATABASE=winebox_oat"
 EnvironmentFile=/opt/winebox/secrets.env
 ExecStart=/opt/winebox/.venv/bin/uvicorn winebox.main:app --host 127.0.0.1 --port 8000 --workers 1
 ExecReload=/bin/kill -HUP $MAINPID

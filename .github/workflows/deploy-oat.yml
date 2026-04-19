@@ -73,7 +73,7 @@ jobs:
       - name: Run E2E smoke tests against OAT
         env:
           WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
-          WINEBOX_DATABASE: "winebox-oat"
+          WINEBOX_DATABASE: "winebox_oat"
           WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
           WINEBOX_USE_CLAUDE_VISION: "false"
           WINEBOX_TEST_USER: ${{ secrets.WINEBOX_TEST_USER }}
