@@ -18,6 +18,7 @@ from winebox.schemas.export import (
 from winebox.services import export_service
 from winebox.services.auth import RequireAuth
 from winebox.services.cellar_event_view import build_event_query, event_to_transaction_response
+from winebox.services.cellar_inventory import attach_breakdowns
 from winebox.services.rate_limit import MAX_USER_RESULTSET, make_limiter
 
 from winebox.models.cellar_event import CellarEvent
@@ -44,6 +45,15 @@ async def export_wines(
     country: str | None = Query(default=None, description="Filter by country"),
     include_blends: bool = Query(default=True, description="Include grape blend details"),
     include_scores: bool = Query(default=True, description="Include wine scores"),
+    cases_as_rows: bool = Query(
+        default=True,
+        description=(
+            "Phase 5 — when True (default), a wine with cases is split "
+            "into one CSV/XLSX row per case plus a loose-remainder row, "
+            "each carrying case_size + provenance + purchase_price. "
+            "Old readers that rely on one-row-per-wine can pass False."
+        ),
+    ),
 ) -> Response:
     """Export wine inventory data.
 
@@ -65,6 +75,17 @@ async def export_wines(
     # are well outside any realistic personal cellar size and would risk OOM.
     wines = await Wine.find(conditions).sort([("name", 1)]).to_list(length=MAX_USER_RESULTSET)
 
+    # Phase 5 — attach the case/loose breakdown so the export carries
+    # per-case provenance and counts. Hierarchical formats emit the
+    # `inventory.cases` array; flat formats either spill into per-case
+    # rows (default) or collapse to one row per wine (cases_as_rows=False).
+    wine_views: list = []
+    for wine in wines:
+        from winebox.schemas.wine import WineWithInventory
+        view = WineWithInventory.model_validate(wine)
+        wine_views.append(view)
+    await attach_breakdowns(wine_views, wines, current_user.id)
+
     # Track applied filters
     filters_applied: dict[str, Any] = {}
     if in_stock is not None:
@@ -75,10 +96,25 @@ async def export_wines(
     # Generate response based on format
     if format in (ExportFormat.CSV, ExportFormat.XLSX):
         # Flat format for CSV/Excel
-        flat_wines = [
-            WineFlatExport.from_wine(wine, include_blends=include_blends, include_scores=include_scores)
-            for wine in wines
-        ]
+        flat_wines: list[WineFlatExport] = []
+        for wine, view in zip(wines, wine_views):
+            # Shim the view's inventory (with cases/loose_bottles) onto the
+            # Wine instance so `rows_with_cases` can read it off a single
+            # object without changing the underlying shape the row builder
+            # has always expected.
+            original_inventory = wine.inventory
+            wine.inventory = view.inventory
+            try:
+                if cases_as_rows:
+                    flat_wines.extend(WineFlatExport.rows_with_cases(
+                        wine, include_blends=include_blends, include_scores=include_scores,
+                    ))
+                else:
+                    flat_wines.append(WineFlatExport.from_wine(
+                        wine, include_blends=include_blends, include_scores=include_scores,
+                    ))
+            finally:
+                wine.inventory = original_inventory
 
         if format == ExportFormat.CSV:
             content = export_service.export_wines_to_csv(flat_wines)
@@ -94,9 +130,11 @@ async def export_wines(
         )
 
     else:
-        # Hierarchical format for JSON/YAML
+        # Hierarchical format for JSON/YAML — inject the case breakdown
+        # onto the wine's inventory dict so the export is a complete
+        # round-trippable description of what's in the cellar.
         wine_dicts = []
-        for wine in wines:
+        for wine, view in zip(wines, wine_views):
             wine_dict = wine.model_dump(mode="json")
             wine_dict["id"] = str(wine.id)
 
@@ -104,6 +142,10 @@ async def export_wines(
             # user, not for inter-user data exchange. Leaking the ObjectId could
             # help an attacker correlate or enumerate users elsewhere.
             wine_dict.pop("owner_id", None)
+
+            # Phase 5: replace the legacy two-field `inventory` with the
+            # full breakdown — cases list + loose count + aggregate.
+            wine_dict["inventory"] = view.inventory.model_dump(mode="json")
 
             # Optionally exclude blends/scores
             if not include_blends:

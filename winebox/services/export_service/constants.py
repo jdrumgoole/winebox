@@ -7,7 +7,9 @@ from openpyxl.styles import Alignment, Font, PatternFill
 
 from winebox.schemas.export import ExportFormat
 
-# Wine export headers
+# Wine export headers (Phase 5 adds the case-level columns — they stay
+# at the end of the row so CSV readers that rely on column position
+# keep working).
 WINE_HEADERS = [
     "id",
     "name",
@@ -26,9 +28,17 @@ WINE_HEADERS = [
     "average_score",
     "created_at",
     "updated_at",
+    # Phase 5 — case-level columns.
+    "item_type",
+    "case_size",
+    "bottles_in_case_remaining",
+    "provenance",
+    "purchase_price",
+    "purchase_date",
 ]
 
-# Transaction export headers
+# Transaction export headers (Phase 5 adds the case snapshots — new
+# columns are appended to preserve column-order-based readers).
 TRANSACTION_HEADERS = [
     "id",
     "wine_id",
@@ -40,6 +50,10 @@ TRANSACTION_HEADERS = [
     "notes",
     "transaction_date",
     "created_at",
+    # Phase 5 — case snapshots.
+    "item_type",
+    "case_size_at_event",
+    "provenance_at_event",
 ]
 
 # X-Wines export headers

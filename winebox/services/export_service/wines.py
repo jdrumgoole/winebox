@@ -40,6 +40,13 @@ def _wine_to_base_row(wine: WineFlatExport) -> list[Any]:
         wine.average_score or "",
         format_datetime(wine.created_at),
         format_datetime(wine.updated_at),
+        # Phase 5 — case columns (empty strings on the aggregate/loose rows).
+        wine.item_type or "",
+        wine.case_size if wine.case_size is not None else "",
+        wine.bottles_in_case_remaining if wine.bottles_in_case_remaining is not None else "",
+        wine.provenance or "",
+        wine.purchase_price if wine.purchase_price is not None else "",
+        format_datetime(wine.purchase_date),
     ]
 
 

@@ -33,6 +33,10 @@ def _transaction_to_row(txn: TransactionFlatExport) -> list[Any]:
         txn.notes or "",
         format_datetime(txn.transaction_date),
         format_datetime(txn.created_at),
+        # Phase 5 — case snapshots (empty on bottle/loose/legacy rows).
+        txn.item_type or "",
+        txn.case_size_at_event if txn.case_size_at_event is not None else "",
+        txn.provenance_at_event or "",
     ]
 
 

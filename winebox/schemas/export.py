@@ -18,7 +18,15 @@ class ExportFormat(str, Enum):
 
 
 class WineFlatExport(BaseModel):
-    """Flat wine schema for CSV/Excel export."""
+    """Flat wine schema for CSV/Excel export.
+
+    Phase 5 — when the caller opts into `cases_as_rows` (the default),
+    a wine with mixed inventory spills into multiple rows: one per
+    case plus one for the loose remainder. The new columns
+    (`item_type`, `case_size`, `bottles_in_case_remaining`,
+    `provenance`, `purchase_price`, `purchase_date`) carry the
+    case-level context that was previously lost.
+    """
 
     id: str
     name: str
@@ -39,6 +47,15 @@ class WineFlatExport(BaseModel):
     custom_fields_dict: dict[str, str] | None = None
     created_at: datetime
     updated_at: datetime
+
+    # Phase 5 — case-level columns. Present on case rows, None on the
+    # aggregate / loose rows. Readers that ignore them see today's shape.
+    item_type: str | None = None
+    case_size: int | None = None
+    bottles_in_case_remaining: int | None = None
+    provenance: str | None = None
+    purchase_price: float | None = None
+    purchase_date: datetime | None = None
 
     @staticmethod
     def from_wine(wine: Any, include_blends: bool = True, include_scores: bool = True) -> "WineFlatExport":
@@ -108,9 +125,69 @@ class WineFlatExport(BaseModel):
             updated_at=wine.updated_at,
         )
 
+    @staticmethod
+    def rows_with_cases(
+        wine: Any, include_blends: bool = True, include_scores: bool = True,
+    ) -> list["WineFlatExport"]:
+        """Emit one row per case plus one row for the loose remainder.
+
+        Phase 5 default for CSV/XLSX. A wine with a case of 12 (Berry
+        Bros) + 3 loose becomes two rows, both carrying the full wine
+        descriptor but different `item_type` / `case_size` /
+        `bottles_in_case_remaining` / `provenance` / `purchase_price` /
+        `purchase_date`. The aggregate `quantity` column on each row is
+        that row's own `bottles_in_case_remaining` (case) or loose count
+        (loose); summing the `quantity` column across a wine's rows
+        reconstructs the total.
+
+        Wines with no breakdown (met wines, or pre-Phase-1 rows where
+        the inventory service didn't run) yield a single row matching
+        today's shape.
+        """
+        base = WineFlatExport.from_wine(wine, include_blends, include_scores)
+
+        inv = getattr(wine, "inventory", None)
+        cases = getattr(inv, "cases", None) or []
+        loose = getattr(inv, "loose_bottles", 0) if inv is not None else 0
+
+        if not cases and loose == 0:
+            # No breakdown information — emit today's single-row shape.
+            return [base]
+
+        rows: list[WineFlatExport] = []
+        for case in cases:
+            row = base.model_copy(update={
+                "item_type": "case",
+                "quantity": case.bottles_remaining,
+                "case_size": case.case_size,
+                "bottles_in_case_remaining": case.bottles_remaining,
+                "provenance": case.provenance,
+                "purchase_price": case.purchase_price,
+                "purchase_date": case.purchase_date,
+            })
+            rows.append(row)
+        if loose > 0:
+            rows.append(base.model_copy(update={
+                "item_type": "bottle",
+                "quantity": loose,
+                "case_size": None,
+                "bottles_in_case_remaining": None,
+                "provenance": None,
+                "purchase_price": None,
+                "purchase_date": None,
+            }))
+        return rows or [base]
+
 
 class TransactionFlatExport(BaseModel):
-    """Flat transaction schema for CSV/Excel export."""
+    """Flat transaction schema for CSV/Excel export.
+
+    Phase 5 — gains `item_type` + `case_size_at_event` +
+    `provenance_at_event` so a CSV row reflects which physical case
+    (if any) a removal came from. These fields are populated from the
+    TransactionResponse the new compatibility view emits; rows
+    sourced from pre-Phase-4 Transactions leave them None.
+    """
 
     id: str
     wine_id: str
@@ -122,6 +199,11 @@ class TransactionFlatExport(BaseModel):
     notes: str | None = None
     transaction_date: datetime
     created_at: datetime
+
+    # Phase 5 — case context snapshots carried through from CellarEvent.
+    item_type: str | None = None
+    case_size_at_event: int | None = None
+    provenance_at_event: str | None = None
 
     @staticmethod
     def from_transaction(
@@ -159,6 +241,12 @@ class TransactionFlatExport(BaseModel):
             notes=transaction.notes,
             transaction_date=transaction.transaction_date,
             created_at=transaction.created_at,
+            # Pull the case context when the source is a TransactionResponse
+            # (post-Phase-4 compatibility view) or a legacy Transaction row
+            # without these fields (they fall back to None).
+            item_type=getattr(transaction, "item_type", None),
+            case_size_at_event=getattr(transaction, "case_size_at_event", None),
+            provenance_at_event=getattr(transaction, "provenance_at_event", None),
         )
 
 
