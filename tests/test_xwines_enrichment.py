@@ -408,9 +408,9 @@ async def test_scan_returns_xwines_fields(client: AsyncClient, init_test_db, sam
 async def test_checkin_accepts_wine_type(client: AsyncClient, init_test_db, sample_image_bytes: bytes) -> None:
     """wine_type form field is saved on the Wine document."""
     # Mock vision to not be available, and OCR to return minimal data
-    with patch("winebox.routers.wines.checkin.vision_service") as mock_vision, \
-         patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
-         patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
+    with patch("winebox.routers.wines.record.vision_service") as mock_vision, \
+         patch("winebox.routers.wines.record.ocr_service") as mock_ocr, \
+         patch("winebox.routers.wines.record.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
         mock_ocr.extract_text.return_value = "Test Wine"
         mock_parser.parse.return_value = {"name": "Test Wine"}

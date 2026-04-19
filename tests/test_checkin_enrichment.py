@@ -49,9 +49,9 @@ async def test_checkin_enriches_empty_fields(
     xwine = await _insert_xwines_wine()
     wine_name = xwine.name
 
-    with patch("winebox.routers.wines.checkin.vision_service") as mock_vision, \
-         patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
-         patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
+    with patch("winebox.routers.wines.record.vision_service") as mock_vision, \
+         patch("winebox.routers.wines.record.ocr_service") as mock_ocr, \
+         patch("winebox.routers.wines.record.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
         mock_ocr.extract_text_from_bytes = AsyncMock(return_value=wine_name)
         mock_parser.parse.return_value = {"name": wine_name}
@@ -94,9 +94,9 @@ async def test_checkin_enrichment_preserves_existing_values(
     xwine = await _insert_xwines_wine()
     wine_name = xwine.name
 
-    with patch("winebox.routers.wines.checkin.vision_service") as mock_vision, \
-         patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
-         patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
+    with patch("winebox.routers.wines.record.vision_service") as mock_vision, \
+         patch("winebox.routers.wines.record.ocr_service") as mock_ocr, \
+         patch("winebox.routers.wines.record.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
         mock_ocr.extract_text_from_bytes = AsyncMock(return_value=wine_name)
         mock_parser.parse.return_value = {"name": wine_name}
@@ -142,9 +142,9 @@ async def test_checkin_no_enrichment_when_no_match(
     """No enrichment metadata when the wine name doesn't match X-Wines."""
     # No X-Wines data inserted
 
-    with patch("winebox.routers.wines.checkin.vision_service") as mock_vision, \
-         patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
-         patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
+    with patch("winebox.routers.wines.record.vision_service") as mock_vision, \
+         patch("winebox.routers.wines.record.ocr_service") as mock_ocr, \
+         patch("winebox.routers.wines.record.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
         mock_ocr.extract_text_from_bytes = AsyncMock(return_value="Totally Unknown Wine XYZZY")
         mock_parser.parse.return_value = {"name": "Totally Unknown Wine XYZZY"}
@@ -175,9 +175,9 @@ async def test_enriched_fields_in_wine_detail_api(
     xwine = await _insert_xwines_wine()
     wine_name = xwine.name
 
-    with patch("winebox.routers.wines.checkin.vision_service") as mock_vision, \
-         patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
-         patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
+    with patch("winebox.routers.wines.record.vision_service") as mock_vision, \
+         patch("winebox.routers.wines.record.ocr_service") as mock_ocr, \
+         patch("winebox.routers.wines.record.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
         mock_ocr.extract_text_from_bytes = AsyncMock(return_value=wine_name)
         mock_parser.parse.return_value = {"name": wine_name}
@@ -214,9 +214,9 @@ async def test_checkin_enrichment_persisted_in_db(
     xwine = await _insert_xwines_wine()
     wine_name = xwine.name
 
-    with patch("winebox.routers.wines.checkin.vision_service") as mock_vision, \
-         patch("winebox.routers.wines.checkin.ocr_service") as mock_ocr, \
-         patch("winebox.routers.wines.checkin.wine_parser") as mock_parser:
+    with patch("winebox.routers.wines.record.vision_service") as mock_vision, \
+         patch("winebox.routers.wines.record.ocr_service") as mock_ocr, \
+         patch("winebox.routers.wines.record.wine_parser") as mock_parser:
         mock_vision.is_available.return_value = False
         mock_ocr.extract_text_from_bytes = AsyncMock(return_value=wine_name)
         mock_parser.parse.return_value = {"name": wine_name}
