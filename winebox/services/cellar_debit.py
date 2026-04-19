@@ -76,7 +76,9 @@ async def debit_cellar_for_wine(
     quantity: int,
     cellar_item_id: Optional[str] = None,
     event_type: CellarEventType = CellarEventType.DRUNK,
+    removal_reason: Optional[RemovalReason] = None,
     event_notes: Optional[str] = None,
+    removal_notes: Optional[str] = None,
     sale_price: Optional[float] = None,
     gift_recipient: Optional[str] = None,
     tasting_notes: Optional[str] = None,
@@ -184,16 +186,27 @@ async def debit_cellar_for_wine(
         event_sale_price: Optional[float] = None
         if sale_price is not None and quantity > 0:
             event_sale_price = round(sale_price * take / quantity, 2)
+        item_type = item.get("item_type", "bottle")
         event = CellarEvent(
             cellar_id=owner_id,
+            owner_id=owner_id,
+            wine_id=wine_id,
             cellar_item_id=item["_id"],
-            item_type=item.get("item_type", "bottle"),
+            item_type=item_type,
             event_type=event_type,
             quantity=take,
             event_date=now,
+            removal_reason=removal_reason,
             notes=event_notes,
+            removal_notes=removal_notes if event_type == CellarEventType.OTHER else None,
             tasting_notes=tasting_notes if event_type == CellarEventType.DRUNK else None,
+            # Snapshot case context so the event survives the case being deleted.
+            case_size_at_event=item.get("case_size") if item_type == "case" else None,
+            provenance_at_event=item.get("provenance") if item_type == "case" else None,
+            # Populate both `sale_price` (legacy) and `sale_price_usd` (clearer
+            # unit name) so readers on either field work.
             sale_price=event_sale_price,
+            sale_price_usd=event_sale_price,
             gift_recipient=gift_recipient if event_type == CellarEventType.GIFTED else None,
         )
         await event.insert()

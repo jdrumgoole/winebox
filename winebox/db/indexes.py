@@ -136,6 +136,12 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("cellar_id", ASCENDING), ("event_date", DESCENDING)]),
         IndexModel([("cellar_id", ASCENDING), ("event_type", ASCENDING)]),
         IndexModel([("import_batch_id", ASCENDING)]),
+        # Phase 4 — match Transaction's query patterns once readers move
+        # off Transaction (4d). Both indexes use owner_id (the new mirror
+        # of cellar_id) so future code that thinks in owners doesn't have
+        # to translate.
+        IndexModel([("owner_id", ASCENDING), ("event_date", DESCENDING)]),
+        IndexModel([("owner_id", ASCENDING), ("wine_id", ASCENDING), ("event_date", DESCENDING)]),
     ],
     "wine_prices": [
         IndexModel(

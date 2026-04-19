@@ -95,12 +95,19 @@ def build_cellar_items_and_events(
             updated_at=now,
             **extra,
         ))
+        # Phase 4: populate the superset fields on the ADDED event so the
+        # post-convergence activity feed (which will read CellarEvent
+        # exclusively) has everything it needs without joining back.
         events.append(CellarEvent(
             cellar_id=owner_id,
+            owner_id=owner_id,
+            wine_id=wine.id,
             cellar_item_id=item_id,
             item_type=item_type,
             event_type=CellarEventType.ADDED,
             quantity=qty,
+            case_size_at_event=extra.get("case_size") if item_type == "case" else None,
+            provenance_at_event=extra.get("provenance") if item_type == "case" else None,
             import_batch_id=import_batch_id,
             event_date=now,
             created_at=now,
