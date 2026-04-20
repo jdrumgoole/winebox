@@ -1,13 +1,16 @@
 """Export endpoints for downloading wine cellar data."""
 
+import os
 from datetime import datetime, timezone
-from typing import Any
+from pathlib import Path
+from typing import Annotated, Any
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import ValidationError
+from starlette.background import BackgroundTask
 
 from winebox.models import TransactionType, Wine
 from winebox.schemas.export import (
@@ -15,11 +18,14 @@ from winebox.schemas.export import (
     TransactionFlatExport,
     WineFlatExport,
 )
+from winebox.schemas.wine import WineWithInventory
 from winebox.services import export_service
 from winebox.services.auth import RequireAuth
 from winebox.services.cellar_event_view import build_event_query, event_to_transaction_response
 from winebox.services.cellar_inventory import attach_breakdowns
+from winebox.services.export_service.static_site import generate_static_site_zip
 from winebox.services.rate_limit import MAX_USER_RESULTSET, make_limiter
+from winebox.services.search_service import WineSearchFilters, search_wines
 
 from winebox.models.cellar_event import CellarEvent
 
@@ -311,3 +317,72 @@ async def export_transactions(
                     "Content-Disposition": f"attachment; filename={_generate_filename('transactions', format)}"
                 },
             )
+
+
+MAX_QUERY_LENGTH = 200
+
+
+@router.get("/static-site")
+@limiter.limit("3/minute;10/hour")
+async def export_static_site(
+    request: Request,
+    current_user: RequireAuth,
+    q: Annotated[str | None, Query(max_length=MAX_QUERY_LENGTH)] = None,
+    vintage: int | None = None,
+    grape: Annotated[str | None, Query(max_length=MAX_QUERY_LENGTH)] = None,
+    winery: Annotated[str | None, Query(max_length=MAX_QUERY_LENGTH)] = None,
+    region: Annotated[str | None, Query(max_length=MAX_QUERY_LENGTH)] = None,
+    country: Annotated[str | None, Query(max_length=MAX_QUERY_LENGTH)] = None,
+    wine_type: Annotated[str | None, Query(max_length=MAX_QUERY_LENGTH)] = None,
+    price_tier: Annotated[str | None, Query(max_length=MAX_QUERY_LENGTH)] = None,
+    in_stock: bool | None = None,
+    storage: str | None = None,
+    provenance: Annotated[str | None, Query(max_length=MAX_QUERY_LENGTH)] = None,
+    enriched: str | None = None,
+) -> FileResponse:
+    """Export cellar as a self-contained static website (ZIP download).
+
+    Accepts the same filter parameters as the search endpoint.
+    Returns a ZIP file containing an ``index.html`` that can be opened
+    in any browser to browse the cellar offline.
+    """
+    from winebox.config import settings
+
+    filters = WineSearchFilters(
+        q=q, vintage=vintage, grape=grape, winery=winery,
+        region=region, country=country, wine_type=wine_type,
+        price_tier=price_tier, in_stock=in_stock, storage=storage,
+        provenance=provenance, enriched=enriched,
+    )
+
+    wines = await search_wines(current_user.id, filters, skip=0, limit=MAX_USER_RESULTSET)
+    results = [WineWithInventory.model_validate(w) for w in wines]
+    await attach_breakdowns(results, wines, current_user.id)
+
+    filters_applied = {
+        k: v for k, v in {
+            "search": q, "vintage": str(vintage) if vintage else None,
+            "grape": grape, "winery": winery, "region": region,
+            "country": country, "wine_type": wine_type,
+            "price_tier": price_tier,
+            "in_stock": "yes" if in_stock else None,
+            "storage": storage, "provenance": provenance,
+            "enriched": enriched,
+        }.items() if v
+    }
+
+    zip_path = generate_static_site_zip(
+        results,
+        settings.image_storage_path,
+        filters_applied=filters_applied,
+    )
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename = f"winebox_cellar_{timestamp}.zip"
+
+    return FileResponse(
+        path=zip_path,
+        media_type="application/zip",
+        filename=filename,
+        background=BackgroundTask(os.unlink, zip_path),
+    )

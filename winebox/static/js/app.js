@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     initAutocomplete();
     initExportDropdowns();
+    initStaticSiteExport();
     initXWinesPage();
     initImportPage();
     initCustomFields();
@@ -3762,6 +3763,76 @@ function initExportDropdowns() {
             });
         }
     });
+}
+
+function initStaticSiteExport() {
+    const btn = document.getElementById('export-generate-btn');
+    if (!btn) return;
+
+    btn.addEventListener('click', handleStaticSiteExport);
+}
+
+async function handleStaticSiteExport() {
+    const btn = document.getElementById('export-generate-btn');
+    const statusEl = document.getElementById('export-status');
+    const statusText = document.getElementById('export-status-text');
+
+    // Collect filter values
+    const params = new URLSearchParams();
+    const form = document.getElementById('export-filter-form');
+    if (form) {
+        const formData = new FormData(form);
+        for (const [key, value] of formData) {
+            if (value && key !== 'in_stock') {
+                params.append(key, value);
+            }
+        }
+        const inStock = document.getElementById('export-in-stock');
+        if (inStock && inStock.checked) {
+            params.append('in_stock', 'true');
+        }
+    }
+
+    // Show progress
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    if (statusEl) {
+        statusEl.style.display = 'flex';
+        statusText.textContent = 'Preparing your cellar export...';
+    }
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/export/static-site?${params}`);
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `Export failed (${response.status})`);
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        // Extract filename from Content-Disposition or use default
+        const disposition = response.headers.get('Content-Disposition');
+        const match = disposition && disposition.match(/filename=(.+)/);
+        a.download = match ? match[1] : 'winebox-cellar-export.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast('Export downloaded', 'success');
+        if (statusText) statusText.textContent = 'Export complete!';
+        setTimeout(() => { if (statusEl) statusEl.style.display = 'none'; }, 3000);
+    } catch (error) {
+        console.error('Static site export failed:', error);
+        showToast(error.message || 'Export failed', 'error');
+        if (statusText) statusText.textContent = 'Export failed. Please try again.';
+        setTimeout(() => { if (statusEl) statusEl.style.display = 'none'; }, 5000);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Download Data';
+    }
 }
 
 function initExportDropdown(dropdownId, buttonId) {
