@@ -106,6 +106,31 @@ class TestStaticSiteZip:
                     names = zf.namelist()
                     assert "index.html" in names
                     assert "data.json" in names
+                    assert "cellar.csv" in names
+            finally:
+                path.unlink(missing_ok=True)
+
+    def test_csv_contains_wine_data(self) -> None:
+        """The cellar.csv contains all wines with correct headers."""
+        wines = [
+            _make_wine(wine_id="w1", name="Wine One", country="France", quantity=6),
+            _make_wine(wine_id="w2", name="Wine Two", country="Italy", quantity=3),
+        ]
+        with tempfile.TemporaryDirectory() as img_dir:
+            path = generate_static_site_zip(wines, Path(img_dir))
+            try:
+                with zipfile.ZipFile(path) as zf:
+                    csv_content = zf.read("cellar.csv").decode("utf-8")
+                    import csv as csv_mod
+                    reader = csv_mod.DictReader(csv_content.splitlines())
+                    rows = list(reader)
+                    assert len(rows) == 2
+                    assert rows[0]["name"] == "Wine One"
+                    assert rows[0]["country"] == "France"
+                    assert rows[0]["quantity"] == "6"
+                    assert rows[1]["name"] == "Wine Two"
+                    assert "wine_type" in reader.fieldnames
+                    assert "vintage" in reader.fieldnames
             finally:
                 path.unlink(missing_ok=True)
 

@@ -15,6 +15,8 @@ Memory strategy:
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import tempfile
@@ -34,6 +36,31 @@ _BATCH_SIZE = 50
 
 # Chart.js location relative to the winebox package.
 _CHART_JS_PATH = Path(__file__).resolve().parent.parent.parent / "static" / "js" / "chart.min.js"
+
+
+_CSV_COLUMNS = [
+    "name", "winery", "vintage", "grape_variety", "region", "sub_region",
+    "appellation", "country", "wine_type", "price_tier", "classification",
+    "alcohol_percentage", "producer_type", "drink_window_start", "drink_window_end",
+    "quantity", "cases", "loose_bottles",
+]
+
+
+def _wines_to_csv(wine_dicts: list[dict[str, Any]]) -> str:
+    """Generate a CSV string from wine dicts."""
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=_CSV_COLUMNS, extrasaction="ignore")
+    writer.writeheader()
+    for w in wine_dicts:
+        inv = w.get("inventory") or {}
+        row = {
+            **{k: w.get(k, "") for k in _CSV_COLUMNS},
+            "quantity": inv.get("quantity", 0),
+            "cases": len(inv.get("cases", [])),
+            "loose_bottles": inv.get("loose_bottles", 0),
+        }
+        writer.writerow(row)
+    return buf.getvalue()
 
 
 def _wine_to_dict(wine: WineWithInventory) -> dict[str, Any]:
@@ -109,6 +136,9 @@ def generate_static_site_zip(
             json_str = json_str.replace("</", "<\\/")
             data_js = f"const CELLAR_DATA = {json_str};\n"
             zf.writestr("data.json", data_js)
+
+            # --- Write cellar.csv ---
+            zf.writestr("cellar.csv", _wines_to_csv(wine_dicts))
 
             # --- Pass 2: add images one at a time ---
             for filename in sorted(image_filenames):
