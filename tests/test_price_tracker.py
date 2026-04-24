@@ -251,9 +251,12 @@ async def test_list_prices_returns_user_wines(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_prices_limit_capped(client: AsyncClient) -> None:
+async def test_list_prices_limit_out_of_range_rejected(client: AsyncClient) -> None:
+    """`limit` is hard-bounded via `Query(..., le=200)` — over-limit is a 422."""
     response = await client.get("/api/prices?limit=500")
-    assert response.status_code == 200
+    assert response.status_code == 422
+    response = await client.get("/api/prices?skip=-1")
+    assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------
@@ -636,6 +639,105 @@ async def test_history_endpoint_empty_when_no_overflow(client: AsyncClient) -> N
     response = await client.get(f"/api/prices/{body['id']}/history")
     assert response.status_code == 200
     assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_history_redacts_other_users_location_and_notes(
+    client: AsyncClient, init_test_db
+) -> None:
+    """User B fetching archived history for a shared wine must not see
+    User A's granular location (`town_city`, `state_county`) or free-text
+    `notes`. Aggregate fields (shop_name, country, price) stay visible."""
+    name = f"HistoryPII Wine {uuid.uuid4().hex[:6]}"
+
+    # User A seeds enough prices that the earliest one overflows to history.
+    for i in range(21):
+        await _create_price(
+            client,
+            wine_name=name,
+            price=str(10.0 + i),
+            notes="User A private note",
+            shop_name="Vintners Cellar",
+            town_city="Dublin",
+            state_county="Leinster",
+            country="Ireland",
+        )
+
+    # Find the wine_price_id via the list endpoint for user A.
+    list_resp = await client.get("/api/prices")
+    assert list_resp.status_code == 200
+    wine_id = next(
+        s["id"] for s in list_resp.json() if s["wine_name"] == name
+    )
+
+    # User A sees their own history unredacted.
+    hist_a = await client.get(f"/api/prices/{wine_id}/history")
+    assert hist_a.status_code == 200
+    assert hist_a.json(), "expected at least one archived entry"
+    for row in hist_a.json():
+        assert row["location"]["town_city"] == "Dublin"
+        assert row["location"]["state_county"] == "Leinster"
+        assert row["notes"] == "User A private note"
+
+    # User B hits the same endpoint; PII fields must be None.
+    from winebox.models import User
+    from winebox.services.auth import create_access_token
+    from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
+
+    other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
+    other_user = User(
+        email=other_email,
+        hashed_password=_CACHED_TEST_PASSWORD_HASH,
+        is_active=True,
+        is_verified=True,
+        is_superuser=False,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    await other_user.insert()
+    other_token = create_access_token(data={"sub": other_email})
+    app = get_test_app()
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {other_token}"},
+    ) as other_client:
+        hist_b = await other_client.get(f"/api/prices/{wine_id}/history")
+
+    assert hist_b.status_code == 200
+    rows = hist_b.json()
+    assert rows, "user B should still see the archive rows, just redacted"
+    for row in rows:
+        assert row["location"]["town_city"] is None
+        assert row["location"]["state_county"] is None
+        assert row["notes"] is None
+        # Aggregate fields still visible for price comparison.
+        assert row["location"]["shop_name"] == "Vintners Cellar"
+        assert row["location"]["country"] == "Ireland"
+        assert row["price"] >= 10.0
+        assert row["currency"] == "EUR"
+
+
+@pytest.mark.asyncio
+async def test_history_skip_rejects_negative(client: AsyncClient) -> None:
+    """`skip<0` is a 422, not a silent pass-through to Mongo."""
+    body = await _create_price(
+        client, wine_name=f"NegSkip {uuid.uuid4().hex[:6]}", price="10.00",
+    )
+    resp = await client.get(f"/api/prices/{body['id']}/history?skip=-1")
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_history_limit_out_of_range_rejected(client: AsyncClient) -> None:
+    """`limit>200` is a hard 422 now, not the old silent clamp."""
+    body = await _create_price(
+        client, wine_name=f"BigLimit {uuid.uuid4().hex[:6]}", price="10.00",
+    )
+    resp = await client.get(f"/api/prices/{body['id']}/history?limit=500")
+    assert resp.status_code == 422
+    resp = await client.get(f"/api/prices/{body['id']}/history?limit=0")
+    assert resp.status_code == 422
 
 
 # ---------------------------------------------------------------------------

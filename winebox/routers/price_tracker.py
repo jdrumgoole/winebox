@@ -13,7 +13,7 @@ from typing import Optional
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 
 from winebox.config import settings
@@ -256,12 +256,10 @@ async def create_price_capture(
 @router.get("", response_model=list[WinePriceSummaryOut])
 async def list_wine_prices(
     current_user: RequireAuth,
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
 ) -> list[WinePriceSummaryOut]:
     """List wines where the current user has contributed prices."""
-    if limit > 200:
-        limit = 200
     docs = (
         await WinePrice.find({"prices.owner_id": current_user.id})
         .sort([("updated_at", -1)])
@@ -331,16 +329,19 @@ async def delete_price_entry(
 async def get_wine_price_history(
     wine_price_id: str,
     current_user: RequireAuth,
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
 ) -> list[WinePriceHistoryEntryOut]:
-    """Get archived price history for a wine."""
+    """Get archived price history for a wine.
+
+    `WinePriceHistory` is a global archive: every contributor's archived
+    entries for a wine are visible here. Mirror the owner-gating used by
+    `_entry_to_out()` so non-owners cannot read other users' granular
+    location (`town_city`, `state_county`) or free-text `notes`.
+    """
     doc = await WinePrice.find_one({"_id": _parse_wine_price_id(wine_price_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="Wine price not found.")
-
-    if limit > 200:
-        limit = 200
 
     history = (
         await WinePriceHistory.find({
@@ -353,27 +354,30 @@ async def get_wine_price_history(
         .limit(limit)
         .to_list()
     )
-    return [
-        WinePriceHistoryEntryOut(
-            id=str(h.id),
-            wine_name=h.wine_name,
-            vintage=h.vintage,
-            wine_type=h.wine_type,
-            timestamp=h.timestamp,
-            source=h.source.value,
-            price=h.price,
-            currency=h.currency,
-            location={
-                "shop_name": h.location.shop_name,
-                "town_city": h.location.town_city,
-                "state_county": h.location.state_county,
-                "country": h.location.country,
-            },
-            notes=h.notes,
-            archived_at=h.archived_at,
+    results: list[WinePriceHistoryEntryOut] = []
+    for h in history:
+        is_owner = h.owner_id is not None and h.owner_id == current_user.id
+        results.append(
+            WinePriceHistoryEntryOut(
+                id=str(h.id),
+                wine_name=h.wine_name,
+                vintage=h.vintage,
+                wine_type=h.wine_type,
+                timestamp=h.timestamp,
+                source=h.source.value,
+                price=h.price,
+                currency=h.currency,
+                location={
+                    "shop_name": h.location.shop_name,
+                    "town_city": h.location.town_city if is_owner else None,
+                    "state_county": h.location.state_county if is_owner else None,
+                    "country": h.location.country,
+                },
+                notes=h.notes if is_owner else None,
+                archived_at=h.archived_at,
+            )
         )
-        for h in history
-    ]
+    return results
 
 
 @router.get("/photos/{filename}")
