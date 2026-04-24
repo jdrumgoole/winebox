@@ -3905,7 +3905,7 @@ async function handleStaticSiteExport() {
         a.href = url;
         // Extract filename from Content-Disposition or use default
         const disposition = response.headers.get('Content-Disposition');
-        const match = disposition && disposition.match(/filename=(.+)/);
+        const match = disposition && disposition.match(/filename="?([^"]+)"?/);
         a.download = match ? match[1] : 'winebox-cellar-export.zip';
         document.body.appendChild(a);
         a.click();

@@ -377,8 +377,8 @@ async def export_static_site(
         filters_applied=filters_applied,
     )
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    filename = f"winebox_cellar_{timestamp}.zip"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    filename = f"winebox-cellar-{timestamp}.zip"
 
     return FileResponse(
         path=zip_path,
