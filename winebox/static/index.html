@@ -400,8 +400,8 @@
                 <button class="cellar-tab active" data-cellar-tab="dashboard">Dashboard</button>
                 <button class="cellar-tab" data-cellar-tab="search">Search</button>
                 <button class="cellar-tab" data-cellar-tab="import">Import</button>
-                <button class="cellar-tab" data-cellar-tab="history">History</button>
                 <button class="cellar-tab" data-cellar-tab="export">Export</button>
+                <button class="cellar-tab" data-cellar-tab="history">History</button>
             </div>
 
             <!-- Dashboard Panel -->
@@ -562,6 +562,13 @@
                         <button type="reset" class="btn btn-secondary">Clear</button>
                     </div>
                 </form>
+                <div class="results-toolbar">
+                    <div class="view-toggle">
+                        <button id="search-view-cards" class="active" title="Card view">Cards</button>
+                        <button id="search-view-table" title="Table view">Table</button>
+                    </div>
+                    <span id="search-result-count" class="result-count"></span>
+                </div>
                 <div id="search-results" class="wine-grid"></div>
             </div>
 
@@ -1056,11 +1063,20 @@
 
             <!-- Export Panel -->
             <div id="cellar-panel-export" class="cellar-panel" style="display:none;">
-                <div class="export-panel-intro">
-                    <h3>Export Your Cellar</h3>
-                    <p>Download your cellar as a standalone website you can browse offline. All your wine data, images, and augmented information will be included.</p>
+                <div class="export-header-bar">
+                    <div class="export-panel-intro">
+                        <h3>Export Your Cellar</h3>
+                        <p>Filter your wines, preview what will be exported, then download.</p>
+                    </div>
+                    <div class="export-actions-bar">
+                        <button type="button" class="btn btn-primary" id="export-generate-btn">Download Data</button>
+                        <div id="export-status" class="export-status" style="display:none;">
+                            <div class="spinner"></div>
+                            <span id="export-status-text">Preparing...</span>
+                        </div>
+                    </div>
                 </div>
-                <form id="export-filter-form" class="form-grid" style="margin-bottom:1.5rem;">
+                <form id="export-filter-form" class="form-grid" style="margin-bottom:1rem;">
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label for="export-search">Filter wines to export</label>
                         <input type="text" id="export-search" name="q" placeholder="Search by name, winery, region, grape...">
@@ -1105,14 +1121,18 @@
                         <input type="checkbox" id="export-in-stock" name="in_stock">
                         <label for="export-in-stock" style="margin:0;">In Stock Only</label>
                     </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <button type="submit" class="btn btn-secondary">Preview</button>
+                    </div>
                 </form>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-primary" id="export-generate-btn">Download Data</button>
+                <div class="results-toolbar" id="export-results-toolbar" style="display:none;">
+                    <div class="view-toggle">
+                        <button id="export-view-cards" class="active" title="Card view">Cards</button>
+                        <button id="export-view-table" title="Table view">Table</button>
+                    </div>
+                    <span id="export-result-count" class="result-count"></span>
                 </div>
-                <div id="export-status" class="export-status" style="display:none;">
-                    <div class="spinner"></div>
-                    <span id="export-status-text">Preparing your cellar export...</span>
-                </div>
+                <div id="export-results" class="wine-grid"></div>
             </div>
         </section>
 

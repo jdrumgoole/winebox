@@ -4237,17 +4237,48 @@ body.logged-out #user-info {
 }
 
 /* Export panel */
+.export-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.export-actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
 .export-panel-intro {
-    margin-bottom: 1.5rem;
+    flex: 1;
 }
 
 .export-panel-intro h3 {
     color: var(--primary-color);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
 }
 
 .export-panel-intro p {
     color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* Results toolbar (shared between Search and Export) */
+.results-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+}
+
+.result-count {
+    color: var(--text-muted);
+    font-size: 0.9rem;
 }
 
 .export-status {
