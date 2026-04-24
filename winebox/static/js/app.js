@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAutocomplete();
     initExportDropdowns();
     initStaticSiteExport();
+    initSearchViewToggle();
     initXWinesPage();
     initImportPage();
     initCustomFields();
@@ -1499,6 +1500,9 @@ function cancelRecordWine() {
     // Keep the form data so user can make changes and try again
 }
 
+let _lastSearchResults = [];
+let _searchViewMode = 'cards';
+
 async function handleSearch(e) {
     e.preventDefault();
     const form = e.target;
@@ -1521,10 +1525,42 @@ async function handleSearch(e) {
     try {
         const response = await fetchWithAuth(`${API_BASE}/search?${params}`);
         const wines = await response.json();
-        renderWineGrid('search-results', wines);
+        _lastSearchResults = wines;
+        renderSearchResults();
     } catch (error) {
         showToast('Search failed', 'error');
     }
+}
+
+function renderSearchResults() {
+    const wines = _lastSearchResults;
+    const countEl = document.getElementById('search-result-count');
+    if (countEl) countEl.textContent = wines.length > 0 ? `${wines.length} wine${wines.length !== 1 ? 's' : ''}` : '';
+
+    if (_searchViewMode === 'table') {
+        renderCellarTable('search-results', wines);
+    } else {
+        renderWineGrid('search-results', wines);
+    }
+}
+
+function initSearchViewToggle() {
+    const cardsBtn = document.getElementById('search-view-cards');
+    const tableBtn = document.getElementById('search-view-table');
+    if (!cardsBtn || !tableBtn) return;
+
+    cardsBtn.addEventListener('click', () => {
+        _searchViewMode = 'cards';
+        cardsBtn.classList.add('active');
+        tableBtn.classList.remove('active');
+        if (_lastSearchResults.length) renderSearchResults();
+    });
+    tableBtn.addEventListener('click', () => {
+        _searchViewMode = 'table';
+        tableBtn.classList.add('active');
+        cardsBtn.classList.remove('active');
+        if (_lastSearchResults.length) renderSearchResults();
+    });
 }
 
 function selectRemovalReason(reason) {
@@ -3765,19 +3801,65 @@ function initExportDropdowns() {
     });
 }
 
+let _lastExportResults = [];
+let _exportViewMode = 'cards';
+
 function initStaticSiteExport() {
     const btn = document.getElementById('export-generate-btn');
-    if (!btn) return;
+    if (btn) btn.addEventListener('click', handleStaticSiteExport);
 
-    btn.addEventListener('click', handleStaticSiteExport);
+    // Preview form
+    const form = document.getElementById('export-filter-form');
+    if (form) form.addEventListener('submit', handleExportPreview);
+
+    // View toggle
+    const cardsBtn = document.getElementById('export-view-cards');
+    const tableBtn = document.getElementById('export-view-table');
+    if (cardsBtn && tableBtn) {
+        cardsBtn.addEventListener('click', () => {
+            _exportViewMode = 'cards';
+            cardsBtn.classList.add('active');
+            tableBtn.classList.remove('active');
+            if (_lastExportResults.length) renderExportResults();
+        });
+        tableBtn.addEventListener('click', () => {
+            _exportViewMode = 'table';
+            tableBtn.classList.add('active');
+            cardsBtn.classList.remove('active');
+            if (_lastExportResults.length) renderExportResults();
+        });
+    }
 }
 
-async function handleStaticSiteExport() {
-    const btn = document.getElementById('export-generate-btn');
-    const statusEl = document.getElementById('export-status');
-    const statusText = document.getElementById('export-status-text');
+async function handleExportPreview(e) {
+    e.preventDefault();
+    const params = _collectExportFilters();
 
-    // Collect filter values
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/search?${params}`);
+        const wines = await response.json();
+        _lastExportResults = wines;
+        renderExportResults();
+        const toolbar = document.getElementById('export-results-toolbar');
+        if (toolbar) toolbar.style.display = 'flex';
+    } catch (error) {
+        showToast('Preview failed', 'error');
+    }
+}
+
+function renderExportResults() {
+    const wines = _lastExportResults;
+    const countEl = document.getElementById('export-result-count');
+    if (countEl) countEl.textContent = wines.length > 0 ? `${wines.length} wine${wines.length !== 1 ? 's' : ''} to export` : '';
+
+    if (_exportViewMode === 'table') {
+        renderCellarTable('export-results', wines);
+    } else {
+        renderWineGrid('export-results', wines);
+    }
+}
+
+function _collectExportFilters() {
     const params = new URLSearchParams();
     const form = document.getElementById('export-filter-form');
     if (form) {
@@ -3792,10 +3874,19 @@ async function handleStaticSiteExport() {
             params.append('in_stock', 'true');
         }
     }
+    return params;
+}
+
+async function handleStaticSiteExport() {
+    const btn = document.getElementById('export-generate-btn');
+    const statusEl = document.getElementById('export-status');
+    const statusText = document.getElementById('export-status-text');
+
+    const params = _collectExportFilters();
 
     // Show progress
     btn.disabled = true;
-    btn.textContent = 'Generating...';
+    btn.textContent = 'Downloading...';
     if (statusEl) {
         statusEl.style.display = 'flex';
         statusText.textContent = 'Preparing your cellar export...';
