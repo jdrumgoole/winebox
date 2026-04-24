@@ -253,7 +253,7 @@ def browse_majestic(
 
     # Read country filters from the sidebar
     text = page.inner_text("body")
-    country_section = re.search(r"COUNTRY\n(.*?)(?:BRAND|REGION|GRAPE|PRICE|STYLE|SPECIAL|\Z)", text, re.DOTALL)
+    country_section = re.search(r"COUNTRY(?:\s+OF\s+ORIGIN)?\n(.*?)(?:BRAND|REGION|GRAPE|PRICE|STYLE|SPECIAL|\Z)", text, re.DOTALL)
     if not country_section:
         print("  Could not find country filter sidebar")
         return
