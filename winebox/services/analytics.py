@@ -108,19 +108,21 @@ class PostHogService:
         distinct_id: str,
         properties: dict[str, Any] | None = None,
     ) -> None:
-        """Identify a user with optional properties.
+        """Attach person properties to a distinct_id.
 
-        Args:
-            distinct_id: Unique identifier for the user.
-            properties: Optional user properties (e.g., email, plan).
+        PostHog removed the top-level `identify()` helper in the v6+
+        Python SDK. The documented replacement is to emit an
+        `$identify` event via `capture()` with the properties wrapped
+        in `$set`; PostHog applies the same person-profile update.
         """
         if not self._ensure_initialized():
             return
 
         try:
-            self._client.identify(
+            self._client.capture(
                 distinct_id=distinct_id,
-                properties=properties or {},
+                event="$identify",
+                properties={"$set": properties or {}},
             )
             if settings.posthog_debug:
                 logger.debug(

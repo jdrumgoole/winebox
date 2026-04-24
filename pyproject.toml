@@ -44,7 +44,7 @@ dependencies = [
     # Export dependencies
     "openpyxl>=3.1.0",
     # Analytics
-    "posthog>=3.0.0",
+    "posthog>=7.0.0",
     "cairosvg>=2.9.0",
 ]
 
