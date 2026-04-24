@@ -98,7 +98,8 @@ class TestPostHogService:
                 )
 
     def test_identify_calls_posthog_when_available(self) -> None:
-        """Test identify calls posthog.identify when available."""
+        """identify() emits `$identify` via capture with `$set` properties
+        (PostHog removed the top-level `identify` helper in v6+)."""
         with patch("winebox.services.analytics.settings") as mock_settings:
             mock_settings.posthog_enabled = True
             mock_settings.posthog_api_key = "phc_test_api_key"
@@ -113,9 +114,10 @@ class TestPostHogService:
                 service = PostHogService()
                 service.identify("user_123", {"email": "user@example.com"})
 
-                mock_posthog.identify.assert_called_once_with(
+                mock_posthog.capture.assert_called_once_with(
                     distinct_id="user_123",
-                    properties={"email": "user@example.com"},
+                    event="$identify",
+                    properties={"$set": {"email": "user@example.com"}},
                 )
 
     def test_shutdown_flushes_and_shuts_down_client(self) -> None:
@@ -163,7 +165,7 @@ class TestPostHogService:
                 )
 
     def test_identify_with_none_properties(self) -> None:
-        """Test identify works with None properties."""
+        """None properties → `$set: {}` via capture."""
         with patch("winebox.services.analytics.settings") as mock_settings:
             mock_settings.posthog_enabled = True
             mock_settings.posthog_api_key = "phc_test_api_key"
@@ -178,9 +180,10 @@ class TestPostHogService:
                 service = PostHogService()
                 service.identify("user_123", None)
 
-                mock_posthog.identify.assert_called_once_with(
+                mock_posthog.capture.assert_called_once_with(
                     distinct_id="user_123",
-                    properties={},
+                    event="$identify",
+                    properties={"$set": {}},
                 )
 
 
