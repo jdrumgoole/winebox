@@ -1537,9 +1537,12 @@ function renderSearchResults() {
     const countEl = document.getElementById('search-result-count');
     if (countEl) countEl.textContent = wines.length > 0 ? `${wines.length} wine${wines.length !== 1 ? 's' : ''}` : '';
 
+    const container = document.getElementById('search-results');
     if (_searchViewMode === 'table') {
+        container.className = '';
         renderCellarTable('search-results', wines);
     } else {
+        container.className = 'wine-grid';
         renderWineGrid('search-results', wines);
     }
 }
@@ -3852,9 +3855,12 @@ function renderExportResults() {
     const countEl = document.getElementById('export-result-count');
     if (countEl) countEl.textContent = wines.length > 0 ? `${wines.length} wine${wines.length !== 1 ? 's' : ''} to export` : '';
 
+    const container = document.getElementById('export-results');
     if (_exportViewMode === 'table') {
+        container.className = '';
         renderCellarTable('export-results', wines);
     } else {
+        container.className = 'wine-grid';
         renderWineGrid('export-results', wines);
     }
 }
