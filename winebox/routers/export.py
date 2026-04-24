@@ -323,7 +323,7 @@ MAX_QUERY_LENGTH = 200
 
 
 @router.get("/static-site")
-@limiter.limit("3/minute;10/hour")
+@limiter.limit("10/minute;60/hour")
 async def export_static_site(
     request: Request,
     current_user: RequireAuth,
