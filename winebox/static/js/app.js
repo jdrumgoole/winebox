@@ -2092,6 +2092,15 @@ function switchCellarTab(tab) {
             resetImportWizard();
             loadImportTab();
             break;
+        case 'export':
+            // Clear any stale preview results when entering the tab
+            if (_lastExportResults.length === 0) {
+                const exportResults = document.getElementById('export-results');
+                if (exportResults) exportResults.innerHTML = '';
+                const toolbar = document.getElementById('export-results-toolbar');
+                if (toolbar) toolbar.style.display = 'none';
+            }
+            break;
         case 'history':
             loadHistory();
             break;
