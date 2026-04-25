@@ -2292,62 +2292,53 @@ async function updateDashboardDemoBanner() {
 }
 
 function renderCellarValuePanel(valueData) {
-    const grid = document.getElementById('cellar-value-grid');
-    if (!grid) return;
+    const panel = document.getElementById('cellar-value-panel');
+    if (!panel) return;
 
     const typeLabels = {
-        'red': 'Red',
-        'white': 'White',
-        'rose': 'Rosé',
-        'rosé': 'Rosé',
-        'sparkling': 'Sparkling',
-        'dessert': 'Dessert',
-        'fortified': 'Fortified',
-        'other': 'Other',
+        'red': 'Red', 'white': 'White', 'rose': 'Rosé', 'rosé': 'Rosé',
+        'sparkling': 'Sparkling', 'dessert': 'Dessert', 'fortified': 'Fortified', 'other': 'Other',
     };
-
     const typeColors = {
-        'red': '#722f37',
-        'white': '#f5e6a8',
-        'rose': '#f4a6b8',
-        'rosé': '#f4a6b8',
-        'sparkling': '#d4af37',
-        'dessert': '#c8956e',
-        'fortified': '#8b4513',
-        'other': '#888888',
+        'red': '#722f37', 'white': '#f5e6a8', 'rose': '#f4a6b8', 'rosé': '#f4a6b8',
+        'sparkling': '#d4af37', 'dessert': '#c8956e', 'fortified': '#8b4513', 'other': '#888888',
     };
 
     if (!valueData || valueData.length === 0) {
-        grid.innerHTML = '<p class="empty-hint">No wine value data available yet.</p>';
+        panel.innerHTML = '<p class="empty-hint">No wine value data available yet.</p>';
         return;
     }
 
     const totalValue = valueData.reduce((sum, item) => sum + item.total_value, 0);
     const totalBottles = valueData.reduce((sum, item) => sum + item.bottles, 0);
+    const fmtTotal = totalValue > 0
+        ? `$${totalValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`
+        : 'No price data';
 
-    const cards = valueData.map(item => {
+    const rows = valueData.map(item => {
         const label = typeLabels[item.wine_type] || item.wine_type || 'Other';
         const color = typeColors[item.wine_type] || typeColors['other'];
         const value = item.total_value > 0
             ? `$${item.total_value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`
-            : 'No price data';
-        return `
-            <div class="value-card">
-                <div class="value-card-color" style="background-color: ${color}"></div>
-                <div class="value-card-content">
-                    <div class="value-card-type">${escapeHtml(label)}</div>
-                    <div class="value-card-amount">${value}</div>
-                    <div class="value-card-bottles">${item.bottles} bottle${item.bottles !== 1 ? 's' : ''}</div>
-                </div>
-            </div>
-        `;
+            : '—';
+        return `<div class="value-row">
+            <span class="value-row-dot" style="background:${color}"></span>
+            <span class="value-row-type">${escapeHtml(label)}</span>
+            <span class="value-row-bottles">${item.bottles} bottle${item.bottles !== 1 ? 's' : ''}</span>
+            <span class="value-row-amount">${value}</span>
+        </div>`;
     }).join('');
 
-    const totalHtml = totalValue > 0
-        ? `<div class="value-total">Total estimated value: $${totalValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} (${totalBottles} bottles)</div>`
-        : `<div class="value-total">${totalBottles} bottles total</div>`;
-
-    grid.innerHTML = cards + totalHtml;
+    panel.innerHTML = `
+        <div class="value-panel-card">
+            <div class="value-panel-header">
+                <div class="value-panel-title">Estimated Cellar Value</div>
+                <div class="value-panel-total">${fmtTotal}</div>
+                <div class="value-panel-subtitle">${totalBottles} bottle${totalBottles !== 1 ? 's' : ''} with price estimates</div>
+            </div>
+            <div class="value-panel-breakdown">${rows}</div>
+        </div>
+    `;
 }
 
 function renderCellarView() {
