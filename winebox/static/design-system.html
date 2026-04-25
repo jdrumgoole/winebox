@@ -6,20 +6,11 @@
     <title>Design System · WineBox</title>
     <link rel="icon" href="/static/logos/favicon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.7.65">
-    <script>
-        // Apply saved theme before anything paints, to avoid a flash of the wrong theme.
-        (function () {
-            try {
-                var t = localStorage.getItem('wb-theme');
-                if (t === 'dark' || t === 'light') {
-                    document.documentElement.setAttribute('data-theme', t);
-                }
-            } catch (e) { /* localStorage unavailable */ }
-        })();
-    </script>
-    <script src="/static/js/theme.js?v=0.7.65"></script>
-    <script src="/static/js/toast.js?v=0.7.65" defer></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=0.7.68">
+    <!-- theme.js is synchronous and self-applies the saved theme before paint. -->
+    <script src="/static/js/theme.js?v=0.7.68"></script>
+    <script src="/static/js/toast.js?v=0.7.68" defer></script>
+    <script src="/static/js/design-system-page.js?v=0.7.68" defer></script>
     <style>
         /* Showcase-only layout helpers — not part of the design system */
         body { background: var(--background-color); }
@@ -102,21 +93,6 @@
             </nav>
         </div>
     </header>
-    <script>
-        // Showcase theme toggle — wires the button to WineBox.theme.cycle().
-        document.addEventListener('DOMContentLoaded', function () {
-            if (!window.WineBox || !window.WineBox.theme) return;
-            var btn = document.getElementById('ds-theme-toggle');
-            var label = document.getElementById('ds-theme-toggle-label');
-            if (!btn) return;
-            function render(theme) {
-                if (label) label.textContent = 'Theme: ' + theme;
-            }
-            render(window.WineBox.theme.get());
-            window.WineBox.theme.subscribe(render);
-            btn.addEventListener('click', function () { window.WineBox.theme.cycle(); });
-        });
-    </script>
 
     <main class="ds-main">
         <section class="ds-section" style="border: none;">
@@ -464,13 +440,13 @@
                 <h3>Trigger a toast</h3>
                 <p class="ds-type-meta" style="margin-bottom:0.75rem;">Click any button below — the toast appears top-right (or bottom on mobile). Toasts stack and dismiss on click of the &times; or after their timeout.</p>
                 <div class="ds-row">
-                    <button class="btn btn-primary btn-small" type="button" onclick="WineBox.toast.success('Bottle added to your cellar.')">success</button>
-                    <button class="btn btn-secondary btn-small" type="button" onclick="WineBox.toast.warning('Vintage looks unusual', { title: 'Double-check' })">warning</button>
-                    <button class="btn btn-danger btn-small" type="button" onclick="WineBox.toast.error('Couldn\u2019t import \u2014 three rows missing a wine name.', { title: 'Import failed' })">error (sticky)</button>
-                    <button class="btn btn-outline btn-small" type="button" onclick="WineBox.toast.info('Tip \u2014 drag a photo onto the scan area to skip the file picker.')">info</button>
+                    <button class="btn btn-primary btn-small" type="button" data-toast='{"variant":"success","body":"Bottle added to your cellar."}'>success</button>
+                    <button class="btn btn-secondary btn-small" type="button" data-toast='{"variant":"warning","title":"Double-check","body":"Vintage looks unusual"}'>warning</button>
+                    <button class="btn btn-danger btn-small" type="button" data-toast='{"variant":"error","title":"Import failed","body":"Couldn\u2019t import \u2014 three rows missing a wine name."}'>error (sticky)</button>
+                    <button class="btn btn-outline btn-small" type="button" data-toast='{"variant":"info","body":"Tip \u2014 drag a photo onto the scan area to skip the file picker."}'>info</button>
                 </div>
                 <div class="ds-row" style="margin-top:1rem;">
-                    <button class="btn btn-secondary btn-small" type="button" onclick="WineBox.toast.success('Saved'); WineBox.toast.info('Updated 2 minutes ago'); WineBox.toast.warning('1 row needs review');">stack three</button>
+                    <button class="btn btn-secondary btn-small" type="button" data-toast='[{"variant":"success","body":"Saved"},{"variant":"info","body":"Updated 2 minutes ago"},{"variant":"warning","body":"1 row needs review"}]'>stack three</button>
                 </div>
             </div>
 

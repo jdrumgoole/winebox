@@ -31,17 +31,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/static/logos/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/logos/apple-touch-icon.png">
     <link rel="stylesheet" href="/static/css/style.css?v=0.7.68">
-    <!-- Theme: apply saved preference before paint to avoid flash of wrong theme -->
-    <script>
-        (function () {
-            try {
-                var t = localStorage.getItem('wb-theme');
-                if (t === 'dark' || t === 'light') {
-                    document.documentElement.setAttribute('data-theme', t);
-                }
-            } catch (e) { /* localStorage unavailable */ }
-        })();
-    </script>
+    <!-- theme.js is synchronous and self-applies the saved theme before paint. -->
     <script src="/static/js/theme.js?v=0.7.68"></script>
     <script src="/static/js/chart.min.js"></script>
     <!-- PostHog Analytics Configuration -->
@@ -1667,32 +1657,6 @@
     <script src="/static/js/papaparse.min.js?v=0.7.68"></script>
     <script src="/static/js/toast.js?v=0.7.68"></script>
     <script src="/static/js/app.js?v=0.7.68"></script>
-    <script>
-        // Wire the theme toggle in the header to WineBox.theme.cycle().
-        (function () {
-            var btn = document.getElementById('theme-toggle');
-            if (!btn || !window.WineBox || !window.WineBox.theme) return;
-            var icons = {
-                auto:  btn.querySelector('.theme-icon-auto'),
-                light: btn.querySelector('.theme-icon-light'),
-                dark:  btn.querySelector('.theme-icon-dark')
-            };
-            var labels = {
-                auto:  'Theme: follow system (click to switch)',
-                light: 'Theme: light (click to switch)',
-                dark:  'Theme: dark (click to switch)'
-            };
-            function render(theme) {
-                Object.keys(icons).forEach(function (k) {
-                    if (icons[k]) icons[k].style.display = (k === theme) ? '' : 'none';
-                });
-                btn.title = labels[theme] || labels.auto;
-                btn.setAttribute('aria-label', labels[theme] || labels.auto);
-            }
-            render(window.WineBox.theme.get());
-            window.WineBox.theme.subscribe(render);
-            btn.addEventListener('click', function () { window.WineBox.theme.cycle(); });
-        })();
-    </script>
+    <script src="/static/js/theme-toggle.js?v=0.7.68"></script>
 </body>
 </html>
