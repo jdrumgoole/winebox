@@ -547,7 +547,7 @@ function showAuthCard(cardId) {
     });
 
     // Clear any error/success messages when switching cards
-    document.querySelectorAll('.login-error, .login-success').forEach(el => {
+    document.querySelectorAll('#login-card .alert, #register-card .alert, #forgot-password-card .alert, #reset-password-card .alert, #verify-card .alert').forEach(el => {
         el.style.display = 'none';
     });
 }
@@ -2390,7 +2390,7 @@ function renderGroupedCellar(data) {
                     ${wine.region ? `<span>${escapeHtml(wine.region)}</span>` : ''}
                     ${wine.country ? `<span>${escapeHtml(wine.country)}</span>` : ''}
                 </div>
-                ${wine.wine_type ? `<span class="wine-type-badge">${escapeHtml(wine.wine_type)}</span>` : ''}
+                ${wine.wine_type ? `<span class="badge badge-primary">${escapeHtml(wine.wine_type)}</span>` : ''}
                 <div class="wine-card-cases">
                     ${casesHtml}
                     ${looseHtml}
@@ -2463,7 +2463,7 @@ function renderGroupedCellarTable(data) {
             <tr class="cellar-table-row" data-wine-id="${wine.wine_id}">
                 <td><strong>${escapeHtml(wine.name)}</strong>${wine.winery ? `<br><span class="text-muted">${escapeHtml(wine.winery)}</span>` : ''}</td>
                 <td>${wine.vintage || '\u2014'}</td>
-                <td class="wine-type-cell">${wine.wine_type ? `<span class="wine-type-badge">${escapeHtml(wine.wine_type)}</span>` : '\u2014'}</td>
+                <td class="wine-type-cell">${wine.wine_type ? `<span class="badge badge-primary">${escapeHtml(wine.wine_type)}</span>` : '\u2014'}</td>
                 <td>${wine.country ? escapeHtml(wine.country) : '\u2014'}</td>
                 <td><strong>${wine.total_bottles}</strong></td>
                 <td>${caseInfo}${looseInfo}</td>
@@ -2516,10 +2516,17 @@ function setCellarViewMode(mode) {
 
 function emptyCellarHtml() {
     return `
-        <div class="empty-search-state">
-            <h3>Your cellar is empty</h3>
-            <p>Add wines to your cellar first, then search to find them here.</p>
-            <a href="#" data-cellar-tab-link="import" class="btn btn-primary">Import Wines</a>
+        <div class="empty-state">
+            <div class="empty-state-icon" aria-hidden="true">
+                <svg class="icon" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path d="M8 2h8v4h-2v3a5 5 0 0 1 4 5v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-8a5 5 0 0 1 4-5V6H8V2z"/>
+                </svg>
+            </div>
+            <div class="empty-state-title">Your cellar is empty</div>
+            <div class="empty-state-description">Add wines to your cellar first, then search to find them here.</div>
+            <div class="empty-state-action">
+                <a href="#" data-cellar-tab-link="import" class="btn btn-primary">Import wines</a>
+            </div>
         </div>
     `;
 }

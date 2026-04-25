@@ -7,8 +7,10 @@
     --bottle: #B82860;
     --gold: #C49A3C;
     --gold-light: #F0D78C;
+    --gold-hover: #d4aa4c;
     --case-wood: #B8956A;
     --cream: #FAF7F2;
+    --cream-dark: #F0EBE3;
     --dark-bg: #1A0A10;
 
     /* Semantic aliases */
@@ -139,7 +141,7 @@ header {
 }
 
 .btn-primary:hover {
-    background: #d4aa4c;
+    background: var(--gold-hover);
 }
 
 .btn-outline {
@@ -174,7 +176,7 @@ header {
     align-items: center;
     justify-content: center;
     padding: 8rem 2rem 4rem;
-    background: linear-gradient(135deg, var(--background-color) 0%, #f0ebe3 100%);
+    background: linear-gradient(135deg, var(--background-color) 0%, var(--cream-dark) 100%);
 }
 
 .hero-content {
@@ -366,7 +368,7 @@ header {
 /* Database Section */
 .database {
     padding: 6rem 2rem;
-    background: linear-gradient(135deg, var(--background-color) 0%, #f0ebe3 100%);
+    background: linear-gradient(135deg, var(--background-color) 0%, var(--cream-dark) 100%);
 }
 
 .database-content {

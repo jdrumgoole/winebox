@@ -31,11 +31,37 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/static/logos/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/logos/apple-touch-icon.png">
     <link rel="stylesheet" href="/static/css/style.css?v=0.7.65">
+    <!-- Theme: apply saved preference before paint to avoid flash of wrong theme -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('wb-theme');
+                if (t === 'dark' || t === 'light') {
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) { /* localStorage unavailable */ }
+        })();
+    </script>
+    <script src="/static/js/theme.js?v=0.7.65"></script>
     <script src="/static/js/chart.min.js"></script>
     <!-- PostHog Analytics Configuration -->
     <script src="/static/js/posthog-init.js"></script>
 </head>
     <body class="logged-out">
+
+    <!-- SVG sprite — referenced via <svg><use href="#i-…"/></svg>. Add a symbol
+         here when an icon is reused in 3+ places to avoid duplicating path data. -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+        </symbol>
+        <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+        </symbol>
+    </svg>
+
     <header>
         <div class="header-content">
             <div class="logo-wrapper">
@@ -52,8 +78,19 @@
             </nav>
             <div id="user-info" class="user-info" style="display: none;">
                 <a href="#" id="username-display" data-page="settings" class="username-link" title="Settings"></a>
+                <button type="button" id="theme-toggle" class="nav-link settings-icon-link" title="Theme" aria-label="Toggle theme">
+                    <svg class="icon icon-sm theme-icon-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                        <rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/>
+                    </svg>
+                    <svg class="icon icon-sm theme-icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true" style="display:none;">
+                        <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+                    </svg>
+                    <svg class="icon icon-sm theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true" style="display:none;">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
                 <a href="#" data-page="settings" class="nav-link settings-icon-link" title="Settings" aria-label="Settings">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
@@ -81,14 +118,8 @@
                         <div class="password-input-wrapper">
                             <input type="password" id="login-password" name="password" required autocomplete="current-password">
                             <button type="button" class="password-toggle" aria-label="Show password">
-                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
+                                <svg class="icon eye-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg>
+                                <svg class="icon eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;"><use href="#i-eye-off"/></svg>
                             </button>
                         </div>
                     </div>
@@ -98,7 +129,7 @@
                             <span>Stay logged in on this machine</span>
                         </label>
                     </div>
-                    <div id="login-error" class="login-error" style="display: none;"></div>
+                    <div id="login-error" class="alert alert-error" style="display: none;"></div>
                     <button type="submit" class="btn btn-primary btn-full">Sign In</button>
                 </form>
                 <div class="login-links">
@@ -123,14 +154,8 @@
                         <div class="password-input-wrapper">
                             <input type="password" id="register-password" name="password" required minlength="8" autocomplete="new-password">
                             <button type="button" class="password-toggle" aria-label="Show password">
-                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
+                                <svg class="icon eye-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg>
+                                <svg class="icon eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;"><use href="#i-eye-off"/></svg>
                             </button>
                         </div>
                         <span class="form-hint">At least 8 characters</span>
@@ -140,18 +165,12 @@
                         <div class="password-input-wrapper">
                             <input type="password" id="register-confirm-password" name="confirm_password" required autocomplete="new-password">
                             <button type="button" class="password-toggle" aria-label="Show password">
-                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
+                                <svg class="icon eye-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg>
+                                <svg class="icon eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;"><use href="#i-eye-off"/></svg>
                             </button>
                         </div>
                     </div>
-                    <div id="register-error" class="login-error" style="display: none;"></div>
+                    <div id="register-error" class="alert alert-error" style="display: none;"></div>
                     <button type="submit" class="btn btn-primary btn-full">Create Account</button>
                 </form>
                 <div class="login-links">
@@ -168,8 +187,8 @@
                         <label for="forgot-email">Email</label>
                         <input type="email" id="forgot-email" name="email" required autocomplete="email">
                     </div>
-                    <div id="forgot-error" class="login-error" style="display: none;"></div>
-                    <div id="forgot-success" class="login-success" style="display: none;"></div>
+                    <div id="forgot-error" class="alert alert-error" style="display: none;"></div>
+                    <div id="forgot-success" class="alert alert-success" style="display: none;"></div>
                     <button type="submit" class="btn btn-primary btn-full">Send Reset Link</button>
                 </form>
                 <div class="login-links" style="text-align: center;">
@@ -188,14 +207,8 @@
                         <div class="password-input-wrapper">
                             <input type="password" id="reset-password" name="password" required minlength="8" autocomplete="new-password">
                             <button type="button" class="password-toggle" aria-label="Show password">
-                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
+                                <svg class="icon eye-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg>
+                                <svg class="icon eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;"><use href="#i-eye-off"/></svg>
                             </button>
                         </div>
                         <span class="form-hint">At least 8 characters</span>
@@ -205,18 +218,12 @@
                         <div class="password-input-wrapper">
                             <input type="password" id="reset-confirm-password" name="confirm_password" required autocomplete="new-password">
                             <button type="button" class="password-toggle" aria-label="Show password">
-                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
+                                <svg class="icon eye-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg>
+                                <svg class="icon eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;"><use href="#i-eye-off"/></svg>
                             </button>
                         </div>
                     </div>
-                    <div id="reset-error" class="login-error" style="display: none;"></div>
+                    <div id="reset-error" class="alert alert-error" style="display: none;"></div>
                     <button type="submit" class="btn btn-primary btn-full">Set New Password</button>
                 </form>
             </div>
@@ -226,8 +233,8 @@
                 <h2 id="verify-title">Verifying Email...</h2>
                 <p class="login-subtitle" id="verify-message">Please wait while we verify your email address.</p>
                 <div id="verify-spinner" class="spinner"></div>
-                <div id="verify-success" class="login-success" style="display: none;"></div>
-                <div id="verify-error" class="login-error" style="display: none;"></div>
+                <div id="verify-success" class="alert alert-success" style="display: none;"></div>
+                <div id="verify-error" class="alert alert-error" style="display: none;"></div>
                 <div class="login-links" id="verify-login-link" style="display: none;">
                     <a href="#" id="show-login-from-verify">Continue to sign in</a>
                 </div>
@@ -262,7 +269,7 @@
 
                 <div class="form-section">
                     <h3>Wine Details</h3>
-                    <p class="form-note">Leave fields blank to use OCR-detected values</p>
+                    <p class="form-note">Leave blank to use what we read from the label</p>
 
                     <div class="form-grid">
                         <div class="form-group autocomplete-wrapper">
@@ -406,10 +413,15 @@
 
             <!-- Dashboard Panel -->
             <div id="cellar-panel-dashboard" class="cellar-panel active">
-                <div id="dashboard-empty-state" class="dashboard-empty-state" style="display:none;">
-                    <h3>Your cellar is empty</h3>
-                    <p>Load sample data to explore the app, or switch to the Import tab to add your own wines.</p>
-                    <div style="margin-top:0.75rem;">
+                <div id="dashboard-empty-state" class="empty-state" style="display:none;">
+                    <div class="empty-state-icon" aria-hidden="true">
+                        <svg class="icon" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path d="M8 2h8v4h-2v3a5 5 0 0 1 4 5v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-8a5 5 0 0 1 4-5V6H8V2z"/>
+                        </svg>
+                    </div>
+                    <div class="empty-state-title">Your cellar is empty</div>
+                    <div class="empty-state-description">Load sample wines to explore the app, or switch to the Import tab to add your own.</div>
+                    <div class="empty-state-action">
                         <button class="btn btn-primary" id="dashboard-demo-install-btn">Load sample wines</button>
                     </div>
                 </div>
@@ -578,7 +590,7 @@
                         <div class="entry-path-cards" id="import-entry-path-cards">
                             <div class="entry-path-card" data-import-path="scan">
                                 <div class="entry-path-icon">
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <svg class="icon icon-xl" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                                         <circle cx="12" cy="13" r="4"></circle>
                                     </svg>
@@ -588,7 +600,7 @@
                             </div>
                             <div class="entry-path-card" data-import-path="manual">
                                 <div class="entry-path-icon">
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <svg class="icon icon-xl" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                     </svg>
@@ -598,7 +610,7 @@
                             </div>
                             <div class="entry-path-card" data-import-path="from-met">
                                 <div class="entry-path-icon">
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <svg class="icon icon-xl" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                                     </svg>
                                 </div>
@@ -607,7 +619,7 @@
                             </div>
                             <div class="entry-path-card" data-import-path="import">
                                 <div class="entry-path-icon">
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <svg class="icon icon-xl" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                         <polyline points="17 8 12 3 7 8"></polyline>
                                         <line x1="12" y1="3" x2="12" y2="15"></line>
@@ -865,7 +877,7 @@
                         <h3>Upload Spreadsheet</h3>
                         <div class="import-upload-area" id="import-drop-zone">
                             <div class="import-upload-icon">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <svg class="icon icon-2xl" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                     <polyline points="17 8 12 3 7 8"></polyline>
                                     <line x1="12" y1="3" x2="12" y2="15"></line>
@@ -979,7 +991,7 @@
                 <div id="import-step-augment" class="import-step" style="display:none;">
                     <div class="form-section">
                         <h3>Add More Details</h3>
-                        <p class="form-note">These columns from your file weren't imported. Map them to wine fields to add the information to your wines.</p>
+                        <p class="form-note">These columns from your spreadsheet weren't matched. Pair them with wine details to add this information to your wines.</p>
                         <div id="import-augment-mapping-container"></div>
                     </div>
                     <div class="form-actions">
@@ -1258,14 +1270,8 @@
                         <div class="password-input-wrapper">
                             <input type="password" id="current-password" name="current_password" required autocomplete="current-password">
                             <button type="button" class="password-toggle" aria-label="Show password">
-                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
+                                <svg class="icon eye-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg>
+                                <svg class="icon eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;"><use href="#i-eye-off"/></svg>
                             </button>
                         </div>
                     </div>
@@ -1274,14 +1280,8 @@
                         <div class="password-input-wrapper">
                             <input type="password" id="new-password" name="new_password" required autocomplete="new-password">
                             <button type="button" class="password-toggle" aria-label="Show password">
-                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
+                                <svg class="icon eye-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg>
+                                <svg class="icon eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;"><use href="#i-eye-off"/></svg>
                             </button>
                         </div>
                     </div>
@@ -1290,14 +1290,8 @@
                         <div class="password-input-wrapper">
                             <input type="password" id="confirm-password" name="confirm_password" required autocomplete="new-password">
                             <button type="button" class="password-toggle" aria-label="Show password">
-                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
+                                <svg class="icon eye-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg>
+                                <svg class="icon eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;"><use href="#i-eye-off"/></svg>
                             </button>
                         </div>
                     </div>
@@ -1667,10 +1661,38 @@
         </div>
     </footer>
 
-    <!-- Toast Notifications -->
-    <div id="toast-container"></div>
+    <!-- Toast Notifications — see WineBox.toast in /static/js/toast.js -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
     <script src="/static/js/papaparse.min.js?v=0.7.65"></script>
+    <script src="/static/js/toast.js?v=0.7.65"></script>
     <script src="/static/js/app.js?v=0.7.65"></script>
+    <script>
+        // Wire the theme toggle in the header to WineBox.theme.cycle().
+        (function () {
+            var btn = document.getElementById('theme-toggle');
+            if (!btn || !window.WineBox || !window.WineBox.theme) return;
+            var icons = {
+                auto:  btn.querySelector('.theme-icon-auto'),
+                light: btn.querySelector('.theme-icon-light'),
+                dark:  btn.querySelector('.theme-icon-dark')
+            };
+            var labels = {
+                auto:  'Theme: follow system (click to switch)',
+                light: 'Theme: light (click to switch)',
+                dark:  'Theme: dark (click to switch)'
+            };
+            function render(theme) {
+                Object.keys(icons).forEach(function (k) {
+                    if (icons[k]) icons[k].style.display = (k === theme) ? '' : 'none';
+                });
+                btn.title = labels[theme] || labels.auto;
+                btn.setAttribute('aria-label', labels[theme] || labels.auto);
+            }
+            render(window.WineBox.theme.get());
+            window.WineBox.theme.subscribe(render);
+            btn.addEventListener('click', function () { window.WineBox.theme.cycle(); });
+        })();
+    </script>
 </body>
 </html>
