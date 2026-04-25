@@ -37,11 +37,15 @@ class TestCellarPage:
     """E2E tests for the cellar page tab structure."""
 
     def test_cellar_has_tab_bar(self, authenticated_page: Page) -> None:
-        """Tab bar with Dashboard/Search/Import/History is present."""
+        """Tab bar with Dashboard/Search/Import/Export/History is present."""
         _navigate_to_cellar(authenticated_page)
         expect(authenticated_page.locator("#cellar-tabs")).to_be_visible()
         tabs = authenticated_page.locator(".cellar-tab")
-        assert tabs.count() == 4
+        assert tabs.count() == 5
+        labels = [tabs.nth(i).inner_text().strip() for i in range(tabs.count())]
+        assert labels == ["Dashboard", "Search", "Import", "Export", "History"], (
+            f"unexpected cellar tab labels: {labels}"
+        )
 
     def test_cellar_dashboard_tab_active_by_default(self, authenticated_page: Page) -> None:
         """Dashboard tab is active by default."""

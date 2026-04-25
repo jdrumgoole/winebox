@@ -377,11 +377,14 @@ class TestXWinesImport:
         wine_cards = page.locator(".wine-card").all()
         assert len(wine_cards) > 0, "No wine cards found in search results"
 
-        # Spot-check wine detail modal
+        # Spot-check wine detail modal. The modal opens after several
+        # sequential API calls (wine + bottles + cases), so use a 10s
+        # timeout to match other tests opening the same #wine-modal
+        # (e.g. test_case_actions_e2e.py).
         page.locator(".wine-card").first.click()
-        page.wait_for_selector(".modal.active", state="visible", timeout=5000)
+        page.wait_for_selector("#wine-modal.active", state="visible", timeout=10000)
 
-        modal = page.locator(".modal.active")
+        modal = page.locator("#wine-modal.active")
         modal_text = modal.text_content() or ""
 
         # Get the first wine card's title for matching
