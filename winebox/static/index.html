@@ -1063,74 +1063,76 @@
 
             <!-- Export Panel -->
             <div id="cellar-panel-export" class="cellar-panel" style="display:none;">
-                <div class="export-header-bar">
-                    <div class="export-panel-intro">
-                        <h3>Export Your Cellar</h3>
-                        <p>Filter your wines, preview what will be exported, then download.</p>
-                    </div>
-                    <div class="export-actions-bar">
-                        <button type="button" class="btn btn-primary" id="export-generate-btn">Download Data</button>
-                        <div id="export-status" class="export-status" style="display:none;">
-                            <div class="spinner"></div>
-                            <span id="export-status-text">Preparing...</span>
+                <div class="export-controls">
+                    <div class="export-header-bar">
+                        <div class="export-panel-intro">
+                            <h3>Export Your Cellar</h3>
+                            <p>Filter your wines, preview what will be exported, then download.</p>
+                        </div>
+                        <div class="export-actions-bar">
+                            <button type="button" class="btn btn-primary" id="export-generate-btn">Download Data</button>
+                            <div id="export-status" class="export-status" style="display:none;">
+                                <div class="spinner"></div>
+                                <span id="export-status-text">Preparing...</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <form id="export-filter-form" class="form-grid" style="margin-bottom:1rem;">
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <label for="export-search">Filter wines to export</label>
-                        <input type="text" id="export-search" name="q" placeholder="Search by name, winery, region, grape...">
+                    <form id="export-filter-form" class="form-grid" style="margin-bottom:0;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label for="export-search">Filter wines to export</label>
+                            <input type="text" id="export-search" name="q" placeholder="Search by name, winery, region, grape...">
+                        </div>
+                        <div class="form-group">
+                            <label for="export-wine-type">Wine Type</label>
+                            <select id="export-wine-type" name="wine_type">
+                                <option value="">All Types</option>
+                                <option value="red">Red</option>
+                                <option value="white">White</option>
+                                <option value="ros&eacute;">Ros&eacute;</option>
+                                <option value="sparkling">Sparkling</option>
+                                <option value="fortified">Fortified</option>
+                                <option value="dessert">Dessert</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="export-country">Country</label>
+                            <input type="text" id="export-country" name="country" placeholder="e.g. France">
+                        </div>
+                        <div class="form-group">
+                            <label for="export-region">Region</label>
+                            <input type="text" id="export-region" name="region" placeholder="e.g. Bordeaux">
+                        </div>
+                        <div class="form-group">
+                            <label for="export-grape">Grape Variety</label>
+                            <input type="text" id="export-grape" name="grape" placeholder="e.g. Cabernet Sauvignon">
+                        </div>
+                        <div class="form-group">
+                            <label for="export-price-tier">Price Tier</label>
+                            <select id="export-price-tier" name="price_tier">
+                                <option value="">All Tiers</option>
+                                <option value="budget">Budget</option>
+                                <option value="value">Value</option>
+                                <option value="mid_range">Mid Range</option>
+                                <option value="premium">Premium</option>
+                                <option value="luxury">Luxury</option>
+                                <option value="ultra_premium">Ultra Premium</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;padding-top:1.5rem;">
+                            <input type="checkbox" id="export-in-stock" name="in_stock">
+                            <label for="export-in-stock" style="margin:0;">In Stock Only</label>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <button type="submit" class="btn btn-secondary">Preview</button>
+                        </div>
+                    </form>
+                    <div class="results-toolbar" id="export-results-toolbar" style="display:none;">
+                        <div class="view-toggle">
+                            <button id="export-view-cards" class="active" title="Card view">Cards</button>
+                            <button id="export-view-table" title="Table view">Table</button>
+                        </div>
+                        <span id="export-result-count" class="result-count"></span>
                     </div>
-                    <div class="form-group">
-                        <label for="export-wine-type">Wine Type</label>
-                        <select id="export-wine-type" name="wine_type">
-                            <option value="">All Types</option>
-                            <option value="red">Red</option>
-                            <option value="white">White</option>
-                            <option value="ros&eacute;">Ros&eacute;</option>
-                            <option value="sparkling">Sparkling</option>
-                            <option value="fortified">Fortified</option>
-                            <option value="dessert">Dessert</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="export-country">Country</label>
-                        <input type="text" id="export-country" name="country" placeholder="e.g. France">
-                    </div>
-                    <div class="form-group">
-                        <label for="export-region">Region</label>
-                        <input type="text" id="export-region" name="region" placeholder="e.g. Bordeaux">
-                    </div>
-                    <div class="form-group">
-                        <label for="export-grape">Grape Variety</label>
-                        <input type="text" id="export-grape" name="grape" placeholder="e.g. Cabernet Sauvignon">
-                    </div>
-                    <div class="form-group">
-                        <label for="export-price-tier">Price Tier</label>
-                        <select id="export-price-tier" name="price_tier">
-                            <option value="">All Tiers</option>
-                            <option value="budget">Budget</option>
-                            <option value="value">Value</option>
-                            <option value="mid_range">Mid Range</option>
-                            <option value="premium">Premium</option>
-                            <option value="luxury">Luxury</option>
-                            <option value="ultra_premium">Ultra Premium</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;padding-top:1.5rem;">
-                        <input type="checkbox" id="export-in-stock" name="in_stock">
-                        <label for="export-in-stock" style="margin:0;">In Stock Only</label>
-                    </div>
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <button type="submit" class="btn btn-secondary">Preview</button>
-                    </div>
-                </form>
-                <div class="results-toolbar" id="export-results-toolbar" style="display:none;">
-                    <div class="view-toggle">
-                        <button id="export-view-cards" class="active" title="Card view">Cards</button>
-                        <button id="export-view-table" title="Table view">Table</button>
-                    </div>
-                    <span id="export-result-count" class="result-count"></span>
                 </div>
                 <div id="export-results" class="wine-grid"></div>
             </div>

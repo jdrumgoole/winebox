@@ -4237,6 +4237,16 @@ body.logged-out #user-info {
 }
 
 /* Export panel */
+.export-controls {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--background-color);
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1.5rem;
+}
+
 .export-header-bar {
     display: flex;
     justify-content: space-between;
