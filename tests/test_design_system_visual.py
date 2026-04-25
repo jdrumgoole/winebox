@@ -33,6 +33,67 @@ ARTIFACTS = PROJECT_DIR / "artifacts" / "design-system-visual"
 
 
 @pytest.mark.e2e
+def test_design_system_theme_toggle_button_works(page: Page) -> None:
+    """Click the showcase theme toggle and verify data-theme actually flips.
+
+    Regression guard for CSP-blocked inline scripts: the visual tests below
+    set localStorage via add_init_script, which bypasses the button. So if
+    the toggle's wiring is blocked by CSP, those tests still pass while the
+    user-facing button does nothing.
+    """
+    page.goto(f"{BASE_URL}/design-system", wait_until="networkidle")
+    html = page.locator("html")
+
+    assert html.get_attribute("data-theme") in (None, ""), (
+        "expected no data-theme initially (auto), "
+        f"got {html.get_attribute('data-theme')!r}"
+    )
+
+    btn = page.locator("#ds-theme-toggle")
+    btn.wait_for(state="visible", timeout=3000)
+
+    btn.click()
+    page.wait_for_function(
+        "document.documentElement.getAttribute('data-theme') === 'dark'",
+        timeout=2000,
+    )
+
+    btn.click()
+    page.wait_for_function(
+        "document.documentElement.getAttribute('data-theme') === 'light'",
+        timeout=2000,
+    )
+
+    btn.click()
+    page.wait_for_function(
+        "document.documentElement.getAttribute('data-theme') === null",
+        timeout=2000,
+    )
+
+
+@pytest.mark.e2e
+def test_design_system_no_csp_violations(page: Page) -> None:
+    """Loading /design-system must produce zero CSP violations.
+
+    Catches new inline <script> blocks or onclick= attributes that would
+    be silently blocked by the project CSP.
+    """
+    violations: list[str] = []
+
+    def on_msg(msg) -> None:  # type: ignore[no-untyped-def]
+        text = msg.text or ""
+        if msg.type == "error" and "Content Security Policy" in text:
+            violations.append(text)
+
+    page.on("console", on_msg)
+    page.goto(f"{BASE_URL}/design-system", wait_until="networkidle")
+    page.locator("[data-toast]").first.click()
+    page.wait_for_timeout(200)
+
+    assert not violations, "CSP violations on /design-system: " + " | ".join(violations)
+
+
+@pytest.mark.e2e
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_design_system_full_page(page: Page, theme: str) -> None:
     """Render /design-system in `theme` and write a full-page PNG artifact."""
