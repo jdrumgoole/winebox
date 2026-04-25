@@ -289,6 +289,14 @@ async def price_tracker_page() -> FileResponse:
     return FileResponse(static_path, media_type="text/html")
 
 
+# Design System — live component showcase paired with brand-kit/DESIGN-SYSTEM.md
+@app.get("/design-system", tags=["Documentation"])
+async def design_system_page() -> FileResponse:
+    """Serve the design system reference page."""
+    static_path = Path(__file__).parent / "static" / "design-system.html"
+    return FileResponse(static_path, media_type="text/html")
+
+
 # Health check endpoint
 @app.get("/health", tags=["Health"])
 async def health_check() -> JSONResponse:

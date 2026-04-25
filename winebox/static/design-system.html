@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System · WineBox</title>
+    <link rel="icon" href="/static/logos/favicon.svg" type="image/svg+xml">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.7.65">
+    <script>
+        // Apply saved theme before anything paints, to avoid a flash of the wrong theme.
+        (function () {
+            try {
+                var t = localStorage.getItem('wb-theme');
+                if (t === 'dark' || t === 'light') {
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) { /* localStorage unavailable */ }
+        })();
+    </script>
+    <script src="/static/js/theme.js?v=0.7.65"></script>
+    <script src="/static/js/toast.js?v=0.7.65" defer></script>
+    <style>
+        /* Showcase-only layout helpers — not part of the design system */
+        body { background: var(--background-color); }
+        .ds-main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .ds-section { margin: 3rem 0; padding-top: 1rem; border-top: 1px solid var(--border-color); }
+        .ds-section:first-of-type { border-top: none; margin-top: 1.5rem; }
+        .ds-section h2 { font-family: 'Playfair Display', Georgia, serif; color: var(--primary-dark); margin-bottom: 0.25rem; }
+        .ds-section p.ds-lede { color: var(--text-muted); margin-bottom: 1.5rem; }
+        .ds-block { margin-bottom: 2rem; }
+        .ds-block h3 { font-family: 'Playfair Display', Georgia, serif; color: var(--text-color); margin-bottom: 0.75rem; font-size: 1.15rem; }
+        .ds-block p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.75rem; }
+
+        .ds-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; }
+        .ds-swatch { background: var(--card-background); border: 1px solid var(--border-color); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+        .ds-swatch-fill { height: 72px; }
+        .ds-swatch-meta { padding: 0.5rem 0.75rem; font-size: 0.8rem; }
+        .ds-swatch-name { font-weight: 600; color: var(--text-color); }
+        .ds-swatch-hex { color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+        .ds-demo { background: var(--card-background); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow); }
+        .ds-demo + .ds-demo { margin-top: 1rem; }
+        .ds-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+        .ds-row + .ds-row { margin-top: 0.75rem; }
+
+        .ds-type-sample { padding: 0.5rem 0; }
+        .ds-type-sample + .ds-type-sample { border-top: 1px dashed var(--border-color); }
+        .ds-type-meta { display: block; color: var(--text-muted); font-size: 0.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 0.25rem; }
+
+        .ds-scale { display: grid; grid-template-columns: 6rem 1fr; gap: 0.5rem 1rem; align-items: center; }
+        .ds-scale-label { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; color: var(--text-muted); }
+        .ds-scale-bar { background: var(--primary-light); height: 12px; border-radius: 2px; }
+
+        .ds-radius-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
+        .ds-radius-box { background: var(--primary-color); color: white; height: 96px; display: flex; align-items: center; justify-content: center; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+
+        .ds-shadow-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; padding: 1rem; }
+        .ds-shadow-box { background: var(--card-background); height: 96px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; color: var(--text-muted); }
+
+        .ds-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; }
+        .ds-status-chip { padding: 0.75rem 1rem; border-radius: var(--radius); color: white; font-weight: 500; }
+
+        .ds-toc { background: var(--card-background); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 1rem 1.25rem; box-shadow: var(--shadow); }
+        .ds-toc ol { list-style: decimal inside; columns: 2; gap: 0.5rem; margin: 0.25rem 0 0 0; padding: 0; }
+        .ds-toc a { color: var(--primary-color); text-decoration: none; }
+        .ds-toc a:hover { text-decoration: underline; }
+
+        .ds-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; background: var(--background-color); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 0.75rem 1rem; color: var(--text-color); white-space: pre-wrap; }
+
+        .ds-modal-preview { position: relative; background: rgba(0,0,0,0.5); border-radius: var(--radius-lg); padding: 2rem; min-height: 260px; display: flex; align-items: center; justify-content: center; }
+        .ds-modal-preview .modal-content { position: static; max-width: 400px; }
+
+        .ds-footer { margin-top: 4rem; padding: 1.5rem 0; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo-wrapper">
+                <img class="header-logo" src="/static/logos/logo-compact-dark.svg" alt="WineBox">
+                <span class="beta-badge">DESIGN SYSTEM</span>
+            </div>
+            <nav>
+                <a class="nav-link" href="/">Back to app</a>
+                <a class="nav-link" href="#colour">Colour</a>
+                <a class="nav-link" href="#typography">Typography</a>
+                <a class="nav-link" href="#spacing">Spacing</a>
+                <a class="nav-link" href="#buttons">Buttons</a>
+                <a class="nav-link" href="#forms">Forms</a>
+                <a class="nav-link" href="#cards">Cards</a>
+                <a class="nav-link" href="#modals">Modals</a>
+                <a class="nav-link" href="#alerts">Alerts</a>
+                <a class="nav-link" href="#toasts">Toasts</a>
+                <a class="nav-link" href="#empty">Empty</a>
+                <a class="nav-link" href="#badges">Badges</a>
+                <a class="nav-link" href="#icons">Icons</a>
+                <a class="nav-link" href="#voice">Voice</a>
+                <button type="button" class="nav-link" id="ds-theme-toggle" style="border:none; background:rgba(255,255,255,0.15); cursor:pointer; font-family:inherit;">
+                    <span id="ds-theme-toggle-label">Theme: auto</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+    <script>
+        // Showcase theme toggle — wires the button to WineBox.theme.cycle().
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!window.WineBox || !window.WineBox.theme) return;
+            var btn = document.getElementById('ds-theme-toggle');
+            var label = document.getElementById('ds-theme-toggle-label');
+            if (!btn) return;
+            function render(theme) {
+                if (label) label.textContent = 'Theme: ' + theme;
+            }
+            render(window.WineBox.theme.get());
+            window.WineBox.theme.subscribe(render);
+            btn.addEventListener('click', function () { window.WineBox.theme.cycle(); });
+        });
+    </script>
+
+    <main class="ds-main">
+        <section class="ds-section" style="border: none;">
+            <h2>WineBox Design System</h2>
+            <p class="ds-lede">A living reference for the visual and UX language of WineBox. Everything here uses the real <code>style.css</code> — if something looks wrong on this page, it's wrong in the app.</p>
+            <div class="ds-toc">
+                <strong>Contents</strong>
+                <ol>
+                    <li><a href="#colour">Colour</a></li>
+                    <li><a href="#typography">Typography</a></li>
+                    <li><a href="#spacing">Spacing</a></li>
+                    <li><a href="#radius">Radius</a></li>
+                    <li><a href="#shadows">Shadows</a></li>
+                    <li><a href="#buttons">Buttons</a></li>
+                    <li><a href="#forms">Forms</a></li>
+                    <li><a href="#cards">Cards</a></li>
+                    <li><a href="#modals">Modals</a></li>
+                    <li><a href="#navigation">Navigation</a></li>
+                    <li><a href="#status">Status colours</a></li>
+                    <li><a href="#alerts">Alerts</a></li>
+                    <li><a href="#toasts">Toasts</a></li>
+                    <li><a href="#empty">Empty states</a></li>
+                    <li><a href="#badges">Badges</a></li>
+                    <li><a href="#icons">Icons</a></li>
+                    <li><a href="#voice">Voice &amp; tone</a></li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- COLOUR -->
+        <section class="ds-section" id="colour">
+            <h2>Colour</h2>
+            <p class="ds-lede">Brand palette and semantic aliases. Always use semantic aliases (<code>--primary-color</code>, <code>--border-color</code>) in component CSS — keep brand names reserved for the palette itself.</p>
+
+            <div class="ds-block">
+                <h3>Brand palette</h3>
+                <div class="ds-swatches">
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:#5C0A2D"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Burgundy</div><div class="ds-swatch-hex">#5C0A2D · --burgundy</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:#8B1A4A"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Burgundy Light</div><div class="ds-swatch-hex">#8B1A4A · --burgundy-light</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:#B82860"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Rose</div><div class="ds-swatch-hex">#B82860 · --bottle</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:#C49A3C"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Gold</div><div class="ds-swatch-hex">#C49A3C · --gold</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:#F0D78C"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Gold Light</div><div class="ds-swatch-hex">#F0D78C · --gold-light</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:#B8956A"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Case Wood</div><div class="ds-swatch-hex">#B8956A · --case-wood</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:#FAF7F2;border-bottom:1px solid var(--border-color)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Cream</div><div class="ds-swatch-hex">#FAF7F2 · --cream</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:#F0EBE3;border-bottom:1px solid var(--border-color)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Cream Dark</div><div class="ds-swatch-hex">#F0EBE3 · --cream-dark</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:#1A0A10"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Dark BG</div><div class="ds-swatch-hex">#1A0A10 · --dark-bg</div></div></div>
+                </div>
+            </div>
+
+            <div class="ds-block">
+                <h3>Semantic aliases</h3>
+                <div class="ds-swatches">
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:var(--primary-color)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Primary</div><div class="ds-swatch-hex">--primary-color</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:var(--primary-light)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Primary Light</div><div class="ds-swatch-hex">--primary-light</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:var(--primary-dark)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Primary Dark</div><div class="ds-swatch-hex">--primary-dark</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:var(--secondary-color)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Secondary</div><div class="ds-swatch-hex">--secondary-color</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:var(--background-color);border-bottom:1px solid var(--border-color)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Background</div><div class="ds-swatch-hex">--background-color</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:var(--card-background);border-bottom:1px solid var(--border-color)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Card</div><div class="ds-swatch-hex">--card-background</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:var(--border-color)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Border</div><div class="ds-swatch-hex">--border-color</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:var(--text-color)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Text</div><div class="ds-swatch-hex">--text-color</div></div></div>
+                </div>
+            </div>
+
+            <div class="ds-block">
+                <h3>Gradients</h3>
+                <div class="ds-swatches">
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:linear-gradient(135deg,#8B1A4A 0%,#5C0A2D 100%)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Nav / CTA</div><div class="ds-swatch-hex">burgundy-light → burgundy</div></div></div>
+                    <div class="ds-swatch"><div class="ds-swatch-fill" style="background:linear-gradient(135deg,#FAF7F2 0%,#F0EBE3 100%)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Hero</div><div class="ds-swatch-hex">cream → cream-dark</div></div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TYPOGRAPHY -->
+        <section class="ds-section" id="typography">
+            <h2>Typography</h2>
+            <p class="ds-lede">Headings use Playfair Display (serif). Body and UI use DM Sans with a system fallback stack. Serif never appears in buttons, labels, or inputs.</p>
+            <div class="ds-demo">
+                <div class="ds-type-sample">
+                    <h1>Heading 1 · Playfair Display</h1>
+                    <span class="ds-type-meta">font-family: 'Playfair Display'; · weight: 700 · from style.css h1 rules</span>
+                </div>
+                <div class="ds-type-sample">
+                    <h2>Heading 2 · 1.75rem</h2>
+                    <span class="ds-type-meta">Used as page title</span>
+                </div>
+                <div class="ds-type-sample">
+                    <h3>Heading 3 · section label</h3>
+                    <span class="ds-type-meta">Used inside cards and modals</span>
+                </div>
+                <div class="ds-type-sample">
+                    <p>Body paragraph · 1rem · DM Sans. A cellar is a curated collection — the copy should read like it was written by someone who cares about wine, not someone documenting a database.</p>
+                    <span class="ds-type-meta">font-family: 'DM Sans', system stack · weight: 400</span>
+                </div>
+                <div class="ds-type-sample">
+                    <p style="color:var(--text-muted); font-size:0.875rem">Secondary text · 0.875rem · muted. Used for helper copy, timestamps, and supporting details.</p>
+                    <span class="ds-type-meta">color: var(--text-muted)</span>
+                </div>
+                <div class="ds-type-sample">
+                    <span class="stat-label">Stat label</span>
+                    <span class="ds-type-meta">0.75rem uppercase — deliberate accent on stat cards only</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SPACING -->
+        <section class="ds-section" id="spacing">
+            <h2>Spacing</h2>
+            <p class="ds-lede">Based on a 0.25rem (4px) unit. Do not invent one-off values.</p>
+            <div class="ds-demo">
+                <div class="ds-scale">
+                    <span class="ds-scale-label">0.25rem</span><div class="ds-scale-bar" style="width:0.25rem"></div>
+                    <span class="ds-scale-label">0.5rem</span><div class="ds-scale-bar" style="width:0.5rem"></div>
+                    <span class="ds-scale-label">0.75rem</span><div class="ds-scale-bar" style="width:0.75rem"></div>
+                    <span class="ds-scale-label">1rem</span><div class="ds-scale-bar" style="width:1rem"></div>
+                    <span class="ds-scale-label">1.25rem</span><div class="ds-scale-bar" style="width:1.25rem"></div>
+                    <span class="ds-scale-label">1.5rem</span><div class="ds-scale-bar" style="width:1.5rem"></div>
+                    <span class="ds-scale-label">2rem</span><div class="ds-scale-bar" style="width:2rem"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- RADIUS -->
+        <section class="ds-section" id="radius">
+            <h2>Border radius</h2>
+            <p class="ds-lede">Two tokens cover nearly every case: <code>--radius</code> for inputs &amp; buttons, <code>--radius-lg</code> for cards &amp; modals.</p>
+            <div class="ds-demo">
+                <div class="ds-radius-grid">
+                    <div class="ds-radius-box" style="border-radius:2px">2px · badge</div>
+                    <div class="ds-radius-box" style="border-radius:4px">4px · logo case</div>
+                    <div class="ds-radius-box" style="border-radius:var(--radius-sm)">6px · --radius-sm</div>
+                    <div class="ds-radius-box" style="border-radius:var(--radius)">8px · --radius</div>
+                    <div class="ds-radius-box" style="border-radius:var(--radius-lg)">12px · --radius-lg</div>
+                    <div class="ds-radius-box" style="border-radius:9999px">pill</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SHADOWS -->
+        <section class="ds-section" id="shadows">
+            <h2>Elevation</h2>
+            <p class="ds-lede">Only two levels: default and hovered/raised. Plus a focus ring on inputs.</p>
+            <div class="ds-demo" style="background:var(--background-color); box-shadow:none;">
+                <div class="ds-shadow-grid">
+                    <div class="ds-shadow-box" style="box-shadow:var(--shadow)">--shadow</div>
+                    <div class="ds-shadow-box" style="box-shadow:var(--shadow-md)">--shadow-md</div>
+                    <div class="ds-shadow-box" style="box-shadow:var(--shadow-hover)">--shadow-hover</div>
+                    <div class="ds-shadow-box" style="box-shadow:0 0 0 3px rgba(139,26,74,0.1); border:1px solid var(--primary-color)">focus ring</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- BUTTONS -->
+        <section class="ds-section" id="buttons">
+            <h2>Buttons</h2>
+            <p class="ds-lede">Every button has the <code>.btn</code> base class plus one variant. Labels start with a verb and use sentence case.</p>
+
+            <div class="ds-demo">
+                <h3>Variants</h3>
+                <div class="ds-row">
+                    <button class="btn btn-primary">Save changes</button>
+                    <button class="btn btn-secondary">Cancel</button>
+                    <button class="btn btn-outline">Learn more</button>
+                    <button class="btn btn-danger">Delete bottle</button>
+                </div>
+            </div>
+
+            <div class="ds-demo">
+                <h3>Sizes</h3>
+                <div class="ds-row">
+                    <button class="btn btn-primary btn-small">Small action</button>
+                    <button class="btn btn-primary">Default action</button>
+                </div>
+                <div class="ds-row" style="margin-top:1rem;">
+                    <button class="btn btn-primary btn-full">Full-width action (e.g. inside a modal)</button>
+                </div>
+            </div>
+
+            <div class="ds-demo">
+                <h3>States</h3>
+                <div class="ds-row">
+                    <button class="btn btn-primary">Idle</button>
+                    <button class="btn btn-primary" disabled style="opacity:0.5;cursor:not-allowed">Disabled</button>
+                    <a href="#" class="btn btn-outline">Link styled as button</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- FORMS -->
+        <section class="ds-section" id="forms">
+            <h2>Forms</h2>
+            <p class="ds-lede">Every input has a visible label. Focus state is burgundy border + soft glow — never suppress it.</p>
+
+            <div class="ds-demo">
+                <form class="form-grid" onsubmit="event.preventDefault()">
+                    <div class="form-group">
+                        <label for="ds-wine">Wine name</label>
+                        <input id="ds-wine" type="text" placeholder="Château Margaux">
+                    </div>
+                    <div class="form-group">
+                        <label for="ds-vintage">Vintage</label>
+                        <input id="ds-vintage" type="number" value="2015">
+                    </div>
+                    <div class="form-group">
+                        <label for="ds-type">Type</label>
+                        <select id="ds-type">
+                            <option>Red</option>
+                            <option>White</option>
+                            <option>Rosé</option>
+                            <option>Sparkling</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ds-date">Acquired</label>
+                        <input id="ds-date" type="date">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="ds-notes">Tasting notes</label>
+                        <textarea id="ds-notes" rows="3" placeholder="Firm tannins, blackcurrant, long finish..."></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                        <label><input type="checkbox"> Mark as favourite</label>
+                    </div>
+                </form>
+            </div>
+
+            <div class="ds-demo">
+                <h3>Image upload</h3>
+                <div class="image-upload">
+                    <input type="file" accept="image/*">
+                    <div class="image-preview">Preview will appear here</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CARDS -->
+        <section class="ds-section" id="cards">
+            <h2>Cards</h2>
+            <p class="ds-lede">White fill, 12px corners, soft shadow. Use <code>.stat-card</code> for numeric tiles — always pair a <code>.stat-value</code> with a <code>.stat-label</code> so no number appears naked.</p>
+
+            <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;">
+                <div class="stat-card">
+                    <div class="stat-value">245</div>
+                    <div class="stat-label">Bottles in cellar</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">3.8</div>
+                    <div class="stat-label">Avg rating (245 wines)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">14.5%</div>
+                    <div class="stat-label">Average ABV</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">£3,420</div>
+                    <div class="stat-label">Total cellar value</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MODALS -->
+        <section class="ds-section" id="modals">
+            <h2>Modals</h2>
+            <p class="ds-lede">Background scrim dims the page. Three widths: small (≤400px), default (≤800px), large (≤900px). Buttons stack full-width inside small modals.</p>
+
+            <div class="ds-modal-preview">
+                <div class="modal-content modal-small">
+                    <h3 style="margin-bottom:0.75rem;">Delete bottle?</h3>
+                    <p style="color:var(--text-muted);margin-bottom:1.25rem;">This removes the 2015 Château Margaux from your cellar. You can't undo this.</p>
+                    <div class="ds-row" style="justify-content:flex-end;">
+                        <button class="btn btn-secondary btn-small">Cancel</button>
+                        <button class="btn btn-danger btn-small">Delete bottle</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- NAVIGATION -->
+        <section class="ds-section" id="navigation">
+            <h2>Navigation</h2>
+            <p class="ds-lede">The header nav above is the live component. Within pages, use <code>.cellar-tab</code> for secondary tabs.</p>
+            <div class="ds-demo">
+                <h3>Page header pattern</h3>
+                <div class="page-header">
+                    <div>
+                        <h2 style="margin-bottom:0;">My cellar</h2>
+                        <p style="color:var(--text-muted);margin:0.25rem 0 0 0;">245 bottles across 18 cases</p>
+                    </div>
+                    <button class="btn btn-primary">Add bottle</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- STATUS -->
+        <section class="ds-section" id="status">
+            <h2>Status colours</h2>
+            <p class="ds-lede">There is no dedicated alert component yet. When you need to indicate status, use these semantic tokens.</p>
+            <div class="ds-demo">
+                <div class="ds-status">
+                    <div class="ds-status-chip" style="background:var(--success-color)">Success · saved</div>
+                    <div class="ds-status-chip" style="background:var(--warning-color)">Warning · verify vintage</div>
+                    <div class="ds-status-chip" style="background:var(--error-color)">Error · import failed</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ALERTS -->
+        <section class="ds-section" id="alerts">
+            <h2>Alerts</h2>
+            <p class="ds-lede">Inline status messages. Paired with a semantic colour. Use for non-blocking feedback inside a page flow. Title is optional; body is always required.</p>
+
+            <div class="ds-demo">
+                <div class="alert alert-success" role="status" style="margin-bottom:0.75rem;">
+                    <div class="alert-body">
+                        <span class="alert-title">Bottle added</span>
+                        Château Margaux 2015 is now in your cellar.
+                    </div>
+                    <button class="alert-close" aria-label="Dismiss">&times;</button>
+                </div>
+                <div class="alert alert-warning" role="alert" style="margin-bottom:0.75rem;">
+                    <div class="alert-body">
+                        <span class="alert-title">Vintage looks unusual</span>
+                        The label reads 1845. Double-check this is correct before saving.
+                    </div>
+                </div>
+                <div class="alert alert-error" role="alert" style="margin-bottom:0.75rem;">
+                    <div class="alert-body">
+                        <span class="alert-title">Couldn't import spreadsheet</span>
+                        Three rows are missing a wine name. Fix them and try again.
+                    </div>
+                </div>
+                <div class="alert alert-info" role="status">
+                    <div class="alert-body">
+                        Tip · drag a photo onto the scan area to skip the file picker.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TOASTS -->
+        <section class="ds-section" id="toasts">
+            <h2>Toasts</h2>
+            <p class="ds-lede">Transient feedback floating outside the page flow. Use after a background action finishes — not for form-level errors (those are alerts, §2.6). Errors are sticky by default; success/warning/info auto-dismiss after 4 seconds.</p>
+
+            <div class="ds-demo">
+                <h3>Trigger a toast</h3>
+                <p class="ds-type-meta" style="margin-bottom:0.75rem;">Click any button below — the toast appears top-right (or bottom on mobile). Toasts stack and dismiss on click of the &times; or after their timeout.</p>
+                <div class="ds-row">
+                    <button class="btn btn-primary btn-small" type="button" onclick="WineBox.toast.success('Bottle added to your cellar.')">success</button>
+                    <button class="btn btn-secondary btn-small" type="button" onclick="WineBox.toast.warning('Vintage looks unusual', { title: 'Double-check' })">warning</button>
+                    <button class="btn btn-danger btn-small" type="button" onclick="WineBox.toast.error('Couldn\u2019t import \u2014 three rows missing a wine name.', { title: 'Import failed' })">error (sticky)</button>
+                    <button class="btn btn-outline btn-small" type="button" onclick="WineBox.toast.info('Tip \u2014 drag a photo onto the scan area to skip the file picker.')">info</button>
+                </div>
+                <div class="ds-row" style="margin-top:1rem;">
+                    <button class="btn btn-secondary btn-small" type="button" onclick="WineBox.toast.success('Saved'); WineBox.toast.info('Updated 2 minutes ago'); WineBox.toast.warning('1 row needs review');">stack three</button>
+                </div>
+            </div>
+
+            <div class="ds-demo">
+                <h3>API</h3>
+                <pre class="ds-code">WineBox.toast.success("Bottle added");
+WineBox.toast.error("Couldn't import - three rows missing a wine name.");
+WineBox.toast.warning("Vintage looks unusual", { title: "Double-check" });
+WineBox.toast.info("Tip - drag a photo onto the scan area");
+
+// Full form
+WineBox.toast.show("Custom message", {
+  variant: "success",   // success | warning | error | info
+  title: "Optional",
+  duration: 6000,       // ms; 0 = sticky (errors default to sticky)
+  dismissible: true     // show X button (default true)
+});</pre>
+            </div>
+
+            <div class="ds-demo">
+                <h3>Rules</h3>
+                <ul style="padding-left:1.25rem; line-height:1.9; margin:0;">
+                    <li>Errors are sticky by default — never auto-dismiss something the user must act on.</li>
+                    <li>One short sentence. If you need more, link to a page or open a modal instead.</li>
+                    <li>Don't toast confirmation for things the user already sees in the UI.</li>
+                    <li>Don't stack more than three at once. If you would, you're using toasts for the wrong thing.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- EMPTY STATES -->
+        <section class="ds-section" id="empty">
+            <h2>Empty states</h2>
+            <p class="ds-lede">Every list or dashboard panel has one. Title is a short noun phrase; description explains what belongs here; up to two actions fill the gap.</p>
+
+            <div class="ds-demo">
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg class="icon" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                            <path d="M8 2h8v4h-2v3a5 5 0 0 1 4 5v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-8a5 5 0 0 1 4-5V6H8V2z"/>
+                        </svg>
+                    </div>
+                    <div class="empty-state-title">Your cellar is empty</div>
+                    <div class="empty-state-description">Start by scanning a bottle's label or importing a spreadsheet of what you already own.</div>
+                    <div class="empty-state-action">
+                        <button class="btn btn-primary">Add bottle</button>
+                        <button class="btn btn-outline">Import cellar</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- BADGES -->
+        <section class="ds-section" id="badges">
+            <h2>Badges</h2>
+            <p class="ds-lede">Small pill labels for categorical status. One badge per item — more and the list becomes noisy. Never use a badge as the only signal for a number.</p>
+
+            <div class="ds-demo">
+                <h3>Variants</h3>
+                <div class="ds-row">
+                    <span class="badge badge-neutral">Unrated</span>
+                    <span class="badge badge-primary">Red</span>
+                    <span class="badge badge-success">Drink now</span>
+                    <span class="badge badge-warning">Peak soon</span>
+                    <span class="badge badge-error">Past peak</span>
+                    <span class="badge badge-gold">Reserve</span>
+                </div>
+            </div>
+
+            <div class="ds-demo">
+                <h3>In context</h3>
+                <div class="ds-row" style="align-items:flex-start; gap:1.5rem;">
+                    <div>
+                        <div style="font-weight:600; margin-bottom:0.25rem;">Château Margaux <span class="badge badge-primary">Red</span></div>
+                        <div style="color:var(--text-muted); font-size:0.9rem;">2015 · Bordeaux · <span class="badge badge-warning">Peak soon</span></div>
+                    </div>
+                    <div>
+                        <div style="font-weight:600; margin-bottom:0.25rem;">Cloudy Bay <span class="badge badge-primary">White</span></div>
+                        <div style="color:var(--text-muted); font-size:0.9rem;">2022 · Marlborough · <span class="badge badge-success">Drink now</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ICONS -->
+        <section class="ds-section" id="icons">
+            <h2>Icons</h2>
+            <p class="ds-lede">All UI icons share a 24-unit grid, stroked paths in <code>currentColor</code>, and one of five fixed sizes. Apply <code>.icon</code> plus an optional size modifier to any inline SVG.</p>
+
+            <div class="ds-demo">
+                <h3>Size scale</h3>
+                <div class="ds-row" style="align-items:center; gap:1.5rem; color:var(--primary-color);">
+                    <div style="text-align:center;">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                        </svg>
+                        <div class="ds-type-meta">.icon-sm · 16px</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <svg class="icon icon-md" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                        </svg>
+                        <div class="ds-type-meta">.icon-md · 20px</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                        </svg>
+                        <div class="ds-type-meta">.icon-lg · 24px</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <svg class="icon icon-xl" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                        </svg>
+                        <div class="ds-type-meta">.icon-xl · 32px · stroke 1.5</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <svg class="icon icon-2xl" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                        </svg>
+                        <div class="ds-type-meta">.icon-2xl · 48px · stroke 1.5</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ds-demo">
+                <h3>Inline with text</h3>
+                <p class="ds-type-meta" style="margin-bottom:0.75rem;">Plain <code>.icon</code> (no size modifier) inherits font size — drop into buttons, links, list items.</p>
+                <div class="ds-row" style="gap:1rem;">
+                    <button class="btn btn-primary">
+                        <svg class="icon icon-text" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"/></svg>
+                        Add bottle
+                    </button>
+                    <button class="btn btn-outline">
+                        <svg class="icon icon-text" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v15"/></svg>
+                        Import cellar
+                    </button>
+                    <button class="btn btn-secondary btn-small">
+                        <svg class="icon icon-text" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                        Delete
+                    </button>
+                </div>
+                <div class="ds-row" style="gap:1rem; margin-top:1rem;">
+                    <span style="font-size:0.85rem; display:inline-flex; align-items:center; gap:0.35rem; color:var(--text-muted);">
+                        <svg class="icon icon-text" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        Updated 2 minutes ago
+                    </span>
+                    <span style="font-size:1.25rem; display:inline-flex; align-items:center; gap:0.5rem;">
+                        <svg class="icon icon-text" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/><path d="M16 21l5-5"/><path d="M16 16h5v5"/></svg>
+                        Larger heading text — icon scales with em
+                    </span>
+                </div>
+            </div>
+
+            <div class="ds-demo">
+                <h3>Stroke-only, current colour</h3>
+                <p class="ds-type-meta" style="margin-bottom:0.75rem;">Icons inherit colour from the parent. Set <code>color</code> on the wrapper, never hardcode the stroke.</p>
+                <div class="ds-row" style="gap:1.5rem; align-items:center;">
+                    <span style="color:var(--primary-color);">
+                        <svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+                        primary
+                    </span>
+                    <span style="color:var(--success-color);">
+                        <svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+                        success
+                    </span>
+                    <span style="color:var(--warning-color);">
+                        <svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+                        warning
+                    </span>
+                    <span style="color:var(--error-color);">
+                        <svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+                        error
+                    </span>
+                    <span style="color:var(--text-muted);">
+                        <svg class="icon icon-lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+                        muted
+                    </span>
+                </div>
+            </div>
+
+            <div class="ds-demo">
+                <h3>Authoring rules</h3>
+                <ul style="padding-left:1.25rem; line-height:1.9; margin:0;">
+                    <li>Always <code>viewBox="0 0 24 24"</code> · always <code>fill="none"</code> with stroked paths.</li>
+                    <li>Don't set inline <code>width</code>, <code>height</code>, or <code>stroke-width</code> — the size class does it.</li>
+                    <li>Decorative icon next to text → <code>aria-hidden="true"</code>.</li>
+                    <li>Icon-only button → <code>aria-label</code> on the button.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- VOICE -->
+        <section class="ds-section" id="voice">
+            <h2>Voice &amp; tone</h2>
+            <p class="ds-lede">The reader is a wine enthusiast, not a developer. Use wine vocabulary, not system vocabulary.</p>
+
+            <div class="ds-demo">
+                <h3>Words to use vs. avoid</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div>
+                        <strong style="color:var(--success-color);">Do</strong>
+                        <ul style="margin-top:0.5rem;padding-left:1.25rem;line-height:2;">
+                            <li>cellar · bottle · case · label</li>
+                            <li>vintage · varietal · tasting note</li>
+                            <li>"Record a wine"</li>
+                            <li>"You have 42 bottles"</li>
+                            <li>"14.5% ABV"</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong style="color:var(--error-color);">Avoid</strong>
+                        <ul style="margin-top:0.5rem;padding-left:1.25rem;line-height:2;">
+                            <li>record · entry · document · batch</li>
+                            <li>row · field · object · endpoint</li>
+                            <li>"Submit form"</li>
+                            <li>"42 records found"</li>
+                            <li>"14.5" (naked number)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ds-demo">
+                <h3>Button label rules</h3>
+                <ul style="padding-left:1.25rem;line-height:1.9;">
+                    <li>Start with a verb: <code>Save changes</code>, <code>Record wine</code>, <code>Import cellar</code>.</li>
+                    <li>Never just <code>OK</code>, <code>Submit</code>, or <code>Click here</code>.</li>
+                    <li>Destructive actions are specific: <code>Delete bottle</code>, not <code>Delete</code>.</li>
+                </ul>
+            </div>
+
+            <div class="ds-demo">
+                <h3>Full guidelines</h3>
+                <p>See <a href="/static/../../brand-kit/DESIGN-SYSTEM.md" style="color:var(--primary-color)">DESIGN-SYSTEM.md §3</a> in the brand kit for the complete voice &amp; tone reference, including empty states and accessibility baseline.</p>
+            </div>
+        </section>
+
+        <div class="ds-footer">
+            Sourced from <code>winebox/static/css/style.css</code> and <code>brand-kit/DESIGN-SYSTEM.md</code>. If anything on this page looks off, the app is off too.
+        </div>
+    </main>
+</body>
+</html>

@@ -9,6 +9,7 @@
     --gold-light: #F0D78C;
     --case-wood: #B8956A;
     --cream: #FAF7F2;
+    --cream-dark: #F0EBE3;
     --dark-bg: #1A0A10;
 
     /* Semantic aliases */
@@ -24,10 +25,99 @@
     --success-color: #4a7c59;
     --warning-color: #c9a227;
     --error-color: #a63d40;
+    --error-dark: #8b3235;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
     --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --radius-sm: 6px;
     --radius: 8px;
     --radius-lg: 12px;
+
+    /* Surface hover overlay — subtle darken-on-light / lighten-on-dark */
+    --surface-hover: rgba(0, 0, 0, 0.05);
+
+    /* Tinted feedback (alerts, toasts, badges) — flip in dark mode */
+    --tint-success-bg: rgba(74, 124, 89, 0.10);
+    --tint-success-fg: #2d5a3a;
+    --tint-warning-bg: rgba(201, 162, 39, 0.12);
+    --tint-warning-fg: #6b5411;
+    --tint-error-bg:   rgba(166, 61, 64, 0.10);
+    --tint-error-fg:   var(--error-dark);
+    --tint-info-bg:    rgba(139, 26, 74, 0.08);
+    --tint-info-fg:    var(--primary-dark);
+    --tint-gold-bg:    rgba(196, 154, 60, 0.18);
+    --tint-gold-fg:    #8a6b20;
+}
+
+/* Dark theme — overrides semantic aliases only. Brand palette stays the same.
+   Activation:
+     - Default: matches the user's OS preference via prefers-color-scheme.
+     - Force dark: <html data-theme="dark">.
+     - Force light: <html data-theme="light">.
+   See brand-kit/DESIGN-SYSTEM.md §1.8 and /design-system. */
+
+:root[data-theme="dark"] {
+    --background-color: #14080c;
+    --card-background: #241419;
+    --text-color: #f0e6e9;
+    --text-muted: #a89098;
+    --border-color: #3a2530;
+    --primary-color: var(--bottle);
+    --primary-light: #e64e80;
+    --primary-dark: var(--burgundy-light);
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.55);
+
+    --surface-hover: rgba(255, 255, 255, 0.06);
+
+    --tint-success-bg: rgba(110, 180, 130, 0.18);
+    --tint-success-fg: #b3d9bf;
+    --tint-warning-bg: rgba(220, 190, 90, 0.20);
+    --tint-warning-fg: #f0d78c;
+    --tint-error-bg:   rgba(220, 100, 110, 0.20);
+    --tint-error-fg:   #f0b8bd;
+    --tint-info-bg:    rgba(230, 78, 128, 0.18);
+    --tint-info-fg:    #f0c0d4;
+    --tint-gold-bg:    rgba(220, 180, 100, 0.20);
+    --tint-gold-fg:    #f0d78c;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --background-color: #14080c;
+        --card-background: #241419;
+        --text-color: #f0e6e9;
+        --text-muted: #a89098;
+        --border-color: #3a2530;
+        --primary-color: var(--bottle);
+        --primary-light: #e64e80;
+        --primary-dark: var(--burgundy-light);
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+        --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.55);
+
+        --surface-hover: rgba(255, 255, 255, 0.06);
+
+        --tint-success-bg: rgba(110, 180, 130, 0.18);
+        --tint-success-fg: #b3d9bf;
+        --tint-warning-bg: rgba(220, 190, 90, 0.20);
+        --tint-warning-fg: #f0d78c;
+        --tint-error-bg:   rgba(220, 100, 110, 0.20);
+        --tint-error-fg:   #f0b8bd;
+        --tint-info-bg:    rgba(230, 78, 128, 0.18);
+        --tint-info-fg:    #f0c0d4;
+        --tint-gold-bg:    rgba(220, 180, 100, 0.20);
+        --tint-gold-fg:    #f0d78c;
+    }
+}
+
+/* Tell the UA which form-control palette to use; gives sensible default
+   appearances for native widgets (scrollbar, checkbox, etc.) in each theme. */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { color-scheme: dark; }
 }
 
 * {
@@ -47,9 +137,10 @@ h1, h2, h3, h4 {
     font-family: 'Playfair Display', Georgia, serif;
 }
 
-/* Header */
+/* Header — uses brand tokens directly (not semantic) so the burgundy gradient
+   anchors the page in both light and dark themes. */
 header {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    background: linear-gradient(135deg, var(--burgundy-light) 0%, var(--burgundy) 100%);
     color: white;
     padding: 1rem 2rem;
     position: sticky;
@@ -441,29 +532,6 @@ h3 {
 }
 
 /* Empty cellar states */
-.dashboard-empty-state,
-.empty-search-state {
-    text-align: center;
-    padding: 2rem 1rem;
-    background: var(--card-background);
-    border-radius: var(--radius-lg);
-    border: 1px dashed var(--border-color);
-    margin-bottom: 1.5rem;
-}
-
-.dashboard-empty-state h3,
-.empty-search-state h3 {
-    font-family: 'Playfair Display', serif;
-    margin: 0 0 0.5rem;
-    color: var(--text-color);
-}
-
-.dashboard-empty-state p,
-.empty-search-state p {
-    color: var(--text-muted);
-    margin: 0 0 0.75rem;
-}
-
 @media (max-width: 768px) {
     .value-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -749,7 +817,7 @@ details.advanced-fields .form-grid {
 }
 
 .btn-danger:hover {
-    background: #8b3235;
+    background: var(--error-dark);
 }
 
 .btn-outline {
@@ -896,9 +964,10 @@ details.advanced-fields .form-grid {
     text-align: right;
 }
 
-/* Enriched field indicator — green text for fields populated by X-Wines */
+/* Enriched field indicator — fields populated by X-Wines lookup are
+   coloured with the success-tint tokens so they flip in dark mode. */
 .enriched {
-    color: #2e7d32;
+    color: var(--tint-success-fg);
 }
 
 .wine-tag {
@@ -910,9 +979,9 @@ details.advanced-fields .form-grid {
 }
 
 .wine-tag.enriched {
-    background: #e8f5e9;
-    color: #2e7d32;
-    border: 1px solid #a5d6a7;
+    background: var(--tint-success-bg);
+    color: var(--tint-success-fg);
+    border: 1px solid var(--success-color);
 }
 
 .wine-tag-label {
@@ -1049,7 +1118,7 @@ details.advanced-fields .form-grid {
     gap: 0.6rem;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--border-color, #e0d9cd);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--bg-secondary, #f3efe7);
     cursor: pointer;
     font-size: 0.9rem;
@@ -1112,19 +1181,6 @@ details.advanced-fields .form-grid {
 .wine-card-meta span:not(:last-child)::after {
     content: "·";
     margin-left: 0.5rem;
-}
-
-.wine-type-badge {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    margin: 0.25rem 1.25rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    background: var(--bg-secondary);
-    color: var(--primary-color);
-    width: fit-content;
 }
 
 /* Grouped cellar table view */
@@ -1367,7 +1423,7 @@ details.advanced-fields .form-grid {
 }
 
 .record-wine-confirm-ocr .collapsible-header:hover {
-    background: #f0ede8;
+    background: var(--surface-hover);
 }
 
 .record-wine-confirm-ocr .collapsible-content {
@@ -1489,12 +1545,12 @@ details.advanced-fields .form-grid {
 }
 
 .wine-detail-field .value.enriched {
-    color: #2e7d32;
+    color: var(--tint-success-fg);
 }
 
 .wine-detail-field:has(.value.enriched) {
-    background: #e8f5e9;
-    border-left: 3px solid #4caf50;
+    background: var(--tint-success-bg);
+    border-left: 3px solid var(--success-color);
 }
 
 .wine-detail-field:has(.value.enriched) .label::after {
@@ -1502,7 +1558,7 @@ details.advanced-fields .form-grid {
     text-transform: none;
     font-style: italic;
     letter-spacing: normal;
-    color: #4caf50;
+    color: var(--success-color);
 }
 
 /* Custom fields grid in detail modal */
@@ -2141,7 +2197,7 @@ details.advanced-fields .form-grid {
 .login-page {
     display: none;
     min-height: calc(100vh - 80px);
-    background: linear-gradient(135deg, var(--background-color) 0%, #f0ebe3 100%);
+    background: linear-gradient(135deg, var(--background-color) 0%, var(--cream-dark) 100%);
     align-items: center;
     justify-content: center;
     padding: 2rem;
@@ -2218,24 +2274,6 @@ details.advanced-fields .form-grid {
 .password-toggle svg {
     width: 20px;
     height: 20px;
-}
-
-.login-error {
-    background: rgba(166, 61, 64, 0.1);
-    color: var(--error-color);
-    padding: 0.75rem 1rem;
-    border-radius: var(--radius);
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-}
-
-.login-success {
-    background: rgba(74, 124, 89, 0.1);
-    color: var(--success-color);
-    padding: 0.75rem 1rem;
-    border-radius: var(--radius);
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
 }
 
 .login-links {
@@ -3295,7 +3333,7 @@ body.logged-out #user-info {
     width: 100%;
     height: 12px;
     background: var(--background-color);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border-color);
     overflow: hidden;
 }
@@ -3303,7 +3341,7 @@ body.logged-out #user-info {
 .import-progress-bar-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--primary-color), var(--success-color));
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     transition: width 0.5s ease-out;
 }
 
@@ -3893,7 +3931,7 @@ body.logged-out #user-info {
 .entry-path-card:hover {
     border-color: var(--primary-color);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow-md);
 }
 
 .entry-path-card.active {
@@ -3961,7 +3999,7 @@ body.logged-out #user-info {
 .met-picker-item-image {
     width: 48px;
     height: 48px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
     flex-shrink: 0;
     background: var(--background-color);
@@ -4028,7 +4066,7 @@ body.logged-out #user-info {
 .qty-preset {
     padding: 0.5rem 1rem;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--card-background);
     color: var(--text-color);
     cursor: pointer;
@@ -4050,7 +4088,7 @@ body.logged-out #user-info {
     width: 100px;
     padding: 0.5rem;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 1rem;
     background: var(--card-background);
     color: var(--text-color);
@@ -4144,15 +4182,15 @@ body.logged-out #user-info {
 }
 
 .demo-banner {
-    background: #fef3cd;
-    border: 1px solid #ffc107;
-    border-radius: 6px;
+    background: var(--tint-warning-bg);
+    border: 1px solid var(--warning-color);
+    border-radius: var(--radius-sm);
     padding: 0.4rem 0.75rem;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
     font-size: 0.8rem;
-    color: #664d03;
+    color: var(--tint-warning-fg);
     white-space: nowrap;
 }
 
@@ -4166,7 +4204,7 @@ body.logged-out #user-info {
     max-width: 400px;
     height: 12px;
     background: var(--border-color);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
     margin: 1rem auto;
 }
@@ -4175,7 +4213,7 @@ body.logged-out #user-info {
     height: 100%;
     width: 0%;
     background: linear-gradient(90deg, var(--primary-color), var(--primary-light));
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     transition: width 0.3s ease;
 }
 
@@ -4183,14 +4221,6 @@ body.logged-out #user-info {
     font-size: 0.9rem;
     color: var(--text-muted);
     margin: 0.5rem 0 0;
-}
-
-@media (prefers-color-scheme: dark) {
-    .demo-banner {
-        background: #332701;
-        border-color: #664d03;
-        color: #ffc107;
-    }
 }
 
 /* Import wizard: field hints */
@@ -4327,3 +4357,294 @@ body.logged-out #user-info {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* =========================================================================
+   Design System — Alerts, Empty States, Badges
+   See: brand-kit/DESIGN-SYSTEM.md and /design-system
+   ========================================================================= */
+
+/* Alerts — inline status messages paired with a semantic colour.
+   Structure: <div class="alert alert-{variant}"> with optional .alert-title,
+   .alert-body, and .alert-close. */
+.alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    margin-bottom: 1rem;
+    border-radius: var(--radius);
+    border-left: 4px solid transparent;
+    background: var(--card-background);
+    color: var(--text-color);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.alert-body { flex: 1; }
+
+.alert-title {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.125rem;
+}
+
+.alert-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.125rem 0.25rem;
+    border-radius: var(--radius-sm);
+}
+
+.alert-close:hover {
+    color: var(--text-color);
+    background: var(--surface-hover);
+}
+
+.alert-success {
+    background: var(--tint-success-bg);
+    border-left-color: var(--success-color);
+    color: var(--tint-success-fg);
+}
+
+.alert-warning {
+    background: var(--tint-warning-bg);
+    border-left-color: var(--warning-color);
+    color: var(--tint-warning-fg);
+}
+
+.alert-error {
+    background: var(--tint-error-bg);
+    border-left-color: var(--error-color);
+    color: var(--tint-error-fg);
+}
+
+.alert-info {
+    background: var(--tint-info-bg);
+    border-left-color: var(--primary-color);
+    color: var(--tint-info-fg);
+}
+
+/* Empty states — shown in place of a list/grid when there is no content.
+   Structure: <div class="empty-state"> with .empty-state-icon (SVG),
+   .empty-state-title, .empty-state-description, optional .empty-state-action. */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: var(--text-muted);
+}
+
+.empty-state-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+    flex-shrink: 0;
+}
+
+.empty-state-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke: currentColor;
+}
+
+.empty-state-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-bottom: 0.375rem;
+}
+
+.empty-state-description {
+    font-size: 0.95rem;
+    margin-bottom: 1.25rem;
+    max-width: 360px;
+}
+
+.empty-state-action {
+    display: inline-flex;
+    gap: 0.5rem;
+}
+
+/* Badges — small inline labels for categorical status.
+   Structure: <span class="badge badge-{variant}">. Pair with a surrounding
+   noun; never use a badge as the only signal for a number. */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.badge-neutral {
+    background: var(--border-color);
+    color: var(--text-color);
+}
+
+.badge-primary {
+    background: var(--tint-info-bg);
+    color: var(--tint-info-fg);
+}
+
+.badge-success {
+    background: var(--tint-success-bg);
+    color: var(--tint-success-fg);
+}
+
+.badge-warning {
+    background: var(--tint-warning-bg);
+    color: var(--tint-warning-fg);
+}
+
+.badge-error {
+    background: var(--tint-error-bg);
+    color: var(--tint-error-fg);
+}
+
+.badge-gold {
+    background: var(--tint-gold-bg);
+    color: var(--tint-gold-fg);
+}
+
+/* Toasts — transient feedback floating outside the page flow.
+   Driven by /static/js/toast.js (WineBox.toast.success/warning/error/info).
+   Variants share styling with .alert; toasts add a shadow, slide-in, and
+   a fixed-position container that stacks. */
+.toast-container {
+    position: fixed;
+    top: 5rem;
+    right: 1.5rem;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 24rem;
+    pointer-events: none;
+}
+
+.toast-container > * {
+    pointer-events: auto;
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius);
+    border-left: 4px solid transparent;
+    background: var(--card-background);
+    box-shadow: var(--shadow-hover);
+    color: var(--text-color);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    animation: toast-slide-in 0.25s ease-out;
+}
+
+.toast.is-leaving {
+    animation: toast-slide-out 0.2s ease-in forwards;
+}
+
+@keyframes toast-slide-in {
+    from { transform: translate(0, -12px); opacity: 0; }
+    to   { transform: translate(0, 0);     opacity: 1; }
+}
+
+@keyframes toast-slide-out {
+    to { transform: translate(0, -12px); opacity: 0; }
+}
+
+.toast-body { flex: 1; }
+
+.toast-title {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.125rem;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: currentColor;
+    opacity: 0.6;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.125rem 0.25rem;
+    border-radius: var(--radius-sm);
+}
+
+.toast-close:hover {
+    opacity: 1;
+    background: var(--surface-hover);
+}
+
+.toast-success {
+    background: var(--tint-success-bg);
+    border-left-color: var(--success-color);
+    color: var(--tint-success-fg);
+}
+
+.toast-warning {
+    background: var(--tint-warning-bg);
+    border-left-color: var(--warning-color);
+    color: var(--tint-warning-fg);
+}
+
+.toast-error {
+    background: var(--tint-error-bg);
+    border-left-color: var(--error-color);
+    color: var(--tint-error-fg);
+}
+
+.toast-info {
+    background: var(--tint-info-bg);
+    border-left-color: var(--primary-color);
+    color: var(--tint-info-fg);
+}
+
+@media (max-width: 768px) {
+    .toast-container {
+        top: auto;
+        bottom: 1rem;
+        right: 1rem;
+        left: 1rem;
+        max-width: none;
+    }
+}
+
+/* Icons — inline SVG utility.
+   Apply .icon to any inline <svg> for shared stroke styling. Size is opt-in:
+   add .icon-text for inline-with-text (1em), or .icon-{sm|md|lg|xl|2xl} for an
+   explicit pixel size. Without a size modifier, the SVG keeps its container's
+   sizing — useful when a parent class (e.g. .empty-state-icon) handles size. */
+.icon {
+    flex-shrink: 0;
+    vertical-align: -0.125em;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.icon-text { width: 1em; height: 1em; stroke-width: 2; }
+.icon-sm   { width: 16px; height: 16px; stroke-width: 2; }
+.icon-md   { width: 20px; height: 20px; stroke-width: 2; }
+.icon-lg   { width: 24px; height: 24px; stroke-width: 2; }
+.icon-xl   { width: 32px; height: 32px; stroke-width: 1.5; }
+.icon-2xl  { width: 48px; height: 48px; stroke-width: 1.5; }
