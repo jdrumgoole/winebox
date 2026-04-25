@@ -115,15 +115,16 @@ def _ensure_demo_data(page: Page) -> None:
 
 
 def _get_server_wine_count(page: Page) -> int:
-    """Get the wine count from the search API."""
+    """Get the wine count from the cellar summary API."""
     return page.evaluate("""
         async () => {
             const token = localStorage.getItem('winebox_token');
-            const resp = await fetch('/api/search?in_stock=true', {
+            const resp = await fetch('/api/cellar/summary', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
+            if (!resp.ok) return 0;
             const data = await resp.json();
-            return data.length;
+            return data.unique_wines || 0;
         }
     """)
 
