@@ -2455,6 +2455,11 @@ details.advanced-fields .form-grid {
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
+    /* Reset <button> defaults so the rule works for both <a> and <button>. */
+    background: none;
+    border: none;
+    cursor: pointer;
+    font: inherit;
 }
 
 .settings-icon-link:hover {
