@@ -357,7 +357,7 @@ h3 {
 /* Stats Grid — compact */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 0.75rem;
     margin-bottom: 1.5rem;
 }
@@ -389,7 +389,7 @@ h3 {
 /* Chart grid layout */
 .chart-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     gap: 1.5rem;
     margin-bottom: 2rem;
 }
@@ -640,6 +640,11 @@ h3 {
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     font-size: 1rem;
+    /* Explicit background and color so the input matches the theme tokens
+       instead of falling back to the browser's color-scheme defaults
+       (which renders as muddy grey on dark surfaces). */
+    background: var(--card-background);
+    color: var(--text-color);
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -650,6 +655,8 @@ h3 {
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     font-size: 1rem;
+    background: var(--card-background);
+    color: var(--text-color);
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -799,11 +806,15 @@ details.advanced-fields .form-grid {
 .btn-secondary {
     background: var(--card-background);
     color: var(--text-color);
-    border-color: var(--border-color);
+    /* Border uses --text-muted (not --border-color) so the button is clearly
+       outlined whether it sits on a card or directly on the page background.
+       --border-color is too low-contrast against page bg in dark mode. */
+    border-color: var(--text-muted);
 }
 
 .btn-secondary:hover {
-    background: var(--background-color);
+    background: var(--surface-hover);
+    border-color: var(--text-color);
 }
 
 .btn-small {
@@ -892,7 +903,12 @@ details.advanced-fields .form-grid {
 
 .wine-card-image {
     height: 180px;
-    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-color) 100%);
+    /* Subdued neutral placeholder so the empty 'No Image' state doesn't
+       dominate the card on dark backgrounds. When a label image loads it
+       covers this background entirely, so cards-with-images are unchanged. */
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-muted);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -903,6 +919,12 @@ details.advanced-fields .form-grid {
     max-width: 100%;
     max-height: 100%;
     object-fit: cover;
+}
+
+.wine-card-image-placeholder {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    letter-spacing: 0.02em;
 }
 
 .wine-card-content {
@@ -2036,7 +2058,7 @@ details.advanced-fields .form-grid {
     }
 
     .stats-grid {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
         gap: 0.5rem;
     }
 
@@ -2197,7 +2219,9 @@ details.advanced-fields .form-grid {
 .login-page {
     display: none;
     min-height: calc(100vh - 80px);
-    background: linear-gradient(135deg, var(--background-color) 0%, var(--cream-dark) 100%);
+    /* Both endpoints are theme-aware so the gradient flips in dark mode.
+       Light: cream -> white. Dark: dark-bg -> dark-card. */
+    background: linear-gradient(135deg, var(--background-color) 0%, var(--card-background) 100%);
     align-items: center;
     justify-content: center;
     padding: 2rem;
