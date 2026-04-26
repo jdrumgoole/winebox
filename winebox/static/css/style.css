@@ -532,11 +532,6 @@ h3 {
 }
 
 /* Empty cellar states */
-@media (max-width: 768px) {
-    .value-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
 
 /* Activity List */
 .activity-list {
@@ -1396,7 +1391,7 @@ details.advanced-fields .form-grid {
 
 .record-wine-confirm-form .form-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
 }
 
@@ -1543,7 +1538,7 @@ details.advanced-fields .form-grid {
 
 .wine-detail-fields {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 0.5rem;
     margin-bottom: 1rem;
 }
@@ -1586,7 +1581,7 @@ details.advanced-fields .form-grid {
 /* Custom fields grid in detail modal */
 .wine-detail-custom-fields {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 0.5rem;
 }
 
@@ -2188,7 +2183,7 @@ details.advanced-fields .form-grid {
     }
 
     .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
         gap: 0.5rem;
     }
 
@@ -2680,7 +2675,7 @@ body.logged-out #user-info {
 
 .record-wine-confirm-fields {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 0.75rem;
 }
 
