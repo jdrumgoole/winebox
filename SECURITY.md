@@ -30,7 +30,7 @@ This design decision is intentional for several reasons:
 
 The application sets comprehensive security headers:
 
-- `Content-Security-Policy` with nonces for inline scripts
+- `Content-Security-Policy` with strict whitelist (`script-src 'self'`, no inline scripts allowed)
 - `X-Frame-Options: DENY`
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`

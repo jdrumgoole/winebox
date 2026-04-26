@@ -2,6 +2,7 @@
 
 import os
 import re
+import shlex
 import sys
 import time
 import urllib.request
@@ -276,7 +277,10 @@ def test_e2e_db(
     # Use a fixed secret key so the server and CLI (winebox-admin) share the
     # same JWT signing key.  Without this, the server generates a random key
     # on startup and tokens created by the CLI are rejected.
-    e2e_secret = "e2e-test-secret-key-not-for-production-use-1234567890"
+    e2e_secret = os.environ.get(
+        "WINEBOX_E2E_SECRET_KEY",
+        "e2e-test-secret-key-not-for-production-use-1234567890",
+    )
 
     # Build env for the server subprocess — inherit current env + overrides
     server_env = os.environ.copy()
@@ -534,9 +538,9 @@ def backup(ctx: Context, profile: str = "winebox_backup", database: str | None =
     if not url:
         print("Error: WINEBOX_MONGODB_URL is not set", file=sys.stderr)
         sys.exit(1)
-    cmd = f"uv run python scripts/mongodb_backup.py --profile {profile} backup '{url}'"
+    cmd = f"uv run python scripts/mongodb_backup.py --profile {shlex.quote(profile)} backup {shlex.quote(url)}"
     if database:
-        cmd += f" --database {database}"
+        cmd += f" --database {shlex.quote(database)}"
     ctx.run(cmd, pty=True)
 
 
@@ -587,7 +591,7 @@ def purge_user(ctx: Context, email: str, yes: bool = False) -> None:
         email: Email of user whose data to purge
         yes: Skip confirmation prompt (-y)
     """
-    cmd = f"uv run winebox-purge --user {email}"
+    cmd = f"uv run winebox-purge --user {shlex.quote(email)}"
     if yes:
         cmd += " -y"
     ctx.run(cmd, pty=not yes)
@@ -609,7 +613,7 @@ def add_user(
         password: Password for the new user
         admin: Make user an admin (default: False)
     """
-    cmd = f"uv run winebox-admin add {email} --password {password}"
+    cmd = f"uv run winebox-admin add {shlex.quote(email)} --password {shlex.quote(password)}"
     if admin:
         cmd += " --admin"
     ctx.run(cmd)
@@ -624,7 +628,7 @@ def remove_user(ctx: Context, email: str, force: bool = False) -> None:
         email: Email of user to remove
         force: Skip confirmation prompt
     """
-    cmd = f"uv run winebox-admin remove {email}"
+    cmd = f"uv run winebox-admin remove {shlex.quote(email)}"
     if force:
         cmd += " --force"
     ctx.run(cmd, pty=True)
@@ -644,7 +648,7 @@ def disable_user(ctx: Context, email: str) -> None:
         ctx: Invoke context
         email: Email of user to disable
     """
-    ctx.run(f"uv run winebox-admin disable {email}")
+    ctx.run(f"uv run winebox-admin disable {shlex.quote(email)}")
 
 
 @task(name="enable-user", aliases=["user-enable"])
