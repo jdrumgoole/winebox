@@ -2756,7 +2756,7 @@ function renderWineGrid(containerId, wines) {
                 <div class="wine-card-image">
                     ${wine.front_label_image_path
                         ? `<img src="/api/images/${escapeHtml(wine.front_label_image_path)}" alt="${escapeHtml(wine.name)}">`
-                        : '<span style="color: white; opacity: 0.6;">No Image</span>'
+                        : '<span class="wine-card-image-placeholder">No Image</span>'
                     }
                 </div>
                 <div class="wine-card-content">
@@ -6240,7 +6240,7 @@ function renderMetGrid(containerId, wines) {
                 <div class="wine-card-image">
                     ${wine.front_label_image_path
                         ? `<img src="/api/images/${wine.front_label_image_path}" alt="${escapeHtml(wine.name)}">`
-                        : '<span style="color: white; opacity: 0.6;">No Image</span>'
+                        : '<span class="wine-card-image-placeholder">No Image</span>'
                     }
                     ${inCellarBadge}
                 </div>
