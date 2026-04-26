@@ -2306,6 +2306,51 @@ details.advanced-fields .form-grid {
     margin-top: 0.25rem;
 }
 
+.password-strength {
+    margin-top: 0.4rem;
+}
+
+.password-strength-bar {
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.password-strength-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 2px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.password-strength-label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.password-strength[data-level="weak"] .password-strength-fill {
+    width: 25%;
+    background-color: var(--error-color);
+}
+
+.password-strength[data-level="fair"] .password-strength-fill {
+    width: 50%;
+    background-color: var(--warning-color);
+}
+
+.password-strength[data-level="good"] .password-strength-fill {
+    width: 75%;
+    background-color: var(--success-color);
+}
+
+.password-strength[data-level="strong"] .password-strength-fill {
+    width: 100%;
+    background-color: var(--success-color);
+}
+
 .spinner {
     width: 40px;
     height: 40px;
