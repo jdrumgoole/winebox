@@ -71,6 +71,7 @@ dev = [
 [project.scripts]
 winebox-server = "winebox.cli.server:main"
 winebox-admin = "winebox.cli.user_admin:main"
+winebox-admin-server = "winebox.admin.cli:main"
 winebox-purge = "winebox.cli.purge_data:main"
 
 [build-system]
@@ -94,6 +95,10 @@ markers = [
 artifacts = [
     "winebox/static/logos/*.png",
     "winebox/static/svg/*.svg",
+    "winebox/admin/static/*.html",
+    "winebox/admin/static/css/*.css",
+    "winebox/admin/static/js/*.js",
+    "winebox/admin/static/logos/*.svg",
 ]
 
 [tool.hatch.build.targets.wheel]

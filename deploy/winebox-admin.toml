@@ -1,0 +1,20 @@
+# Operator allowlist for the WineBox admin panels.
+#
+# These IPs are applied at the nginx layer (allow ...; deny all;) on top of
+# the application's own auth. Plain IPv4 addresses or CIDR blocks are both
+# accepted — nginx parses them directly.
+#
+# Edit and re-run `invoke deploy-oat` (or `invoke deploy`) to roll changes.
+
+[oat]
+# Who can reach https://oatadmin.winebox.app
+allow = [
+    "109.255.27.13",  # joe — home
+]
+
+[production]
+# Who can reach the prod admin panel (booze.winebox.app/admin today;
+# moves to its own subdomain when prod admin gets the same treatment).
+allow = [
+    "109.255.27.13",  # joe — home
+]

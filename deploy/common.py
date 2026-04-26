@@ -5,11 +5,14 @@ This module provides shared functionality used by all deployment scripts:
 - Digital Ocean API access
 - Environment configuration loading
 - File upload via SCP
+- Nginx config templating (admin allowlist)
 """
 
 import os
 import subprocess
 import sys
+import tempfile
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -421,6 +424,89 @@ NEVER_SYNC = [
     "WINEBOX_DROPLET_IP",
     "WINEBOX_DO_TOKEN",
 ]
+
+
+# =============================================================================
+# Nginx config templating
+# =============================================================================
+
+ADMIN_ALLOWLIST_PLACEHOLDER = "# __ADMIN_ALLOWLIST__"
+
+
+def _load_admin_allowlist(section: str) -> list[str]:
+    """Load the IP allowlist for an env (oat|production) from
+    `deploy/winebox-admin.toml`.
+
+    Raises ValueError if the section is missing or empty — fail loudly rather
+    than ship an open admin panel.
+    """
+    toml_path = Path(__file__).parent / "winebox-admin.toml"
+    with toml_path.open("rb") as fh:
+        cfg = tomllib.load(fh)
+
+    entries = cfg.get(section, {}).get("allow") or []
+    if not entries:
+        raise ValueError(
+            f"deploy/winebox-admin.toml has no '[{section}].allow' entries — "
+            "refusing to render an empty allowlist (would leave admin open)."
+        )
+    return entries
+
+
+def render_nginx_config(template_path: Path, allowlist_section: str) -> Path:
+    """Render an nginx config template, substituting each line that consists
+    of `# __ADMIN_ALLOWLIST__` (plus any leading whitespace) with `allow ...;
+    deny all;` directives indented to match the placeholder's column.
+
+    Matching only at line-start avoids accidentally rewriting the placeholder
+    string when it appears inside a comment that documents the mechanism.
+
+    Args:
+        template_path: Path to the nginx .conf template.
+        allowlist_section: Section name in `winebox-admin.toml`
+            (`"oat"` or `"production"`).
+
+    Returns:
+        Path to a tempfile holding the rendered config. Caller can upload it
+        directly; cleanup is left to the OS (/tmp).
+
+    Raises:
+        ValueError: If the template has no placeholder line, or the allowlist
+            section is missing/empty.
+    """
+    import re
+
+    entries = _load_admin_allowlist(allowlist_section)
+    template = template_path.read_text()
+
+    pattern = re.compile(
+        r"^([ \t]*)" + re.escape(ADMIN_ALLOWLIST_PLACEHOLDER) + r"[ \t]*$",
+        re.MULTILINE,
+    )
+
+    if not pattern.search(template):
+        raise ValueError(
+            f"{template_path} has no standalone {ADMIN_ALLOWLIST_PLACEHOLDER} "
+            "line — the allowlist would silently not be applied."
+        )
+
+    def _expand(match: "re.Match[str]") -> str:
+        indent = match.group(1)
+        lines = [f"{indent}allow {ip};" for ip in entries]
+        lines.append(f"{indent}deny all;")
+        return "\n".join(lines)
+
+    rendered = pattern.sub(_expand, template)
+
+    out = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".conf",
+        prefix="winebox-nginx-",
+        delete=False,
+    )
+    out.write(rendered)
+    out.close()
+    return Path(out.name)
 
 
 def sync_secrets(

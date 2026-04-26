@@ -1297,8 +1297,10 @@ def generate_test_data(
 
 OAT_DROPLET_NAME = "winebox-oat"
 OAT_DOMAIN = "oat.winebox.app"
+OAT_ADMIN_DOMAIN = "oatadmin.winebox.app"
 OAT_DATABASE = "winebox_oat"
 OAT_NGINX_CONF = "nginx-winebox-oat.conf"
+OAT_ADMIN_SERVICE_FILE = "deploy/winebox-admin-oat.service"
 OAT_WINEBOX_ADMIN = "/opt/winebox/.venv/bin/winebox-admin"
 
 
@@ -1387,6 +1389,105 @@ def oat_ssl(ctx: Context, host: str = "") -> None:
     print(f"SSL configured for {OAT_DOMAIN}")
 
 
+@task(name="oat-admin-dns")
+def oat_admin_dns(ctx: Context, host: str = "", dry_run: bool = False) -> None:
+    """Create or update the `oatadmin.winebox.app` A record at DigitalOcean.
+
+    One-time setup. Idempotent — safe to rerun. Adds an A record named
+    `oatadmin` inside the existing `winebox.app` zone, pointing at the OAT
+    droplet IP. Run this BEFORE `oat-admin-ssl` (certbot needs DNS to
+    resolve before it can complete the HTTP-01 challenge).
+
+    Args:
+        ctx: Invoke context
+        host: Override droplet IP (default: discovered via DO API)
+        dry_run: Preview without applying
+    """
+    oat_host = _resolve_oat_host(ctx, host or None) if host or not dry_run else "<droplet-ip>"
+
+    parent_zone = "winebox.app"
+    record_name = "oatadmin"
+    fqdn = f"{record_name}.{parent_zone}"
+
+    print(f"Configuring DNS: {fqdn} -> {oat_host}")
+    if dry_run:
+        print("  DRY RUN - no changes")
+        return
+
+    from dotenv import load_dotenv
+    load_dotenv(".env")
+    token = os.environ.get("WINEBOX_DO_TOKEN")
+    if not token:
+        print("Error: WINEBOX_DO_TOKEN not set in .env or environment")
+        sys.exit(1)
+
+    from deploy.common import DigitalOceanAPI
+
+    client = DigitalOceanAPI(token)
+    existing = client.list_dns_records(parent_zone)
+    match = next(
+        (r for r in existing if r["type"] == "A" and r["name"] == record_name),
+        None,
+    )
+
+    record = {"type": "A", "name": record_name, "data": oat_host, "ttl": 300}
+    if match is None:
+        client.create_dns_record(parent_zone, record)
+        print(f"  Created A {fqdn} -> {oat_host}")
+    elif match["data"] == oat_host:
+        print(f"  Already set: A {fqdn} -> {oat_host}")
+    else:
+        client.update_dns_record(parent_zone, match["id"], record)
+        print(f"  Updated A {fqdn}: {match['data']} -> {oat_host}")
+
+    print(f"\nVerify propagation: dig +short {fqdn}")
+    print("Then run: invoke oat-admin-ssl")
+
+
+@task(name="oat-admin-ssl")
+def oat_admin_ssl(ctx: Context, host: str = "") -> None:
+    """Issue a Let's Encrypt cert for `oatadmin.winebox.app`.
+
+    One-time setup. Must be run AFTER `oat-admin-dns` and after DNS has
+    propagated (test with `dig +short oatadmin.winebox.app`).
+
+    Briefly stops nginx so certbot's standalone HTTP-01 challenge can bind
+    port 80 — the same approach as `oat-ssl`. This means `oat.winebox.app`
+    is unavailable for the few seconds certbot takes to issue the cert; do
+    it during a quiet window.
+
+    After this, run `invoke deploy-oat` to publish the nginx config that
+    references the new certs. nginx won't reload cleanly until both the
+    cert files and the updated config are in place.
+
+    Args:
+        ctx: Invoke context
+        host: Override droplet IP
+    """
+    oat_host = _resolve_oat_host(ctx, host or None)
+    print(f"Setting up SSL for {OAT_ADMIN_DOMAIN} on {oat_host}...")
+
+    from deploy.common import run_ssh
+
+    # Stop nginx to free port 80 for certbot --standalone
+    run_ssh(oat_host, "root", "systemctl stop nginx", check=False)
+
+    try:
+        run_ssh(
+            oat_host, "root",
+            f"certbot certonly --standalone --non-interactive --agree-tos "
+            f"--email support@winebox.app -d {OAT_ADMIN_DOMAIN}",
+        )
+    finally:
+        # Always bring nginx back up, even if certbot failed — otherwise
+        # oat.winebox.app stays down until the operator notices.
+        run_ssh(oat_host, "root", "systemctl start nginx")
+
+    print(f"SSL configured for {OAT_ADMIN_DOMAIN}")
+    print("\nNext: run `invoke deploy-oat` to publish the nginx config that")
+    print("references the new certs and start the admin service.")
+
+
 @task(name="deploy-oat")
 def deploy_oat(
     ctx: Context,
@@ -1447,8 +1548,10 @@ def deploy_oat(
     if dry_run:
         cmd += "--dry-run "
 
-    # Upload OAT-specific service file BEFORE deploy.app runs (so it uses
-    # the correct WINEBOX_DATABASE=winebox_oat when the service restarts)
+    # Upload OAT-specific service files BEFORE deploy.app runs (so the units
+    # have the correct WINEBOX_DATABASE=winebox_oat when they restart). We
+    # only daemon-reload here; the admin service is started after the main
+    # deploy finishes so it runs against the new code, not stale.
     if not dry_run:
         from deploy.common import run_ssh, upload_file
         service_file = Path("deploy/winebox-oat.service")
@@ -1456,11 +1559,40 @@ def deploy_oat(
             upload_file(oat_host, "root", service_file, "/tmp/winebox.service")
             run_ssh(oat_host, "root", [
                 "mv /tmp/winebox.service /etc/systemd/system/winebox.service",
-                "systemctl daemon-reload",
             ])
+        admin_service_file = Path(OAT_ADMIN_SERVICE_FILE)
+        if admin_service_file.exists():
+            upload_file(
+                oat_host, "root",
+                admin_service_file,
+                "/tmp/winebox-admin.service",
+            )
+            run_ssh(oat_host, "root", [
+                "mv /tmp/winebox-admin.service /etc/systemd/system/winebox-admin.service",
+            ])
+        run_ssh(oat_host, "root", ["systemctl daemon-reload"])
 
     # Override nginx config for OAT
     ctx.run(cmd, pty=True, env={"WINEBOX_NGINX_CONF": OAT_NGINX_CONF})
+
+    # Start/restart the admin service AFTER the main deploy finishes — by
+    # then the new winebox wheel (which contains winebox.admin.main:app) is
+    # installed in /opt/winebox/.venv. `systemctl enable` is idempotent on
+    # subsequent deploys; restart picks up the new code each time. Failures
+    # propagate (check=True) so a bad unit or crashed app fails the deploy
+    # rather than silently shipping a dead admin panel.
+    if not dry_run:
+        from deploy.common import run_ssh
+        print(f"\nStarting admin panel ({OAT_ADMIN_DOMAIN})...")
+        run_ssh(oat_host, "root", [
+            "systemctl enable winebox-admin",
+            "systemctl restart winebox-admin",
+            "sleep 2",
+            "systemctl is-active winebox-admin",
+            "curl -sf http://localhost:8001/health "
+            "|| (echo '--- admin failed health check, recent logs: ---'; "
+            "journalctl -u winebox-admin -n 30 --no-pager; exit 1)",
+        ])
 
     # Ensure test user exists on OAT (idempotent — ignores if already exists)
     if not dry_run:
@@ -1485,8 +1617,9 @@ def deploy_oat(
                 print(f"  Warning: could not create test user: {combined.strip()}")
 
     print(f"\nOAT deployment complete!")
-    print(f"  URL: https://{OAT_DOMAIN}")
-    print(f"  Database: {OAT_DATABASE}")
+    print(f"  App URL:    https://{OAT_DOMAIN}")
+    print(f"  Admin URL:  https://{OAT_ADMIN_DOMAIN}  (IP-restricted)")
+    print(f"  Database:   {OAT_DATABASE}")
 
 
 @task(name="oat-deploy-xwines")
@@ -1523,8 +1656,12 @@ def oat_status(ctx: Context, host: str = "") -> None:
     """
     oat_host = _resolve_oat_host(ctx, host or None)
     print(f"OAT server: {oat_host} ({OAT_DOMAIN})")
-    ctx.run(_oat_ssh_cmd(oat_host, "systemctl status winebox"), pty=True, warn=True)
+    print("\n--- winebox (main app) ---")
+    ctx.run(_oat_ssh_cmd(oat_host, "systemctl status winebox --no-pager"), pty=True, warn=True)
     ctx.run(_oat_ssh_cmd(oat_host, "curl -sf http://localhost:8000/health || echo 'Health check failed'"), pty=True, warn=True)
+    print(f"\n--- winebox-admin ({OAT_ADMIN_DOMAIN}) ---")
+    ctx.run(_oat_ssh_cmd(oat_host, "systemctl status winebox-admin --no-pager"), pty=True, warn=True)
+    ctx.run(_oat_ssh_cmd(oat_host, "curl -sf http://localhost:8001/health || echo 'Admin health check failed'"), pty=True, warn=True)
 
 
 @task(name="oat-logs")

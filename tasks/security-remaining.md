@@ -132,7 +132,7 @@ first within each tier.
 | #30 Move inline script out of `og-preview.html` | `winebox/static/og-preview.html:132` | 10 min |
 | #31 OAT nginx admin IP allow-list on `/admin` | `deploy/nginx-winebox-oat.conf` — same pattern as prod | 15 min |
 | #32 Add timeouts to DigitalOcean API calls | `deploy/common.py` lines 142, 161, 191, 211, 222, 232, 242, 252, 268, 286 | 30 min |
-| #34 Drop MongoDB hostname from admin info endpoint | `admin/admin_app/routers/admin.py:35-42` | 5 min |
+| #34 Drop MongoDB hostname from admin info endpoint | `winebox/admin/routers/admin.py:35-42` | 5 min |
 | #35 Playwright nav timeout in scrape script | `scripts/scrape_wine_prices.py` | 5 min |
 | #36 Disable FastAPI auto-docs in production | `winebox/main.py:233` — `docs_url=None, redoc_url=None, openapi_url=None` when not in dev | 15 min |
 | #37 HSTS on nginx static `location` blocks | `deploy/nginx-winebox.conf:179-184` | 10 min |

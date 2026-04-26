@@ -28,8 +28,10 @@ import os
 from pathlib import Path
 
 from deploy.common import (
+    ADMIN_ALLOWLIST_PLACEHOLDER,
     DigitalOceanAPI,
     get_env_config,
+    render_nginx_config,
     resolve_host,
     run_ssh,
     sync_secrets,
@@ -184,7 +186,17 @@ def deploy(
     if not dry_run:
         nginx_conf_file = Path(__file__).parent / (nginx_conf or "nginx-winebox.conf")
         if nginx_conf_file.exists():
-            upload_file(host, user, nginx_conf_file, "/tmp/nginx-winebox.conf")
+            # Render the admin allowlist if the template uses the placeholder.
+            # Section is inferred from the filename — keep this in sync if a
+            # third env (e.g. staging) is ever added.
+            template = nginx_conf_file.read_text()
+            if ADMIN_ALLOWLIST_PLACEHOLDER in template:
+                section = "oat" if "oat" in nginx_conf_file.name else "production"
+                upload_path = render_nginx_config(nginx_conf_file, section)
+                print(f"  Rendered admin allowlist from [{section}] section")
+            else:
+                upload_path = nginx_conf_file
+            upload_file(host, user, upload_path, "/tmp/nginx-winebox.conf")
             run_ssh(host, user, [
                 "mv /tmp/nginx-winebox.conf /etc/nginx/sites-available/winebox",
                 "ln -sf /etc/nginx/sites-available/winebox /etc/nginx/sites-enabled/",
