@@ -150,7 +150,7 @@ header {
 }
 
 .header-content {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
@@ -223,7 +223,7 @@ nav::-webkit-scrollbar {
 
 /* Main Content */
 main {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 2rem;
 }
