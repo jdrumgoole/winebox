@@ -331,6 +331,15 @@ function initAuth() {
         navigateTo('settings');
     });
 
+    // Logo click → home (cellar if logged in, login if not)
+    document.getElementById('logo-home')?.addEventListener('click', () => {
+        if (authToken) {
+            navigateTo('cellar');
+        } else {
+            showAuthCard('login-card');
+        }
+    });
+
     // Password toggle for all password fields
     initPasswordToggles();
     initPasswordStrengthMeters();
@@ -603,10 +612,26 @@ function showAuthCard(cardId) {
         }
     });
 
-    // Clear any error/success messages when switching cards
-    document.querySelectorAll('#login-card .alert, #register-card .alert, #forgot-password-card .alert, #reset-password-card .alert, #verify-card .alert').forEach(el => {
-        el.style.display = 'none';
+    // Clear forms and error/success messages when switching cards
+    cards.forEach(id => {
+        const card = document.getElementById(id);
+        if (card) {
+            const form = card.querySelector('form');
+            if (form) form.reset();
+            card.querySelectorAll('.alert').forEach(el => { el.style.display = 'none'; });
+        }
     });
+
+    // Reset password strength meter on the visible card
+    const activeCard = document.getElementById(cardId);
+    if (activeCard) {
+        const meter = activeCard.querySelector('.password-strength');
+        if (meter) {
+            meter.removeAttribute('data-level');
+            const label = meter.querySelector('.password-strength-label');
+            if (label) label.textContent = 'At least 8 characters';
+        }
+    }
 }
 
 // Handle hash parameters for email verification, password reset, and login/register navigation
