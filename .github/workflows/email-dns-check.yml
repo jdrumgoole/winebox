@@ -1,0 +1,60 @@
+name: Weekly Email DNS Check
+
+on:
+  schedule:
+    # Run every Monday at 9:00 AM UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check-dns:
+    name: Verify email DNS records
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Check email DNS
+        id: dns_check
+        continue-on-error: true
+        run: uv run python scripts/check_email_dns.py 2>&1 | tee /tmp/dns-check.txt
+
+      - name: Create issue on failure
+        if: steps.dns_check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OUTPUT=$(cat /tmp/dns-check.txt)
+          gh issue create \
+            --title "Email DNS check failed ($(date +%Y-%m-%d))" \
+            --label "bug" \
+            --body "$(cat <<BODY
+          ## Email DNS Check Failed
+
+          The weekly email DNS verification found issues with \`winebox.app\`:
+
+          \`\`\`
+          $OUTPUT
+          \`\`\`
+
+          ### Actions
+          - Check DNS records in DigitalOcean: \`doctl compute domain records list winebox.app\`
+          - Compare against Fastmail's expected values in Settings → Domains
+          - See \`scripts/check_email_dns.py\` for the expected records
+
+          🤖 Created automatically by the weekly DNS check
+          BODY
+          )"
