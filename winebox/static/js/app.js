@@ -408,7 +408,10 @@ function initPasswordToggles() {
 
 function scorePassword(password) {
     if (!password) return { level: '', label: 'At least 8 characters' };
-    if (password.length < 8) return { level: '', label: 'At least 8 characters' };
+    if (password.length < 8) {
+        const remaining = 8 - password.length;
+        return { level: 'weak', label: `${remaining} more character${remaining !== 1 ? 's' : ''} needed` };
+    }
 
     let score = 0;
     if (password.length >= 8) score++;
