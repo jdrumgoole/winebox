@@ -1,9 +1,9 @@
-name: Weekly Email DNS Check
+name: Daily Email DNS Check
 
 on:
   schedule:
-    # Run every Monday at 9:00 AM UTC
-    - cron: "0 9 * * 1"
+    # Run every morning at 7:00 AM UTC
+    - cron: "0 7 * * *"
   workflow_dispatch:
 
 jobs:
@@ -55,6 +55,6 @@ jobs:
           - Compare against Fastmail's expected values in Settings → Domains
           - See \`scripts/check_email_dns.py\` for the expected records
 
-          🤖 Created automatically by the weekly DNS check
+          🤖 Created automatically by the daily DNS check
           BODY
           )"
