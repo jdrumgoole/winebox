@@ -333,6 +333,7 @@ function initAuth() {
 
     // Password toggle for all password fields
     initPasswordToggles();
+    initPasswordStrengthMeters();
 
     // Registration form
     const registerForm = document.getElementById('register-form');
@@ -401,6 +402,42 @@ function initPasswordToggles() {
                 eyeOffIcon.style.display = 'none';
                 this.setAttribute('aria-label', 'Show password');
             }
+        });
+    });
+}
+
+function scorePassword(password) {
+    if (!password) return { level: '', label: 'At least 8 characters' };
+    if (password.length < 8) return { level: '', label: 'At least 8 characters' };
+
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (password.length >= 16) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+
+    if (score <= 2) return { level: 'weak', label: 'Weak — try adding more characters' };
+    if (score <= 3) return { level: 'fair', label: 'Fair — a longer mix would be stronger' };
+    if (score <= 4) return { level: 'good', label: 'Good' };
+    return { level: 'strong', label: 'Strong' };
+}
+
+function initPasswordStrengthMeters() {
+    const fields = [
+        { inputId: 'register-password', meterId: 'register-password-strength' },
+        { inputId: 'reset-password', meterId: 'reset-password-strength' },
+        { inputId: 'new-password', meterId: 'new-password-strength' },
+    ];
+    fields.forEach(({ inputId, meterId }) => {
+        const input = document.getElementById(inputId);
+        const meter = document.getElementById(meterId);
+        if (!input || !meter) return;
+        input.addEventListener('input', () => {
+            const { level, label } = scorePassword(input.value);
+            meter.setAttribute('data-level', level);
+            meter.querySelector('.password-strength-label').textContent = label;
         });
     });
 }
@@ -3734,8 +3771,8 @@ async function handlePasswordChange(e) {
         return;
     }
 
-    if (newPassword.length < 6) {
-        showToast('Password must be at least 6 characters', 'error');
+    if (newPassword.length < 8) {
+        showToast('Password must be at least 8 characters', 'error');
         return;
     }
 
