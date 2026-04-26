@@ -413,16 +413,33 @@ function scorePassword(password) {
         return { level: 'weak', label: `${remaining} more character${remaining !== 1 ? 's' : ''} needed` };
     }
 
+    const hasLower = /[a-z]/.test(password);
+    const hasUpper = /[A-Z]/.test(password);
+    const hasDigit = /\d/.test(password);
+    const hasSpecial = /[^a-zA-Z0-9]/.test(password);
+
     let score = 0;
     if (password.length >= 8) score++;
     if (password.length >= 12) score++;
     if (password.length >= 16) score++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-    if (/\d/.test(password)) score++;
-    if (/[^a-zA-Z0-9]/.test(password)) score++;
+    if (hasLower && hasUpper) score++;
+    if (hasDigit) score++;
+    if (hasSpecial) score++;
 
-    if (score <= 2) return { level: 'weak', label: 'Weak — try adding more characters' };
-    if (score <= 3) return { level: 'fair', label: 'Fair — a longer mix would be stronger' };
+    if (score <= 2) {
+        // Give specific advice about what's missing
+        const tips = [];
+        if (!hasUpper || !hasLower) tips.push('mix upper and lowercase');
+        if (!hasDigit) tips.push('add a number');
+        if (!hasSpecial) tips.push('add a special character (!@#$%&*)');
+        const advice = tips.length ? ' — try: ' + tips.join(', ') : '';
+        return { level: 'weak', label: `Weak${advice}` };
+    }
+    if (score <= 3) {
+        if (!hasSpecial) return { level: 'fair', label: 'Fair — add a special character (!@#$%&*) to strengthen' };
+        if (!hasDigit) return { level: 'fair', label: 'Fair — add a number to strengthen' };
+        return { level: 'fair', label: 'Fair — try making it a bit longer' };
+    }
     if (score <= 4) return { level: 'good', label: 'Good' };
     return { level: 'strong', label: 'Strong' };
 }
