@@ -50,9 +50,16 @@
         fn(spec.body || '', opts);
     }
 
+    function wireFormDemo() {
+        var form = document.getElementById('ds-form-demo');
+        if (!form) return;
+        form.addEventListener('submit', function (e) { e.preventDefault(); });
+    }
+
     function init() {
         wireThemeToggle();
         wireToastDemos();
+        wireFormDemo();
     }
 
     if (document.readyState === 'loading') {

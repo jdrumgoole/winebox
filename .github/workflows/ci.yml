@@ -75,6 +75,9 @@ jobs:
         run: uv run pip install isort && uv run isort --check-only --diff winebox tests
         continue-on-error: true
 
+      - name: Lint static assets (CSP — no inline scripts / onclick handlers)
+        run: uv run python scripts/lint_static_assets.py
+
   build:
     name: Build package
     runs-on: ubuntu-latest
