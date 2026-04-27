@@ -1,0 +1,67 @@
+name: Weekly Cert Check
+
+on:
+  schedule:
+    # Every Monday 07:00 UTC. Lets Encrypt certbot auto-renews at 60 days
+    # left; this 14-day warning gives multiple weekly checks of headroom
+    # before anything expires.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check-certs:
+    name: Verify TLS cert expiry
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        # The cert-check script only uses the stdlib (ssl, socket), but
+        # `uv run` needs a synced env. --no-dev keeps this fast.
+        run: uv sync --no-dev
+
+      - name: Check TLS certs
+        id: cert_check
+        continue-on-error: true
+        run: uv run python scripts/check_certs.py 2>&1 | tee /tmp/cert-check.txt
+
+      - name: Create issue on failure
+        if: steps.cert_check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OUTPUT=$(cat /tmp/cert-check.txt)
+          gh issue create \
+            --title "TLS cert check failed ($(date +%Y-%m-%d))" \
+            --label "bug" \
+            --body "$(cat <<BODY
+          ## TLS cert check failed
+
+          The weekly cert verification found issues:
+
+          \`\`\`
+          $OUTPUT
+          \`\`\`
+
+          ### Actions
+          - Investigate certbot's renewal log on the affected droplet:
+            \`ssh root@<droplet-ip> 'systemctl status certbot.timer; journalctl -u certbot.service -n 50'\`
+          - Re-issue manually if needed:
+            - oat: \`invoke oat-ssl\` and/or \`invoke oat-admin-ssl\`
+            - production: certbot on the booze droplet
+          - See \`scripts/check_certs.py\` and \`docs/deployment.md\`.
+
+          🤖 Created automatically by the weekly cert check
+          BODY
+          )"

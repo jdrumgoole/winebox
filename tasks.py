@@ -1584,14 +1584,21 @@ def deploy_oat(
     if not dry_run:
         from deploy.common import run_ssh
         print(f"\nStarting admin panel ({OAT_ADMIN_DOMAIN})...")
+        # Cold start observed at ~5s (winebox imports + Mongo init); poll
+        # /health up to ~30s before failing. systemctl is-active happens
+        # first so a unit that exits immediately still fails fast instead
+        # of waiting the full window.
         run_ssh(oat_host, "root", [
             "systemctl enable winebox-admin",
             "systemctl restart winebox-admin",
-            "sleep 2",
             "systemctl is-active winebox-admin",
-            "curl -sf http://localhost:8001/health "
-            "|| (echo '--- admin failed health check, recent logs: ---'; "
-            "journalctl -u winebox-admin -n 30 --no-pager; exit 1)",
+            "for i in $(seq 1 30); do "
+            "  curl -sf http://localhost:8001/health >/dev/null && exit 0; "
+            "  sleep 1; "
+            "done; "
+            "echo '--- admin failed health check after 30s, recent logs: ---'; "
+            "journalctl -u winebox-admin -n 30 --no-pager; "
+            "exit 1",
         ])
 
     # Ensure test user exists on OAT (idempotent — ignores if already exists)
