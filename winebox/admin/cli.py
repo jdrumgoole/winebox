@@ -31,12 +31,12 @@ def start(args: argparse.Namespace) -> None:
     import subprocess
     cmd = [
         sys.executable, "-m", "uvicorn",
-        "admin_app.main:app",
+        "winebox.admin.main:app",
         "--host", args.host,
         "--port", str(args.port),
         "--workers", str(args.workers),
     ]
-    proc = subprocess.Popen(cmd, cwd=Path(__file__).parent.parent)
+    proc = subprocess.Popen(cmd)
     PID_FILE.write_text(str(proc.pid))
     print(f"Admin server started on http://{args.host}:{args.port} (PID {proc.pid})")
 

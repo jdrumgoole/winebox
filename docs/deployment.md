@@ -258,6 +258,90 @@ Actions:
 3. Imports wines into MongoDB
 4. Cleans up temporary files
 
+## OAT Admin Panel
+
+The OAT environment runs the admin panel as a separate FastAPI app on its own subdomain (`oatadmin.winebox.app`, port 8001), distinct from the main wine app on `oat.winebox.app` (port 8000). Both ship from the same `winebox` PyPI wheel — there is no separate admin package.
+
+### Architecture
+
+```
+Internet ─┬─► oat.winebox.app       → nginx → uvicorn winebox.main:app       (port 8000)
+          │
+          └─► oatadmin.winebox.app  → nginx (IP allowlist) → uvicorn winebox.admin.main:app (port 8001)
+                                       │
+                                       └─ both share the same /opt/winebox/.venv and secrets.env
+```
+
+The admin host is fully IP-restricted at the nginx layer — every path on `oatadmin.winebox.app` requires a source IP in the allowlist.
+
+### Allowlist
+
+The single source of truth is **`deploy/winebox-admin.toml`**:
+
+```toml
+[oat]
+allow = [
+    "109.255.27.13",  # operator — home
+]
+
+[production]
+allow = [
+    "109.255.27.13",
+]
+```
+
+Edit and re-run `invoke deploy-oat`. The renderer in `deploy/common.py:render_nginx_config` substitutes each standalone `# __ADMIN_ALLOWLIST__` line in the nginx template with `allow ...; deny all;` directives, indented to the placeholder's own column. Empty sections are rejected so a typo can't silently ship an open admin panel.
+
+### One-time bring-up
+
+Run once per droplet, in order:
+
+```bash
+# 1. Add the A record at DigitalOcean (idempotent).
+invoke oat-admin-dns
+
+# 2. Wait for DNS to propagate.
+dig +short oatadmin.winebox.app
+
+# 3. Issue the Let's Encrypt cert. Briefly stops nginx for the standalone
+#    HTTP-01 challenge — the same approach as `oat-ssl`.
+invoke oat-admin-ssl
+
+# 4. Roll out the nginx config that references the new cert and start the
+#    admin systemd unit.
+invoke deploy-oat
+```
+
+After step 4, the admin panel is live at `https://oatadmin.winebox.app`.
+
+### Routine deploys
+
+`invoke deploy-oat` (with or without `--release`) ships both services:
+
+1. Installs the new `winebox` wheel from PyPI (contains `winebox.main` AND `winebox.admin`).
+2. Uploads `deploy/winebox-oat.service` → `/etc/systemd/system/winebox.service`.
+3. Uploads `deploy/winebox-admin-oat.service` → `/etc/systemd/system/winebox-admin.service`.
+4. Renders `deploy/nginx-winebox-oat.conf` against the `[oat]` allowlist and uploads it.
+5. Restarts `winebox` (port 8000), then `winebox-admin` (port 8001).
+6. Health-checks both services. The admin curl talks to `http://localhost:8001/health` from the droplet, so the allowlist is bypassed for this internal probe.
+
+### Smoke test (post-deploy)
+
+Run from a machine whose IP is in the OAT allowlist (typically the same machine that ran `invoke deploy-oat`):
+
+```bash
+uv run python -m pytest tests/test_oat_admin_smoke.py -v
+```
+
+The test module auto-skips on machines that can't reach `/health` — CI and unallowlisted dev environments don't see it as a failure.
+
+### Service status / logs
+
+```bash
+invoke oat-status                                       # both services + both health endpoints
+ssh root@<oat-ip> "journalctl -u winebox-admin -n 50"   # admin logs
+```
+
 ## Database Migrations
 
 ### Text Index Migration (v0.5.12)

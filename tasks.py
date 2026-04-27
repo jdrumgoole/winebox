@@ -1620,6 +1620,8 @@ def deploy_oat(
     print(f"  App URL:    https://{OAT_DOMAIN}")
     print(f"  Admin URL:  https://{OAT_ADMIN_DOMAIN}  (IP-restricted)")
     print(f"  Database:   {OAT_DATABASE}")
+    print(f"\nSmoke test the admin panel:")
+    print(f"  uv run python -m pytest tests/test_oat_admin_smoke.py -v")
 
 
 @task(name="oat-deploy-xwines")

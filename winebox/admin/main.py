@@ -29,8 +29,8 @@ from slowapi.util import get_remote_address
 from winebox.database import close_db, init_db
 from winebox.main import SecurityHeadersMiddleware
 
-from admin_app import __version__
-from admin_app.routers import admin, auth
+from winebox.admin import __version__
+from winebox.admin.routers import admin, auth
 
 logger = logging.getLogger(__name__)
 

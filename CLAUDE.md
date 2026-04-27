@@ -99,7 +99,8 @@
 There are two deployment environments:
 
 ### OAT (Pre-release Testing)
-- **URL:** https://oat.winebox.app
+- **App URL:** https://oat.winebox.app
+- **Admin URL:** https://oatadmin.winebox.app  (IP-restricted, see allowlist below)
 - **Database:** `winebox_oat` (isolated from production)
 - **Droplet:** `winebox-oat` (46.101.134.8, 1 worker due to small memory)
 - **When the user says "make an OAT release"** or "deploy to OAT": run `invoke deploy-oat --release`
@@ -110,14 +111,37 @@ Deploy to OAT:
     invoke deploy-oat                        # Latest version already on PyPI
     invoke deploy-oat --version 0.6.0        # Specific version already on PyPI
 
+`deploy-oat` ships both the main app (port 8000) and the admin panel (port 8001) from a single PyPI wheel — they share `winebox.__version__`. After a successful run, smoke-test the admin panel:
+
+    uv run python -m pytest tests/test_oat_admin_smoke.py -v
+
 OAT management tasks:
-- `invoke oat-setup` — Initial droplet setup
-- `invoke oat-ssl` — Set up SSL certificates
-- `invoke deploy-oat` — Deploy app to OAT
+- `invoke oat-setup` — Initial droplet setup (one-time)
+- `invoke oat-ssl` — Set up SSL for `oat.winebox.app` (one-time)
+- `invoke oat-admin-dns` — Add the `oatadmin.winebox.app` A record at DigitalOcean (one-time)
+- `invoke oat-admin-ssl` — Issue the `oatadmin.winebox.app` Let's Encrypt cert (one-time, run AFTER `oat-admin-dns` propagates)
+- `invoke deploy-oat` — Deploy app + admin panel to OAT
 - `invoke oat-deploy-xwines` — Load X-Wines test data
-- `invoke oat-status` — Check server health
+- `invoke oat-status` — Health-check both `winebox` and `winebox-admin` services
 - `invoke oat-logs` — View server logs
 - `invoke test-e2e-oat` — Run E2E tests against OAT
+
+Bringing up `oatadmin.winebox.app` from scratch (one-time sequence):
+
+1. `invoke oat-admin-dns`            # add A record
+2. `dig +short oatadmin.winebox.app`  # wait until it returns the droplet IP
+3. `invoke oat-admin-ssl`            # issue cert (briefly stops nginx)
+4. `invoke deploy-oat`               # publishes the nginx config that references the cert + starts the admin systemd unit
+
+#### Admin allowlist
+The admin panel is IP-restricted at the nginx layer. The allowlist is **the** source of truth — `deploy/winebox-admin.toml`:
+
+    [oat]
+    allow = [
+        "109.255.27.13",  # joe — home
+    ]
+
+Edit, then re-run `invoke deploy-oat` to roll the change. Empty sections are rejected — the renderer refuses to ship an open admin panel.
 
 ### Production
 - **URL:** https://booze.winebox.app
