@@ -82,9 +82,21 @@ document.addEventListener('DOMContentLoaded', () => {
     initCustomFields();
     initMetPage();
     initAddToCellarPage();
+    initChartTheming();
     checkAuth();
     loadAppInfo();
 });
+
+// Push theme tokens into Chart.js defaults at boot, and re-apply on every
+// theme change so live charts flip with the rest of the UI.
+function initChartTheming() {
+    applyChartTheme();
+    if (window.WineBox && window.WineBox.theme) {
+        window.WineBox.theme.subscribe(() => {
+            requestAnimationFrame(applyChartTheme);
+        });
+    }
+}
 
 // Load app info for footer
 async function loadAppInfo() {
@@ -1878,7 +1890,9 @@ const CHART_DEFAULTS = {
         legend: {
             labels: {
                 font: { family: "'Cormorant Garamond', serif", size: 13 },
-                color: '#444',
+                // color intentionally omitted — inherits Chart.defaults.color,
+                // which applyChartTheme() keeps in sync with --text-color so
+                // legends flip in dark mode.
             },
         },
         tooltip: {
@@ -1887,6 +1901,38 @@ const CHART_DEFAULTS = {
         },
     },
 };
+
+// Push the live theme tokens into Chart.js defaults so axis labels, legends,
+// tooltips, and grid lines flip with the theme. Also patches every live
+// chart in _dashboardCharts because Chart.js bakes defaults at construction
+// time — existing instances need their options updated explicitly.
+function applyChartTheme() {
+    if (typeof Chart === 'undefined') return;
+    const cs = getComputedStyle(document.documentElement);
+    const textColor = cs.getPropertyValue('--text-color').trim() || '#2D1A22';
+    const borderColor = cs.getPropertyValue('--border-color').trim() || '#E8E0D8';
+
+    Chart.defaults.color = textColor;
+    Chart.defaults.borderColor = borderColor;
+
+    Object.values(_dashboardCharts).forEach(chart => {
+        if (!chart || !chart.options) return;
+        chart.options.color = textColor;
+        chart.options.borderColor = borderColor;
+        if (chart.options.plugins?.legend?.labels) {
+            chart.options.plugins.legend.labels.color = textColor;
+        }
+        if (chart.options.scales) {
+            for (const scale of Object.values(chart.options.scales)) {
+                if (scale.ticks) scale.ticks.color = textColor;
+                if (scale.grid && scale.grid.display !== false) {
+                    scale.grid.color = borderColor;
+                }
+            }
+        }
+        chart.update('none');
+    });
+}
 
 function renderDashboardCharts(summary) {
     // Wine Type — doughnut
@@ -1987,7 +2033,7 @@ function _renderHorizontalBarChart(canvasId, data, maxItems) {
                 y: {
                     ticks: {
                         font: { family: "'Cormorant Garamond', serif", size: 12 },
-                        color: '#444',
+                        // color inherits Chart.defaults.color (theme-aware).
                     },
                     grid: { display: false },
                 },
