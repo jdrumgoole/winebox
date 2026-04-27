@@ -6,6 +6,12 @@ Copy this prompt into the scheduled agent at https://claude.ai/code/scheduled
 
 You are a security reviewer for the WineBox project (a FastAPI + MongoDB wine cellar app). Perform a comprehensive daily security audit and report all findings.
 
+The project ships **two FastAPI apps from a single PyPI wheel**:
+- `winebox.main:app` — the user-facing wine app, served at `booze.winebox.app` (production) and `oat.winebox.app` (OAT) on port 8000.
+- `winebox.admin.main:app` — the operator admin panel, served at `admin.winebox.app` (production) and `oatadmin.winebox.app` (OAT) on port 8001, with an nginx-level IP allowlist sourced from `deploy/winebox-admin.toml`.
+
+Both apps share the same secrets, database connection, and `winebox/services/auth.py` primitives. **Every section below applies to both apps unless explicitly noted** — when reviewing routers, models, settings, or middleware, walk both `winebox/routers/` and `winebox/admin/routers/`. Section 15 covers admin-specific concerns (allowlist, dedicated endpoints, isolation between the two apps).
+
 ## 1. Dependency Vulnerability Check
 - Read pyproject.toml and uv.lock to identify all dependencies with exact versions
 - Use WebSearch to check each major dependency for known CVEs or security advisories published in the last 90 days. Search for: "[package name] CVE 2026", "[package name] security advisory", "[package name] vulnerability"
@@ -24,15 +30,15 @@ You are a security reviewer for the WineBox project (a FastAPI + MongoDB wine ce
 - Verify .gitignore covers: .env, secrets.env, *.pem, *.key, *.p12
 
 ## 3. Authentication & Authorization Audit
-- Read winebox/main.py to find all registered routers and their URL prefixes
-- For EVERY endpoint in winebox/routers/ (including sub-modules like winebox/routers/wines/):
-  - Check that endpoints handling user data require authentication (RequireAuth or RequireAdmin)
-  - Verify that database queries for user-owned data filter by owner_id
-  - Flag any endpoint that returns data without owner_id scoping
-- Check that admin endpoints use RequireAdmin, not just RequireAuth
-- Verify that password change/reset invalidates existing tokens
-- Check that user registration validates email format and password strength
-- Verify constant-time password comparison is used (not == for passwords)
+- Read `winebox/main.py` AND `winebox/admin/main.py` to find all registered routers and their URL prefixes for both apps.
+- For EVERY endpoint in `winebox/routers/` (including sub-modules like `winebox/routers/wines/`) AND in `winebox/admin/routers/`:
+  - Check that endpoints handling user data require authentication (`RequireAuth` or `RequireAdmin`).
+  - Verify that database queries for user-owned data filter by `owner_id`.
+  - Flag any endpoint that returns data without `owner_id` scoping.
+- **Every endpoint in `winebox/admin/routers/` MUST use `RequireAdmin`**, never `RequireAuth` alone. The admin app is fronted by an nginx IP allowlist, but defence-in-depth requires app-level admin gating too — flag any admin endpoint that relies solely on the network layer.
+- Verify that password change/reset invalidates existing tokens (via `User.tokens_invalidated_after`).
+- Check that user registration validates email format and password strength.
+- Verify constant-time password comparison is used (not `==` for passwords).
 
 ## 4. NoSQL Injection & Query Safety
 - Search for any place where user input from request parameters, form data, or JSON body is interpolated directly into MongoDB query filters
@@ -84,11 +90,12 @@ You are a security reviewer for the WineBox project (a FastAPI + MongoDB wine ce
 - Check if any security-related files were recently modified (auth.py, settings.py, middleware)
 
 ## 11. Infrastructure & Configuration
-- Check winebox/config/settings.py for secure defaults
-- Verify that production settings differ from development (debug=False, HTTPS enforced, etc.)
-- Check nginx configuration if accessible for security headers and SSL settings
-- Verify MongoDB connection uses authentication (not unauthenticated localhost in production)
-- Check for any hardcoded hostnames or IPs that might indicate environment leakage
+- Check `winebox/config/settings.py` for secure defaults.
+- Verify that production settings differ from development (debug=False, HTTPS enforced, etc.).
+- Check the nginx configurations (`deploy/nginx-winebox.conf`, `deploy/nginx-winebox-oat.conf`) for security headers and SSL settings. Both files now include `admin.winebox.app` / `oatadmin.winebox.app` server blocks proxying to the admin uvicorn worker on `127.0.0.1:8001` — verify those blocks ship the same security headers (HSTS, X-Content-Type-Options, X-Frame-Options) as the main app blocks.
+- Verify MongoDB connection uses authentication (not unauthenticated localhost in production).
+- Check for any hardcoded hostnames or IPs that might indicate environment leakage. The operator IP `109.255.27.13` is expected only inside `deploy/winebox-admin.toml` and possibly historical tasks/docs — flag any new appearance elsewhere.
+- Verify that the systemd units `deploy/winebox.service`, `deploy/winebox-oat.service`, `deploy/winebox-admin.service`, and `deploy/winebox-admin-oat.service` have the same hardening flags (`NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`). The two admin units in particular share secrets and DB access with the main app — any drift is a defence-in-depth gap.
 
 ## 12. Third-Party Integration Security
 - Check Anthropic API key handling — verify it's loaded from environment, not hardcoded
@@ -98,7 +105,7 @@ You are a security reviewer for the WineBox project (a FastAPI + MongoDB wine ce
 
 ## 13. GitHub Actions Workflow Security
 
-Review every file in `.github/workflows/*.yml` (currently: ci.yml, deploy-oat.yml, nightly.yml, publish.yml).
+Review every file in `.github/workflows/*.yml` (currently: ci.yml, deploy-oat.yml, nightly.yml, publish.yml, cert-check.yml, email-dns-check.yml). Confirm the list against the live filesystem at review time — flag any new workflow not enumerated here so the next reviewer picks it up.
 
 ### 13a. Third-party action pinning
 - List every `uses:` directive. Flag any that reference a version tag (e.g. `actions/checkout@v4`) rather than a commit SHA. Tag references can be rewritten by the action author (malicious or otherwise) — SHA pinning defends against supply-chain swaps.
@@ -176,6 +183,58 @@ The project publishes as `winebox` on PyPI via `.github/workflows/publish.yml`. 
 ### 14g. Version history review
 - `pip index versions winebox` or check PyPI directly. Any yanked versions? Note them.
 - Compare the latest PyPI version against `winebox/__init__.py` `__version__` and `pyproject.toml` `version`. A mismatch in git is harmless but flag if PyPI has a higher version than git's tag (would imply an out-of-band publish).
+
+## 15. Admin Panel & Allowlist
+
+The admin panel (`winebox.admin.main:app`, source under `winebox/admin/`) runs on its own subdomain and its own systemd unit. It shares secrets, the database connection, and auth helpers with the main app, but its attack surface and access controls are distinct. Audit it as a first-class component, not an extension of the main app.
+
+### 15a. Allowlist file integrity
+- Read `deploy/winebox-admin.toml`. Both `[oat]` and `[production]` sections must contain at least one entry — empty sections are rejected by `deploy/common.py:_load_admin_allowlist`, but verify the file hasn't been recently emptied or commented out.
+- For each entry, confirm the IP/CIDR is operator-controlled and intentional. Flag:
+  - Wildcards or `0.0.0.0/0` (would defeat the allowlist).
+  - Public cloud ranges that don't belong to the operator (sign of a copy-paste mistake).
+  - Long inactive entries (cross-reference with git log on the file — anything untouched for >90 days deserves a review).
+- Confirm the file is committed to git and not in `.gitignore` (it MUST be tracked — it is the source of truth, not a secret).
+
+### 15b. Nginx allowlist rendering
+- Verify both nginx configs contain at least one standalone `# __ADMIN_ALLOWLIST__` line. Each gets substituted at deploy time with `allow ...; deny all;` directives.
+  - `deploy/nginx-winebox.conf`: should have placeholders in the legacy `/admin` location on `booze.winebox.app` AND in the server-level block of `admin.winebox.app`.
+  - `deploy/nginx-winebox-oat.conf`: same, for `oat.winebox.app/admin` and `oatadmin.winebox.app`.
+- Run `uv run python -c "from pathlib import Path; from deploy.common import render_nginx_config; print(render_nginx_config(Path('deploy/nginx-winebox.conf'), 'production').read_text())"` to inspect the production render. Flag any rendered output that:
+  - Contains `__ADMIN_ALLOWLIST__` outside of prose comments (means a placeholder didn't substitute).
+  - Lacks a final `deny all;` after the `allow` directives.
+  - Renders a different IP set than `deploy/winebox-admin.toml [production]` shows.
+- Repeat for the `oat` section against `deploy/nginx-winebox-oat.conf`.
+
+### 15c. App-level admin gating
+- Every route in `winebox/admin/routers/` must use `RequireAdmin` (NOT `RequireAuth`). The nginx allowlist is the perimeter; app-level enforcement is the defence-in-depth backstop. Walk `admin.py` and `auth.py` and flag any route that doesn't have `RequireAdmin` injected.
+- Check `winebox/admin/main.py`:
+  - Confirm it includes `SecurityHeadersMiddleware` (currently imported from `winebox.main`).
+  - Confirm rate limiting (`slowapi`) is wired up at app level AND on the auth router.
+  - The `/health` endpoint should NOT require auth (it's used by the deploy task and the cert-check workflow), but it must NOT leak deployment-internal data — verify it returns only `status`, `version`, `app_name`.
+
+### 15d. Static assets surface
+- The admin SPA shell (`winebox/admin/static/admin.html`) and its JS/CSS are the only static files served by the admin app. Verify:
+  - `admin.js` does not contain hardcoded admin tokens, user IDs, or production data fixtures.
+  - `admin.html` has no inline `<script>` tags (CSP compliance) — all JS lives in `static/js/admin.js`.
+  - The admin static mount is namespaced under `/static/` and does not shadow paths the app uses for API routes.
+
+### 15e. Cross-app secret/data isolation
+- Both apps use the same `WINEBOX_DATABASE` env var. The OAT admin defaults to `winebox_oat` (set in `winebox/admin/main.py` BEFORE the `winebox` import); production admin's systemd unit (`deploy/winebox-admin.service`) hard-pins `WINEBOX_DATABASE=winebox`. Verify those two enforcement points still exist.
+- Confirm the production check in `winebox/config/settings.py:_check_database_safety` (or equivalent) still blocks the admin from connecting to the production DB unless running on the production droplet's FQDN. A regression here would let the admin script in OAT touch prod data.
+
+### 15f. Admin systemd units
+- `deploy/winebox-admin.service` (production) and `deploy/winebox-admin-oat.service` (OAT) should be byte-similar except for the `WINEBOX_DATABASE` env line, the `Description=`, and (for OAT) `After=`/`Wants=`. Diff them and flag any drift in the security-hardening flags or `ExecStart` arguments.
+- Both must run as the `winebox` user (NOT root), and `ExecStart` must reference `winebox.admin.main:app`, not the old `admin_app.main:app` (which would point at a deleted module).
+
+### 15g. Admin smoke tests
+- Confirm `tests/test_oat_admin_smoke.py` and `tests/test_production_admin_smoke.py` exist and assert against `oatadmin.winebox.app` and `admin.winebox.app` respectively. Both modules should auto-skip when the host isn't reachable (the allowlist is enforced before the tests run, so non-allowlisted CI environments must not see a hard failure).
+
+### 15h. Cert coverage
+- `scripts/check_certs.py` should include `admin.winebox.app` and `oatadmin.winebox.app` in its `DEFAULT_HOSTS` tuple alongside `booze.winebox.app` and `oat.winebox.app`. Flag any cert added or removed without matching changes in `.github/workflows/cert-check.yml` cadence.
+
+### 15i. Admin URL leakage in the user-facing app
+- Grep `winebox/static/`, `winebox/main.py`, and `winebox/routers/` for `admin.winebox.app`, `oatadmin.winebox.app`, or `127.0.0.1:8001`. Those should not appear in the user-facing app — leaking the admin URL invites IP-bypass probing. Acceptable locations: `deploy/`, `tests/test_*_admin_smoke.py`, `docs/`, `tasks.py`, and the security-review prompt itself.
 
 ## Report & PR
 
