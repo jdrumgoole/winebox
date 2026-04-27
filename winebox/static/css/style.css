@@ -884,6 +884,13 @@ details.advanced-fields .form-grid {
     align-items: stretch;
 }
 
+/* When the grid is empty and shows an .empty-state, span every column so the
+   placeholder is centred across the full width instead of squeezed into the
+   first 300px cell. */
+.wine-grid > .empty-state {
+    grid-column: 1 / -1;
+}
+
 .wine-card {
     display: flex;
     flex-direction: column;

@@ -2613,6 +2613,23 @@ function emptyCellarHtml() {
     `;
 }
 
+function emptyMetHtml() {
+    return `
+        <div class="empty-state">
+            <div class="empty-state-icon" aria-hidden="true">
+                <svg class="icon" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path d="M8 2h8v4h-2v3a5 5 0 0 1 4 5v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-8a5 5 0 0 1 4-5V6H8V2z"/>
+                </svg>
+            </div>
+            <div class="empty-state-title">No wines recorded yet</div>
+            <div class="empty-state-description">Scan a wine label or enter the details to start tracking wines you've encountered.</div>
+            <div class="empty-state-action">
+                <a href="#" data-page="record-wine" class="btn btn-primary">Record a wine</a>
+            </div>
+        </div>
+    `;
+}
+
 function renderCellarTable(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
@@ -6225,7 +6242,7 @@ function renderMetViewWith(wines) {
 function renderMetGrid(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        container.innerHTML = '<div class="empty-state"><h3>No wines recorded yet</h3><p>Use Add Wine to scan a label</p></div>';
+        container.innerHTML = emptyMetHtml();
         return;
     }
 
@@ -6291,7 +6308,7 @@ function renderMetGrid(containerId, wines) {
 function renderMetTable(containerId, wines) {
     const container = document.getElementById(containerId);
     if (!wines || wines.length === 0) {
-        container.innerHTML = '<div class="empty-state"><h3>No wines recorded yet</h3><p>Use Add Wine to scan a label</p></div>';
+        container.innerHTML = emptyMetHtml();
         return;
     }
 
