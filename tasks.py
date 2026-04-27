@@ -659,7 +659,7 @@ def enable_user(ctx: Context, email: str) -> None:
         ctx: Invoke context
         email: Email of user to enable
     """
-    ctx.run(f"uv run winebox-admin enable {email}")
+    ctx.run(f"uv run winebox-admin enable {shlex.quote(email)}")
 
 
 @task(name="passwd", aliases=["user-passwd"])
@@ -671,7 +671,10 @@ def change_password(ctx: Context, email: str, password: str) -> None:
         email: Email of user to change password for
         password: New password
     """
-    ctx.run(f"uv run winebox-admin passwd {email} --password {password}")
+    ctx.run(
+        f"uv run winebox-admin passwd {shlex.quote(email)} "
+        f"--password {shlex.quote(password)}"
+    )
 
 
 @task(name="docs-build")
@@ -1277,9 +1280,16 @@ def _resolve_prod_host() -> str:
 
 
 def _ssh_cmd(cmd: str) -> str:
-    """Build SSH command for production server."""
+    """Build SSH command for production server.
+
+    Quotes `cmd` for the LOCAL shell (the shell ctx.run uses to launch ssh)
+    so $, backticks, and double-quotes inside it are not interpreted before
+    SSH transmits them. Callers must additionally shlex.quote() any
+    user-supplied values they substitute into `cmd` so they are safe for
+    the REMOTE shell as well.
+    """
     host = _resolve_prod_host()
-    return f'ssh -o StrictHostKeyChecking=accept-new root@{host} "{cmd}"'
+    return f"ssh -o StrictHostKeyChecking=accept-new root@{host} {shlex.quote(cmd)}"
 
 
 @task(name="prod-list-users")
@@ -1298,7 +1308,10 @@ def prod_add_user(ctx: Context, email: str, password: str, admin: bool = False) 
         password: Password for the new user
         admin: Make user an admin
     """
-    cmd = f"{PROD_WINEBOX_ADMIN} add {email} --password {password}"
+    cmd = (
+        f"{PROD_WINEBOX_ADMIN} add {shlex.quote(email)} "
+        f"--password {shlex.quote(password)}"
+    )
     if admin:
         cmd += " --admin"
     ctx.run(_ssh_cmd(cmd), pty=True)
@@ -1312,7 +1325,10 @@ def prod_remove_user(ctx: Context, email: str) -> None:
         ctx: Invoke context
         email: Email of user to remove
     """
-    ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} remove {email} --force"), pty=True)
+    ctx.run(
+        _ssh_cmd(f"{PROD_WINEBOX_ADMIN} remove {shlex.quote(email)} --force"),
+        pty=True,
+    )
 
 
 @task(name="prod-disable-user")
@@ -1323,7 +1339,7 @@ def prod_disable_user(ctx: Context, email: str) -> None:
         ctx: Invoke context
         email: Email of user to disable
     """
-    ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} disable {email}"), pty=True)
+    ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} disable {shlex.quote(email)}"), pty=True)
 
 
 @task(name="prod-enable-user")
@@ -1334,7 +1350,7 @@ def prod_enable_user(ctx: Context, email: str) -> None:
         ctx: Invoke context
         email: Email of user to enable
     """
-    ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} enable {email}"), pty=True)
+    ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} enable {shlex.quote(email)}"), pty=True)
 
 
 @task(name="prod-admin-dns")
@@ -1776,7 +1792,8 @@ def deploy_oat(
             add_user_cmd = _oat_ssh_cmd(
                 oat_host,
                 f"cd /opt/winebox && set -a && . secrets.env && set +a && "
-                f"{OAT_WINEBOX_ADMIN} add {test_user} --password '{test_pass}'"
+                f"{OAT_WINEBOX_ADMIN} add {shlex.quote(test_user)} "
+                f"--password {shlex.quote(test_pass)}"
             )
             result = ctx.run(add_user_cmd, warn=True, hide=True)
             combined = (result.stdout or "") + (result.stderr or "")
@@ -1815,8 +1832,14 @@ def oat_deploy_xwines(ctx: Context, host: str = "", test: bool = True, dry_run: 
 
 
 def _oat_ssh_cmd(host: str, cmd: str) -> str:
-    """Build SSH command for OAT server."""
-    return f'ssh -o StrictHostKeyChecking=accept-new root@{host} "{cmd}"'
+    """Build SSH command for OAT server.
+
+    Quotes `cmd` for the LOCAL shell so $, backticks, and double-quotes
+    inside it are not interpreted before SSH transmits them. Callers must
+    additionally shlex.quote() any user-supplied values they substitute
+    into `cmd` so they are safe for the REMOTE shell as well.
+    """
+    return f"ssh -o StrictHostKeyChecking=accept-new root@{host} {shlex.quote(cmd)}"
 
 
 @task(name="oat-status")
