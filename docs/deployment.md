@@ -342,6 +342,48 @@ invoke oat-status                                       # both services + both h
 ssh root@<oat-ip> "journalctl -u winebox-admin -n 50"   # admin logs
 ```
 
+## Production Admin Panel
+
+Production runs the admin panel at `https://admin.winebox.app` on the production droplet (`winebox-production`, 104.248.46.96), port 8001. Architecture, allowlist semantics, and unit layout match OAT exactly — this section only covers what differs.
+
+### Allowlist
+
+The same `deploy/winebox-admin.toml` file holds both environments. Production uses the `[production]` section; the renderer in `deploy/common.py` picks the section based on the nginx config filename (`nginx-winebox.conf` → `production`).
+
+### One-time bring-up
+
+```bash
+# 1. Add the A record at DigitalOcean (idempotent).
+invoke prod-admin-dns
+
+# 2. Wait for DNS propagation.
+dig +short admin.winebox.app
+
+# 3. Issue the cert. Briefly stops nginx for the standalone HTTP-01
+#    challenge — same approach as `oat-admin-ssl`.
+invoke prod-admin-ssl
+
+# 4. Roll out the nginx config that references the new cert and start
+#    the admin systemd unit.
+invoke deploy        # full release pipeline
+# or
+invoke deploy-only --version 0.x.y   # re-deploy without bumping
+```
+
+### Routine deploys
+
+Both `invoke deploy` and `invoke deploy-only` now upload `deploy/winebox-admin.service` to `/etc/systemd/system/winebox-admin.service` and start/restart the admin service after the main app, with a 30s polling health check against `http://localhost:8001/health`.
+
+### Smoke test (post-deploy)
+
+Run from a machine in the production allowlist (typically the same machine that ran `invoke deploy`):
+
+```bash
+uv run python -m pytest tests/test_production_login.py tests/test_production_admin_smoke.py -v
+```
+
+Both auto-skip on machines that can't reach the relevant endpoint, so CI doesn't see them as failures.
+
 ## Database Migrations
 
 ### Text Index Migration (v0.5.12)

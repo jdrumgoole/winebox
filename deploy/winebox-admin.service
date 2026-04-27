@@ -1,0 +1,32 @@
+[Unit]
+Description=WineBox Admin Panel
+After=network.target winebox.service
+Wants=winebox.service
+
+[Service]
+Type=exec
+User=winebox
+Group=winebox
+WorkingDirectory=/opt/winebox
+Environment="PATH=/opt/winebox/.venv/bin:/usr/local/bin:/usr/bin"
+Environment="WINEBOX_DATABASE=winebox"
+EnvironmentFile=/opt/winebox/secrets.env
+ExecStart=/opt/winebox/.venv/bin/uvicorn winebox.admin.main:app --host 127.0.0.1 --port 8001 --workers 1
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening — admin panel reads MongoDB and serves static files,
+# does not write to local disk. Mirrors winebox.service ReadWritePaths so a
+# future feature that needs scratch space (export, backup) works without
+# rewriting the unit.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/winebox/data /opt/winebox/logs
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

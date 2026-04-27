@@ -984,11 +984,27 @@ def deploy(
         dry_run=dry_run,
     )
 
+    # Resolve production host once so we can bracket deploy.app with admin
+    # service upload (before) and admin service start (after).
+    prod_host = host or _resolve_prod_host()
+
+    # Pre-deploy: upload the admin systemd unit so the new nginx config
+    # (rendered inside deploy.app) has a valid backend on 127.0.0.1:8001.
+    # daemon-reload only — the service is started AFTER deploy.app finishes,
+    # at which point the new winebox wheel (with winebox.admin) is installed.
+    if not dry_run:
+        from deploy.common import run_ssh, upload_file
+        admin_unit = Path(PROD_ADMIN_SERVICE_FILE)
+        if admin_unit.exists():
+            upload_file(prod_host, "root", admin_unit, "/tmp/winebox-admin.service")
+            run_ssh(prod_host, "root", [
+                "mv /tmp/winebox-admin.service /etc/systemd/system/winebox-admin.service",
+                "systemctl daemon-reload",
+            ])
+
     # Deploy to server
     print("\n[7/7] Deploying to production server...")
-    deploy_cmd = f"uv run python -m deploy.app --version {new_version}"
-    if host:
-        deploy_cmd += f" --host {host}"
+    deploy_cmd = f"uv run python -m deploy.app --version {new_version} --host {prod_host}"
     if droplet_name:
         deploy_cmd += f" --droplet-name {droplet_name}"
     if no_secrets:
@@ -999,13 +1015,36 @@ def deploy(
         deploy_cmd += " --dry-run"
     ctx.run(deploy_cmd, pty=True)
 
+    # Post-deploy: start (or restart) the admin service against the new code.
+    # Cold start observed at ~5s on OAT; production has more cores so it's
+    # usually faster, but the same 30s polling window applies.
+    if not dry_run:
+        from deploy.common import run_ssh
+        print(f"\nStarting admin panel ({PROD_ADMIN_DOMAIN})...")
+        run_ssh(prod_host, "root", [
+            "systemctl enable winebox-admin",
+            "systemctl restart winebox-admin",
+            "systemctl is-active winebox-admin",
+            "for i in $(seq 1 30); do "
+            "  curl -sf http://localhost:8001/health >/dev/null && exit 0; "
+            "  sleep 1; "
+            "done; "
+            "echo '--- admin failed health check after 30s, recent logs: ---'; "
+            "journalctl -u winebox-admin -n 30 --no-pager; "
+            "exit 1",
+        ])
+
     print("\n" + "=" * 60)
     if dry_run:
         print("DRY RUN complete - no changes were made")
     else:
         print(f"Release v{new_version} deployed successfully!")
-        print(f"  PyPI: https://pypi.org/project/winebox/{new_version}/")
-        print(f"  App:  https://booze.winebox.app")
+        print(f"  PyPI:        https://pypi.org/project/winebox/{new_version}/")
+        print(f"  App:         https://booze.winebox.app")
+        print(f"  Admin:       https://{PROD_ADMIN_DOMAIN}  (IP-restricted)")
+        print()
+        print(f"Smoke-test:")
+        print(f"  uv run python -m pytest tests/test_production_login.py tests/test_production_admin_smoke.py -v")
     print("=" * 60)
 
 
@@ -1030,9 +1069,21 @@ def deploy_only(
         setup_dns: Configure DNS A records (first-time setup)
         dry_run: Preview changes without applying
     """
-    cmd = "uv run python -m deploy.app"
-    if host:
-        cmd += f" --host {host}"
+    prod_host = host or _resolve_prod_host()
+
+    # Pre-deploy: keep the admin systemd unit fresh so any local edits to
+    # deploy/winebox-admin.service propagate without needing a full release.
+    if not dry_run:
+        from deploy.common import run_ssh, upload_file
+        admin_unit = Path(PROD_ADMIN_SERVICE_FILE)
+        if admin_unit.exists():
+            upload_file(prod_host, "root", admin_unit, "/tmp/winebox-admin.service")
+            run_ssh(prod_host, "root", [
+                "mv /tmp/winebox-admin.service /etc/systemd/system/winebox-admin.service",
+                "systemctl daemon-reload",
+            ])
+
+    cmd = f"uv run python -m deploy.app --host {prod_host}"
     if droplet_name:
         cmd += f" --droplet-name {droplet_name}"
     if version:
@@ -1044,6 +1095,23 @@ def deploy_only(
     if dry_run:
         cmd += " --dry-run"
     ctx.run(cmd, pty=True)
+
+    # Post-deploy: restart the admin service against the new code.
+    if not dry_run:
+        from deploy.common import run_ssh
+        print(f"\nRestarting admin panel ({PROD_ADMIN_DOMAIN})...")
+        run_ssh(prod_host, "root", [
+            "systemctl enable winebox-admin",
+            "systemctl restart winebox-admin",
+            "systemctl is-active winebox-admin",
+            "for i in $(seq 1 30); do "
+            "  curl -sf http://localhost:8001/health >/dev/null && exit 0; "
+            "  sleep 1; "
+            "done; "
+            "echo '--- admin failed health check after 30s, recent logs: ---'; "
+            "journalctl -u winebox-admin -n 30 --no-pager; "
+            "exit 1",
+        ])
 
 
 @task(name="deploy-xwines")
@@ -1173,6 +1241,9 @@ def rebuild_droplet(
 # pinned to a literal so a droplet rebuild/re-IP doesn't silently break these
 # tasks. Fall back to WINEBOX_DROPLET_IP env override for offline use.
 PROD_DROPLET_NAME = "winebox-production"
+PROD_DOMAIN = "booze.winebox.app"
+PROD_ADMIN_DOMAIN = "admin.winebox.app"
+PROD_ADMIN_SERVICE_FILE = "deploy/winebox-admin.service"
 PROD_WINEBOX_ADMIN = "/opt/winebox/.venv/bin/winebox-admin"
 
 
@@ -1264,6 +1335,99 @@ def prod_enable_user(ctx: Context, email: str) -> None:
         email: Email of user to enable
     """
     ctx.run(_ssh_cmd(f"{PROD_WINEBOX_ADMIN} enable {email}"), pty=True)
+
+
+@task(name="prod-admin-dns")
+def prod_admin_dns(ctx: Context, dry_run: bool = False) -> None:
+    """Create or update the `admin.winebox.app` A record at DigitalOcean.
+
+    One-time setup. Idempotent — safe to rerun. Adds an A record named
+    `admin` inside the existing `winebox.app` zone, pointing at the
+    production droplet IP. Run this BEFORE `prod-admin-ssl` (certbot needs
+    DNS to resolve before it can complete the HTTP-01 challenge).
+
+    Args:
+        ctx: Invoke context
+        dry_run: Preview without applying
+    """
+    prod_host = _resolve_prod_host() if not dry_run else "<droplet-ip>"
+
+    parent_zone = "winebox.app"
+    record_name = "admin"
+    fqdn = f"{record_name}.{parent_zone}"
+
+    print(f"Configuring DNS: {fqdn} -> {prod_host}")
+    if dry_run:
+        print("  DRY RUN - no changes")
+        return
+
+    from dotenv import load_dotenv
+    load_dotenv(".env")
+    token = os.environ.get("WINEBOX_DO_TOKEN")
+    if not token:
+        print("Error: WINEBOX_DO_TOKEN not set in .env or environment")
+        sys.exit(1)
+
+    from deploy.common import DigitalOceanAPI
+
+    client = DigitalOceanAPI(token)
+    existing = client.list_dns_records(parent_zone)
+    match = next(
+        (r for r in existing if r["type"] == "A" and r["name"] == record_name),
+        None,
+    )
+
+    record = {"type": "A", "name": record_name, "data": prod_host, "ttl": 300}
+    if match is None:
+        client.create_dns_record(parent_zone, record)
+        print(f"  Created A {fqdn} -> {prod_host}")
+    elif match["data"] == prod_host:
+        print(f"  Already set: A {fqdn} -> {prod_host}")
+    else:
+        client.update_dns_record(parent_zone, match["id"], record)
+        print(f"  Updated A {fqdn}: {match['data']} -> {prod_host}")
+
+    print(f"\nVerify propagation: dig +short {fqdn}")
+    print("Then run: invoke prod-admin-ssl")
+
+
+@task(name="prod-admin-ssl")
+def prod_admin_ssl(ctx: Context) -> None:
+    """Issue a Let's Encrypt cert for `admin.winebox.app`.
+
+    One-time setup. Must be run AFTER `prod-admin-dns` and after DNS has
+    propagated (test with `dig +short admin.winebox.app`).
+
+    Briefly stops nginx so certbot's standalone HTTP-01 challenge can bind
+    port 80 — the same approach as `oat-admin-ssl`. This means
+    `booze.winebox.app` is unavailable for the few seconds certbot takes to
+    issue the cert; do it during a quiet window.
+
+    After this, run `invoke deploy` to publish the nginx config that
+    references the new certs and start the admin systemd unit. nginx won't
+    reload cleanly until both the cert files and the updated config are in
+    place.
+    """
+    prod_host = _resolve_prod_host()
+    print(f"Setting up SSL for {PROD_ADMIN_DOMAIN} on {prod_host}...")
+
+    from deploy.common import run_ssh
+
+    run_ssh(prod_host, "root", "systemctl stop nginx", check=False)
+    try:
+        run_ssh(
+            prod_host, "root",
+            f"certbot certonly --standalone --non-interactive --agree-tos "
+            f"--email support@winebox.app -d {PROD_ADMIN_DOMAIN}",
+        )
+    finally:
+        # Always bring nginx back up, even if certbot failed — otherwise
+        # booze.winebox.app stays down until the operator notices.
+        run_ssh(prod_host, "root", "systemctl start nginx")
+
+    print(f"SSL configured for {PROD_ADMIN_DOMAIN}")
+    print("\nNext: run `invoke deploy` (or `invoke deploy-only --version X`)")
+    print("to publish the nginx config that references the new certs.")
 
 
 @task(name="generate-test-data")

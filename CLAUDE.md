@@ -144,10 +144,24 @@ The admin panel is IP-restricted at the nginx layer. The allowlist is **the** so
 Edit, then re-run `invoke deploy-oat` to roll the change. Empty sections are rejected — the renderer refuses to ship an open admin panel.
 
 ### Production
-- **URL:** https://booze.winebox.app
+- **App URL:** https://booze.winebox.app
+- **Admin URL:** https://admin.winebox.app  (IP-restricted, same allowlist file as OAT)
 - **Database:** `winebox`
 - **Droplet:** `winebox-production` (104.248.46.96)
 - **When the user says "make a production release"** or "make a release" or "deploy": run `invoke deploy`
+
+`invoke deploy` ships both the main app (port 8000) and the admin panel (port 8001) from a single PyPI wheel — they share `winebox.__version__`. After a successful run, smoke-test both:
+
+    uv run python -m pytest tests/test_production_login.py tests/test_production_admin_smoke.py -v
+
+Bringing up `admin.winebox.app` from scratch (one-time sequence):
+
+1. `invoke prod-admin-dns`             # add A record at DigitalOcean
+2. `dig +short admin.winebox.app`      # wait until it returns the droplet IP
+3. `invoke prod-admin-ssl`             # issue cert (briefly stops nginx)
+4. `invoke deploy`                     # publishes nginx config that references the cert + starts the admin systemd unit
+
+The `[production]` section of `deploy/winebox-admin.toml` controls who can reach `admin.winebox.app`. Same semantics as the OAT allowlist.
 
 Full production release (tests, version bump, PyPI publish, deploy):
 
@@ -174,11 +188,12 @@ To re-deploy an existing version without making a new release:
     invoke deploy-only --version 0.5.8
 
 ### Post-Deployment Production Smoke Test
-- **After EVERY production deploy**, run the production login smoke test:
-  `uv run python -m pytest tests/test_production_login.py -v`
-- This verifies health, login, and authenticated API access against https://booze.winebox.app
-- Requires `WINEBOX_PROD_TEST_USER` and `WINEBOX_PROD_TEST_PASSWORD` in `.env`
-- If this test fails after a deploy, the deploy has broken authentication — investigate immediately
+- **After EVERY production deploy**, run both production smoke tests:
+  `uv run python -m pytest tests/test_production_login.py tests/test_production_admin_smoke.py -v`
+- The login test verifies health, login, and authenticated API access against https://booze.winebox.app
+- The admin test verifies the IP-restricted admin panel at https://admin.winebox.app
+- Requires `WINEBOX_PROD_TEST_USER` and `WINEBOX_PROD_TEST_PASSWORD` in `.env`; the admin test auto-skips on machines outside the allowlist
+- If either fails after a deploy, the deploy has broken something — investigate immediately
 
 ### Deployment Rules (both environments)
 
