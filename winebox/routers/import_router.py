@@ -27,7 +27,7 @@ from winebox.schemas.import_schemas import (
     RowChunkRequest,
 )
 from winebox.services.auth import RequireAuth
-from winebox.services.rate_limit import make_limiter
+from winebox.services.rate_limit import MAX_PAGE_SIZE, make_limiter
 from winebox.services.import_service import (
     UPLOAD_CHUNK_SIZE,
     VALID_WINE_FIELDS,
@@ -506,15 +506,15 @@ async def process_batch_stream(
 @router.get("/batches", response_model=list[ImportBatchSummary])
 async def list_batches(
     current_user: RequireAuth,
-    limit: int | None = None,
+    limit: int = Query(default=100, ge=1, le=MAX_PAGE_SIZE),
 ) -> list[ImportBatchSummary]:
     """List the current user's import batches."""
-    query = ImportBatch.find(
-        {"owner_id": current_user.id}
-    ).sort([("imported_at", -1)])
-    if limit is not None:
-        query = query.limit(limit)
-    batches = await query.to_list()
+    batches = await (
+        ImportBatch.find({"owner_id": current_user.id})
+        .sort([("imported_at", -1)])
+        .limit(limit)
+        .to_list()
+    )
 
     return [
         ImportBatchSummary(

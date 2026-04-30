@@ -26,6 +26,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from winebox.config import settings
 from winebox.database import close_db, init_db
 from winebox.main import SecurityHeadersMiddleware
 
@@ -49,10 +50,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 limiter = Limiter(key_func=get_remote_address)
 
+# Disable interactive API docs outside debug mode. The admin panel sits
+# behind an IP allowlist, but exposing the full OpenAPI schema to anyone
+# inside the allowlist (or anyone who bypasses it) is unnecessary.
+_docs_enabled = settings.debug
+
 app = FastAPI(
     title="WineBox Admin",
     version=__version__,
     lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 app.state.limiter = limiter

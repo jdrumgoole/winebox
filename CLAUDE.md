@@ -18,7 +18,7 @@
 
 ## Backups
 - **All database backups must go to S3**, never just `/tmp/` on a droplet. Use `scripts/mongodb_backup.py` with the `--profile winebox_backup` flag.
-- Example: `uv run python scripts/mongodb_backup.py --profile winebox_backup backup "mongodb+srv://...@shared.2t22cum.mongodb.net/winebox"`
+- Example: `uv run python scripts/mongodb_backup.py --profile winebox_backup backup "mongodb+srv://...@<cluster>.mongodb.net/winebox"`
 - S3 bucket is configured via `WINEBOX_S3_BUCKET` env var. AWS credentials use the `winebox_backup` profile.
 - Always back up the production database before any deployment or data migration.
 

@@ -9,6 +9,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from winebox.services.auth import (
+    RequireAdmin,
     RequireAuth,
     authenticate_user,
     create_access_token,
@@ -57,13 +58,8 @@ async def admin_logout(
 
 
 @router.get("/me")
-async def admin_me(current_user: RequireAuth) -> dict:
+async def admin_me(current_user: RequireAdmin) -> dict:
     """Get current admin user info."""
-    if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
-        )
     return {
         "id": str(current_user.id),
         "email": current_user.email,

@@ -357,6 +357,36 @@ footer a {
     background: #fde8ea;
 }
 
+/* Pagination */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+}
+
+.pagination-bar .pagination-status {
+    flex: 1;
+    min-width: 0;
+}
+
+.pagination-bar .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-bar .pagination-controls button[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* Login form styles */
 .login-container {
     max-width: 400px;
