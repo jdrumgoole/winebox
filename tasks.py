@@ -7,6 +7,7 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from invoke import task
 from invoke.context import Context
@@ -525,23 +526,67 @@ def purge(ctx: Context, include_images: bool = True, yes: bool = False) -> None:
     ctx.run(cmd, pty=not yes)
 
 
+def _backup_url(base_url: str, database: str) -> str:
+    """Embed the database name in a MongoDB connection URL.
+
+    `WINEBOX_MONGODB_URL` is the cluster URL with no database path, but
+    `scripts/mongodb_backup.py` requires the database name in the URL
+    (e.g. ``mongodb+srv://.../winebox``). This strips any existing path,
+    inserts the database before the query string, and preserves params
+    like ``?retryWrites=true&w=majority``.
+    """
+    parts = urlsplit(base_url)
+    return urlunsplit(
+        (parts.scheme, parts.netloc, f"/{database}", parts.query, parts.fragment)
+    )
+
+
+def _backup_database(ctx: Context, *, database: str, profile: str) -> None:
+    """Run the backup script for ``database`` against the configured cluster."""
+    base_url = os.environ.get("WINEBOX_MONGODB_URL")
+    if not base_url:
+        print("Error: WINEBOX_MONGODB_URL is not set", file=sys.stderr)
+        sys.exit(1)
+    full_url = _backup_url(base_url, database)
+    cmd = (
+        f"uv run python scripts/mongodb_backup.py "
+        f"--profile {shlex.quote(profile)} "
+        f"backup {shlex.quote(full_url)}"
+    )
+    ctx.run(cmd, pty=True)
+
+
 @task(aliases=["db-backup"])
-def backup(ctx: Context, profile: str = "winebox_backup", database: str | None = None) -> None:
-    """Back up the MongoDB database to S3 via scripts/mongodb_backup.py.
+def backup(ctx: Context, database: str, profile: str = "winebox_backup") -> None:
+    """Back up a MongoDB database to S3.
+
+    The database name is required so it is impossible to back up the
+    wrong cluster by accident. Use ``prod-backup`` / ``oat-backup`` for
+    the named environments rather than calling this directly.
 
     Args:
         ctx: Invoke context.
-        profile: AWS profile for the S3 upload (default: winebox_backup).
-        database: Override the database name; defaults to the connection URL's db.
+        database: Database name (e.g. ``winebox`` or ``winebox_oat``).
+        profile: AWS profile for the S3 upload (default: ``winebox_backup``).
     """
-    url = os.environ.get("WINEBOX_MONGODB_URL")
-    if not url:
-        print("Error: WINEBOX_MONGODB_URL is not set", file=sys.stderr)
-        sys.exit(1)
-    cmd = f"uv run python scripts/mongodb_backup.py --profile {shlex.quote(profile)} backup {shlex.quote(url)}"
-    if database:
-        cmd += f" --database {shlex.quote(database)}"
-    ctx.run(cmd, pty=True)
+    _backup_database(ctx, database=database, profile=profile)
+
+
+@task(name="prod-backup")
+def prod_backup(ctx: Context, profile: str = "winebox_backup") -> None:
+    """Back up the production database (``winebox``) to S3.
+
+    Run this before every production deploy. The MongoDB URL is read
+    from ``WINEBOX_MONGODB_URL`` (in ``.env`` or the shell), and the
+    ``winebox`` database name is appended to it.
+    """
+    _backup_database(ctx, database="winebox", profile=profile)
+
+
+@task(name="oat-backup")
+def oat_backup(ctx: Context, profile: str = "winebox_backup") -> None:
+    """Back up the OAT database (``winebox_oat``) to S3."""
+    _backup_database(ctx, database="winebox_oat", profile=profile)
 
 
 @task(name="seed-reference", aliases=["db-seed"])
