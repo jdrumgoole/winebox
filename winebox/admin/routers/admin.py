@@ -6,7 +6,7 @@ from typing import Any
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -16,6 +16,7 @@ from winebox.config.settings import settings
 from winebox.models import ImportBatch, Transaction, User, Wine
 from winebox.models.import_batch_row import RawUploadRow
 from winebox.services.auth import RequireAdmin, get_password_hash
+from winebox.services.rate_limit import MAX_PAGE_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +33,9 @@ async def get_admin_info(
     """Return server info for the admin panel header.
 
     The MongoDB hostname is intentionally NOT exposed: even with admin auth,
-    leaking the cluster name (e.g. `shared.2t22cum.mongodb.net`) gives
-    attackers a free starting point if admin credentials are ever stolen.
-    Admins can read the URL from the secret store if they need it.
+    leaking the cluster name gives attackers a free starting point if admin
+    credentials are ever stolen. Admins can read the URL from the secret
+    store if they need it.
     """
     app_url = str(request.base_url).rstrip("/")
 
@@ -49,33 +50,52 @@ async def get_admin_info(
 async def list_users(
     request: Request,
     admin: RequireAdmin,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict[str, Any]:
-    """List all users with their cellar statistics.
+    """List users with their cellar statistics, newest first.
+
+    Paginated via ``skip`` and ``limit``. ``total_users`` always reflects
+    the full unpaginated count so the UI can render page controls.
 
     Returns user information including:
     - Basic user info (email, verification status, etc.)
     - Account timestamps (created_at, last_login)
     - Cellar size (total bottles)
     """
-    # Get all users
-    users = await User.find_all().sort([("created_at", -1)]).to_list()
+    total_users = await User.count()
 
-    # Get cellar sizes via aggregation
-    cellar_sizes_pipeline = [
-        {"$match": {"inventory.quantity": {"$gt": 0}}},
-        {"$group": {"_id": "$owner_id", "total": {"$sum": "$inventory.quantity"}}},
-    ]
-    cursor = await Wine.get_pymongo_collection().aggregate(
-        cellar_sizes_pipeline
+    # Secondary sort on _id keeps pagination stable when many users share
+    # the same created_at (BSON datetime is millisecond precision, so ties
+    # are common) — without it skip/limit can overlap or miss rows.
+    users = await (
+        User.find_all()
+        .sort([("created_at", -1), ("_id", -1)])
+        .skip(skip)
+        .limit(limit)
+        .to_list(length=limit)
     )
-    cellar_sizes_result = await cursor.to_list(length=None)
 
-    # Create a lookup dict for cellar sizes
-    cellar_size_by_user = {
-        row["_id"]: row["total"] for row in cellar_sizes_result
-    }
+    # Cellar sizes for just the page we're returning — keeps the
+    # aggregation cost bounded by ``limit`` rather than total user count.
+    user_ids = [u.id for u in users]
+    cellar_size_by_user: dict[Any, int] = {}
+    if user_ids:
+        cellar_sizes_pipeline = [
+            {"$match": {
+                "owner_id": {"$in": user_ids},
+                "inventory.quantity": {"$gt": 0},
+            }},
+            {"$group": {"_id": "$owner_id", "total": {"$sum": "$inventory.quantity"}}},
+        ]
+        cursor = await Wine.get_pymongo_collection().aggregate(
+            cellar_sizes_pipeline
+        )
+        cellar_sizes_result = await cursor.to_list(length=len(user_ids))
+        cellar_size_by_user = {
+            row["_id"]: row["total"] for row in cellar_sizes_result
+        }
 
-    # Build response
     user_list = []
     for user in users:
         user_data = {
@@ -93,7 +113,9 @@ async def list_users(
 
     return {
         "users": user_list,
-        "total_users": len(users),
+        "total_users": total_users,
+        "skip": skip,
+        "limit": limit,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 

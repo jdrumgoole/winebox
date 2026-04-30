@@ -6,6 +6,7 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException, Query
 
 from winebox.models import Classification, GrapeVariety, Region, WineType
+from winebox.services.rate_limit import MAX_REFERENCE_RESULTSET
 from winebox.schemas.reference import (
     ClassificationResponse,
     ClassificationsBySystem,
@@ -28,7 +29,7 @@ router = APIRouter()
 @router.get("/wine-types", response_model=list[WineTypeResponse])
 async def list_wine_types() -> list[WineTypeResponse]:
     """List all wine types."""
-    wine_types = await WineType.find().sort([("name", 1)]).to_list()
+    wine_types = await WineType.find().sort([("name", 1)]).to_list(length=MAX_REFERENCE_RESULTSET)
     return [
         WineTypeResponse(
             id=wt.type_id,
@@ -73,7 +74,7 @@ async def list_grape_varieties(
     if search:
         conditions["name"] = {"$regex": re.compile(re.escape(search), re.IGNORECASE)}
 
-    varieties = await GrapeVariety.find(conditions).sort([("name", 1)]).to_list()
+    varieties = await GrapeVariety.find(conditions).sort([("name", 1)]).to_list(length=MAX_REFERENCE_RESULTSET)
     return [
         GrapeVarietyResponse(
             id=str(v.id),
@@ -135,7 +136,7 @@ async def list_regions(
 
     regions = await Region.find(conditions).sort(
         [("level", 1), ("display_name", 1)]
-    ).to_list()
+    ).to_list(length=MAX_REFERENCE_RESULTSET)
 
     return [
         RegionResponse(
@@ -161,7 +162,7 @@ async def get_region_tree(
 
     all_regions = await Region.find(conditions).sort(
         [("level", 1), ("display_name", 1)]
-    ).to_list()
+    ).to_list(length=MAX_REFERENCE_RESULTSET)
 
     # Build tree structure
     regions_by_id: dict[str, RegionWithChildren] = {}
@@ -227,7 +228,7 @@ async def get_region_children(region_id: str) -> list[RegionResponse]:
     # Get children
     children = await Region.find(
         {"parent_id": parent.id}
-    ).sort([("display_name", 1)]).to_list()
+    ).sort([("display_name", 1)]).to_list(length=MAX_REFERENCE_RESULTSET)
 
     return [
         RegionResponse(
@@ -267,7 +268,7 @@ async def get_region_path(region_id: str) -> list[RegionResponse]:
     if region.ancestors:
         ancestor_docs = await Region.find(
             {"_id": {"$in": region.ancestors}}
-        ).sort([("level", 1)]).to_list()
+        ).sort([("level", 1)]).to_list(length=MAX_REFERENCE_RESULTSET)
         path = [_to_response(a) for a in ancestor_docs]
         path.append(_to_response(region))
         return path
@@ -305,7 +306,7 @@ async def list_classifications(
 
     classifications = await Classification.find(conditions).sort(
         [("country", 1), ("system", 1), ("level", 1)]
-    ).to_list()
+    ).to_list(length=MAX_REFERENCE_RESULTSET)
 
     return [
         ClassificationResponse(
@@ -332,7 +333,7 @@ async def list_classifications_by_system(
 
     classifications = await Classification.find(conditions).sort(
         [("country", 1), ("system", 1), ("level", 1)]
-    ).to_list()
+    ).to_list(length=MAX_REFERENCE_RESULTSET)
 
     # Group by system
     systems: dict[str, ClassificationsBySystem] = {}

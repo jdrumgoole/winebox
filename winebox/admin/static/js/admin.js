@@ -204,25 +204,86 @@ function renderManageTable(users) {
 // Load users into both tabs
 // ---------------------------------------------------------------------------
 
+const USERS_PAGE_SIZE = 50;
+
 let _cachedUsers = [];
 let _manageListenersAttached = false;
+let _usersSkip = 0;
+let _usersTotal = 0;
+
+function renderUsersPagination(skip, limit, total) {
+    const start = total === 0 ? 0 : skip + 1;
+    const end = Math.min(skip + limit, total);
+    const onFirstPage = skip <= 0;
+    const onLastPage = end >= total;
+    return `
+        <div class="pagination-bar">
+            <div class="pagination-status">Showing ${start}–${end} of ${total} users</div>
+            <div class="pagination-controls">
+                <button class="btn-admin btn-admin-outline" data-page-action="prev" ${onFirstPage ? 'disabled' : ''}>Previous</button>
+                <button class="btn-admin btn-admin-outline" data-page-action="next" ${onLastPage ? 'disabled' : ''}>Next</button>
+            </div>
+        </div>
+    `;
+}
+
+function attachUsersPaginationListeners(container) {
+    container.querySelectorAll('[data-page-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.pageAction;
+            if (action === 'prev') {
+                _usersSkip = Math.max(0, _usersSkip - USERS_PAGE_SIZE);
+            } else if (action === 'next') {
+                _usersSkip = _usersSkip + USERS_PAGE_SIZE;
+            }
+            loadUsers();
+        });
+    });
+}
 
 async function loadUsers() {
     const readonlyContainer = document.getElementById('users-readonly-container');
     const manageContainer = document.getElementById('users-manage-container');
 
     try {
-        const response = await apiRequest('/api/users');
+        const params = new URLSearchParams({
+            skip: String(_usersSkip),
+            limit: String(USERS_PAGE_SIZE),
+        });
+        const response = await apiRequest(`/api/users?${params.toString()}`);
         if (!response.ok) throw new Error('Failed to load users');
         const data = await response.json();
         _cachedUsers = data.users;
+        _usersTotal = data.total_users;
 
-        readonlyContainer.innerHTML = renderReadonlyTable(_cachedUsers);
+        // If the page we asked for is now past the end (e.g. users were
+        // deleted from another tab) snap back to the last valid page.
+        if (_usersSkip > 0 && _usersSkip >= _usersTotal) {
+            const lastPageStart = Math.max(
+                0,
+                Math.floor(Math.max(0, _usersTotal - 1) / USERS_PAGE_SIZE) * USERS_PAGE_SIZE,
+            );
+            if (lastPageStart !== _usersSkip) {
+                _usersSkip = lastPageStart;
+                await loadUsers();
+                return;
+            }
+        }
+
+        const paginationHtml = renderUsersPagination(
+            data.skip ?? _usersSkip,
+            data.limit ?? USERS_PAGE_SIZE,
+            _usersTotal,
+        );
+
+        readonlyContainer.innerHTML = renderReadonlyTable(_cachedUsers) + paginationHtml;
+        attachUsersPaginationListeners(readonlyContainer);
 
         // Skip manage table re-render if a dropdown is currently open
         const hasOpenDropdown = manageContainer.querySelector('.actions-dropdown.open');
         if (!hasOpenDropdown) {
-            manageContainer.innerHTML = renderManageTable(_cachedUsers);
+            manageContainer.innerHTML = renderManageTable(_cachedUsers) + paginationHtml;
+            attachUsersPaginationListeners(manageContainer);
         }
 
         // Attach delegated listeners once (they survive innerHTML changes via delegation)

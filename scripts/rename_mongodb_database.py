@@ -8,7 +8,7 @@ MongoDB doesn't support renaming databases directly, so this script:
 
 Usage:
     uv run python scripts/rename_mongodb_database.py \
-        --url "mongodb+srv://...@shared.2t22cum.mongodb.net" \
+        --url "mongodb+srv://...@<cluster>.mongodb.net" \
         --source winebox-oat \
         --target winebox_oat
 

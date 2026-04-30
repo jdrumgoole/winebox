@@ -9,6 +9,7 @@ All styling reuses WineBox brand colours and component patterns.
 
 from __future__ import annotations
 
+import html
 from datetime import datetime, timezone
 
 
@@ -29,7 +30,11 @@ def render_html(
 
     filters_summary = ""
     if filters_applied:
-        parts = [f"{k}: {v}" for k, v in filters_applied.items() if v]
+        parts = [
+            f"{html.escape(k)}: {html.escape(v)}"
+            for k, v in filters_applied.items()
+            if v
+        ]
         if parts:
             filters_summary = f'<p class="export-filters">Filtered by: {", ".join(parts)}</p>'
 

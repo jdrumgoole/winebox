@@ -186,7 +186,7 @@ async def get_item_events(
         raise HTTPException(status_code=404, detail="Item not found")
 
     events = await CellarEvent.find(
-        {"cellar_item_id": oid}
+        {"cellar_item_id": oid, "cellar_id": current_user.id}
     ).sort([("created_at", -1)]).to_list()
 
     return {
