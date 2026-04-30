@@ -4581,12 +4581,7 @@ async function showXWinesDetail(wineId) {
 
         let vintages = '';
         if (wine.vintages) {
-            try {
-                const parsed = JSON.parse(wine.vintages);
-                vintages = Array.isArray(parsed) ? parsed.join(', ') : wine.vintages;
-            } catch {
-                vintages = wine.vintages;
-            }
+            vintages = parsePythonList(wine.vintages);
         }
 
         const ratingDisplay = wine.avg_rating
