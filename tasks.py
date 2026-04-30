@@ -868,15 +868,22 @@ def _release_to_pypi(
             print("  Committed pending changes.")
 
     # Step 1: Run tests
+    # test_production_login.py and test_production_admin_smoke.py hit live
+    # production and are *post*-deploy smoke checks (see line ~1050) — they
+    # must not gate the pre-deploy run, especially for OAT releases where
+    # production is irrelevant.
+    pretest_cmd = (
+        "WINEBOX_USE_CLAUDE_VISION=false uv run python -m pytest tests/ "
+        "--ignore=tests/test_checkin_e2e.py "
+        "--ignore=tests/test_production_login.py "
+        "--ignore=tests/test_production_admin_smoke.py -v"
+    )
     if not skip_tests:
         print("\n[1/6] Running test suite...")
         if dry_run:
-            print("  DRY RUN - Would run: uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py -v")
+            print(f"  DRY RUN - Would run: {pretest_cmd}")
         else:
-            ctx.run(
-                "WINEBOX_USE_CLAUDE_VISION=false uv run python -m pytest tests/ --ignore=tests/test_checkin_e2e.py -v",
-                pty=True,
-            )
+            ctx.run(pretest_cmd, pty=True)
             print("  Tests passed!")
     else:
         print("\n[1/6] Skipping tests (--skip-tests)")
