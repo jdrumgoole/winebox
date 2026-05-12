@@ -1,5 +1,10 @@
-"""API routers for WineBox."""
+"""API routers for WineBox.
 
-from winebox.routers import auth, cellar, search, transactions, wines
+Auth routes are owned by the embedded regstack instance (mounted from
+:func:`winebox.main.lifespan`), so this package exports only the
+domain-specific routers.
+"""
 
-__all__ = ["auth", "wines", "cellar", "transactions", "search"]
+from winebox.routers import cellar, search, transactions, wines
+
+__all__ = ["wines", "cellar", "transactions", "search"]

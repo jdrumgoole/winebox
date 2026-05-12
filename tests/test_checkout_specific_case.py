@@ -211,8 +211,8 @@ async def test_cross_user_cellar_item_returns_404(
 ) -> None:
     """User B trying to debit User A's case via B's own wine → 404."""
     from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
+    from tests._regstack_helpers import create_access_token
     from winebox.models import User
-    from winebox.services.auth import create_access_token
 
     # User A creates a case.
     name_a = f"UserA {uuid.uuid4().hex[:6]}"
@@ -227,7 +227,7 @@ async def test_cross_user_cellar_item_returns_404(
         is_active=True, is_verified=True, is_superuser=False,
         created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
     ).insert()
-    token = create_access_token(data={"sub": other_email})
+    token = await create_access_token(data={"sub": other_email})
     async with AsyncClient(
         transport=ASGITransport(app=get_test_app()),
         base_url="http://test",

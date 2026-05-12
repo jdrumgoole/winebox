@@ -18,10 +18,11 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from winebox import __version__
+from tests._regstack_helpers import create_access_token
 from winebox.admin.routers import admin as admin_router_module
 from winebox.admin.routers import auth as admin_auth_module
 from winebox.models import User
-from winebox.services.auth import create_access_token, get_password_hash
+from winebox.services.auth import get_password_hash
 
 
 def _build_admin_test_app() -> FastAPI:
@@ -56,7 +57,7 @@ async def admin_http_client(isolated_db) -> AsyncGenerator[tuple[AsyncClient, Us
     )
     await admin_user.insert()
 
-    token = create_access_token(data={"sub": admin_email})
+    token = await create_access_token(data={"sub": admin_email})
     transport = ASGITransport(app=_build_admin_test_app())
     async with AsyncClient(
         transport=transport,

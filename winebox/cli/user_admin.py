@@ -12,7 +12,7 @@ Commands:
 import argparse
 import asyncio
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from getpass import getpass
 
 from winebox.database import init_db as _init_db
@@ -170,7 +170,12 @@ async def remove_user(email: str, force: bool = False, skip_db_init: bool = Fals
 
 
 async def change_password(email: str, password: str, skip_db_init: bool = False) -> None:
-    """Change a user's password."""
+    """Change a user's password.
+
+    Also bumps the user's `tokens_invalidated_after` cutoff so every JWT
+    issued before this reset is rejected — admin-driven password changes
+    must invalidate existing sessions exactly like a user-driven reset.
+    """
     if not skip_db_init:
         await init_db()
 
@@ -179,14 +184,13 @@ async def change_password(email: str, password: str, skip_db_init: bool = False)
         print(f"Error: User '{email}' not found.")
         sys.exit(1)
 
+    now = datetime.now(timezone.utc)
     user.hashed_password = get_password_hash(password)
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = now
+    # Add a second of slop so a brand-new token minted in the same wall-clock
+    # moment is not falsely rejected by the cutoff comparison.
+    user.tokens_invalidated_after = now + timedelta(seconds=1)
     await user.save()
-
-    # Admin-driven password change — invalidate every existing JWT for this
-    # user so an attacker holding a stolen session cannot survive the reset.
-    from winebox.services.auth import revoke_all_user_tokens
-    await revoke_all_user_tokens(user, reason="admin_password_change")
 
     print(f"Password for user '{email}' has been updated.")
 

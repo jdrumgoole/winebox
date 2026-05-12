@@ -20,6 +20,15 @@ load_dotenv()  # Load .env so API keys etc. are available to tests
 if "WINEBOX_DATABASE" not in os.environ:
     os.environ["WINEBOX_DATABASE"] = "winebox_test"
 
+# Tests always target the local Mongo, never the .env's Atlas URL —
+# regstack reads `settings.mongodb_url` to build its own client, and a
+# `.env` symlink intended for deploys would otherwise point regstack at
+# production while xdist workers' user inserts hit localhost. Force the
+# test value here regardless of what .env loaded.
+os.environ["WINEBOX_MONGODB_URL"] = os.environ.get(
+    "TEST_MONGODB_URL", "mongodb://localhost:27017"
+)
+
 # Disable slowapi rate limits for the test suite. The slowapi memory store
 # is per-process, so a single xdist worker's tests share one bucket per
 # endpoint. Otherwise tests like `test_supported_currencies` (which fires 9
@@ -33,7 +42,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator
 import tempfile
-from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -42,7 +50,8 @@ from pymongo import AsyncMongoClient
 
 from winebox.database import init_db
 from winebox.models import User
-from winebox.services.auth import get_password_hash, create_access_token
+from winebox.services.auth import get_password_hash
+from tests._regstack_helpers import create_access_token
 
 # Pre-compute password hash for test fixtures — Argon2 is deliberately slow
 # (~38ms per call), and every test using the `client` fixture hashes the same
@@ -156,10 +165,16 @@ def pytest_unconfigure(config: pytest.Config) -> None:
 
 # Create a test-specific app to avoid lifespan conflicts
 def create_test_app():
-    """Create a FastAPI app configured for testing (no database lifespan)."""
+    """Create a FastAPI app configured for testing (no database lifespan).
+
+    Mounts the regstack auth router explicitly — the production app does
+    this inside its lifespan, which doesn't run for ASGI test clients.
+    """
     from fastapi import FastAPI
     from fastapi.responses import JSONResponse, RedirectResponse
+
     from winebox import __version__
+    from winebox.auth.regstack_setup import build_regstack
     from winebox.config import settings
 
     # Empty lifespan for testing - we manage the database ourselves
@@ -173,12 +188,19 @@ def create_test_app():
         lifespan=test_lifespan,
     )
 
-    # Copy routes from the main app
+    # Copy routes from main_app FIRST so the override `/api/auth/me`
+    # registered there wins over regstack's own /me when both match.
     from winebox.main import app as main_app, SecurityHeadersMiddleware
 
-    # Copy all routes
     for route in main_app.routes:
         test_app.routes.append(route)
+
+    # Now mount regstack — for paths the main app already serves (notably
+    # the /me override), FastAPI tries routes in registration order, so the
+    # main-app-side handler is matched first and these regstack handlers
+    # become dead aliases. That's fine.
+    rs = build_regstack()
+    test_app.include_router(rs.router, prefix=rs.config.api_prefix)
 
     # Add security headers middleware (same as main app)
     test_app.add_middleware(SecurityHeadersMiddleware)
@@ -240,8 +262,24 @@ async def init_test_db(mongo_client):
     The database was dropped by pytest_configure in the controller process.
     ensure_indexes() is idempotent — first worker creates them, others
     find them already present.
+
+    Also brings up the embedded regstack instance against `SHARED_TEST_DB`
+    so auth endpoints in tests resolve through regstack just like
+    production. We have to override the live Settings before
+    `build_regstack()` runs, because regstack snapshots the database name
+    at construction time.
     """
     await init_db(mongo_client=mongo_client, mongodb_database=SHARED_TEST_DB)
+
+    from winebox.auth.regstack_setup import build_regstack, reset_regstack
+    from winebox.config import settings as _settings
+
+    # Pin regstack at the shared test DB regardless of what the
+    # environment-driven settings defaulted to.
+    _settings._config.database.mongodb_database = SHARED_TEST_DB
+    reset_regstack()
+    rs = build_regstack()
+    await rs.backend.install_schema()
 
     from winebox.database import get_database
 
@@ -253,23 +291,52 @@ async def init_test_db(mongo_client):
 async def isolated_db(mongo_client):
     """Isolated database for tests that purge all data.
 
-    Creates a throwaway database, switches the global to it,
-    runs the test, then restores the shared database connection.
-    Safe because xdist runs tests sequentially within a worker.
+    Creates a throwaway database, switches both the WineBox connection
+    AND the regstack singleton to point at it, runs the test, then
+    restores the shared connection / singleton. Also forces a rebuild
+    of the test ASGI app so its mounted regstack routes resolve through
+    the new instance. Safe because xdist runs tests sequentially within
+    a worker.
     """
     db_name = f"test_winebox_isolated_{os.getpid()}_{uuid.uuid4().hex[:8]}"
     await init_db(
         mongo_client=mongo_client, mongodb_database=db_name, skip_indexes=True
     )
 
+    from winebox.auth.regstack_setup import build_regstack, reset_regstack
+    from winebox.config import settings as _settings
+
+    # Override the database name on the live settings so build_regstack()
+    # below targets the isolated DB. We restore on teardown.
+    saved_db_name = _settings._config.database.mongodb_database
+    _settings._config.database.mongodb_database = db_name
+
+    reset_regstack()
+    iso_rs = build_regstack()
+    await iso_rs.backend.install_schema()
+
+    # Invalidate the test-app singleton so its included regstack router is
+    # rebuilt against `iso_rs`.
+    global _test_app
+    saved_test_app = _test_app
+    _test_app = None
+
     from winebox.database import get_database
 
-    yield get_database()
-    await mongo_client.drop_database(db_name)
-    # Restore the shared database connection
-    await init_db(
-        mongo_client=mongo_client, mongodb_database=SHARED_TEST_DB, skip_indexes=True
-    )
+    try:
+        yield get_database()
+    finally:
+        # Restore the shared DB, singleton, and cached test app.
+        _settings._config.database.mongodb_database = saved_db_name
+        await mongo_client.drop_database(db_name)
+        await init_db(
+            mongo_client=mongo_client,
+            mongodb_database=SHARED_TEST_DB,
+            skip_indexes=True,
+        )
+        reset_regstack()
+        build_regstack()
+        _test_app = saved_test_app
 
 
 @pytest.fixture
@@ -296,8 +363,7 @@ async def client(init_test_db, test_user_email) -> AsyncGenerator[AsyncClient, N
     )
     await test_user.insert()
 
-    # Create auth token with email as subject
-    access_token = create_access_token(data={"sub": test_user_email})
+    access_token = await create_access_token(data={"sub": test_user_email})
 
     # Use test app instead of main app
     app = get_test_app()
@@ -325,7 +391,7 @@ async def admin_client(init_test_db) -> AsyncGenerator[AsyncClient, None]:
     )
     await admin_user.insert()
 
-    access_token = create_access_token(data={"sub": admin_email})
+    access_token = await create_access_token(data={"sub": admin_email})
     app = get_test_app()
     transport = ASGITransport(app=app)
     async with AsyncClient(
@@ -378,22 +444,26 @@ def test_user(test_user_email) -> dict:
     }
 
 
-@pytest.fixture
-def auth_headers(test_user) -> dict:
-    """Return authorization headers for the test user."""
-    access_token = create_access_token(data={"sub": test_user["email"]})
+@pytest_asyncio.fixture
+async def auth_headers(test_user, init_test_db) -> dict:
+    """Return authorization headers for the test user.
+
+    Inserts the user record on demand so the token's `sub` (user_id)
+    resolves to a real account in the regstack user lookup.
+    """
+    existing = await User.find_one({"email": test_user["email"]})
+    if existing is None:
+        await User(
+            email=test_user["email"],
+            hashed_password=_CACHED_TEST_PASSWORD_HASH,
+            is_active=True,
+            is_verified=True,
+            is_superuser=False,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        ).insert()
+    access_token = await create_access_token(data={"sub": test_user["email"]})
     return {"Authorization": f"Bearer {access_token}"}
-
-
-@pytest.fixture
-def mock_email_service():
-    """Mock email service to prevent actual email sending in tests."""
-    with patch("winebox.auth.users.get_email_service") as mock:
-        mock_service = AsyncMock()
-        mock_service.send_verification_email = AsyncMock(return_value=True)
-        mock_service.send_password_reset_email = AsyncMock(return_value=True)
-        mock.return_value = mock_service
-        yield mock_service
 
 
 @pytest_asyncio.fixture(scope="function")

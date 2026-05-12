@@ -8,8 +8,9 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from tests._regstack_helpers import create_access_token
 from winebox.models import User
-from winebox.services.auth import create_access_token, get_password_hash
+from winebox.services.auth import get_password_hash
 
 # Pre-compute password hashes — Argon2 is deliberately slow (~38ms per call)
 _HASH_PASSWORD1 = get_password_hash("password1")
@@ -39,7 +40,7 @@ async def two_users_clients(init_test_db):
         updated_at=datetime.utcnow(),
     )
     await user1.insert()
-    token1 = create_access_token(data={"sub": user1_email})
+    token1 = await create_access_token(data={"sub": user1_email})
 
     # Create user 2
     user2 = User(
@@ -52,7 +53,7 @@ async def two_users_clients(init_test_db):
         updated_at=datetime.utcnow(),
     )
     await user2.insert()
-    token2 = create_access_token(data={"sub": user2_email})
+    token2 = await create_access_token(data={"sub": user2_email})
 
     app = get_test_app()
 

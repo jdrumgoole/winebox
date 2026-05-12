@@ -26,6 +26,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from winebox.auth.regstack_setup import build_regstack
 from winebox.config import settings
 from winebox.database import close_db, init_db
 from winebox.main import SecurityHeadersMiddleware
@@ -40,10 +41,16 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Manage application lifecycle: database connection."""
+    """Manage application lifecycle: database connection + regstack."""
     await init_db()
+    rs = build_regstack()
+    await rs.backend.install_schema()
     logger.info("WineBox Admin %s started", __version__)
     yield
+    try:
+        await rs.aclose()
+    except Exception:
+        logger.exception("Error closing regstack backend")
     await close_db()
     logger.info("WineBox Admin shutting down")
 

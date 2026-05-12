@@ -184,8 +184,8 @@ async def test_breakdown_scoped_by_owner(client: AsyncClient, sample_image_bytes
     from datetime import datetime, timezone
     from httpx import ASGITransport
     from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
+    from tests._regstack_helpers import create_access_token
     from winebox.models import User
-    from winebox.services.auth import create_access_token
 
     other_email = f"b-{uuid.uuid4().hex[:8]}@example.com"
     await User(
@@ -193,7 +193,7 @@ async def test_breakdown_scoped_by_owner(client: AsyncClient, sample_image_bytes
         is_active=True, is_verified=True, is_superuser=False,
         created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
     ).insert()
-    other_token = create_access_token(data={"sub": other_email})
+    other_token = await create_access_token(data={"sub": other_email})
     async with AsyncClient(
         transport=ASGITransport(app=get_test_app()),
         base_url="http://test",

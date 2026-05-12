@@ -40,7 +40,6 @@ def test_all_collections_have_indexes() -> None:
 def test_expected_collections_present() -> None:
     """Verify all model collections have index definitions."""
     expected = {
-        "users",
         "wines",
         "transactions",
         "wine_types",
@@ -50,8 +49,6 @@ def test_expected_collections_present() -> None:
         "xwines_wines",
         "xwines_metadata",
         "xwines_prices",
-        "revoked_tokens",
-        "login_attempts",
         "import_batches",
         "raw_uploads",
         "cellars",

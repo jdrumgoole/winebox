@@ -397,7 +397,7 @@ async def test_other_user_cannot_delete_entry(
     created = await _create_price(client, wine_name=name)
 
     from winebox.models import User
-    from winebox.services.auth import create_access_token
+    from tests._regstack_helpers import create_access_token
     from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
 
     other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
@@ -411,7 +411,7 @@ async def test_other_user_cannot_delete_entry(
         updated_at=datetime.now(timezone.utc),
     )
     await other_user.insert()
-    other_token = create_access_token(data={"sub": other_email})
+    other_token = await create_access_token(data={"sub": other_email})
     app = get_test_app()
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -432,7 +432,7 @@ async def test_other_user_cannot_access_photo(
     created = await _create_price(client, wine_name=name, photo=photo)
 
     from winebox.models import User
-    from winebox.services.auth import create_access_token
+    from tests._regstack_helpers import create_access_token
     from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
 
     other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
@@ -446,7 +446,7 @@ async def test_other_user_cannot_access_photo(
         updated_at=datetime.now(timezone.utc),
     )
     await other_user.insert()
-    other_token = create_access_token(data={"sub": other_email})
+    other_token = await create_access_token(data={"sub": other_email})
     app = get_test_app()
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -466,7 +466,7 @@ async def test_two_users_contribute_to_same_wine(
     body1 = await _create_price(client, wine_name=name, price="10.00")
 
     from winebox.models import User
-    from winebox.services.auth import create_access_token
+    from tests._regstack_helpers import create_access_token
     from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
 
     other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
@@ -480,7 +480,7 @@ async def test_two_users_contribute_to_same_wine(
         updated_at=datetime.now(timezone.utc),
     )
     await other_user.insert()
-    other_token = create_access_token(data={"sub": other_email})
+    other_token = await create_access_token(data={"sub": other_email})
     app = get_test_app()
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -536,7 +536,7 @@ async def test_get_wine_price_redacts_other_users_pii(
 
     # User B fetches the same wine_price — must see redacted version
     from winebox.models import User
-    from winebox.services.auth import create_access_token
+    from tests._regstack_helpers import create_access_token
     from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
 
     other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
@@ -550,7 +550,7 @@ async def test_get_wine_price_redacts_other_users_pii(
         updated_at=datetime.now(timezone.utc),
     )
     await other_user.insert()
-    other_token = create_access_token(data={"sub": other_email})
+    other_token = await create_access_token(data={"sub": other_email})
     app = get_test_app()
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -681,7 +681,7 @@ async def test_history_redacts_other_users_location_and_notes(
 
     # User B hits the same endpoint; PII fields must be None.
     from winebox.models import User
-    from winebox.services.auth import create_access_token
+    from tests._regstack_helpers import create_access_token
     from tests.conftest import get_test_app, _CACHED_TEST_PASSWORD_HASH
 
     other_email = f"other-{uuid.uuid4().hex[:8]}@example.com"
@@ -695,7 +695,7 @@ async def test_history_redacts_other_users_location_and_notes(
         updated_at=datetime.now(timezone.utc),
     )
     await other_user.insert()
-    other_token = create_access_token(data={"sub": other_email})
+    other_token = await create_access_token(data={"sub": other_email})
     app = get_test_app()
     async with AsyncClient(
         transport=ASGITransport(app=app),

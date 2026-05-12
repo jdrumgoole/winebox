@@ -18,8 +18,9 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from tests._regstack_helpers import create_access_token
 from winebox.models import User
-from winebox.services.auth import create_access_token, get_password_hash
+from winebox.services.auth import get_password_hash
 
 
 _HASH = get_password_hash("imgtestpw")
@@ -45,8 +46,8 @@ async def two_clients(init_test_db):
 
     app = get_test_app()
     transport = ASGITransport(app=app)
-    token_a = create_access_token(data={"sub": email_a})
-    token_b = create_access_token(data={"sub": email_b})
+    token_a = await create_access_token(data={"sub": email_a})
+    token_b = await create_access_token(data={"sub": email_b})
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
