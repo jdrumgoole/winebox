@@ -27,6 +27,7 @@ from winebox.integrations.regstack_email import (
     WineboxSesEmailService,
 )
 from winebox.integrations.regstack_hooks import register_posthog_hooks
+from winebox.services.rate_limit import make_limiter
 
 if TYPE_CHECKING:
     pass
@@ -35,6 +36,21 @@ logger = logging.getLogger(__name__)
 
 
 _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "static" / "regstack_templates"
+
+
+# Per-route IP rate limits for the regstack auth router. Values match what
+# WineBox enforced on its old fastapi-users wrappers, now expressed via
+# regstack 0.5.6's per-route config fields. `make_limiter()` builds a
+# slowapi Limiter that respects `WINEBOX_RATE_LIMIT_DISABLED=1` for tests.
+_RATE_LIMITS = {
+    "login_rate_limit": "30/minute;200/hour",
+    "register_rate_limit": "10/minute;50/hour",
+    "forgot_password_rate_limit": "5/minute;20/hour",
+    "reset_password_rate_limit": "5/minute;20/hour",
+    "verify_rate_limit": "10/minute;60/hour",
+    "resend_verification_rate_limit": "5/minute;30/hour",
+    "change_password_rate_limit": "5/minute;20/hour",
+}
 
 
 _regstack: RegStack | None = None
@@ -63,6 +79,7 @@ def _build_config() -> RegStackConfig:
             from_name=settings.email_sender_name,
             ses_region=settings.aws_region,
         ),
+        **_RATE_LIMITS,
     )
 
 
@@ -72,7 +89,10 @@ def build_regstack() -> RegStack:
     if _regstack is not None:
         return _regstack
 
-    rs = RegStack(config=_build_config())
+    # Use the shared WineBox limiter factory so the env-var test gate
+    # (`WINEBOX_RATE_LIMIT_DISABLED=1`) silences regstack's per-route
+    # limits in CI the same way it silences the rest of WineBox's.
+    rs = RegStack(config=_build_config(), rate_limiter=make_limiter())
 
     if settings.email_backend == "ses":
         rs.set_email_backend(

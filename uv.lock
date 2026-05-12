@@ -2456,7 +2456,7 @@ wheels = [
 
 [[package]]
 name = "regstack"
-version = "0.5.0"
+version = "0.5.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosmtplib" },
@@ -2477,9 +2477,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6f/d7/495f37c758368699c3cda6671d843569cd7f2158b6b4235171eb391bfd10/regstack-0.5.0.tar.gz", hash = "sha256:35a4b2329cf4669638bdd63f18d9fb724ca730b00b918df8fe165e8ec2dac741", size = 445575, upload-time = "2026-05-02T11:59:45.771Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/30/81/d15e11fbec8388f6697b3764b0ccdcaf491df4f25fba2a8648cd2f05daba/regstack-0.5.6.tar.gz", hash = "sha256:6754183e2f968d2658c130a726b7afba5fb725f3a16cbf7fba203e0db3899b29", size = 462989, upload-time = "2026-05-12T23:32:47.577Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/08/6d23e4bd49f2a85a4149d8fc121cf17db517c844b46bfd5cf4bb4efaf51f/regstack-0.5.0-py3-none-any.whl", hash = "sha256:ab334a4f9a3742058f4237f8b338a0a90c2361624c0cc571e6e05f5838faa797", size = 191590, upload-time = "2026-05-02T11:59:44.077Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/1e/5d1f108bb02d1fd8eb7facbab9d64480ea147264a35919da8880d8242f6a/regstack-0.5.6-py3-none-any.whl", hash = "sha256:d13b8c5214c8ed8972329fec5cbd8465dcf706f16b0e3a02bd208583de56ab5a", size = 197177, upload-time = "2026-05-12T23:32:46.002Z" },
 ]
 
 [package.optional-dependencies]
@@ -3187,7 +3187,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5.0" },
     { name = "python-multipart", specifier = ">=0.0.26" },
     { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "regstack", extras = ["mongo"], specifier = ">=0.5.0" },
+    { name = "regstack", extras = ["mongo"], specifier = ">=0.5.6" },
     { name = "requests", specifier = ">=2.33.1" },
     { name = "slowapi", specifier = ">=0.1.9" },
     { name = "sphinx", marker = "extra == 'dev'", specifier = ">=7.0.0" },
