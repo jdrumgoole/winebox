@@ -589,6 +589,31 @@ def oat_backup(ctx: Context, profile: str = "winebox_backup") -> None:
     _backup_database(ctx, database="winebox_oat", profile=profile)
 
 
+@task(name="oat-clear-legacy-auth")
+def oat_clear_legacy_auth(ctx: Context, confirm: bool = False) -> None:
+    """Drop the pre-regstack ``revoked_tokens`` and ``login_attempts``
+    collections from ``winebox_oat``. Required ONCE before the first
+    regstack deploy — leaves the ``users`` collection untouched.
+    """
+    cmd = "uv run python scripts/clear_legacy_auth_collections.py --database winebox_oat"
+    if confirm:
+        cmd += " --confirm"
+    ctx.run(cmd, pty=True)
+
+
+@task(name="prod-clear-legacy-auth")
+def prod_clear_legacy_auth(ctx: Context, confirm: bool = False) -> None:
+    """Drop the pre-regstack ``revoked_tokens`` and ``login_attempts``
+    collections from production ``winebox``. Required ONCE before the
+    first regstack deploy. Requires ``WINEBOX_ALLOW_PROD_LEGACY_DROP=1``
+    in the environment as a second safety gate.
+    """
+    cmd = "uv run python scripts/clear_legacy_auth_collections.py --database winebox"
+    if confirm:
+        cmd += " --confirm"
+    ctx.run(cmd, pty=True)
+
+
 @task(name="seed-reference", aliases=["db-seed"])
 def seed_reference(ctx: Context, database: str | None = None, yes: bool = False) -> None:
     """Seed reference tables (wine types, grapes, regions, classifications).
@@ -2045,6 +2070,7 @@ def test_e2e_oat(
 _LOCAL_DEV_SECRETS = [
     "WINEBOX_MONGODB_URL",
     "WINEBOX_SECRET_KEY",
+    "WINEBOX_REGSTACK_JWT_SECRET",
     "WINEBOX_ANTHROPIC_API_KEY",
 ]
 
@@ -2052,6 +2078,7 @@ _LOCAL_DEV_SECRETS = [
 _DEPLOY_SECRETS = [
     "WINEBOX_MONGODB_URL",
     "WINEBOX_SECRET_KEY",
+    "WINEBOX_REGSTACK_JWT_SECRET",
     "WINEBOX_ANTHROPIC_API_KEY",
     "WINEBOX_DO_TOKEN",
     "WINEBOX_POSTHOG_API_KEY",
@@ -2063,6 +2090,7 @@ _DEPLOY_SECRETS = [
 _GITHUB_SECRETS = [
     "WINEBOX_MONGODB_URL",
     "WINEBOX_SECRET_KEY",
+    "WINEBOX_REGSTACK_JWT_SECRET",
     "WINEBOX_ANTHROPIC_API_KEY",
     "WINEBOX_POSTHOG_API_KEY",
     "WINEBOX_POSTHOG_ENABLED",
