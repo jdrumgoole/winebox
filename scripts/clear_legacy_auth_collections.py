@@ -33,6 +33,14 @@ load_dotenv()  # Pick up WINEBOX_MONGODB_URL from a project-local .env.
 
 LEGACY_COLLECTIONS = ("revoked_tokens", "login_attempts")
 
+# Legacy indexes on the SHARED users collection. WineBox pre-regstack
+# created an unnamed unique index on email (which Mongo named ``email_1``)
+# in ``winebox.db.indexes``. regstack's ``install_schema()`` tries to
+# create ``email_unique`` over the same key and Mongo raises
+# IndexOptionsConflict — the collection isn't dropped (existing users
+# must be preserved), but the legacy index has to go.
+LEGACY_USERS_INDEXES = ("email_1",)
+
 
 async def _main(database: str, confirm: bool) -> int:
     mongo_url = os.environ.get("WINEBOX_MONGODB_URL")
@@ -45,22 +53,32 @@ async def _main(database: str, confirm: bool) -> int:
         db = client[database]
         existing = await db.list_collection_names()
 
-        targets = [c for c in LEGACY_COLLECTIONS if c in existing]
-        if not targets:
-            print(f"Nothing to do: no legacy auth collections in {database!r}.")
+        coll_targets = [c for c in LEGACY_COLLECTIONS if c in existing]
+        idx_targets: list[str] = []
+        if "users" in existing:
+            users_indexes = await db.users.index_information()
+            idx_targets = [name for name in LEGACY_USERS_INDEXES if name in users_indexes]
+
+        if not coll_targets and not idx_targets:
+            print(f"Nothing to do: no legacy auth state in {database!r}.")
             return 0
 
-        for name in targets:
+        for name in coll_targets:
             count = await db[name].estimated_document_count()
-            print(f"  {database}.{name}: ~{count} documents")
+            print(f"  drop collection {database}.{name}: ~{count} documents")
+        for name in idx_targets:
+            print(f"  drop index {database}.users.{name}")
 
         if not confirm:
-            print("\nDry run. Re-run with --confirm to drop the listed collections.")
+            print("\nDry run. Re-run with --confirm to drop the listed items.")
             return 0
 
-        for name in targets:
+        for name in coll_targets:
             await db.drop_collection(name)
-            print(f"Dropped {database}.{name}")
+            print(f"Dropped collection {database}.{name}")
+        for name in idx_targets:
+            await db.users.drop_index(name)
+            print(f"Dropped index {database}.users.{name}")
         return 0
     finally:
         await client.close()
