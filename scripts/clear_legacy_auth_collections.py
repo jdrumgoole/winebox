@@ -26,7 +26,10 @@ import asyncio
 import os
 import sys
 
+from dotenv import load_dotenv
 from pymongo import AsyncMongoClient
+
+load_dotenv()  # Pick up WINEBOX_MONGODB_URL from a project-local .env.
 
 LEGACY_COLLECTIONS = ("revoked_tokens", "login_attempts")
 
