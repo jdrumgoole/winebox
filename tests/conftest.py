@@ -20,14 +20,20 @@ load_dotenv()  # Load .env so API keys etc. are available to tests
 if "WINEBOX_DATABASE" not in os.environ:
     os.environ["WINEBOX_DATABASE"] = "winebox_test"
 
-# Tests always target the local Mongo, never the .env's Atlas URL —
-# regstack reads `settings.mongodb_url` to build its own client, and a
-# `.env` symlink intended for deploys would otherwise point regstack at
-# production while xdist workers' user inserts hit localhost. Force the
-# test value here regardless of what .env loaded.
-os.environ["WINEBOX_MONGODB_URL"] = os.environ.get(
-    "TEST_MONGODB_URL", "mongodb://localhost:27017"
-)
+# In-process tests always target the local Mongo, never the .env's
+# Atlas URL — regstack reads `settings.mongodb_url` to build its own
+# client, and a `.env` symlink intended for deploys would otherwise
+# point regstack at production while xdist workers' user inserts hit
+# localhost.
+#
+# E2E tests are the exception: they set `WINEBOX_TEST_URL` to the
+# remote target and need `WINEBOX_MONGODB_URL` to point at the
+# corresponding Atlas database so the local `winebox-admin add`
+# subprocess provisions test users there rather than locally.
+if not os.environ.get("WINEBOX_TEST_URL"):
+    os.environ["WINEBOX_MONGODB_URL"] = os.environ.get(
+        "TEST_MONGODB_URL", "mongodb://localhost:27017"
+    )
 
 # Disable slowapi rate limits for the test suite. The slowapi memory store
 # is per-process, so a single xdist worker's tests share one bucket per
