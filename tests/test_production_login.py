@@ -44,8 +44,8 @@ def test_production_health():
 def test_production_login():
     """Test user can log in to production."""
     resp = requests.post(
-        f"{PROD_URL}/api/auth/token",
-        data={"username": PROD_TEST_USER, "password": PROD_TEST_PASSWORD},
+        f"{PROD_URL}/api/auth/login",
+        json={"email": PROD_TEST_USER, "password": PROD_TEST_PASSWORD},
         timeout=10,
     )
     assert resp.status_code == 200, (
@@ -60,8 +60,8 @@ def test_production_auth_me():
     """Authenticated API call works with the login token."""
     # Login first
     login_resp = requests.post(
-        f"{PROD_URL}/api/auth/token",
-        data={"username": PROD_TEST_USER, "password": PROD_TEST_PASSWORD},
+        f"{PROD_URL}/api/auth/login",
+        json={"email": PROD_TEST_USER, "password": PROD_TEST_PASSWORD},
         timeout=10,
     )
     token = login_resp.json()["access_token"]
