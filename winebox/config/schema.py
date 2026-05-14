@@ -111,3 +111,4 @@ class SecretsConfig(BaseModel):
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
     posthog_api_key: str | None = None
+    regstack_jwt_secret: str | None = None

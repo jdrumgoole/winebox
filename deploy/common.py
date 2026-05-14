@@ -411,6 +411,7 @@ def upload_file(host: str, user: str, local_path: Path, remote_path: str) -> Non
 SYNCABLE_SECRETS = [
     "WINEBOX_ANTHROPIC_API_KEY",
     "WINEBOX_SECRET_KEY",
+    "WINEBOX_REGSTACK_JWT_SECRET",
     "WINEBOX_MONGODB_URL",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",

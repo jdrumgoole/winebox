@@ -557,16 +557,12 @@ async function handleLogin(e) {
     errorDiv.style.display = 'none';
 
     try {
-        const formData = new URLSearchParams();
-        formData.append('username', email);  // OAuth2 spec uses 'username' field
-        formData.append('password', password);
-
-        const response = await fetch(`${API_BASE}/auth/token`, {
+        const response = await fetch(`${API_BASE}/auth/login`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: formData
+            body: JSON.stringify({ email: email, password: password })
         });
 
         if (!response.ok) {
@@ -839,7 +835,7 @@ async function handleResetPassword(e) {
             },
             body: JSON.stringify({
                 token: token,
-                password: password,
+                new_password: password,
             })
         });
 
@@ -3885,8 +3881,8 @@ async function handlePasswordChange(e) {
     }
 
     try {
-        const response = await fetchWithAuth(`${API_BASE}/auth/password`, {
-            method: 'PUT',
+        const response = await fetchWithAuth(`${API_BASE}/auth/change-password`, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },

@@ -1,6 +1,6 @@
 [project]
 name = "winebox"
-version = "0.7.80"
+version = "0.7.82"
 description = "Wine Cellar Management Application with OCR label scanning"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -47,9 +47,10 @@ dependencies = [
     "posthog>=7.0.0",
     "cairosvg>=2.9.0",
     # Transitive deps pinned for CVEs (no direct usage)
-    "aiohttp>=3.13.4",       # CVE-2026-34520 (HTTP response splitting)
-    "requests>=2.33.1",      # CVE-2026-25645 (local privilege escalation)
-    "certifi>=2026.4.22",    # refresh stale CA bundle
+    "aiohttp>=3.13.4", # CVE-2026-34520 (HTTP response splitting)
+    "requests>=2.33.1", # CVE-2026-25645 (local privilege escalation)
+    "certifi>=2026.4.22", # refresh stale CA bundle
+    "regstack[mongo]>=0.5.6",
 ]
 
 [project.urls]

@@ -12,7 +12,7 @@ Commands:
 import argparse
 import asyncio
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from getpass import getpass
 
 from winebox.database import init_db as _init_db
@@ -110,23 +110,53 @@ async def disable_user(email: str, skip_db_init: bool = False) -> None:
 
 
 async def verify_user(email: str, skip_db_init: bool = False) -> None:
-    """Mark a user's email as verified."""
+    """Mark a user's email as verified.
+
+    Two paths:
+    - Existing user in ``users`` → flip ``is_verified`` on the document.
+    - Pending registration in ``pending_registrations`` → promote it to a
+      verified user document, mirroring what the regstack /verify endpoint
+      does when a user clicks the email link. This keeps operator-driven
+      "approve this pending account" flows working without intercepting
+      the verification email.
+    """
     if not skip_db_init:
         await init_db()
 
-    user = await User.find_one({"email": email})
-    if not user:
+    email_norm = email.lower()
+
+    user = await User.find_one({"email": email_norm})
+    if user is not None:
+        if user.is_verified:
+            print(f"User '{email}' is already verified.")
+            return
+        user.is_verified = True
+        user.updated_at = datetime.now(timezone.utc)
+        await user.save()
+        print(f"User '{email}' has been verified.")
+        return
+
+    # No user record — see if a pending registration is waiting.
+    from winebox.auth.regstack_setup import build_regstack
+
+    rs = build_regstack()
+    pending = await rs.pending.find_by_email(email_norm)
+    if pending is None:
         print(f"Error: User '{email}' not found.")
         sys.exit(1)
 
-    if user.is_verified:
-        print(f"User '{email}' is already verified.")
-        return
+    from regstack.models.user import BaseUser as RegstackUser
 
-    user.is_verified = True
-    user.updated_at = datetime.now(timezone.utc)
-    await user.save()
-    print(f"User '{email}' has been verified.")
+    new_user = RegstackUser(
+        email=pending.email,
+        hashed_password=pending.hashed_password,
+        full_name=pending.full_name,
+        is_active=True,
+        is_verified=True,
+    )
+    await rs.users.create(new_user)
+    await rs.pending.delete_by_email(pending.email)
+    print(f"User '{email}' promoted from pending and verified.")
 
 
 async def enable_user(email: str, skip_db_init: bool = False) -> None:
@@ -170,7 +200,12 @@ async def remove_user(email: str, force: bool = False, skip_db_init: bool = Fals
 
 
 async def change_password(email: str, password: str, skip_db_init: bool = False) -> None:
-    """Change a user's password."""
+    """Change a user's password.
+
+    Also bumps the user's `tokens_invalidated_after` cutoff so every JWT
+    issued before this reset is rejected — admin-driven password changes
+    must invalidate existing sessions exactly like a user-driven reset.
+    """
     if not skip_db_init:
         await init_db()
 
@@ -179,14 +214,13 @@ async def change_password(email: str, password: str, skip_db_init: bool = False)
         print(f"Error: User '{email}' not found.")
         sys.exit(1)
 
+    now = datetime.now(timezone.utc)
     user.hashed_password = get_password_hash(password)
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = now
+    # Add a second of slop so a brand-new token minted in the same wall-clock
+    # moment is not falsely rejected by the cutoff comparison.
+    user.tokens_invalidated_after = now + timedelta(seconds=1)
     await user.save()
-
-    # Admin-driven password change — invalidate every existing JWT for this
-    # user so an attacker holding a stolen session cannot survive the reset.
-    from winebox.services.auth import revoke_all_user_tokens
-    await revoke_all_user_tokens(user, reason="admin_password_change")
 
     print(f"Password for user '{email}' has been updated.")
 

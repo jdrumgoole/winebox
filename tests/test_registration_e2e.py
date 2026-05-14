@@ -104,7 +104,15 @@ class TestRegistrationE2E:
             )
 
     def test_registration_duplicate_email(self, registration_page: Page, unique_user_data: dict) -> None:
-        """Verify error message for duplicate email."""
+        """Verify error message for duplicate email.
+
+        Under regstack a pre-verification re-registration is a deliberate
+        no-op upsert of the pending row (anti-enumeration — never leak
+        that an address has registered but not verified). The 409 fires
+        once the FIRST registration has been promoted to a real user
+        document, which is the realistic "this email is genuinely taken"
+        scenario the UI message exists to communicate.
+        """
         page = registration_page
 
         # First registration
@@ -115,6 +123,19 @@ class TestRegistrationE2E:
 
         # Wait for first registration to complete
         page.wait_for_timeout(2000)
+
+        # Promote the pending registration to a real verified user so the
+        # second attempt is genuinely a "this address is taken" case.
+        # See cli.user_admin.verify_user — falls through to the pending
+        # collection when no users row exists.
+        subprocess.run(
+            ["uv", "run", "winebox-admin", "verify", unique_user_data["email"]],
+            cwd=PROJECT_DIR,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
 
         # Navigate back to registration page
         page.goto(BASE_URL)
@@ -223,13 +244,16 @@ class TestRegistrationE2E:
         # Wait for registration to complete
         page.wait_for_timeout(2000)
 
-        # Verify the user via CLI (bypasses email verification requirement)
+        # Verify the user via CLI (bypasses email verification requirement).
+        # Under regstack the UI registration leaves a pending row; the CLI
+        # `verify` falls through to that collection and promotes it.
         subprocess.run(
             ["uv", "run", "winebox-admin", "verify", unique_user_data["email"]],
             cwd=PROJECT_DIR,
             capture_output=True,
             text=True,
             timeout=30,
+            check=True,
         )
 
         # Navigate to login if not already there

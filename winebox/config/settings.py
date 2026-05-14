@@ -114,6 +114,18 @@ class Settings:
                 "when the server restarts. Set WINEBOX_SECRET_KEY for production use."
             )
 
+        # regstack uses its own base secret for JWT signing (per-purpose key
+        # derivation). Generate a dev fallback so unit tests and quick local
+        # runs work without setting an env var, but warn loudly — production
+        # must provide WINEBOX_REGSTACK_JWT_SECRET via secrets.env.
+        if not self._secrets.regstack_jwt_secret:
+            self._secrets.regstack_jwt_secret = secrets_module.token_urlsafe(48)
+            logger.warning(
+                "SECURITY WARNING: No regstack JWT secret configured. "
+                "A random secret has been generated; all sessions die on restart. "
+                "Set WINEBOX_REGSTACK_JWT_SECRET for production use."
+            )
+
     # =========================================================================
     # Config accessors
     # =========================================================================
@@ -264,6 +276,11 @@ class Settings:
     def secret_key(self) -> str:
         # This should never be None due to __init__ handling
         return self._secrets.secret_key or ""
+
+    @property
+    def regstack_jwt_secret(self) -> str:
+        # Never None: __init__ generates a dev fallback when not configured.
+        return self._secrets.regstack_jwt_secret or ""
 
     @property
     def anthropic_api_key(self) -> str | None:

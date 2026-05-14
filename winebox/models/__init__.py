@@ -8,8 +8,6 @@ from winebox.models.grape_variety import GrapeVariety
 from winebox.models.region import Region
 from winebox.models.classification import Classification
 from winebox.models.xwines import XWinesWine, XWinesMetadata
-from winebox.models.token_blacklist import RevokedToken
-from winebox.models.login_attempt import LoginAttempt
 from winebox.models.import_batch import ImportBatch, ImportStatus
 from winebox.models.import_batch_row import RawUploadRow
 from winebox.models.cellar import CellarItem, EmbeddedWine
@@ -25,8 +23,6 @@ __all__ = [
     "TransactionType",
     "RemovalReason",
     "User",
-    "RevokedToken",
-    "LoginAttempt",
     # Embedded subdocuments
     "InventoryInfo",
     "GrapeBlendEntry",

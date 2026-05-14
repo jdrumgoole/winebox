@@ -239,6 +239,7 @@ def load_secrets(secrets_file: Path | None = None) -> SecretsConfig:
             "AWS_ACCESS_KEY_ID": "aws_access_key_id",
             "AWS_SECRET_ACCESS_KEY": "aws_secret_access_key",
             "WINEBOX_POSTHOG_API_KEY": "posthog_api_key",
+            "WINEBOX_REGSTACK_JWT_SECRET": "regstack_jwt_secret",
         }
 
         for file_key, config_key in key_mapping.items():
@@ -253,6 +254,7 @@ def load_secrets(secrets_file: Path | None = None) -> SecretsConfig:
         "AWS_ACCESS_KEY_ID": "aws_access_key_id",
         "AWS_SECRET_ACCESS_KEY": "aws_secret_access_key",
         "WINEBOX_POSTHOG_API_KEY": "posthog_api_key",
+        "WINEBOX_REGSTACK_JWT_SECRET": "regstack_jwt_secret",
     }
 
     for env_var, config_key in env_mapping.items():

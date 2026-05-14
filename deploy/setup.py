@@ -71,8 +71,11 @@ SECRETS_ENV_TEMPLATE = """\
 # WineBox Secrets - Production
 # IMPORTANT: Keep this file secure (chmod 600)
 
-# Required: Secret key for JWT signing
+# Required: Application secret for legacy code paths (analytics, signing)
 WINEBOX_SECRET_KEY={secret_key}
+
+# Required: regstack base secret (per-purpose JWT signing keys derive from this)
+WINEBOX_REGSTACK_JWT_SECRET={regstack_jwt_secret}
 
 # Optional: Anthropic API key for Claude Vision OCR
 # WINEBOX_ANTHROPIC_API_KEY=sk-ant-...
@@ -249,9 +252,13 @@ def setup_config_files(host: str, user: str, domain: str, mongodb_database: str 
     )
 
     if "exists" not in result:
-        # Generate secret key and create secrets.env
+        # Generate secret keys and create secrets.env
         secret_key = secrets.token_urlsafe(32)
-        secrets_content = SECRETS_ENV_TEMPLATE.format(secret_key=secret_key)
+        regstack_jwt_secret = secrets.token_urlsafe(48)
+        secrets_content = SECRETS_ENV_TEMPLATE.format(
+            secret_key=secret_key,
+            regstack_jwt_secret=regstack_jwt_secret,
+        )
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.env', delete=False) as f:
             f.write(secrets_content)

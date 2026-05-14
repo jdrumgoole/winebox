@@ -1,9 +1,7 @@
 """FastAPI application entry point for WineBox."""
 
-import asyncio
 import logging
 import os
-import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
@@ -19,14 +17,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from winebox import __version__
+from winebox.auth.regstack_setup import build_regstack
 from winebox.config import settings
 from winebox.database import close_db, init_db
 from winebox.services.analytics import posthog_service
 
 logger = logging.getLogger(__name__)
-
-# Background cleanup task handle
-_cleanup_task: asyncio.Task | None = None
 
 
 # Rate limiter configuration — disabled in test mode (CI runs many parallel
@@ -93,39 +89,6 @@ def _is_production() -> bool:
     return not settings.debug and not os.getenv("PYTEST_CURRENT_TEST")
 
 
-async def _run_security_cleanup() -> None:
-    """Background task to cleanup expired tokens and old login attempts.
-
-    Runs every hour to remove:
-    - Expired tokens from the blacklist
-    - Old login attempts (> 24 hours)
-    """
-    from winebox.models.login_attempt import LoginAttempt
-    from winebox.models.token_blacklist import RevokedToken
-
-    while True:
-        try:
-            # Wait 1 hour between cleanups
-            await asyncio.sleep(3600)
-
-            # Cleanup expired revoked tokens
-            tokens_cleaned = await RevokedToken.cleanup_expired()
-            if tokens_cleaned > 0:
-                logger.info("Token blacklist cleanup: removed %d expired tokens", tokens_cleaned)
-
-            # Cleanup old login attempts
-            attempts_cleaned = await LoginAttempt.cleanup_old_attempts(older_than_hours=24)
-            if attempts_cleaned > 0:
-                logger.info("Login attempts cleanup: removed %d old attempts", attempts_cleaned)
-
-        except asyncio.CancelledError:
-            logger.debug("Security cleanup task cancelled")
-            break
-        except Exception as e:
-            logger.error("Security cleanup task error: %s", str(e))
-            # Continue running despite errors
-
-
 def _validate_security_configuration() -> None:
     """Validate security configuration at startup.
 
@@ -188,8 +151,6 @@ def _validate_security_configuration() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
-    global _cleanup_task
-
     # Startup
     # Validate security configuration before proceeding
     _validate_security_configuration()
@@ -201,6 +162,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize database
     await init_db()
 
+    # Bring up regstack — owns the users, sessions, blacklist, and lockout
+    # collections and mounts the auth router on this app.
+    regstack = build_regstack()
+    await regstack.backend.install_schema()
+    app.include_router(regstack.router, prefix=regstack.config.api_prefix)
+    logger.info("Mounted regstack router at %s", regstack.config.api_prefix)
+
     # Pre-warm the X-Wines filter cache so first page load is instant
     try:
         from winebox.routers.xwines import refresh_filter_cache
@@ -208,21 +176,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.warning("Failed to pre-warm X-Wines filter cache (data may not be loaded yet)")
 
-    # Start background cleanup task
-    _cleanup_task = asyncio.create_task(_run_security_cleanup())
-    logger.info("Started security cleanup background task")
-
     yield
 
     # Shutdown
-    # Cancel cleanup task
-    if _cleanup_task:
-        _cleanup_task.cancel()
-        try:
-            await _cleanup_task
-        except asyncio.CancelledError:
-            pass
-        logger.info("Stopped security cleanup background task")
+    try:
+        await regstack.aclose()
+    except Exception:
+        logger.exception("Error closing regstack backend")
 
     # Shutdown PostHog analytics (flush pending events)
     posthog_service.shutdown()
@@ -297,6 +257,19 @@ async def design_system_page() -> FileResponse:
     return FileResponse(static_path, media_type="text/html")
 
 
+# regstack emails embed canonical /verify?token=... and /reset-password?token=...
+# URLs; the WineBox SPA uses hash-based routes. Redirect path → hash so a user
+# landing on either URL ends up in the right SPA card.
+@app.get("/verify", include_in_schema=False)
+async def verify_redirect(request: Request) -> RedirectResponse:
+    return RedirectResponse(url=f"/#verify?{request.url.query}", status_code=302)
+
+
+@app.get("/reset-password", include_in_schema=False)
+async def reset_password_redirect(request: Request) -> RedirectResponse:
+    return RedirectResponse(url=f"/#reset-password?{request.url.query}", status_code=302)
+
+
 # Health check endpoint
 @app.get("/health", tags=["Health"])
 async def health_check() -> JSONResponse:
@@ -308,6 +281,31 @@ async def health_check() -> JSONResponse:
             "app_name": settings.app_name,
         }
     )
+
+
+# Override regstack's /api/auth/me so the response key is `id` (matching
+# WineBox's existing SPA + admin contract) rather than regstack's `_id`.
+# Must be registered BEFORE regstack's router is included in lifespan so
+# this handler takes precedence on route match.
+from winebox.services.auth import RequireAuth as _RequireAuth
+from winebox.models.user import User as _WineboxUser
+
+
+@app.get("/api/auth/me", tags=["Authentication"])
+async def get_current_user_info(current_user: _RequireAuth) -> dict:
+    """Authenticated user info — replaces regstack's /me to keep the
+    response key `id` (string) compatible with WineBox's SPA and admin."""
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "is_active": current_user.is_active,
+        "is_admin": current_user.is_admin,
+        "is_superuser": current_user.is_superuser,
+        "is_verified": current_user.is_verified,
+        "created_at": current_user.created_at,
+        "last_login": current_user.last_login,
+    }
 
 
 # PostHog analytics configuration endpoint
@@ -327,9 +325,8 @@ async def get_analytics_config() -> JSONResponse:
     )
 
 
-# Import and include routers
+# Import and include routers (auth is mounted from regstack inside lifespan).
 from winebox.routers import (
-    auth,
     bottles,
     cases,
     cellar,
@@ -346,7 +343,6 @@ from winebox.routers import (
     xwines,
 )
 
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(wines.router, prefix="/api/wines", tags=["Wines"])
 app.include_router(cellar.router, prefix="/api/cellar", tags=["Cellar"])
 app.include_router(met.router, prefix="/api/met", tags=["Wines I've Met"])

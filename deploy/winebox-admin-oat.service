@@ -10,6 +10,10 @@ Group=winebox
 WorkingDirectory=/opt/winebox
 Environment="PATH=/opt/winebox/.venv/bin:/usr/local/bin:/usr/bin"
 Environment="WINEBOX_DATABASE=winebox_oat"
+# OAT is internal-only and IP-restricted; per-route IP rate limits add
+# nothing here. Mirror the main service so the admin panel doesn't
+# accidentally throttle E2E or operator clicks.
+Environment="WINEBOX_RATE_LIMIT_DISABLED=1"
 EnvironmentFile=/opt/winebox/secrets.env
 ExecStart=/opt/winebox/.venv/bin/uvicorn winebox.admin.main:app --host 127.0.0.1 --port 8001 --workers 1
 ExecReload=/bin/kill -HUP $MAINPID
