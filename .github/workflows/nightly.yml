@@ -114,6 +114,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
+      - name: Disk diagnostics + stale Playwright cleanup
+        # The OAT droplet is 10 GB total; a half-downloaded chromium
+        # from a previous failed install (ENOSPC, killed worker, etc.)
+        # can leave a multi-hundred-MB stub in the cache and trip the
+        # next install. Print the free-space picture for triage and
+        # nuke the cache before re-downloading.
+        run: |
+          df -h /
+          du -sh ~/.cache/ms-playwright 2>/dev/null || true
+          rm -rf ~/.cache/ms-playwright
+          df -h /
+
       - name: Install Playwright browsers
         # --with-deps shells out to apt-get on Linux; the droplet's
         # unattended-upgrades regularly holds /var/lib/apt/lists/lock
