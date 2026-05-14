@@ -115,15 +115,34 @@ jobs:
         run: uv sync --all-extras
 
       - name: Disk diagnostics + stale Playwright cleanup
-        # The OAT droplet is 10 GB total; a half-downloaded chromium
-        # from a previous failed install (ENOSPC, killed worker, etc.)
-        # can leave a multi-hundred-MB stub in the cache and trip the
-        # next install. Print the free-space picture for triage and
-        # nuke the cache before re-downloading.
+        # The OAT droplet is 10 GB total. A failed Playwright install
+        # can leave a stub in the cache; nuke it. Also surface what's
+        # actually eating the disk so the operator can decide whether
+        # to clean, resize, or move the runner elsewhere.
         run: |
+          set +e
+          echo "=== df -h ==="
           df -h /
+          echo "=== top-level dirs (sorted) ==="
+          du -shx /* 2>/dev/null | sort -h | tail -15
+          echo "=== /var/* ==="
+          du -shx /var/* 2>/dev/null | sort -h | tail -10
+          echo "=== /opt/* ==="
+          du -shx /opt/* 2>/dev/null | sort -h | tail -10
+          echo "=== /root (incl. dotfiles) ==="
+          du -shx /root /root/.[!.]* 2>/dev/null | sort -h | tail -10
+          echo "=== /var/log ==="
+          du -shx /var/log/* 2>/dev/null | sort -h | tail -10
+          echo "=== journalctl disk usage ==="
+          journalctl --disk-usage 2>/dev/null || true
+          echo "=== /var/lib (data dirs) ==="
+          du -shx /var/lib/* 2>/dev/null | sort -h | tail -10
+          echo "=== /opt/github-runner/_work ==="
+          du -shx /opt/github-runner/_work/* 2>/dev/null | sort -h | tail -10
+          echo "=== stale Playwright cache ==="
           du -sh ~/.cache/ms-playwright 2>/dev/null || true
           rm -rf ~/.cache/ms-playwright
+          echo "=== df -h after cleanup ==="
           df -h /
 
       - name: Install Playwright browsers
