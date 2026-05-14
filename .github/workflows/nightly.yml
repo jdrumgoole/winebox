@@ -44,18 +44,11 @@ jobs:
         run: |
           uv run python -m invoke deploy-oat --host 127.0.0.1
 
-  test:
-    name: Run full test suite against OAT
+  unit-tests:
+    name: Run unit tests
     needs: deploy
     if: always() && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-    outputs:
-      tests_passed: ${{ steps.e2e.outcome == 'success' }}
-      test_output: ${{ steps.e2e.outputs.test_output }}
 
     services:
       mongodb:
@@ -68,13 +61,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
 
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure git identity
-        run: |
-          git config user.name "WineBox Nightly Bot"
-          git config user.email "nightly-bot@winebox.app"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -94,14 +80,48 @@ jobs:
         run: |
           uv run python -m pytest -m "not e2e" -v
 
+  # E2E runs on the self-hosted runner that lives on the OAT droplet so
+  # the test process talks to the deployed app over loopback. The OAT
+  # cloud firewall keeps :443 closed to public traffic; trying to run
+  # E2E from a GitHub-hosted Azure runner times out at TCP. localhost
+  # always works.
+  e2e-tests:
+    name: Run full E2E suite against OAT (loopback)
+    needs: deploy
+    if: always() && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
+    runs-on: [self-hosted, oat]
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      tests_passed: ${{ steps.e2e.outcome == 'success' }}
+      test_output: ${{ steps.e2e.outputs.test_output }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "WineBox Nightly Bot"
+          git config user.email "nightly-bot@winebox.app"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
       - name: Install Playwright browsers
-        run: uv run playwright install --with-deps
+        run: uv run playwright install --with-deps chromium
 
       - name: Run full E2E tests against OAT
         id: e2e
         continue-on-error: true
         env:
-          WINEBOX_TEST_URL: "https://oat.winebox.app"
+          WINEBOX_TEST_URL: "http://localhost:8000"
           WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_OAT_MONGODB_URL }}
           WINEBOX_DATABASE: "winebox_oat"
           WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
@@ -145,8 +165,8 @@ jobs:
 
   auto-fix:
     name: Auto-fix failing tests with Claude Code
-    needs: test
-    if: needs.test.outputs.tests_passed == 'false'
+    needs: e2e-tests
+    if: needs.e2e-tests.outputs.tests_passed == 'false'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -222,10 +242,10 @@ jobs:
 
   create-issue:
     name: Create issue for unresolved failures
-    needs: [test, auto-fix]
+    needs: [e2e-tests, auto-fix]
     if: |
       always() &&
-      needs.test.outputs.tests_passed == 'false' &&
+      needs.e2e-tests.outputs.tests_passed == 'false' &&
       (needs.auto-fix.result == 'failure' || needs.auto-fix.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:

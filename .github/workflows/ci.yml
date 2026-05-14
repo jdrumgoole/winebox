@@ -7,14 +7,11 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    name: Test Python ${{ matrix.python-version }} (unit)
+  test-ubuntu:
+    name: Test Python 3.11 (Ubuntu, unit)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
 
+    # MongoDB on Linux is a Docker `services:` container — same as before.
     services:
       mongodb:
         image: mongo:7
@@ -24,13 +21,57 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
 
       - name: Install Tesseract OCR
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run unit tests (exclude E2E)
+        env:
+          WINEBOX_USE_CLAUDE_VISION: "false"
+        run: uv run python -m pytest -v -m "not e2e"
+
+  test-macos:
+    name: Test Python 3.11 (macOS, unit)
+    runs-on: macos-latest
+
+    # macOS GHA runners don't support `services:` (no Docker). Install
+    # MongoDB and Tesseract via Homebrew instead, then start the
+    # daemon as a background service so the test suite finds it at
+    # the same localhost:27017 the Linux job expects.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Tesseract OCR (Homebrew)
+        run: brew install tesseract
+
+      - name: Install MongoDB (Homebrew)
+        run: |
+          brew tap mongodb/brew
+          brew install mongodb-community@7.0
+          brew services start mongodb-community@7.0
+          # Wait for mongod to accept connections — brew services is
+          # async and tests fail-fast on connection refused.
+          for i in $(seq 1 30); do
+            if nc -z localhost 27017; then exit 0; fi
+            sleep 1
+          done
+          echo "MongoDB did not come up on localhost:27017 in 30s" >&2
+          exit 1
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
