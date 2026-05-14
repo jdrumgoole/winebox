@@ -9,6 +9,13 @@ Group=winebox
 WorkingDirectory=/opt/winebox
 Environment="PATH=/opt/winebox/.venv/bin:/usr/local/bin:/usr/bin"
 Environment="WINEBOX_DATABASE=winebox_oat"
+# OAT is internal-only and IP-restricted; per-route IP rate limits are
+# noise here (xdist E2E hammers /login from one machine). The
+# `make_limiter()` factory short-circuits to a no-op Limiter when this
+# env var is set, so the regstack router's per-route decorators become
+# no-ops. Per-account login lockout (separate config field, defaults to
+# enabled) still defends against credential stuffing.
+Environment="WINEBOX_RATE_LIMIT_DISABLED=1"
 EnvironmentFile=/opt/winebox/secrets.env
 ExecStart=/opt/winebox/.venv/bin/uvicorn winebox.main:app --host 127.0.0.1 --port 8000 --workers 1
 ExecReload=/bin/kill -HUP $MAINPID
