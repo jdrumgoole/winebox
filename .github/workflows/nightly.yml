@@ -114,45 +114,59 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Disk diagnostics + stale Playwright cleanup
-        # The OAT droplet is 10 GB total. A failed Playwright install
-        # can leave a stub in the cache; nuke it. Also surface what's
-        # actually eating the disk so the operator can decide whether
-        # to clean, resize, or move the runner elsewhere.
+      - name: Free disk before Playwright install
+        # The OAT droplet is 10 GB total and was sitting at 99 % full.
+        # Disk audit (run 25890973645) revealed three categories of
+        # safely-deletable cruft that accumulate over time:
+        #
+        #   - /opt/github-runner/externals.* — superseded runner
+        #     versions left behind after self-update. Keep only the
+        #     newest (sort -V); the live agent is on that one.
+        #   - actions-runner-linux-x64-*.tar.gz — bootstrap install
+        #     archive, never reused after first unpack.
+        #   - /opt/winebox/.cache — uv/pip wheel cache; regenerated
+        #     on demand, no app state.
+        #   - /opt/winebox/data/xwines/.../last/*.zip — X-Wines source
+        #     archives. The unzipped data on the same disk is what
+        #     `oat-deploy-xwines` ingests into Mongo; the zips are
+        #     post-ingest dead weight.
+        #
+        # Idempotent: ~1.2 GB freed on the first run, near-no-op
+        # after. Always exits 0 so a transient `rm` failure on a
+        # phantom file doesn't block the actual E2E.
         run: |
           set +e
-          echo "=== df -h ==="
+          echo "=== df -h before ==="
           df -h /
-          echo "=== top-level dirs (sorted) ==="
-          du -shx /* 2>/dev/null | sort -h | tail -15
-          echo "=== /var/* ==="
-          du -shx /var/* 2>/dev/null | sort -h | tail -10
-          echo "=== /opt/* ==="
-          du -shx /opt/* 2>/dev/null | sort -h | tail -10
-          echo "=== /root (incl. dotfiles) ==="
-          du -shx /root /root/.[!.]* 2>/dev/null | sort -h | tail -10
-          echo "=== /var/log ==="
-          du -shx /var/log/* 2>/dev/null | sort -h | tail -10
-          echo "=== journalctl disk usage ==="
-          journalctl --disk-usage 2>/dev/null || true
-          echo "=== /var/lib (data dirs) ==="
-          du -shx /var/lib/* 2>/dev/null | sort -h | tail -10
-          echo "=== /opt/github-runner/_work ==="
-          du -shx /opt/github-runner/_work/* 2>/dev/null | sort -h | tail -10
-          echo "=== /opt/winebox/* (3.3 GB) ==="
-          du -shx /opt/winebox/* /opt/winebox/.[!.]* 2>/dev/null | sort -h | tail -15
-          echo "=== /opt/winebox/data/* ==="
-          du -shx /opt/winebox/data/* 2>/dev/null | sort -h | tail -10
-          echo "=== /opt/winebox/data/images count + total ==="
-          find /opt/winebox/data/images -type f 2>/dev/null | wc -l
-          du -shx /opt/winebox/data/images 2>/dev/null
-          echo "=== top 20 single files anywhere ==="
-          find / -xdev -type f -size +20M 2>/dev/null | xargs -I{} du -h {} 2>/dev/null | sort -h | tail -20
-          echo "=== stale Playwright cache ==="
-          du -sh ~/.cache/ms-playwright 2>/dev/null || true
+
+          # Old runner versions (keep newest).
+          if [ -d /opt/github-runner ]; then
+            cd /opt/github-runner
+            LATEST=$(ls -d externals.* 2>/dev/null | sort -V | tail -1)
+            echo "Keeping current runner externals: $LATEST"
+            for d in externals.*/; do
+              d=${d%/}
+              if [ -n "$d" ] && [ "$d" != "$LATEST" ]; then
+                echo "Removing $d"
+                rm -rf "$d"
+              fi
+            done
+            rm -f actions-runner-linux-x64-*.tar.gz
+            cd - >/dev/null
+          fi
+
+          # uv/pip wheel cache (regenerated on demand).
+          rm -rf /opt/winebox/.cache
+
+          # X-Wines source zips (post-ingest).
+          rm -f /opt/winebox/data/xwines/X-Wines_Official_Repository/last/*.zip
+
+          # Stale Playwright cache from a failed previous install.
           rm -rf ~/.cache/ms-playwright
-          echo "=== df -h after cleanup ==="
+
+          echo "=== df -h after ==="
           df -h /
+          true
 
       - name: Install Playwright browsers
         # --with-deps shells out to apt-get on Linux; the droplet's
