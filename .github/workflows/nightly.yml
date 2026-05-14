@@ -139,6 +139,15 @@ jobs:
           du -shx /var/lib/* 2>/dev/null | sort -h | tail -10
           echo "=== /opt/github-runner/_work ==="
           du -shx /opt/github-runner/_work/* 2>/dev/null | sort -h | tail -10
+          echo "=== /opt/winebox/* (3.3 GB) ==="
+          du -shx /opt/winebox/* /opt/winebox/.[!.]* 2>/dev/null | sort -h | tail -15
+          echo "=== /opt/winebox/data/* ==="
+          du -shx /opt/winebox/data/* 2>/dev/null | sort -h | tail -10
+          echo "=== /opt/winebox/data/images count + total ==="
+          find /opt/winebox/data/images -type f 2>/dev/null | wc -l
+          du -shx /opt/winebox/data/images 2>/dev/null
+          echo "=== top 20 single files anywhere ==="
+          find / -xdev -type f -size +20M 2>/dev/null | xargs -I{} du -h {} 2>/dev/null | sort -h | tail -20
           echo "=== stale Playwright cache ==="
           du -sh ~/.cache/ms-playwright 2>/dev/null || true
           rm -rf ~/.cache/ms-playwright
