@@ -110,23 +110,53 @@ async def disable_user(email: str, skip_db_init: bool = False) -> None:
 
 
 async def verify_user(email: str, skip_db_init: bool = False) -> None:
-    """Mark a user's email as verified."""
+    """Mark a user's email as verified.
+
+    Two paths:
+    - Existing user in ``users`` → flip ``is_verified`` on the document.
+    - Pending registration in ``pending_registrations`` → promote it to a
+      verified user document, mirroring what the regstack /verify endpoint
+      does when a user clicks the email link. This keeps operator-driven
+      "approve this pending account" flows working without intercepting
+      the verification email.
+    """
     if not skip_db_init:
         await init_db()
 
-    user = await User.find_one({"email": email})
-    if not user:
+    email_norm = email.lower()
+
+    user = await User.find_one({"email": email_norm})
+    if user is not None:
+        if user.is_verified:
+            print(f"User '{email}' is already verified.")
+            return
+        user.is_verified = True
+        user.updated_at = datetime.now(timezone.utc)
+        await user.save()
+        print(f"User '{email}' has been verified.")
+        return
+
+    # No user record — see if a pending registration is waiting.
+    from winebox.auth.regstack_setup import build_regstack
+
+    rs = build_regstack()
+    pending = await rs.pending.find_by_email(email_norm)
+    if pending is None:
         print(f"Error: User '{email}' not found.")
         sys.exit(1)
 
-    if user.is_verified:
-        print(f"User '{email}' is already verified.")
-        return
+    from regstack.models.user import BaseUser as RegstackUser
 
-    user.is_verified = True
-    user.updated_at = datetime.now(timezone.utc)
-    await user.save()
-    print(f"User '{email}' has been verified.")
+    new_user = RegstackUser(
+        email=pending.email,
+        hashed_password=pending.hashed_password,
+        full_name=pending.full_name,
+        is_active=True,
+        is_verified=True,
+    )
+    await rs.users.create(new_user)
+    await rs.pending.delete_by_email(pending.email)
+    print(f"User '{email}' promoted from pending and verified.")
 
 
 async def enable_user(email: str, skip_db_init: bool = False) -> None:
