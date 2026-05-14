@@ -207,3 +207,30 @@ GitHub Actions only publishes to PyPI (no auto-deploy to production).
 - When taking screenshots of deployed apps, use cache-busting query parameters (e.g., `?v=0.5.0`) or clear browser cache first
 - **Never modify server configuration piecemeal.** Do not SSH into the server to tweak nginx configs, systemd units, or other settings manually. All server configuration changes must go through a clean `invoke deploy` cycle so the full deployment pipeline runs and the server state matches the repo.
 - **Never make a release while CI tests are failing.** Check `gh run list` for recent failures before any release. If CI is failing, diagnose and fix the failures first. Do not deploy with a broken CI pipeline — this includes both unit tests and E2E tests.
+
+### One-shot: legacy auth cleanup before regstack deploys
+
+WineBox embeds `regstack` for registration / login / password reset. The
+first deploy of regstack onto a database that previously ran the
+in-house auth code must drop three pieces of legacy state, or
+`regstack.backend.install_schema()` raises `IndexOptionsConflict` on
+boot and the service won't start:
+
+- `users.email_1` — pre-regstack unnamed unique index on `email`.
+  regstack creates `email_unique` over the same key and Mongo refuses.
+- `revoked_tokens` collection — replaced by regstack's
+  `token_blacklist` (different document shape).
+- `login_attempts` collection — replaced by regstack's own
+  `login_attempts` (different document shape).
+
+The shared `users` collection itself is preserved — existing accounts
+keep their Argon2id hashes and log in unchanged.
+
+Run the cleanup once per environment:
+
+    invoke oat-clear-legacy-auth --confirm
+    WINEBOX_ALLOW_PROD_LEGACY_DROP=1 invoke prod-clear-legacy-auth --confirm
+
+The prod task is gated by a second env var so it can't be invoked by
+accident. Both tasks are idempotent — re-running them on a
+post-migration database is a no-op.
