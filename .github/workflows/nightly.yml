@@ -115,7 +115,13 @@ jobs:
         run: uv sync --all-extras
 
       - name: Install Playwright browsers
-        run: uv run playwright install --with-deps chromium
+        # --with-deps shells out to apt-get on Linux; the droplet's
+        # unattended-upgrades regularly holds /var/lib/apt/lists/lock
+        # and the install fails. Install just the chromium binary;
+        # system libs persist across runs on a long-lived self-hosted
+        # runner, and a missing libnss/libatk surfaces as a clear
+        # browser-launch error rather than a flaky apt lock fight.
+        run: uv run playwright install chromium
 
       - name: Run full E2E tests against OAT
         id: e2e
