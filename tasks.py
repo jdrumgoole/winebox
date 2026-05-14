@@ -1956,6 +1956,24 @@ def oat_logs(ctx: Context, host: str = "", lines: int = 50, follow: bool = False
     )
 
 
+@task(name="oat-repair-runner")
+def oat_repair_runner(ctx: Context, confirm: bool = False) -> None:
+    """Repair the GitHub Actions self-hosted runner on the OAT droplet.
+
+    Used after `/opt/github-runner/externals/` ends up pointing at a
+    missing inode — typically because an overeager disk-cleanup deleted
+    one of the versioned `externals.<v>/` dirs that the canonical path
+    referenced. Re-extracts just the `externals/` tree from the matching
+    runner tarball, preserving the agent's registration and `_work/`.
+
+    Dry-runs by default. Pass ``--confirm`` to actually SSH and run.
+    """
+    cmd = "uv run python scripts/repair_oat_runner.py"
+    if confirm:
+        cmd += " --confirm"
+    ctx.run(cmd, pty=True)
+
+
 @task(name="oat-install-runner")
 def oat_install_runner(ctx: Context, host: str = "", token: str = "", repo: str = "jdrumgoole/winebox") -> None:
     """Install a GitHub Actions self-hosted runner on the OAT droplet.
