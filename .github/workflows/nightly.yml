@@ -115,50 +115,31 @@ jobs:
         run: uv sync --all-extras
 
       - name: Free disk before Playwright install
-        # The OAT droplet is 10 GB total and was sitting at 99 % full.
-        # Disk audit (run 25890973645) revealed three categories of
-        # safely-deletable cruft that accumulate over time:
+        # Idempotent cleanup of safely-recoverable cruft. ~600 MB freed
+        # on the first run, near no-op after.
         #
-        #   - /opt/github-runner/externals.* — superseded runner
-        #     versions left behind after self-update. Keep only the
-        #     newest (sort -V); the live agent is on that one.
-        #   - actions-runner-linux-x64-*.tar.gz — bootstrap install
-        #     archive, never reused after first unpack.
-        #   - /opt/winebox/.cache — uv/pip wheel cache; regenerated
-        #     on demand, no app state.
-        #   - /opt/winebox/data/xwines/.../last/*.zip — X-Wines source
-        #     archives. The unzipped data on the same disk is what
-        #     `oat-deploy-xwines` ingests into Mongo; the zips are
-        #     post-ingest dead weight.
-        #
-        # Idempotent: ~1.2 GB freed on the first run, near-no-op
-        # after. Always exits 0 so a transient `rm` failure on a
-        # phantom file doesn't block the actual E2E.
+        # NOT included (intentionally — see commit history):
+        #   /opt/github-runner/externals.* — superseded runner version
+        #   dirs are hard-linked into the canonical `externals/` tree
+        #   the agent uses; `rm -rf` of any one drops the link count
+        #   on shared inodes and breaks node20 for every subsequent
+        #   job. Cleanup of those has to happen via the runner's own
+        #   reinstall script, not from inside a CI step.
         run: |
           set +e
           echo "=== df -h before ==="
           df -h /
 
-          # Old runner versions (keep newest).
-          if [ -d /opt/github-runner ]; then
-            cd /opt/github-runner
-            LATEST=$(ls -d externals.* 2>/dev/null | sort -V | tail -1)
-            echo "Keeping current runner externals: $LATEST"
-            for d in externals.*/; do
-              d=${d%/}
-              if [ -n "$d" ] && [ "$d" != "$LATEST" ]; then
-                echo "Removing $d"
-                rm -rf "$d"
-              fi
-            done
-            rm -f actions-runner-linux-x64-*.tar.gz
-            cd - >/dev/null
-          fi
+          # The runner-install bootstrap tarball is unpacked once and
+          # never read again — only the unpacked tree (which we
+          # explicitly DO NOT touch) is load-bearing.
+          rm -f /opt/github-runner/actions-runner-linux-x64-*.tar.gz
 
-          # uv/pip wheel cache (regenerated on demand).
+          # uv/pip wheel cache (regenerated on demand, no app state).
           rm -rf /opt/winebox/.cache
 
-          # X-Wines source zips (post-ingest).
+          # X-Wines source zips (post-ingest dead weight; the unzipped
+          # tree next to them is what oat-deploy-xwines reads).
           rm -f /opt/winebox/data/xwines/X-Wines_Official_Repository/last/*.zip
 
           # Stale Playwright cache from a failed previous install.
