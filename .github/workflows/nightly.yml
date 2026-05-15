@@ -154,26 +154,32 @@ jobs:
         run: uv run playwright install chromium
 
       - name: Install Playwright system deps (apt, retry on lock)
-        # Chromium needs libnss3/libatk-bridge2.0-0/libxcomposite/etc.
-        # `playwright install-deps` shells out to `apt-get install` which
-        # contends with the droplet's unattended-upgrades cron for
-        # /var/lib/apt/lists/lock. The lock usually clears in 30–60 s
-        # so retry up to 12 × 10 s = 2 min. apt-get on the second pass
-        # is a near-no-op (already-installed packages), so the retry
-        # cost when there's no lock is one quick `dpkg --status`.
+        # Chromium needs libnss3 / libatk-bridge2.0-0 / libxcomposite /
+        # etc. `playwright install-deps` shells out to apt-get install
+        # which can contend with the droplet's unattended-upgrades cron
+        # for /var/lib/apt/lists/lock. Capture stdout+stderr so a
+        # genuine package-resolution failure isn't masked as "apt
+        # locked" by the retry loop.
         run: |
           set +e
+          LOG=$(mktemp)
           for i in $(seq 1 12); do
-            uv run playwright install-deps chromium
+            uv run playwright install-deps chromium >"$LOG" 2>&1
             rc=$?
             if [ $rc -eq 0 ]; then
               echo "Playwright deps installed on attempt $i."
+              rm -f "$LOG"
               exit 0
             fi
-            echo "Attempt $i failed (rc=$rc) — apt likely locked. Sleeping 10 s."
+            echo "=== attempt $i failed (rc=$rc), output: ==="
+            cat "$LOG"
+            echo "=== sleeping 10 s ==="
             sleep 10
           done
           echo "Playwright deps install never succeeded after 12 attempts." >&2
+          echo "=== last attempt's output: ===" >&2
+          cat "$LOG" >&2
+          rm -f "$LOG"
           exit 1
 
       - name: Run full E2E tests against OAT
