@@ -30,7 +30,7 @@ jobs:
 
       - name: Deploy to OAT (loopback)
         env:
-          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_OAT_MONGODB_URL }}
+          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
           WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
           WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
           WINEBOX_POSTHOG_API_KEY: ${{ secrets.WINEBOX_POSTHOG_API_KEY }}
@@ -187,7 +187,7 @@ jobs:
         continue-on-error: true
         env:
           WINEBOX_TEST_URL: "http://localhost:8000"
-          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_OAT_MONGODB_URL }}
+          WINEBOX_MONGODB_URL: ${{ secrets.WINEBOX_MONGODB_URL }}
           WINEBOX_DATABASE: "winebox_oat"
           WINEBOX_SECRET_KEY: ${{ secrets.WINEBOX_SECRET_KEY }}
           WINEBOX_ANTHROPIC_API_KEY: ${{ secrets.WINEBOX_ANTHROPIC_API_KEY }}
