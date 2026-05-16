@@ -50,7 +50,7 @@ dependencies = [
     "aiohttp>=3.13.4", # CVE-2026-34520 (HTTP response splitting)
     "requests>=2.33.1", # CVE-2026-25645 (local privilege escalation)
     "certifi>=2026.4.22", # refresh stale CA bundle
-    "regstack[mongo]>=0.5.6",
+    "regstack[mongo]>=0.6.0",
 ]
 
 [project.urls]
