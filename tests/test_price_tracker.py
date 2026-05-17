@@ -209,6 +209,26 @@ async def test_invalid_photo_content_type_rejected(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_photo_extension_derived_from_magic_bytes_not_filename(
+    client: AsyncClient, sample_image_bytes: bytes
+) -> None:
+    """A JPEG body uploaded under ``filename='evil.html'`` must land on
+    disk with ``.jpg``, not ``.html`` — otherwise Starlette serves it
+    as text/html and the photo is a stored-XSS vector. Regression for
+    the 2026-05-17 security review WARNING-1.
+    """
+    name = f"Spoofed {uuid.uuid4().hex[:6]}"
+    spoofed = ("evil.html", io.BytesIO(sample_image_bytes), "image/png")
+    body = await _create_price(client, wine_name=name, photo=spoofed)
+    photo_url = body["prices"][0]["photo_url"]
+    assert photo_url is not None
+    assert photo_url.endswith(".png"), (
+        f"Photo URL should end with the magic-byte-derived extension "
+        f"(.png for the test PNG body), not the spoofed .html. Got: {photo_url}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_photo_too_large_rejected(client: AsyncClient) -> None:
     big_photo = ("huge.png", io.BytesIO(b"\x00" * (10 * 1024 * 1024 + 1)), "image/png")
     response = await client.post(
