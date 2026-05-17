@@ -49,6 +49,43 @@ limiter = make_limiter()
 PRICE_PHOTOS_DIR = "price_captures"
 
 
+# Magic-byte signatures for the formats the mobile capture flow accepts.
+# Mirrors `winebox.services.image_storage.detect_image_type` for JPEG /
+# PNG / WebP but ALSO includes HEIC (iPhone default), which the wine-
+# label flow doesn't accept. Inline rather than shared so widening the
+# capture allow-list never accidentally widens the label allow-list.
+_CAPTURE_MAGIC_SIGNATURES: tuple[tuple[bytes, int, str], ...] = (
+    (b"\xff\xd8\xff", 0, "jpg"),
+    (b"\x89PNG\r\n\x1a\n", 0, "png"),
+    (b"RIFF", 0, "webp"),   # WEBP additionally verified at offset 8
+    (b"ftyp", 4, "heic"),    # HEIC brand additionally verified at offset 8
+)
+# Brand identifiers (at offset 8) that mean an ISO BMFF `ftyp` box is
+# carrying HEIC payload. Without this check, an MP4 or QuickTime video
+# would slip past because it shares the same `ftyp` header.
+_HEIC_BRANDS = frozenset({
+    b"heic", b"heix", b"hevc", b"hevx", b"heim", b"heis", b"hevm",
+    b"hevs", b"mif1",
+})
+
+
+def _detect_capture_image_type(content: bytes) -> str | None:
+    """Return the extension (no leading dot) for a recognised capture
+    photo, or ``None`` if the content doesn't match an allowed format.
+    """
+    if len(content) < 12:
+        return None
+    for magic, offset, ext in _CAPTURE_MAGIC_SIGNATURES:
+        if content[offset:offset + len(magic)] != magic:
+            continue
+        if ext == "webp" and content[8:12] != b"WEBP":
+            continue
+        if ext == "heic" and content[8:12] not in _HEIC_BRANDS:
+            continue
+        return ext
+    return None
+
+
 def _photo_storage_path() -> Path:
     """Get the directory for storing price capture photos."""
     path = settings.image_storage_path / PRICE_PHOTOS_DIR
@@ -203,7 +240,18 @@ async def create_price_capture(
         if len(content) > MAX_PHOTO_BYTES:
             raise HTTPException(status_code=422, detail="Photo too large (max 10 MB).")
 
-        ext = photo.filename.rsplit(".", 1)[-1].lower() if "." in photo.filename else "jpg"
+        # Derive the on-disk extension from the file's actual magic bytes,
+        # NOT from `photo.filename`. A client supplying
+        # ``filename="evil.html"`` with a valid JPEG body would otherwise
+        # land a `.html`-suffixed file in storage that Starlette later
+        # serves with `Content-Type: text/html`, which is a stored-XSS
+        # vector even with `X-Content-Type-Options: nosniff` set elsewhere.
+        ext = _detect_capture_image_type(content)
+        if ext is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Photo must be JPEG, PNG, WebP, or HEIC.",
+            )
         filename = f"{uuid.uuid4().hex}.{ext}"
         dest = _photo_storage_path() / filename
         dest.write_bytes(content)
