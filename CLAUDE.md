@@ -163,6 +163,14 @@ Bringing up `admin.winebox.app` from scratch (one-time sequence):
 
 The `[production]` section of `deploy/winebox-admin.toml` controls who can reach `admin.winebox.app`. Same semantics as the OAT allowlist.
 
+#### Renewing the apex landing-page cert
+
+`winebox.app` + `www.winebox.app` share one Let's Encrypt cert. If it expires (or to renew it by hand), run from a machine with SSH access to the droplet:
+
+    invoke prod-ssl                        # issue/renew the apex cert (briefly stops nginx)
+
+This also installs certbot renewal hooks (`/etc/letsencrypt/renewal-hooks/{pre,post}/`) that stop/start nginx around renewals, so unattended `certbot.timer` auto-renew no longer fails on the port-80 conflict. Verify afterwards with `uv run python scripts/check_certs.py`.
+
 Full production release (tests, version bump, PyPI publish, deploy):
 
     invoke deploy
