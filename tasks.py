@@ -2262,3 +2262,39 @@ def push_secrets(ctx: Context) -> None:
             print(f"  {key}: FAILED")
 
     print(f"\nPushed {pushed} secrets, skipped {skipped}.")
+
+
+@task(name="clean-test-dbs")
+def clean_test_dbs(ctx: Context, dry_run: bool = False) -> None:
+    """Drop leftover winebox test databases from the local MongoDB.
+
+    Covers the shared test_winebox DB, isolated-fixture DBs
+    (test_winebox_isolated_*), and stale DBs left by older conftest
+    generations (test_winebox_<hex> per-test, test_winebox_<pid>
+    per-worker). Never touches winebox, winebox-oat, or any other
+    non-test database. Don't run this while a test run is active in
+    another worktree — it drops a live run's isolated DBs too.
+    """
+    from pymongo import MongoClient
+
+    client: MongoClient = MongoClient(
+        "mongodb://localhost:27017", serverSelectionTimeoutMS=2000
+    )
+    try:
+        victims = [
+            name
+            for name in client.list_database_names()
+            if name == "test_winebox" or name.startswith("test_winebox_")
+        ]
+        if not victims:
+            print("no leftover test databases")
+            return
+        for name in victims:
+            if dry_run:
+                print(f"would drop {name}")
+            else:
+                client.drop_database(name)
+        verb = "would drop" if dry_run else "dropped"
+        print(f"{verb} {len(victims)} test database(s)")
+    finally:
+        client.close()

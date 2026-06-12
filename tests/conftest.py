@@ -71,6 +71,22 @@ TEST_MONGODB_URL = os.environ.get("TEST_MONGODB_URL", "mongodb://localhost:27017
 # Shared database name for all xdist workers
 SHARED_TEST_DB = "test_winebox"
 
+# Isolated-DB names carry a per-run token so pytest_sessionfinish can sweep
+# this run's leftovers — including DBs whose fixture teardown never ran
+# (worker crash, -x abort, Ctrl-C between create and drop). The token is
+# minted once in the xdist controller and inherited by workers via env, and
+# scopes the sweep to THIS run only: a parallel test run in another worktree
+# must never have its live DBs dropped out from under it.
+_RUN_TOKEN_ENV = "WINEBOX_TEST_RUN_TOKEN"
+
+
+def _run_token() -> str:
+    return os.environ[_RUN_TOKEN_ENV]
+
+
+def _isolated_db_prefix() -> str:
+    return f"test_winebox_isolated_{_run_token()}_"
+
 
 def pytest_configure(config: pytest.Config) -> None:
     """Drop shared test database before xdist workers start.
@@ -78,6 +94,7 @@ def pytest_configure(config: pytest.Config) -> None:
     Runs only in the master/controller process (workers have 'workerinput').
     Uses sync MongoClient since pytest_configure is synchronous.
     """
+    os.environ.setdefault(_RUN_TOKEN_ENV, uuid.uuid4().hex[:8])
     if not hasattr(config, "workerinput"):
         # Skip local-DB drop when running E2E against a remote target (OAT).
         # Remote E2E jobs don't need a local mongo at all.
@@ -89,6 +106,28 @@ def pytest_configure(config: pytest.Config) -> None:
         sync_client = MongoClient(url, serverSelectionTimeoutMS=2000)
         sync_client.drop_database(SHARED_TEST_DB)
         sync_client.close()
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Sweep this run's isolated DBs in case a fixture teardown never ran."""
+    if hasattr(session.config, "workerinput"):
+        return  # workers exit first; the controller does the sweep
+    if os.environ.get("WINEBOX_TEST_URL"):
+        return
+    from pymongo import MongoClient
+
+    prefix = _isolated_db_prefix()
+    url = os.environ.get("TEST_MONGODB_URL", "mongodb://localhost:27017")
+    try:
+        sync_client = MongoClient(url, serverSelectionTimeoutMS=2000)
+        try:
+            for name in sync_client.list_database_names():
+                if name.startswith(prefix):
+                    sync_client.drop_database(name)
+        finally:
+            sync_client.close()
+    except Exception as e:  # a failed sweep must not mask test results
+        print(f"\nwarning: could not sweep leftover isolated test DBs ({prefix}*): {e}")
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:
@@ -304,7 +343,7 @@ async def isolated_db(mongo_client):
     the new instance. Safe because xdist runs tests sequentially within
     a worker.
     """
-    db_name = f"test_winebox_isolated_{os.getpid()}_{uuid.uuid4().hex[:8]}"
+    db_name = f"{_isolated_db_prefix()}{os.getpid()}_{uuid.uuid4().hex[:8]}"
     await init_db(
         mongo_client=mongo_client, mongodb_database=db_name, skip_indexes=True
     )
