@@ -62,6 +62,7 @@ jobs:
       - name: Install MongoDB (Homebrew)
         run: |
           brew tap mongodb/brew
+          brew trust mongodb/brew
           brew install mongodb-community@7.0
           brew services start mongodb-community@7.0
           # Wait for mongod to accept connections — brew services is
