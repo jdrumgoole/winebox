@@ -1323,6 +1323,9 @@ def rebuild_droplet(
 PROD_DROPLET_NAME = "winebox-production"
 PROD_DOMAIN = "booze.winebox.app"
 PROD_ADMIN_DOMAIN = "admin.winebox.app"
+# Apex landing-page cert. Shares one Let's Encrypt cert under
+# /etc/letsencrypt/live/winebox.app/ (see deploy/nginx-winebox.conf).
+PROD_APEX_DOMAINS = ("winebox.app", "www.winebox.app")
 PROD_ADMIN_SERVICE_FILE = "deploy/winebox-admin.service"
 PROD_WINEBOX_ADMIN = "/opt/winebox/.venv/bin/winebox-admin"
 
@@ -1521,6 +1524,67 @@ def prod_admin_ssl(ctx: Context) -> None:
     print(f"SSL configured for {PROD_ADMIN_DOMAIN}")
     print("\nNext: run `invoke deploy` (or `invoke deploy-only --version X`)")
     print("to publish the nginx config that references the new certs.")
+
+
+@task(name="prod-ssl")
+def prod_ssl(ctx: Context) -> None:
+    """Issue or renew the apex Let's Encrypt cert (winebox.app + www.winebox.app).
+
+    Covers the gap left by `prod-admin-ssl`/`oat-ssl`: the landing-page cert
+    at /etc/letsencrypt/live/winebox.app/ was only ever issued during the
+    one-time `deploy/initialise.py` setup, with no renewal task. Run this to
+    fix an expired apex cert.
+
+    The cert was issued with the standalone authenticator, whose unattended
+    auto-renew (`certbot.timer` -> `certbot renew`) fails whenever nginx is
+    holding port 80 — the likely reason this cert lapsed. To stop that from
+    recurring, this task also installs certbot renewal hooks that stop nginx
+    before a renewal and start it after. The hooks live in
+    /etc/letsencrypt/renewal-hooks/{pre,post}/ and apply to every cert on the
+    box, so all of them auto-renew cleanly from here on. certbot only runs the
+    hooks when a cert is actually due, so day-to-day uptime is unaffected.
+
+    Like the other SSL tasks this briefly stops nginx so certbot's standalone
+    HTTP-01 challenge can bind port 80, taking the public site down for the few
+    seconds certbot needs — run it during a quiet window.
+    """
+    prod_host = _resolve_prod_host()
+    domain_flags = " ".join(f"-d {d}" for d in PROD_APEX_DOMAINS)
+    print(f"Issuing/renewing SSL for {', '.join(PROD_APEX_DOMAINS)} on {prod_host}...")
+
+    from deploy.common import run_ssh
+
+    # Install renewal hooks so unattended `certbot renew` no longer fails on
+    # the port-80 conflict. Idempotent — re-running just rewrites the scripts.
+    run_ssh(
+        prod_host, "root",
+        [
+            "mkdir -p /etc/letsencrypt/renewal-hooks/pre "
+            "/etc/letsencrypt/renewal-hooks/post",
+            "printf '#!/bin/sh\\nsystemctl stop nginx\\n' "
+            "> /etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh",
+            "printf '#!/bin/sh\\nsystemctl start nginx\\n' "
+            "> /etc/letsencrypt/renewal-hooks/post/start-nginx.sh",
+            "chmod +x /etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh "
+            "/etc/letsencrypt/renewal-hooks/post/start-nginx.sh",
+        ],
+    )
+
+    run_ssh(prod_host, "root", "systemctl stop nginx", check=False)
+    try:
+        run_ssh(
+            prod_host, "root",
+            f"certbot certonly --standalone --non-interactive --agree-tos "
+            f"--email support@winebox.app {domain_flags}",
+        )
+    finally:
+        # Always bring nginx back up, even if certbot failed — otherwise the
+        # public site stays down until the operator notices.
+        run_ssh(prod_host, "root", "systemctl start nginx")
+
+    print(f"SSL issued/renewed for {', '.join(PROD_APEX_DOMAINS)}")
+    print("\nVerify from a machine with network access to the host:")
+    print("  uv run python scripts/check_certs.py --hosts winebox.app www.winebox.app")
 
 
 @task(name="generate-test-data")
